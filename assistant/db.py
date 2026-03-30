@@ -13,6 +13,30 @@ from assistant.actions.calendar.intent import CalendarIntent
 
 DB_PATH = os.path.expanduser("~/.assistant_tools/calendar.db")
 
+_CREATE_TODOS_TABLE = """
+CREATE TABLE IF NOT EXISTS todos (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    title           TEXT    NOT NULL,
+    list            TEXT    NOT NULL DEFAULT 'today',
+    completed       INTEGER NOT NULL DEFAULT 0,
+    priority        TEXT    NOT NULL DEFAULT 'none',
+    due_date        TEXT    NOT NULL DEFAULT '',
+    notes           TEXT    NOT NULL DEFAULT '',
+    source          TEXT    NOT NULL DEFAULT 'manual',
+    source_event_id INTEGER,
+    created_at      TEXT    NOT NULL,
+    completed_at    TEXT    NOT NULL DEFAULT ''
+)
+"""
+
+_TODO_MIGRATIONS = [
+    "ALTER TABLE todos ADD COLUMN priority TEXT NOT NULL DEFAULT 'none'",
+    "ALTER TABLE todos ADD COLUMN due_date TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE todos ADD COLUMN notes TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE todos ADD COLUMN source_event_id INTEGER",
+    "ALTER TABLE todos ADD COLUMN completed_at TEXT NOT NULL DEFAULT ''",
+]
+
 _CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS events (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,11 +90,24 @@ class CalendarDB:
         with self._conn() as conn:
             conn.execute(_CREATE_TABLE)
             self._migrate(conn)
+            conn.execute(_CREATE_TODOS_TABLE)
+            self._migrate_todos(conn)
 
     def _migrate(self, conn: sqlite3.Connection) -> None:
         """Apply any missing schema migrations safely."""
         existing = {r[1] for r in conn.execute("PRAGMA table_info(events)")}
         for stmt in _MIGRATIONS:
+            col = stmt.split("ADD COLUMN")[1].strip().split()[0]
+            if col not in existing:
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError:
+                    pass  # already exists
+
+    def _migrate_todos(self, conn: sqlite3.Connection) -> None:
+        """Apply any missing todos schema migrations safely."""
+        existing = {r[1] for r in conn.execute("PRAGMA table_info(todos)")}
+        for stmt in _TODO_MIGRATIONS:
             col = stmt.split("ADD COLUMN")[1].strip().split()[0]
             if col not in existing:
                 try:
@@ -316,6 +353,164 @@ class CalendarDB:
                 (series_id, series_id, from_date),
             )
             return cur.rowcount
+
+    # ------------------------------------------------------------------
+    # Todos: Create
+    # ------------------------------------------------------------------
+
+    def create_todo(
+        self,
+        title: str,
+        list_name: str = "today",
+        priority: str = "none",
+        due_date: str = "",
+        notes: str = "",
+        source: str = "manual",
+        source_event_id: Optional[int] = None,
+    ) -> int:
+        """Insert a new todo item. Returns the new row id."""
+        with self._conn() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO todos
+                    (title, list, completed, priority, due_date, notes,
+                     source, source_event_id, created_at, completed_at)
+                VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, '')
+                """,
+                (
+                    title,
+                    list_name,
+                    priority,
+                    due_date,
+                    notes,
+                    source,
+                    source_event_id,
+                    datetime.datetime.now().isoformat(),
+                ),
+            )
+            return cur.lastrowid
+
+    # ------------------------------------------------------------------
+    # Todos: Read
+    # ------------------------------------------------------------------
+
+    def get_todos(
+        self,
+        list_name: Optional[str] = None,
+        include_completed: bool = True,
+    ) -> List[dict]:
+        """Return todos, optionally filtered by list and/or completion state."""
+        query = "SELECT * FROM todos"
+        conditions: List[str] = []
+        params: List = []
+        if list_name is not None:
+            conditions.append("list = ?")
+            params.append(list_name)
+        if not include_completed:
+            conditions.append("completed = 0")
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY completed ASC, created_at ASC"
+        with self._conn() as conn:
+            rows = conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_todo(self, todo_id: int) -> Optional[dict]:
+        with self._conn() as conn:
+            row = conn.execute("SELECT * FROM todos WHERE id = ?", (todo_id,)).fetchone()
+        return dict(row) if row else None
+
+    def get_todos_by_source(
+        self, source: str, source_event_id: Optional[int] = None
+    ) -> List[dict]:
+        if source_event_id is not None:
+            with self._conn() as conn:
+                rows = conn.execute(
+                    "SELECT * FROM todos WHERE source = ? AND source_event_id = ?",
+                    (source, source_event_id),
+                ).fetchall()
+        else:
+            with self._conn() as conn:
+                rows = conn.execute(
+                    "SELECT * FROM todos WHERE source = ?", (source,)
+                ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
+    # Todos: Update
+    # ------------------------------------------------------------------
+
+    def update_todo(self, todo_id: int, **fields) -> None:
+        allowed = {"title", "list", "completed", "priority", "due_date", "notes", "completed_at"}
+        updates = {k: v for k, v in fields.items() if k in allowed}
+        if not updates:
+            return
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        values = list(updates.values()) + [todo_id]
+        with self._conn() as conn:
+            conn.execute(f"UPDATE todos SET {set_clause} WHERE id = ?", values)
+
+    def toggle_todo_complete(self, todo_id: int) -> bool:
+        """Flip completed flag; update completed_at. Returns new completed state."""
+        todo = self.get_todo(todo_id)
+        if todo is None:
+            return False
+        new_state = 0 if todo["completed"] else 1
+        completed_at = datetime.datetime.now().isoformat() if new_state else ""
+        self.update_todo(todo_id, completed=new_state, completed_at=completed_at)
+        return bool(new_state)
+
+    # ------------------------------------------------------------------
+    # Todos: Delete
+    # ------------------------------------------------------------------
+
+    def delete_todo(self, todo_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute("DELETE FROM todos WHERE id = ?", (todo_id,))
+
+    def delete_todos_by_source(self, source: str) -> int:
+        """Delete all todos with the given source. Returns count deleted."""
+        with self._conn() as conn:
+            cur = conn.execute("DELETE FROM todos WHERE source = ?", (source,))
+            return cur.rowcount
+
+    # ------------------------------------------------------------------
+    # Todos: Calendar Sync
+    # ------------------------------------------------------------------
+
+    def sync_calendar_to_todos(self, list_name: str = "today") -> int:
+        """
+        Pull calendar events into the todos table with source='calendar_sync'.
+        Wipes previous calendar_sync rows for this list first.
+        Returns the count of todos created.
+        """
+        today = datetime.date.today()
+        if list_name == "general":
+            events = self.get_events_for_week(today)
+        else:
+            events = self.get_events_for_day(today)
+
+        # Remove old synced rows for this list before re-inserting
+        with self._conn() as conn:
+            conn.execute(
+                "DELETE FROM todos WHERE source = 'calendar_sync' AND list = ?",
+                (list_name,),
+            )
+
+        count = 0
+        for ev in events:
+            self.create_todo(
+                title=ev["title"],
+                list_name=list_name,
+                source="calendar_sync",
+                source_event_id=ev["id"],
+            )
+            count += 1
+        return count
+
+    # ------------------------------------------------------------------
+    # Util
+    # ------------------------------------------------------------------
 
     def clear_all(self) -> None:
         """Wipe all events from the database."""

@@ -60,6 +60,41 @@ cp config.example.yaml config.yaml
 - **The easy way:** Double-click `Launch Calendar.command` in the Finder.
 - **The terminal way:** Run `python -m assistant.main`.
 
+### Views
+- **Month / Week / Day** — Switch between views using the toolbar buttons.
+- The **Day view** shows a full hourly timeline for any single date with a live red current-time indicator.
+- **Tasks** — Apple Reminders-style task panel with Today and General lists (see below).
+
+### Morning Briefing
+Click the **🌅 Brief Me** button in the Day view (or ask via voice) to have your assistant read today's full schedule aloud — great for hands-free mornings.
+
+Voice triggers: *"What does my day look like?"*, *"When is my first meeting?"*, *"What's next?"*, *"How many events do I have today?"*
+
+### Tasks View
+Switch to **Tasks** in the toolbar to manage your todo list with two sections:
+
+| Section | Purpose |
+|---------|---------|
+| **Today** | Tasks for today. Click **🔄 Sync Today** to pull in today's calendar events automatically. |
+| **General** | Ongoing or someday tasks, independent of any date. |
+
+**Manual editing:** Click any task title to edit it inline. Click the checkbox to complete it. Hover to reveal the × delete button. Click **+ New Task** to add from the keyboard.
+
+**Calendar sync:** The **🔄 Sync Today** button in the Today header pulls all of today's calendar events into your Today list as tasks. The ⚙ gear offers additional sync options (upcoming week → General list, or clear synced tasks).
+
+**Voice commands (Tasks mode):**
+When the Tasks tab is active, the mic button enters *Tasks mode* — voice commands are automatically biased towards task actions:
+- *"Add task buy groceries"* — adds a single task
+- *"Add tasks: buy milk, call dentist, walk the dog"* — adds multiple tasks at once
+- *"Mark buy milk done"* / *"Check off call dentist"* — complete a task
+- *"Delete buy groceries"* / *"Remove it"* — delete by title or by anaphoric "it"
+- *"Rename buy milk to buy oat milk"* — update a task
+- *"Move call dentist to general list"* — change list
+- *"What tasks do I have today?"* — read out the list (switches to Tasks view)
+
+> [!TIP]
+> **Context Memory:** Within the Tasks view, "it" and "that task" always refer to the last task you created or modified.
+
 ### Interacting with Voice
 1. **Trigger:** Press the hotkey (`Cmd+Shift+Space`) to start listening.
 2. **Speak:** State your request clearly (e.g., *"Schedule a dentist appointment for tomorrow at 2 PM"* or *"Cancel my meeting with Alex"*).
@@ -67,7 +102,7 @@ cp config.example.yaml config.yaml
 4. **Autonomous Mode:** You can toggle "Auto-Approve" in the **⚙️ Settings** icon in the UI to skip confirmation dialogs.
 
 > [!TIP]
-> **Context Memory:** You can refer to the last event you created by saying "delete **it**" or "move **that event**".
+> **Context Memory:** You can refer to the last event you created by saying "delete **it**" or "move **that event**". Same works for tasks.
 
 ## 🔒 Security & Privacy
 - **LLM Choices:** By default, everything is local and private using Ollama. If you switch to `openai`, `gemini`, or `claude`, your transcripts will be sent to the respective provider's API.
@@ -78,7 +113,17 @@ cp config.example.yaml config.yaml
 ## 🧪 Testing
 A comprehensive test suite is provided to verify model reasoning and database logic:
 ```bash
+# Calendar voice command tests (requires Ollama running)
 python tests/test_ollama_parser.py
+
+# Todo feature tests — direct execution (no LLM required)
+python tests/test_todo_parser.py --direct
+
+# Todo feature tests — full LLM routing (requires Ollama running)
+python tests/test_todo_parser.py
+
+# Full unit test suite
+pytest tests/
 ```
 
 ## 🤖 For Developers & AI Assistants

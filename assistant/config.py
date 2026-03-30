@@ -78,6 +78,17 @@ class TTSConfig(BaseModel):
     rate: int = 200
 
 
+class TodoSyncConfig(BaseModel):
+    mode: Literal["today", "general", "off"] = "off"
+    auto_sync_on_open: bool = False
+
+
+class TodoConfig(BaseModel):
+    sync: TodoSyncConfig = TodoSyncConfig()
+    show_completed: bool = False
+    default_list: Literal["today", "general"] = "today"
+
+
 class AppConfig(BaseModel):
     hotkey: HotkeyConfig
     stt_engine: Literal["whisper", "google"] = "whisper"
@@ -92,6 +103,7 @@ class AppConfig(BaseModel):
     confirmation_level: int = 1
     audio: AudioConfig = AudioConfig()
     tts: TTSConfig = TTSConfig()
+    todo: TodoConfig = TodoConfig()
 
     @field_validator("confirmation_level")
     @classmethod

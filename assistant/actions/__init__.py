@@ -66,7 +66,7 @@ class ActionRegistry:
         upcoming_str = "\n".join(upcoming)
 
         lines = [
-            "You are a voice assistant intent parser for a calendar application.",
+            "You are a voice assistant intent parser for a calendar and task management application.",
             f"Today is {day_name}, {today}. Timezone: {timezone}.",
             "",
             "Upcoming date reference (use these to resolve relative dates):",
@@ -79,6 +79,12 @@ class ActionRegistry:
             "If the user's transcript contains multiple distinct events, times, or tasks (e.g. 'Set a meeting at 10am and another at 2pm'), extract each as a separate object in the 'actions' array.",
             "",
             'Use action="unknown" with parameters={} if no action matches.',
+            "",
+            "VIEW CONTEXT: If the transcript starts with '[TASKS VIEW]', the user is looking at their",
+            "task list. In this context, strongly prefer todo actions (create_todo, complete_todo,",
+            "delete_todo, update_todo, query_todos) for ambiguous commands like 'add groceries' or",
+            "'remove milk'. Only use calendar actions if the user explicitly mentions times, dates,",
+            "meetings, or events.",
             "",
             "Registered actions and what triggers them:",
         ]

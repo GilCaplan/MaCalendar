@@ -1,7 +1,7 @@
 """Base classes for the action plugin system."""
 
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Type
+from typing import Any, ClassVar, Optional, Type
 
 from pydantic import BaseModel
 
@@ -32,6 +32,9 @@ class BaseAction(ABC):
     # JSON Schema fragment describing the 'parameters' object.
     # Used in the Ollama system prompt to teach the LLM what fields to emit.
     parameters_schema: ClassVar[dict]
+    # Optional: set to a status string (e.g. "switch_today") to signal the UI
+    # to perform a view switch after this action executes.
+    view_switch: ClassVar[Optional[str]] = None
 
     @abstractmethod
     def execute(self, intent: BaseIntent, config: Any) -> str:

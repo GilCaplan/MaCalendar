@@ -11,6 +11,7 @@ import sys
 # here to activate additional plugins.
 # ---------------------------------------------------------------------------
 import assistant.actions.calendar  # noqa: F401  registers CreateEventAction
+import assistant.actions.todo      # noqa: F401  registers todo actions
 
 from assistant.actions import registry
 from assistant.calendar_ui.window import CalendarWindow
@@ -73,7 +74,7 @@ def main() -> None:
     # ------------------------------------------------------------------
     # Launch calendar window (blocks until closed)
     # ------------------------------------------------------------------
-    window = CalendarWindow(pipeline)
+    window = CalendarWindow(pipeline, config=config)
     window.show()
 
     sys.exit(app.exec())

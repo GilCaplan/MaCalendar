@@ -68,6 +68,8 @@ class Pipeline:
         self._phase = STATUS_IDLE  # tracks current stage for button re-press logic
 
         self.on_auth_expired: Optional[Callable[[], None]] = None
+        # Set by the UI when the active view changes; used to inject parse context
+        self.current_view: str = "month"
 
     def trigger(self) -> None:
         """Called by HotkeyListener or mic button."""
@@ -145,6 +147,11 @@ class Pipeline:
 
         # Strip stop keywords from the tail of the transcript
         transcript = _strip_stop_keyword(transcript)
+
+        # Inject view context so the LLM biases routing appropriately
+        if self.current_view == "todo":
+            transcript = "[TASKS VIEW] " + transcript
+
         logger.info("Transcript (cleaned): %s", transcript)
         snippet = transcript[:60] + ("…" if len(transcript) > 60 else "")
         self._set_status(STATUS_PROCESSING, f'💭 "{snippet}"')
@@ -210,8 +217,14 @@ class Pipeline:
 
         if results:
             summary = " ".join(results)
-            # Show brief UI toast with the result
-            self._set_status("refresh", results[0][:80])
+            # Check if any executed action requested a UI view switch
+            view_switch = next(
+                (getattr(self.registry.get(n), "view_switch", None) for n, _ in valid
+                 if getattr(self.registry.get(n), "view_switch", None)),
+                None,
+            )
+            ui_status = view_switch if view_switch else "refresh"
+            self._set_status(ui_status, results[0][:80])
             self._tts.speak(summary)
             time.sleep(2)
 

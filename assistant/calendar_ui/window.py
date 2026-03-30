@@ -28,6 +28,7 @@ from PyQt6.QtWidgets import (
     QSpinBox,
 )
 
+from assistant.calendar_ui.day_view import DayView
 from assistant.calendar_ui.event_dialog import EventDialog
 from assistant.calendar_ui.month_view import MonthView
 from assistant.calendar_ui.sidebar import Sidebar
@@ -45,6 +46,19 @@ from assistant.pipeline import (
 )
 
 STATUS_REFRESH = "refresh"
+STATUS_SWITCH_TODAY = "switch_today"
+STATUS_SWITCH_TODO = "switch_todo"
+
+
+def _fmt_time(time_str: str) -> str:
+    """Convert '14:30' → '2:30 PM'."""
+    try:
+        h, m = map(int, time_str.split(":"))
+        period = "AM" if h < 12 else "PM"
+        h12 = h % 12 or 12
+        return f"{h12}:{m:02d} {period}" if m else f"{h12} {period}"
+    except Exception:
+        return time_str
 
 _MIC_ICONS = {
     STATUS_IDLE: "🎙",
@@ -53,6 +67,8 @@ _MIC_ICONS = {
     STATUS_DONE: "✅",
     STATUS_ERROR: "⚠️",
     STATUS_REFRESH: "✅",
+    STATUS_SWITCH_TODAY: "✅",
+    STATUS_SWITCH_TODO: "✅",
 }
 
 _MIC_OBJ_NAMES = {
@@ -62,6 +78,8 @@ _MIC_OBJ_NAMES = {
     STATUS_DONE: "mic_idle",
     STATUS_ERROR: "mic_idle",
     STATUS_REFRESH: "mic_idle",
+    STATUS_SWITCH_TODAY: "mic_idle",
+    STATUS_SWITCH_TODO: "mic_idle",
 }
 
 
@@ -102,12 +120,13 @@ class CalendarWindow(QMainWindow):
     A QTimer drains the queue on the main thread every 100ms.
     """
 
-    def __init__(self, pipeline=None, parent=None):
+    def __init__(self, pipeline=None, config=None, parent=None):
         super().__init__(parent)
         self._pipeline = pipeline
+        self._config = config
         self._db = CalendarDB()
         self._current_date = datetime.date.today()
-        self._view_mode = "month"  # "month" or "week"
+        self._view_mode = "month"  # "month" | "week" | "day" | "todo"
 
         self._dark = False
 
@@ -117,6 +136,10 @@ class CalendarWindow(QMainWindow):
         self.setStyleSheet(get_app_style(False))
 
         self._build_ui()
+
+        # Auto-sync todos from calendar on open if configured
+        if config and config.todo.sync.auto_sync_on_open and config.todo.sync.mode != "off":
+            self._db.sync_calendar_to_todos(list_name=config.todo.sync.mode)
 
         # Poll pipeline status queue
         if pipeline is not None:
@@ -151,17 +174,25 @@ class CalendarWindow(QMainWindow):
         self._sidebar.date_selected.connect(self._on_sidebar_date)
         splitter.addWidget(self._sidebar)
 
-        # Stacked: month / week
+        # Stacked: month / week / day / todo
+        from assistant.calendar_ui.todo_view import TodoView
         self._stack = QStackedWidget()
         self._month_view = MonthView(self._db)
         self._week_view = WeekView(self._db)
+        self._day_view = DayView(self._db)
+        self._todo_view = TodoView(self._db, config=self._config)
         self._stack.addWidget(self._month_view)
         self._stack.addWidget(self._week_view)
+        self._stack.addWidget(self._day_view)
+        self._stack.addWidget(self._todo_view)
         self._month_view.date_selected.connect(self._on_day_selected)
         self._month_view.date_double_clicked.connect(self._on_day_double_clicked)
         self._month_view.event_clicked.connect(self._on_event_clicked)
         self._week_view.datetime_double_clicked.connect(self._on_datetime_double_clicked)
         self._week_view.event_clicked.connect(self._on_event_clicked)
+        self._day_view.datetime_double_clicked.connect(self._on_datetime_double_clicked)
+        self._day_view.event_clicked.connect(self._on_event_clicked)
+        self._day_view.briefing_requested.connect(self._on_briefing_requested)
         splitter.addWidget(self._stack)
 
         splitter.setSizes([200, 900])
@@ -214,7 +245,7 @@ class CalendarWindow(QMainWindow):
         layout.addStretch()
 
         # View toggle
-        for label, mode in [("Month", "month"), ("Week", "week")]:
+        for label, mode in [("Month", "month"), ("Week", "week"), ("Day", "day"), ("Tasks", "todo")]:
             btn = QPushButton(label)
             btn.setObjectName("view_btn")
             btn.setProperty("active", mode == self._view_mode)
@@ -274,19 +305,27 @@ class CalendarWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def _on_prev(self) -> None:
+        if self._view_mode == "todo":
+            return
         if self._view_mode == "month":
             d = self._current_date.replace(day=1) - datetime.timedelta(days=1)
             self._current_date = d.replace(day=1)
-        else:
+        elif self._view_mode == "week":
             self._current_date -= datetime.timedelta(weeks=1)
+        else:  # day
+            self._current_date -= datetime.timedelta(days=1)
         self._navigate()
 
     def _on_next(self) -> None:
+        if self._view_mode == "todo":
+            return
         if self._view_mode == "month":
             d = self._current_date.replace(day=28) + datetime.timedelta(days=4)
             self._current_date = d.replace(day=1)
-        else:
+        elif self._view_mode == "week":
             self._current_date += datetime.timedelta(weeks=1)
+        else:  # day
+            self._current_date += datetime.timedelta(days=1)
         self._navigate()
 
     def _on_today(self) -> None:
@@ -302,27 +341,53 @@ class CalendarWindow(QMainWindow):
         self._update_title()
 
     def _navigate(self) -> None:
+        if self._view_mode == "todo":
+            self._update_title()
+            return
         if self._view_mode == "month":
             self._month_view.navigate(self._current_date.year, self._current_date.month)
-        else:
+        elif self._view_mode == "week":
             week_start = self._current_date - datetime.timedelta(days=self._current_date.weekday())
             self._week_view.navigate(week_start)
+        else:  # day
+            self._day_view.navigate(self._current_date)
         self._update_title()
 
     def _set_view(self, mode: str) -> None:
         self._view_mode = mode
-        self._stack.setCurrentWidget(self._month_view if mode == "month" else self._week_view)
-        for m in ("month", "week"):
-            btn = getattr(self, f"_view_btn_{m}")
-            btn.setProperty("active", m == mode)
-            btn.style().unpolish(btn)
-            btn.style().polish(btn)
+        widget = {
+            "month": self._month_view,
+            "week": self._week_view,
+            "day": self._day_view,
+            "todo": self._todo_view,
+        }.get(mode, self._month_view)
+        self._stack.setCurrentWidget(widget)
+        for m in ("month", "week", "day", "todo"):
+            btn = getattr(self, f"_view_btn_{m}", None)
+            if btn:
+                btn.setProperty("active", m == mode)
+                btn.style().unpolish(btn)
+                btn.style().polish(btn)
+        # Keep pipeline context-aware of current view for voice routing
+        if self._pipeline is not None:
+            self._pipeline.current_view = mode
+            if mode == "todo":
+                self._mic_btn.setToolTip(
+                    "Tasks mode — voice commands will create/manage tasks\n"
+                    "Click or press Cmd+Shift+Space to speak"
+                )
+            else:
+                self._mic_btn.setToolTip(
+                    "Click or press Cmd+Shift+Space to activate voice assistant"
+                )
         self._navigate()
 
     def _update_title(self) -> None:
-        if self._view_mode == "month":
+        if self._view_mode == "todo":
+            self._title_label.setText("Tasks")
+        elif self._view_mode == "month":
             self._title_label.setText(self._current_date.strftime("%B %Y"))
-        else:
+        elif self._view_mode == "week":
             week_start = self._current_date - datetime.timedelta(days=self._current_date.weekday())
             week_end = week_start + datetime.timedelta(days=6)
             if week_start.month == week_end.month:
@@ -333,6 +398,8 @@ class CalendarWindow(QMainWindow):
                 self._title_label.setText(
                     f"{week_start.strftime('%b %-d')} – {week_end.strftime('%b %-d, %Y')}"
                 )
+        else:  # day
+            self._title_label.setText(self._current_date.strftime("%A, %B %-d, %Y"))
 
     # ------------------------------------------------------------------
     # Event actions
@@ -425,13 +492,27 @@ class CalendarWindow(QMainWindow):
 
         if status == STATUS_REFRESH:
             self.refresh_calendar()
+            self.refresh_todos()
+        elif status == STATUS_SWITCH_TODAY:
+            self._current_date = datetime.date.today()
+            self._set_view("day")
+        elif status == STATUS_SWITCH_TODO:
+            self._set_view("todo")
+            self.refresh_todos()
 
     def refresh_calendar(self) -> None:
         """Reload events from DB in the active view."""
         if self._view_mode == "month":
             self._month_view.refresh()
-        else:
+        elif self._view_mode == "week":
             self._week_view.refresh()
+        elif self._view_mode != "todo":
+            self._day_view.refresh()
+
+    def refresh_todos(self) -> None:
+        """Reload todos from DB in the TodoView."""
+        if hasattr(self, "_todo_view"):
+            self._todo_view.refresh()
 
     def show_toast(self, message: str) -> None:
         self._toast.show_message(message)
@@ -463,7 +544,10 @@ class CalendarWindow(QMainWindow):
         self.setStyleSheet(get_app_style(dark))
         self._month_view.apply_theme(dark)
         self._week_view.apply_theme(dark)
+        self._day_view.apply_theme(dark)
         self._sidebar.apply_theme(dark)
+        if hasattr(self, "_todo_view"):
+            self._todo_view.apply_theme(dark)
         # Re-style toolbar
         bg = _styles.D_WHITE if dark else WHITE
         border = _styles.D_GRAY_BORDER if dark else GRAY_BORDER
@@ -472,6 +556,33 @@ class CalendarWindow(QMainWindow):
         )
         self._theme_btn.setText("☀️" if dark else "🌙")
         self.show_toast("Dark mode on" if dark else "Light mode on")
+
+    def _on_briefing_requested(self) -> None:
+        """Query today's events and read them aloud via TTS."""
+        import threading as _threading
+        events = self._db.get_events_for_day(datetime.date.today())
+        events = sorted(events, key=lambda e: e.get("start_time", ""))
+        n = len(events)
+
+        if n == 0:
+            summary = "Your schedule is clear today. Nothing planned."
+        elif n == 1:
+            ev = events[0]
+            t = _fmt_time(ev.get("start_time", ""))
+            summary = f"You have one event today: {ev['title']} at {t}."
+        else:
+            parts = [f"{ev['title']} at {_fmt_time(ev.get('start_time', ''))}" for ev in events]
+            if len(parts) == 2:
+                schedule = f"{parts[0]} and {parts[1]}"
+            else:
+                schedule = ", ".join(parts[:-1]) + f", and {parts[-1]}"
+            summary = f"You have {n} events today: {schedule}."
+
+        self.show_toast(summary[:80])
+        if self._pipeline:
+            _threading.Thread(
+                target=lambda: self._pipeline._tts.speak(summary), daemon=True
+            ).start()
 
     def _on_settings_popup(self) -> None:
         if not self._pipeline:

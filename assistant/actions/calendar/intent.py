@@ -46,3 +46,9 @@ class DeleteEventIntent(BaseIntent):
     """Intent for deleting an existing event — match by title + optional date."""
     match_title: str
     match_date: Optional[str] = None  # narrow by date if provided
+
+
+class QueryScheduleIntent(BaseIntent):
+    """Intent for querying and reading out the user's schedule."""
+    scope: str = "today"        # "today" | "tomorrow" | "week"
+    query_type: str = "full"    # "full" | "first" | "next" | "count"

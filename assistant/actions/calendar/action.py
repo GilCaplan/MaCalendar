@@ -4,7 +4,7 @@ from typing import ClassVar, List, Optional, Type
 
 from assistant.actions import register
 from assistant.actions.base import BaseAction, BaseIntent
-from assistant.actions.calendar.intent import CalendarIntent, DeleteEventIntent, UpdateEventIntent
+from assistant.actions.calendar.intent import CalendarIntent, DeleteEventIntent, QueryScheduleIntent, UpdateEventIntent
 
 
 # Global memory to remember the most recently created or modified event
@@ -157,6 +157,115 @@ class DeleteEventAction(BaseAction):
         db.delete_event(event["id"])
         _last_event_id = None
         return f"Deleted '{event['title']}' from your calendar."
+
+
+# ---------------------------------------------------------------------------
+# Query Schedule
+# ---------------------------------------------------------------------------
+
+@register
+class QueryScheduleAction(BaseAction):
+    action_name: ClassVar[str] = "query_schedule"
+    view_switch: ClassVar[str] = "switch_today"
+    description: ClassVar[str] = (
+        "Query and read out the user's schedule. Triggers on phrases like "
+        "'what does my day look like', 'what's on my schedule', 'when is my first meeting', "
+        "'how many events do I have today', 'read my schedule', 'what's next'."
+    )
+    intent_model: ClassVar[Type[BaseIntent]] = QueryScheduleIntent
+    parameters_schema: ClassVar[dict] = {
+        "type": "object",
+        "properties": {
+            "scope": {
+                "type": "string",
+                "enum": ["today", "tomorrow", "week"],
+                "description": "Time range to query. Default: 'today'.",
+            },
+            "query_type": {
+                "type": "string",
+                "enum": ["full", "first", "next", "count"],
+                "description": (
+                    "'full' = read all events, 'first' = first event only, "
+                    "'next' = next upcoming event, 'count' = how many events."
+                ),
+            },
+        },
+        "required": [],
+    }
+
+    def execute(self, intent: QueryScheduleIntent, _config) -> str:  # type: ignore[override]
+        import datetime as dt
+        from assistant.db import CalendarDB
+        db = CalendarDB()
+
+        today = dt.date.today()
+        if intent.scope == "tomorrow":
+            target_date = today + dt.timedelta(days=1)
+            day_label = "tomorrow"
+        elif intent.scope == "week":
+            day_label = "this week"
+        else:
+            target_date = today
+            day_label = "today"
+
+        if intent.scope == "week":
+            week_start = today - dt.timedelta(days=today.weekday())
+            events = db.get_events_for_week(week_start)
+        else:
+            events = db.get_events_for_day(target_date)
+
+        events = sorted(events, key=lambda e: e.get("start_time", ""))
+        n = len(events)
+
+        if intent.query_type == "count":
+            if n == 0:
+                return f"You have no events {day_label}."
+            return f"You have {n} event{'s' if n != 1 else ''} {day_label}."
+
+        if n == 0:
+            return f"Your schedule is clear {day_label}. Nothing planned."
+
+        if intent.query_type == "first":
+            ev = events[0]
+            return f"Your first event {day_label} is {ev['title']} at {_fmt_time(ev.get('start_time', ''))}."
+
+        if intent.query_type == "next":
+            now_time = dt.datetime.now().strftime("%H:%M")
+            upcoming = [e for e in events if e.get("start_time", "") >= now_time]
+            if not upcoming:
+                return f"No more events for {day_label}."
+            ev = upcoming[0]
+            return f"Your next event is {ev['title']} at {_fmt_time(ev.get('start_time', ''))}."
+
+        # "full" — read the whole schedule
+        if n == 1:
+            ev = events[0]
+            return (
+                f"You have one event {day_label}: "
+                f"{ev['title']} at {_fmt_time(ev.get('start_time', ''))}."
+            )
+
+        parts = [
+            f"{ev['title']} at {_fmt_time(ev.get('start_time', ''))}"
+            for ev in events
+        ]
+        # Oxford-style list
+        if len(parts) == 2:
+            schedule = f"{parts[0]} and {parts[1]}"
+        else:
+            schedule = ", ".join(parts[:-1]) + f", and {parts[-1]}"
+        return f"You have {n} events {day_label}: {schedule}."
+
+
+def _fmt_time(time_str: str) -> str:
+    """Convert '14:30' → '2:30 PM'."""
+    try:
+        h, m = map(int, time_str.split(":"))
+        period = "AM" if h < 12 else "PM"
+        h12 = h % 12 or 12
+        return f"{h12}:{m:02d} {period}" if m else f"{h12} {period}"
+    except Exception:
+        return time_str
 
 
 # ---------------------------------------------------------------------------
