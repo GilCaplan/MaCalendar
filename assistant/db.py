@@ -1,0 +1,326 @@
+"""SQLite-backed local calendar event storage."""
+
+from __future__ import annotations
+
+import calendar
+import datetime
+import os
+import sqlite3
+from contextlib import contextmanager
+from typing import Generator, List, Optional
+
+from assistant.actions.calendar.intent import CalendarIntent
+
+DB_PATH = os.path.expanduser("~/.assistant_tools/calendar.db")
+
+_CREATE_TABLE = """
+CREATE TABLE IF NOT EXISTS events (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    title          TEXT    NOT NULL,
+    date           TEXT    NOT NULL,
+    start_time     TEXT    NOT NULL,
+    end_time       TEXT    NOT NULL,
+    attendees      TEXT    NOT NULL DEFAULT '',
+    location       TEXT    NOT NULL DEFAULT '',
+    description    TEXT    NOT NULL DEFAULT '',
+    color          TEXT    NOT NULL DEFAULT '#0078d4',
+    created_at     TEXT    NOT NULL,
+    series_id      INTEGER,               -- NULL = not recurring; shared by all instances
+    recurrence     TEXT    NOT NULL DEFAULT '',   -- '' | 'daily' | 'weekly' | 'monthly'
+    recurrence_end TEXT    NOT NULL DEFAULT ''    -- '' or ISO date (last allowed date)
+)
+"""
+
+# Columns added after initial release — migrated on first open
+_MIGRATIONS = [
+    "ALTER TABLE events ADD COLUMN series_id INTEGER",
+    "ALTER TABLE events ADD COLUMN recurrence TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE events ADD COLUMN recurrence_end TEXT NOT NULL DEFAULT ''",
+]
+
+
+def _next_date(d: datetime.date, recurrence: str) -> datetime.date:
+    """Advance d by one recurrence period."""
+    if recurrence == "daily":
+        return d + datetime.timedelta(days=1)
+    if recurrence == "weekly":
+        return d + datetime.timedelta(weeks=1)
+    if recurrence == "monthly":
+        month = d.month + 1
+        year = d.year
+        if month > 12:
+            month = 1
+            year += 1
+        # Clamp day to the last valid day of the target month
+        max_day = calendar.monthrange(year, month)[1]
+        return datetime.date(year, month, min(d.day, max_day))
+    raise ValueError(f"Unknown recurrence: {recurrence!r}")
+
+
+class CalendarDB:
+    """Thread-safe SQLite calendar event store."""
+
+    def __init__(self, path: str = DB_PATH) -> None:
+        self.path = path
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with self._conn() as conn:
+            conn.execute(_CREATE_TABLE)
+            self._migrate(conn)
+
+    def _migrate(self, conn: sqlite3.Connection) -> None:
+        """Apply any missing schema migrations safely."""
+        existing = {r[1] for r in conn.execute("PRAGMA table_info(events)")}
+        for stmt in _MIGRATIONS:
+            col = stmt.split("ADD COLUMN")[1].strip().split()[0]
+            if col not in existing:
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError:
+                    pass  # already exists
+
+    @contextmanager
+    def _conn(self) -> Generator[sqlite3.Connection, None, None]:
+        conn = sqlite3.connect(self.path)
+        conn.row_factory = sqlite3.Row
+        try:
+            yield conn
+            conn.commit()
+        finally:
+            conn.close()
+
+    # ------------------------------------------------------------------
+    # Create
+    # ------------------------------------------------------------------
+
+    def create_event(self, intent: CalendarIntent, color: str = "#0078d4") -> int:
+        """Insert a single event (or first instance of a series). Returns new row id."""
+        recurrence = getattr(intent, "recurrence", None) or ""
+        recur_until = getattr(intent, "recur_until", None) or ""
+
+        with self._conn() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO events
+                    (title, date, start_time, end_time, attendees, location, description,
+                     color, created_at, series_id, recurrence, recurrence_end)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    intent.title,
+                    intent.date,
+                    intent.start_time,
+                    intent.end_time,
+                    ", ".join(intent.attendees),
+                    intent.location or "",
+                    intent.description or "",
+                    color,
+                    datetime.datetime.now().isoformat(),
+                    None,       # series_id set below if recurring
+                    recurrence,
+                    recur_until,
+                ),
+            )
+            first_id = cur.lastrowid
+
+            if recurrence:
+                # Create all subsequent instances and link them with series_id
+                self._create_series_instances(
+                    conn, first_id, intent, recurrence, recur_until, color
+                )
+
+        return first_id
+
+    def _create_series_instances(
+        self,
+        conn: sqlite3.Connection,
+        first_id: int,
+        intent: CalendarIntent,
+        recurrence: str,
+        recur_until: str,
+        color: str,
+    ) -> None:
+        """Generate and insert all recurrence instances; also back-fill series_id on first row."""
+        end_date = (
+            datetime.date.fromisoformat(recur_until)
+            if recur_until
+            else datetime.date.fromisoformat(intent.date) + datetime.timedelta(days=365)
+        )
+
+        # Back-fill series_id on the first (already inserted) row
+        conn.execute("UPDATE events SET series_id = ? WHERE id = ?", (first_id, first_id))
+
+        current = datetime.date.fromisoformat(intent.date)
+        count = 0
+        max_instances = 500  # hard safety cap
+
+        while count < max_instances:
+            current = _next_date(current, recurrence)
+            if current > end_date:
+                break
+            conn.execute(
+                """
+                INSERT INTO events
+                    (title, date, start_time, end_time, attendees, location, description,
+                     color, created_at, series_id, recurrence, recurrence_end)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    intent.title,
+                    current.isoformat(),
+                    intent.start_time,
+                    intent.end_time,
+                    ", ".join(intent.attendees),
+                    intent.location or "",
+                    intent.description or "",
+                    color,
+                    datetime.datetime.now().isoformat(),
+                    first_id,
+                    recurrence,
+                    recur_until,
+                ),
+            )
+            count += 1
+
+    def create_event_from_dict(self, data: dict) -> int:
+        """Create an event from a plain dict (used by EventDialog)."""
+        recurrence = data.get("recurrence", "")
+        recur_until = data.get("recurrence_end", "")
+
+        with self._conn() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO events
+                    (title, date, start_time, end_time, attendees, location, description,
+                     color, created_at, series_id, recurrence, recurrence_end)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    data["title"],
+                    data["date"],
+                    data["start_time"],
+                    data["end_time"],
+                    data.get("attendees", ""),
+                    data.get("location", ""),
+                    data.get("description", ""),
+                    data.get("color", "#0078d4"),
+                    datetime.datetime.now().isoformat(),
+                    None,
+                    recurrence,
+                    recur_until,
+                ),
+            )
+            first_id = cur.lastrowid
+
+            if recurrence:
+                # Build a minimal intent-like object for _create_series_instances
+                class _FakeIntent:
+                    title = data["title"]
+                    date = data["date"]
+                    start_time = data["start_time"]
+                    end_time = data["end_time"]
+                    attendees: list = []
+                    location = data.get("location", "")
+                    description = data.get("description", "")
+
+                self._create_series_instances(
+                    conn, first_id, _FakeIntent(), recurrence, recur_until,
+                    data.get("color", "#0078d4")
+                )
+
+        return first_id
+
+    # ------------------------------------------------------------------
+    # Read
+    # ------------------------------------------------------------------
+
+    def get_events_for_month(self, year: int, month: int) -> List[dict]:
+        """Return all events whose date falls in the given month."""
+        prefix = f"{year:04d}-{month:02d}"
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM events WHERE date LIKE ? ORDER BY date, start_time",
+                (f"{prefix}%",),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_events_for_week(self, start_date: datetime.date) -> List[dict]:
+        """Return events for the 7 days starting from start_date."""
+        end_date = start_date + datetime.timedelta(days=6)
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM events WHERE date >= ? AND date <= ? ORDER BY date, start_time",
+                (start_date.isoformat(), end_date.isoformat()),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_events_for_day(self, date: datetime.date) -> List[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM events WHERE date = ? ORDER BY start_time",
+                (date.isoformat(),),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_event(self, event_id: int) -> Optional[dict]:
+        with self._conn() as conn:
+            row = conn.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
+        return dict(row) if row else None
+
+    def get_series_events(self, series_id: int) -> List[dict]:
+        """Return all events belonging to a recurring series."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM events WHERE series_id = ? OR id = ? ORDER BY date, start_time",
+                (series_id, series_id),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
+    # Update
+    # ------------------------------------------------------------------
+
+    def update_event(self, event_id: int, **fields) -> None:
+        allowed = {"title", "date", "start_time", "end_time", "attendees",
+                   "location", "description", "color", "recurrence", "recurrence_end"}
+        updates = {k: v for k, v in fields.items() if k in allowed}
+        if not updates:
+            return
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        values = list(updates.values()) + [event_id]
+        with self._conn() as conn:
+            conn.execute(f"UPDATE events SET {set_clause} WHERE id = ?", values)
+
+    # ------------------------------------------------------------------
+    # Delete
+    # ------------------------------------------------------------------
+
+    def delete_event(self, event_id: int) -> None:
+        """Delete a single event instance."""
+        with self._conn() as conn:
+            conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
+
+    def delete_series(self, series_id: int) -> int:
+        """Delete all events in a series. Returns the count deleted."""
+        with self._conn() as conn:
+            cur = conn.execute(
+                "DELETE FROM events WHERE series_id = ? OR id = ?",
+                (series_id, series_id),
+            )
+            return cur.rowcount
+
+    def delete_series_from(self, series_id: int, from_date: str) -> int:
+        """Delete this event and all future instances in the series."""
+        with self._conn() as conn:
+            cur = conn.execute(
+                "DELETE FROM events WHERE (series_id = ? OR id = ?) AND date >= ?",
+                (series_id, series_id, from_date),
+            )
+            return cur.rowcount
+
+    def clear_all(self) -> None:
+        """Wipe all events from the database."""
+        with self._conn() as conn:
+            conn.execute("DELETE FROM events")
+            conn.execute("DELETE FROM sqlite_sequence WHERE name='events'")  # reset IDs
+
+

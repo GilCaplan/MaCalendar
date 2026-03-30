@@ -1,0 +1,61 @@
+hotkey:
+  modifiers: ["cmd", "shift"]
+  key: "space"
+
+# "whisper" = free, local, runs on your Mac (no internet needed)
+# "google"  = free tier, requires internet
+stt_engine: "whisper"
+
+whisper:
+  model_size: "base"       # tiny | base | small | medium | large-v3
+  compute_type: "int8"     # int8 is fastest on Apple Silicon
+  device: "cpu"            # cpu recommended (CTranslate2 int8 is very fast on M-series)
+  language: "en"           # null = auto-detect
+
+google_stt:
+  api_key: null            # null = free tier (no key needed)
+
+# "ollama" = free, local (default)
+# "openai" = requires API key (GPT-4o)
+# "gemini" = requires API key (Gemini 1.5 Pro)
+# "claude" = requires API key (Claude 3.5 Sonnet)
+llm_engine: "ollama"
+
+ollama:
+  base_url: "http://localhost:11434"
+  model: "llama3.1:8b"
+  temperature: 0.1
+  timeout_seconds: 180
+
+openai:
+  api_key: null
+  model: "gpt-4o"
+  temperature: 0.1
+
+gemini:
+  api_key: null
+  model: "gemini-1.5-pro"
+  temperature: 0.1
+
+claude:
+  api_key: null
+  model: "claude-3-5-sonnet-20240620"
+  temperature: 0.1
+
+# ...
+
+# 0 = fully autonomous (no confirmation dialogs)
+# 1 = simple yes/no before each action
+confirmation_level: 1
+
+audio:
+  sample_rate: 16000
+  silence_threshold: 0.01      # RMS below this = silence
+  silence_duration_sec: 20.0   # stop after 20s of silence (or use 'execute' stop word)
+  max_recording_sec: 120       # hard cap
+
+tts:
+  mute: false          # set to true to disable voice output
+  voice: "Samantha"    # run `say -v ?` to list all available voices
+  rate: 200            # words per minute
+

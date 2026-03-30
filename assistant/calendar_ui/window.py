@@ -1,0 +1,631 @@
+"""Main calendar application window."""
+
+from __future__ import annotations
+
+import datetime
+import queue
+import threading
+from typing import Optional
+
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QFont, QCloseEvent
+from PyQt6.QtWidgets import (
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QSizePolicy,
+    QSplitter,
+    QStackedWidget,
+    QToolBar,
+    QVBoxLayout,
+    QWidget,
+    QDialog,
+    QCheckBox,
+    QComboBox,
+    QSpinBox,
+)
+
+from assistant.calendar_ui.event_dialog import EventDialog
+from assistant.calendar_ui.month_view import MonthView
+from assistant.calendar_ui.sidebar import Sidebar
+import assistant.calendar_ui.styles as _styles
+from assistant.calendar_ui.styles import get_app_style, BLUE, GRAY_BORDER, GRAY_DARK, GRAY_TEXT, WHITE
+from assistant.calendar_ui.week_view import WeekView
+from assistant.calendar_ui.importer import parse_ics, scan_macos_calendar, import_events
+from assistant.db import CalendarDB
+from assistant.pipeline import (
+    STATUS_DONE,
+    STATUS_ERROR,
+    STATUS_IDLE,
+    STATUS_LISTENING,
+    STATUS_PROCESSING,
+)
+
+STATUS_REFRESH = "refresh"
+
+_MIC_ICONS = {
+    STATUS_IDLE: "🎙",
+    STATUS_LISTENING: "🔴",
+    STATUS_PROCESSING: "⚙️",
+    STATUS_DONE: "✅",
+    STATUS_ERROR: "⚠️",
+    STATUS_REFRESH: "✅",
+}
+
+_MIC_OBJ_NAMES = {
+    STATUS_IDLE: "mic_idle",
+    STATUS_LISTENING: "mic_listening",
+    STATUS_PROCESSING: "mic_processing",
+    STATUS_DONE: "mic_idle",
+    STATUS_ERROR: "mic_idle",
+    STATUS_REFRESH: "mic_idle",
+}
+
+
+class ToastLabel(QLabel):
+    """Brief notification that fades out after a few seconds."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setStyleSheet(
+            f"""
+            QLabel {{
+                background-color: {BLUE};
+                color: white;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-size: 13px;
+            }}
+            """
+        )
+        self.hide()
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self.hide)
+
+    def show_message(self, text: str, duration_ms: int = 3000) -> None:
+        self.setText(text)
+        self.adjustSize()
+        self.show()
+        self._timer.start(duration_ms)
+
+
+class CalendarWindow(QMainWindow):
+    """
+    Main Outlook-style calendar window.
+
+    Voice pipeline updates come in via pipeline.status_queue (thread-safe).
+    A QTimer drains the queue on the main thread every 100ms.
+    """
+
+    def __init__(self, pipeline=None, parent=None):
+        super().__init__(parent)
+        self._pipeline = pipeline
+        self._db = CalendarDB()
+        self._current_date = datetime.date.today()
+        self._view_mode = "month"  # "month" or "week"
+
+        self._dark = False
+
+        self.setWindowTitle("Calendar")
+        self.setMinimumSize(900, 640)
+        self.resize(1100, 720)
+        self.setStyleSheet(get_app_style(False))
+
+        self._build_ui()
+
+        # Poll pipeline status queue
+        if pipeline is not None:
+            self._poll_timer = QTimer(self)
+            self._poll_timer.setInterval(100)
+            self._poll_timer.timeout.connect(self._poll_status)
+            self._poll_timer.start()
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        """Standard window close event — keeps persistence."""
+        event.accept()
+
+    # ------------------------------------------------------------------
+    # UI construction
+    # ------------------------------------------------------------------
+
+    def _build_ui(self) -> None:
+        central = QWidget()
+        self.setCentralWidget(central)
+        root = QVBoxLayout(central)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        root.addWidget(self._build_toolbar())
+
+        # Splitter: sidebar | main view
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setHandleWidth(1)
+
+        self._sidebar = Sidebar()
+        self._sidebar.new_event_clicked.connect(self._on_new_event)
+        self._sidebar.date_selected.connect(self._on_sidebar_date)
+        splitter.addWidget(self._sidebar)
+
+        # Stacked: month / week
+        self._stack = QStackedWidget()
+        self._month_view = MonthView(self._db)
+        self._week_view = WeekView(self._db)
+        self._stack.addWidget(self._month_view)
+        self._stack.addWidget(self._week_view)
+        self._month_view.date_selected.connect(self._on_day_selected)
+        self._month_view.date_double_clicked.connect(self._on_day_double_clicked)
+        self._month_view.event_clicked.connect(self._on_event_clicked)
+        self._week_view.datetime_double_clicked.connect(self._on_datetime_double_clicked)
+        self._week_view.event_clicked.connect(self._on_event_clicked)
+        splitter.addWidget(self._stack)
+
+        splitter.setSizes([200, 900])
+        splitter.setStretchFactor(1, 1)
+        root.addWidget(splitter, stretch=1)
+
+        # Toast notification (overlaid)
+        self._toast = ToastLabel(central)
+        self._toast.raise_()
+
+        self._update_title()
+
+    def _build_toolbar(self) -> QWidget:
+        bar = QWidget()
+        self._toolbar_bar = bar  # keep ref for theme updates
+        bar.setFixedHeight(52)
+        bar.setStyleSheet(f"background-color: {WHITE}; border-bottom: 1px solid {GRAY_BORDER};")
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(12, 0, 12, 0)
+        layout.setSpacing(4)
+
+        # Nav arrows
+        prev_btn = QPushButton("‹")
+        prev_btn.setObjectName("nav")
+        prev_btn.setFixedSize(28, 28)
+        prev_btn.clicked.connect(self._on_prev)
+        layout.addWidget(prev_btn)
+
+        next_btn = QPushButton("›")
+        next_btn.setObjectName("nav")
+        next_btn.setFixedSize(28, 28)
+        next_btn.clicked.connect(self._on_next)
+        layout.addWidget(next_btn)
+
+        # Today button
+        today_btn = QPushButton("Today")
+        today_btn.setObjectName("flat")
+        today_btn.clicked.connect(self._on_today)
+        layout.addWidget(today_btn)
+
+        # Month/Year title
+        self._title_label = QLabel()
+        self._title_label.setObjectName("month_title")
+        font = QFont()
+        font.setPointSize(16)
+        font.setWeight(QFont.Weight.DemiBold)
+        self._title_label.setFont(font)
+        layout.addWidget(self._title_label)
+
+        layout.addStretch()
+
+        # View toggle
+        for label, mode in [("Month", "month"), ("Week", "week")]:
+            btn = QPushButton(label)
+            btn.setObjectName("view_btn")
+            btn.setProperty("active", mode == self._view_mode)
+            btn.clicked.connect(lambda _, m=mode: self._set_view(m))
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            layout.addWidget(btn)
+            setattr(self, f"_view_btn_{mode}", btn)
+
+        layout.addSpacing(8)
+
+        # Settings Popup
+        self._settings_btn = QPushButton("⚙️")
+        self._settings_btn.setObjectName("flat")
+        self._settings_btn.setFixedSize(36, 36)
+        self._settings_btn.setToolTip("Assistant Settings")
+        self._settings_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._settings_btn.clicked.connect(self._on_settings_popup)
+        layout.addWidget(self._settings_btn)
+
+        layout.addSpacing(4)
+
+        # Import button
+        import_btn = QPushButton("⬇ Import")
+        import_btn.setObjectName("flat")
+        import_btn.setToolTip("Import events from an .ics file or macOS Calendar")
+        import_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        import_btn.clicked.connect(self._on_import)
+        layout.addWidget(import_btn)
+
+        layout.addSpacing(4)
+
+        # Dark mode toggle
+        self._theme_btn = QPushButton("🌙")
+        self._theme_btn.setObjectName("flat")
+        self._theme_btn.setFixedSize(36, 36)
+        self._theme_btn.setToolTip("Toggle dark / light mode")
+        self._theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._theme_btn.clicked.connect(self._on_toggle_theme)
+        layout.addWidget(self._theme_btn)
+
+        layout.addSpacing(4)
+
+        # Mic button (voice assistant status)
+        self._mic_btn = QPushButton("🎙")
+        self._mic_btn.setObjectName("mic_idle")
+        self._mic_btn.setFixedSize(36, 36)
+        self._mic_btn.setToolTip("Click or press Cmd+Shift+Space to activate voice assistant")
+        self._mic_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        if self._pipeline is not None:
+            self._mic_btn.clicked.connect(self._pipeline.trigger)
+        layout.addWidget(self._mic_btn)
+
+        return bar
+
+    # ------------------------------------------------------------------
+    # Navigation
+    # ------------------------------------------------------------------
+
+    def _on_prev(self) -> None:
+        if self._view_mode == "month":
+            d = self._current_date.replace(day=1) - datetime.timedelta(days=1)
+            self._current_date = d.replace(day=1)
+        else:
+            self._current_date -= datetime.timedelta(weeks=1)
+        self._navigate()
+
+    def _on_next(self) -> None:
+        if self._view_mode == "month":
+            d = self._current_date.replace(day=28) + datetime.timedelta(days=4)
+            self._current_date = d.replace(day=1)
+        else:
+            self._current_date += datetime.timedelta(weeks=1)
+        self._navigate()
+
+    def _on_today(self) -> None:
+        self._current_date = datetime.date.today()
+        self._navigate()
+
+    def _on_sidebar_date(self, date: datetime.date) -> None:
+        self._current_date = date
+        self._navigate()
+
+    def _on_day_selected(self, date: datetime.date) -> None:
+        self._current_date = date
+        self._update_title()
+
+    def _navigate(self) -> None:
+        if self._view_mode == "month":
+            self._month_view.navigate(self._current_date.year, self._current_date.month)
+        else:
+            week_start = self._current_date - datetime.timedelta(days=self._current_date.weekday())
+            self._week_view.navigate(week_start)
+        self._update_title()
+
+    def _set_view(self, mode: str) -> None:
+        self._view_mode = mode
+        self._stack.setCurrentWidget(self._month_view if mode == "month" else self._week_view)
+        for m in ("month", "week"):
+            btn = getattr(self, f"_view_btn_{m}")
+            btn.setProperty("active", m == mode)
+            btn.style().unpolish(btn)
+            btn.style().polish(btn)
+        self._navigate()
+
+    def _update_title(self) -> None:
+        if self._view_mode == "month":
+            self._title_label.setText(self._current_date.strftime("%B %Y"))
+        else:
+            week_start = self._current_date - datetime.timedelta(days=self._current_date.weekday())
+            week_end = week_start + datetime.timedelta(days=6)
+            if week_start.month == week_end.month:
+                self._title_label.setText(
+                    f"{week_start.strftime('%B %-d')} – {week_end.day}, {week_end.year}"
+                )
+            else:
+                self._title_label.setText(
+                    f"{week_start.strftime('%b %-d')} – {week_end.strftime('%b %-d, %Y')}"
+                )
+
+    # ------------------------------------------------------------------
+    # Event actions
+    # ------------------------------------------------------------------
+
+    def _on_new_event(self, default_date: Optional[datetime.date] = None) -> None:
+        dialog = EventDialog(self, default_date=default_date or self._current_date)
+        if dialog.exec() and dialog.event_data:
+            self._db.create_event_from_dict(dialog.event_data)
+            self.refresh_calendar()
+
+    def _on_day_double_clicked(self, date: datetime.date) -> None:
+        self._on_new_event(default_date=date)
+
+    def _on_datetime_double_clicked(self, dt: datetime.datetime) -> None:
+        end = dt + datetime.timedelta(hours=1)
+        pre = {
+            "title": "",
+            "date": dt.date().isoformat(),
+            "start_time": dt.strftime("%H:%M"),
+            "end_time": end.strftime("%H:%M"),
+            "attendees": "",
+            "location": "",
+            "description": "",
+            "color": BLUE,
+        }
+        dialog = EventDialog(self, default_date=dt.date())
+        if dialog.exec() and dialog.event_data:
+            self._db.create_event_from_dict(dialog.event_data)
+            self.refresh_calendar()
+
+    def _on_event_clicked(self, event: dict) -> None:
+        dialog = EventDialog(self, event=event)
+        if dialog.exec():
+            ev_id = event.get("id")
+            series_id = event.get("series_id")
+
+            if dialog.delete_series_requested and series_id:
+                count = self._db.delete_series(series_id)
+                self.refresh_calendar()
+                self.show_toast(f"Deleted {count} events in series")
+            elif dialog.delete_requested and ev_id:
+                self._db.delete_event(ev_id)
+                self.refresh_calendar()
+                self.show_toast(f"Deleted \"{event['title']}\"")
+            elif dialog.event_data:
+                ev_id = dialog.event_data.pop("id", None)
+                series_id = dialog.event_data.pop("series_id", None)
+                
+                if ev_id:
+                    if series_id:
+                        # For now, UI saves edits to just THIS instance
+                        # (A more complex UI could ask "Apply changes to all?")
+                        self._db.update_event(ev_id, **dialog.event_data)
+                    else:
+                        self._db.update_event(ev_id, **dialog.event_data)
+                    self.refresh_calendar()
+                    self.show_toast(f"Updated \"{dialog.event_data['title']}\"")
+
+    # ------------------------------------------------------------------
+    # Voice assistant integration
+    # ------------------------------------------------------------------
+
+    def _poll_status(self) -> None:
+        """Drain pipeline.status_queue on the main thread (called by QTimer)."""
+        if self._pipeline is None:
+            return
+        try:
+            while True:
+                item = self._pipeline.status_queue.get_nowait()
+                # Pipeline now sends (status, message) tuples
+                if isinstance(item, tuple):
+                    status, message = item
+                else:
+                    status, message = item, ""
+                self._handle_status(status, message)
+        except queue.Empty:
+            pass
+
+    def _handle_status(self, status: str, message: str = "") -> None:
+        icon = _MIC_ICONS.get(status, "🎙")
+        obj_name = _MIC_OBJ_NAMES.get(status, "mic_idle")
+        self._mic_btn.setText(icon)
+        self._mic_btn.setObjectName(obj_name)
+        self._mic_btn.style().unpolish(self._mic_btn)
+        self._mic_btn.style().polish(self._mic_btn)
+
+        if message:
+            self.show_toast(message)
+
+        if status == STATUS_REFRESH:
+            self.refresh_calendar()
+
+    def refresh_calendar(self) -> None:
+        """Reload events from DB in the active view."""
+        if self._view_mode == "month":
+            self._month_view.refresh()
+        else:
+            self._week_view.refresh()
+
+    def show_toast(self, message: str) -> None:
+        self._toast.show_message(message)
+        # Centre the toast at the bottom of the window
+        self._toast.adjustSize()
+        x = (self.width() - self._toast.width()) // 2
+        y = self.height() - self._toast.height() - 24
+        self._toast.move(x, y)
+
+    # ------------------------------------------------------------------
+    # Resize: keep toast centred
+    # ------------------------------------------------------------------
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "_toast"):
+            self._toast.adjustSize()
+            x = (self.width() - self._toast.width()) // 2
+            y = self.height() - self._toast.height() - 24
+            self._toast.move(x, y)
+
+    # ------------------------------------------------------------------
+    # Dark mode
+    # ------------------------------------------------------------------
+
+    def _on_toggle_theme(self) -> None:
+        self._dark = not self._dark
+        dark = self._dark
+        self.setStyleSheet(get_app_style(dark))
+        self._month_view.apply_theme(dark)
+        self._week_view.apply_theme(dark)
+        self._sidebar.apply_theme(dark)
+        # Re-style toolbar
+        bg = _styles.D_WHITE if dark else WHITE
+        border = _styles.D_GRAY_BORDER if dark else GRAY_BORDER
+        self._toolbar_bar.setStyleSheet(
+            f"background-color: {bg}; border-bottom: 1px solid {border};"
+        )
+        self._theme_btn.setText("☀️" if dark else "🌙")
+        self.show_toast("Dark mode on" if dark else "Light mode on")
+
+    def _on_settings_popup(self) -> None:
+        if not self._pipeline:
+            return
+            
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Assistant Settings")
+        dialog.setFixedSize(320, 240)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Auto-Approve check
+        auto_cb = QCheckBox("Auto-Approve Actions (No Confirmations)")
+        auto_cb.setChecked(self._pipeline._confirmer.level == 0)
+        layout.addWidget(auto_cb)
+
+        # Mute check
+        mute_cb = QCheckBox("Mute Voice Output")
+        mute_cb.setChecked(self._pipeline._tts.mute)
+        layout.addWidget(mute_cb)
+        
+        # Speed 
+        speed_layout = QHBoxLayout()
+        speed_layout.addWidget(QLabel("Talking Speed:"))
+        speed_spin = QSpinBox()
+        speed_spin.setRange(50, 400)
+        speed_spin.setValue(self._pipeline._tts.rate)
+        speed_layout.addWidget(speed_spin)
+        layout.addLayout(speed_layout)
+        
+        # Voice Dropdown
+        voice_layout = QHBoxLayout()
+        voice_layout.addWidget(QLabel("Voice Type:"))
+        voice_combo = QComboBox()
+        import subprocess
+        try:
+            voices = subprocess.check_output(["say", "-v", "?"], text=True).splitlines()
+            voice_names = []
+            for v in voices:
+                if v.strip():
+                    name = v.split()[0]
+                    if name not in voice_names:
+                        voice_names.append(name)
+            voice_combo.addItems(voice_names)
+        except Exception:
+            voice_combo.addItems(["Samantha", "Daniel", "Alex", "Ava", "Zari"])
+            
+        current_voice = self._pipeline._tts.voice
+        if current_voice in [voice_combo.itemText(i) for i in range(voice_combo.count())]:
+            voice_combo.setCurrentText(current_voice)
+        else:
+            voice_combo.addItem(current_voice)
+            voice_combo.setCurrentText(current_voice)
+            
+        voice_layout.addWidget(voice_combo)
+        layout.addLayout(voice_layout)
+        
+        # Test & Save
+        btn_layout = QHBoxLayout()
+        test_btn = QPushButton("Test Audio")
+        def run_test():
+            if mute_cb.isChecked():
+                self.show_toast("Muted. Uncheck to test.")
+                return
+            import threading
+            threading.Thread(target=lambda: subprocess.Popen(
+                ["say", "-v", voice_combo.currentText(), "-r", str(speed_spin.value()), "Hello, I am ready."],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            ), daemon=True).start()
+        test_btn.clicked.connect(run_test)
+        btn_layout.addWidget(test_btn)
+        
+        save_btn = QPushButton("Save Config")
+        save_btn.setDefault(True)
+        def save_config():
+            self._pipeline._confirmer.level = 0 if auto_cb.isChecked() else 1
+            self._pipeline._tts.mute = mute_cb.isChecked()
+            self._pipeline._tts.rate = speed_spin.value()
+            self._pipeline._tts.voice = voice_combo.currentText()
+            # Try to write to config.yaml safely
+            try:
+                import os, re
+                c_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "config.yaml")
+                if os.path.exists(c_path):
+                    with open(c_path, "r") as f:
+                        txt = f.read()
+                    txt = re.sub(r"mute:\s*(true|false)", f"mute: {'true' if mute_cb.isChecked() else 'false'}", txt, count=1, flags=re.IGNORECASE)
+                    txt = re.sub(r"voice:\s*\"[^\"]+\"", f'voice: "{voice_combo.currentText()}"', txt, count=1)
+                    txt = re.sub(r"rate:\s*\d+", f"rate: {speed_spin.value()}", txt, count=1)
+                    txt = re.sub(r"confirmation_level:\s*\d+", f"confirmation_level: {0 if auto_cb.isChecked() else 1}", txt, count=1)
+                    with open(c_path, "w") as f:
+                        f.write(txt)
+            except Exception as e:
+                print("Failed saving to config.yaml:", e)
+                
+            self.show_toast("Settings applied!")
+            dialog.accept()
+            
+        save_btn.clicked.connect(save_config)
+        btn_layout.addWidget(save_btn)
+        layout.addLayout(btn_layout)
+        
+        dialog.exec()
+
+    # ------------------------------------------------------------------
+    # ICS / macOS Calendar import
+    # ------------------------------------------------------------------
+
+    def _on_import(self) -> None:
+        """Show an import dialog: choose .ics file OR scan macOS Calendar."""
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Import Calendar Events")
+        msg.setText("How would you like to import events?")
+        ics_btn = msg.addButton("📂 Open .ics file", QMessageBox.ButtonRole.ActionRole)
+        mac_btn = msg.addButton("🗓 Scan macOS Calendar", QMessageBox.ButtonRole.ActionRole)
+        msg.addButton(QMessageBox.StandardButton.Cancel)
+        msg.exec()
+
+        clicked = msg.clickedButton()
+        if clicked == ics_btn:
+            self._import_ics_file()
+        elif clicked == mac_btn:
+            self._import_macos_calendar()
+
+    def _import_ics_file(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open ICS File",
+            "",
+            "iCalendar Files (*.ics *.ical);;All Files (*)",
+        )
+        if not path:
+            return
+        try:
+            events = parse_ics(path)
+            inserted, skipped = import_events(self._db, events)
+            self.refresh_calendar()
+            self.show_toast(f"Imported {inserted} event(s), {skipped} skipped")
+        except Exception as e:
+            QMessageBox.critical(self, "Import Error", str(e))
+
+    def _import_macos_calendar(self) -> None:
+        try:
+            events = scan_macos_calendar()
+            if not events:
+                QMessageBox.information(
+                    self,
+                    "macOS Calendar",
+                    "No events found. Make sure Calendar.app has events and "
+                    "that you have granted Full Disk Access if prompted.",
+                )
+                return
+            inserted, skipped = import_events(self._db, events)
+            self.refresh_calendar()
+            self.show_toast(f"Imported {inserted} event(s) from macOS Calendar, {skipped} skipped")
+        except Exception as e:
+            QMessageBox.critical(self, "Import Error", str(e))
