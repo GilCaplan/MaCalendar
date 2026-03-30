@@ -1,129 +1,62 @@
-# assistant_tools
+# MaCalendar Assistant System State
 
-A **voice-controlled calendar assistant** for macOS. Speak a command (e.g. "Add a standup Monday at 9 and a review Friday at 3, done"), the app transcribes it, parses the intent with a local LLM, confirms, and saves to a SQLite-backed PyQt6 calendar UI.
+A **voice-controlled, privacy-first calendar assistant** for macOS. This document serves as the "brain" for the project, allowing any AI developer or assistant to resume work with full context.
+
+## 🚀 Recent Core Improvements (Current Build)
+
+- **Real-Time Streaming STT**: Modified `AudioCapture` to support background chunking. The pipeline now performs incremental transcription every 2.5s, allowing pro-active detection of stop-keywords (e.g., "execute", "done") to terminate the microphone mid-speech for instant responsiveness.
+- **Universal LLM Intent Parser**: Refactored the core parser to support four backends: **Ollama (local)**, **OpenAI**, **Google Gemini**, and **Anthropic Claude**. The engine is routed via `config.llm_engine`.
+- **Integrated Settings UI**: Replaced cluttered toolbar buttons with a single ⚙️ Settings gear. It opens a native popup for:
+  - Toggling **Auto-Approve** (autonomous mode).
+  - Selecting from all **macOS System Voices** (native list).
+  - Adjusting **Talking Speed** (WPM) and **Mute**.
+  - **Live Audio Testing** button.
+- **Context Memory (Anaphora)**: The assistant now retains the ID of the most recently created or modified event. Users can use pronouns like *"Delete **it**"* or *"Move **that event** to 5pm"* for fluid conversation.
+- **Fuzzy Token Matching**: Refactored event lookup to use token-based fuzzy scoring. This handles LLM hallucinations or trailing transcription words (like "...done") that aren't part of the event title.
+- **Security & Defense**: Implemented a **Prompt Injection Defense** layer that sanitizes transcripts before LLM submission to prevent system-prompt poisoning via voice.
 
 ---
 
-## How it works
+## 🛠 Project Architecture
 
+### Data Flow
 ```
-Hotkey (Cmd+Shift+Space) or Mic button
-  → AudioCapture (records until stop keyword / button re-press / 20s silence)
-  → STT (faster-whisper local or Google Cloud fallback)
-  → _strip_stop_keyword()  (strips "done"/"end"/"execute" etc. from tail)
-  → OllamaIntentParser (local LLM → JSON → Pydantic validation)
-      supports single:  {"action": "...", "parameters": {...}}
-      supports multi:   {"actions": [{"action": "...", "parameters": {...}}, ...]}
-  → ConfirmationHandler (macOS native dialog, level 0–3)
-  → Action.execute() loop  (create / update / delete → CalendarDB → SQLite)
-  → TTS feedback (macOS `say`) + UI toast + calendar refresh
-```
-
-Pipeline pushes `(status, message)` tuples to `status_queue`; `CalendarWindow` drains it every 100ms and shows the message as a toast.
-
----
-
-## Key files
-
-| File | Role |
-|------|------|
-| `assistant/main.py` | Entry point — wires everything, launches PyQt6 window |
-| `assistant/pipeline.py` | Core orchestrator; multi-action loop; `stop_recording()` |
-| `assistant/config.py` | Pydantic config schema; supports YAML + env var overrides |
-| `assistant/db.py` | `CalendarDB` — SQLite at `~/.assistant_tools/calendar.db` |
-| `assistant/actions/__init__.py` | `ActionRegistry` Borg singleton + `@register` decorator |
-| `assistant/actions/base.py` | `BaseAction` + `BaseIntent` abstract base classes |
-| `assistant/actions/calendar/action.py` | `CreateEventAction`, `UpdateEventAction`, `DeleteEventAction` |
-| `assistant/actions/calendar/intent.py` | `CalendarIntent`, `UpdateEventIntent`, `DeleteEventIntent` |
-| `assistant/intent/parser.py` | Calls Ollama; returns `list[(action_name, intent)]`; handles single + multi-action JSON |
-| `assistant/audio/capture.py` | `AudioCapture` — records until 20s silence, `stop()` call, or hard cap (120s) |
-| `assistant/stt/whisper_stt.py` | `WhisperSTT` — faster-whisper, Apple Silicon optimized |
-| `assistant/hotkey.py` | `HotkeyListener` — global shortcut via pynput |
-| `assistant/confirmation/handler.py` | macOS `osascript` dialogs at 4 confirmation levels |
-| `assistant/tts/speaker.py` | Wraps macOS `say` command |
-| `assistant/calendar_ui/window.py` | `CalendarWindow` — month/week views, dark mode toggle, import button, live voice toasts |
-| `assistant/calendar_ui/styles.py` | Light + dark palette constants + `get_app_style(dark)` |
-| `assistant/calendar_ui/month_view.py` | Month grid; `apply_theme(dark)` |
-| `assistant/calendar_ui/week_view.py` | Week view with time axis; `apply_theme(dark)` |
-| `assistant/calendar_ui/sidebar.py` | Mini-calendar sidebar; `apply_theme(dark)` |
-| `assistant/calendar_ui/importer.py` | ICS parser + macOS Calendar scanner + `import_events()` |
-| `assistant/calendar_ui/event_dialog.py` | Create/edit dialog with 🗑 Delete button (edit mode only) |
-| `assistant/exceptions.py` | Custom exception hierarchy |
-| `config.yaml` | Active configuration |
-| `config.example.yaml` | Template — copy to `config.yaml` to get started |
-| `Launch Calendar.command` | Double-clickable macOS launcher (auto-activates `.venv`) |
-
----
-
-## Voice recording controls
-
-| Method | Effect |
-|--------|--------|
-| Press hotkey / mic button | Start recording |
-| Press mic button again | Stop recording immediately |
-| Say `end`, `done`, `execute`, `set event`, `set events`, `stop`, `that's it` | Stop recording; keyword stripped before parsing |
-| 20 seconds of silence | Auto-stop (configurable via `audio.silence_duration_sec`) |
-| 120 seconds elapsed | Hard cap (configurable via `audio.max_recording_sec`) |
-
-Multi-event example: *"Create a standup Monday at 9am and a team review Friday at 3pm, done"*
-Update example: *"Move my standup to 10am"*
-Delete example: *"Cancel the team review on Friday"*
-
----
-
-## Adding a new voice action (plugin system)
-
-1. Create `assistant/actions/<name>/` with an `__init__.py`
-2. Define `<Name>Intent(BaseIntent)` with Pydantic fields
-3. Define `<Name>Action(BaseAction)` with the `@register` decorator
-4. Implement `execute(intent, config) -> str` (returns a TTS confirmation string)
-5. Import the module in `assistant/main.py`
-
-No changes to the pipeline or intent parser needed — Ollama learns about the new action automatically from the registry.
-
----
-
-## External dependencies (must be running)
-
-- **Ollama** — `ollama serve` (default: `http://localhost:11434`)
-- **Ollama model** — must match `config.yaml → ollama.model`; pull with `ollama pull llama3.2:3b`
-- **Whisper model** — auto-downloaded on first run (~74MB for `base`)
-
----
-
-## Configuration
-
-`config.yaml` (copy from `config.example.yaml`). Key fields:
-
-```yaml
-stt_engine: "whisper"         # or "google"
-ollama:
-  model: "llama3.2:3b"        # must match a pulled Ollama model
-confirmation_level: 1         # 0=none 1=simple 2=full 3=editable
-audio:
-  silence_threshold: 0.01
-  silence_duration_sec: 20.0  # auto-stop after 20s of silence
-  max_recording_sec: 120      # hard cap
+Hotkey (Cmd+Shift+Space) 
+  → AudioCapture (records with 2.5s streaming window)
+  → stream_checker() (Detects 'execute'/'done' → self.stop_recording())
+  → Universal IntentParser (Ollama/OpenAI/Gemini/Claude → JSON)
+  → ConfirmationHandler (Auto-Approve Check → level 0/1)
+  → Action.execute() (Create/Update/Delete + Memory Tracking)
+  → TTS Speaker (macOS 'say' with speed/voice/mute params)
+  → DB persistence (SQLite) + UI Month/Week Refresh
 ```
 
-Env var overrides: `ASSISTANT_OLLAMA_MODEL`, `ASSISTANT_STT_ENGINE`, `ASSISTANT_CONFIRMATION`
-
-Logs: `~/.assistant_tools/assistant.log`
-
----
-
-## Setup (first run)
-
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-```
-
-Or just double-click **`Launch Calendar.command`** — it handles venv activation automatically.
+### Key Components
+- `assistant/pipeline.py`: Orchestrates the streaming STT and LLM handshake.
+- `assistant/intent/parser.py`: Unified factory for local and cloud LLM providers.
+- `assistant/actions/calendar/action.py`: Contains match logic and contextual memory hooks.
+- `assistant/calendar_ui/window.py`: Main PyQt6 interface, including the new Settings Popup.
+- `assistant/db.py`: Thread-safe SQLite store with `clear_all()` for testing.
 
 ---
 
-## Not yet wired up
+## ⚙️ Configuration (`config.yaml`)
 
-- Microsoft Graph API sync (auth + client code exists in `assistant/actions/calendar/`)
+| Section | Key Settings |
+|---------|--------------|
+| `llm_engine` | `ollama` (default), `openai`, `gemini`, `claude` |
+| `audio` | `sample_rate: 16000`, `silence_duration_sec: 20.0` |
+| `tts` | `voice: "Eddy"`, `rate: 200`, `mute: false` |
+| `confirmation_level` | `0` (Auto-Approve) or `1` (Manual) |
+
+---
+
+## 📋 Ongoing & Future Tasks
+
+- **Persistence Layer**: Currently, `config.yaml` is updated via Regex in the UI. Consider moving to `ruamel.yaml` to ensure comment preservation.
+- **GitHub Management**: Repo is synced to `https://github.com/GilCaplan/MaCalendar`. Always `git push` after major feature additions.
+- **Microsoft Graph**: Auth code is present but integration into the main pipeline is pending.
+- **Testing**: Use `tests/test_ollama_parser.py` (which includes multi-scenario suites) to verify reasoning logic.
+
+## 🏁 Hand-off Summary
+The project is in a stable, high-performance state. The "Streaming STT" and "Multi-LLM" features are fully operational. The database persists locally in `~/.assistant_tools/calendar.db`. Every launch starts clean, but the settings are saved in `config.yaml`.
