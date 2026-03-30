@@ -12,15 +12,22 @@ import requests
 from assistant.actions import ActionRegistry
 from assistant.actions.base import BaseIntent
 from assistant.config import AppConfig
+from assistant.exceptions import (
+    AssistantError,
+    LLMTimeoutError,
+    LLMUnavailableError,
+    OllamaTimeoutError,
+    OllamaUnavailableError,
+    ParseError,
+)
 
-# --- Exceptions ---
+logger = logging.getLogger(__name__)
 
-class LLMUnavailableError(AssistantError):
-    """Raised when the chosen LLM backend cannot be reached."""
-    pass
 
-class LLMTimeoutError(AssistantError):
-    """Raised when the LLM backend times out."""
+# --- Intent Metadata ---
+
+class UnknownIntent(BaseIntent):
+    """Placeholder for cases where the LLM's response couldn't be parsed."""
     pass
 
 
@@ -114,9 +121,14 @@ class IntentParser:
             "temperature": conf.temperature,
             "response_format": {"type": "json_object"}
         }
-        resp = self._session.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers, timeout=60)
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+        try:
+            resp = self._session.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers, timeout=60)
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
+        except requests.ConnectionError as e:
+            raise LLMUnavailableError("OpenAI API is unreachable") from e
+        except requests.Timeout as e:
+            raise LLMTimeoutError("OpenAI request timed out") from e
 
     def _call_gemini(self, sys: str, user: str, schema: dict) -> str:
         conf = self.config.gemini
@@ -128,9 +140,14 @@ class IntentParser:
             "contents": [{"parts": [{"text": f"System Instruction: {sys}\nUser Prompt: {user}\nRespond in JSON matching the requested schema."}]}],
             "generationConfig": {"temperature": conf.temperature, "responseMimeType": "application/json"}
         }
-        resp = self._session.post(url, json=payload, timeout=60)
-        resp.raise_for_status()
-        return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        try:
+            resp = self._session.post(url, json=payload, timeout=60)
+            resp.raise_for_status()
+            return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        except requests.ConnectionError as e:
+            raise LLMUnavailableError("Gemini API is unreachable") from e
+        except requests.Timeout as e:
+            raise LLMTimeoutError("Gemini request timed out") from e
 
     def _call_claude(self, sys: str, user: str, schema: dict) -> str:
         conf = self.config.claude
@@ -148,9 +165,14 @@ class IntentParser:
             "max_tokens": 1024,
             "temperature": conf.temperature,
         }
-        resp = self._session.post("https://api.anthropic.com/v1/messages", json=payload, headers=headers, timeout=60)
-        resp.raise_for_status()
-        return resp.json()["content"][0]["text"]
+        try:
+            resp = self._session.post("https://api.anthropic.com/v1/messages", json=payload, headers=headers, timeout=60)
+            resp.raise_for_status()
+            return resp.json()["content"][0]["text"]
+        except requests.ConnectionError as e:
+            raise LLMUnavailableError("Claude API is unreachable") from e
+        except requests.Timeout as e:
+            raise LLMTimeoutError("Claude request timed out") from e
 
     # ------------------------------------------------------------------
     # Parsing Helpers

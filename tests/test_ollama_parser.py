@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from assistant.actions import ActionRegistry
 from assistant.actions.calendar.action import CreateEventAction, DeleteEventAction, UpdateEventAction
 from assistant.config import OllamaConfig, AppConfig, load_config
-from assistant.intent.parser import OllamaIntentParser
+from assistant.intent.parser import IntentParser
 from assistant.db import CalendarDB
 
 def clear_db():
@@ -22,7 +22,7 @@ def clear_db():
     events = db.get_events_for_month(2026, 3) # Or any query
     assert len(events) == 0
 
-def run_test(parser: OllamaIntentParser, config: AppConfig, transcript: str, expected_count: int, test_name: str, seed_data: list = None):
+def run_test(parser: IntentParser, config: AppConfig, transcript: str, expected_count: int, test_name: str, seed_data: list = None):
     print(f"\n==============================================")
     print(f"🎬 Test: {test_name}")
     print(f"Transcript: '{transcript}'")
@@ -77,7 +77,7 @@ def main():
     # Force use the specified test model
     config.ollama.model = "llama3.1:8b"
     config.ollama.timeout_seconds = 180
-    parser = OllamaIntentParser(config.ollama, registry)
+    parser = IntentParser(config, registry)
     
     print("Checking Ollama backend connection at", config.ollama.base_url)
     if not parser.health_check():

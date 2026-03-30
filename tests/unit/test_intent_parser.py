@@ -6,13 +6,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from assistant.exceptions import OllamaUnavailableError, ParseError
-from assistant.intent.parser import OllamaIntentParser, UnknownIntent
+from assistant.intent.parser import IntentParser, UnknownIntent
 from tests.conftest import DummyAction, DummyIntent
 
 
 def _make_parser(isolated_registry, sample_config):
     isolated_registry.register(DummyAction)
-    return OllamaIntentParser(sample_config.ollama, isolated_registry)
+    return IntentParser(sample_config, isolated_registry)
 
 
 def _mock_post(monkeypatch, content: str):
@@ -28,7 +28,8 @@ def _mock_post(monkeypatch, content: str):
 def test_valid_response_returns_intent(monkeypatch, isolated_registry, sample_config):
     parser = _make_parser(isolated_registry, sample_config)
     _mock_post(monkeypatch, json.dumps({"action": "dummy_action", "parameters": {"message": "hi"}}))
-    action_name, intent = parser.parse("do the dummy thing")
+    results = parser.parse("do the dummy thing")
+    action_name, intent = results[0]
     assert action_name == "dummy_action"
     assert isinstance(intent, DummyIntent)
     assert intent.message == "hi"
@@ -37,7 +38,8 @@ def test_valid_response_returns_intent(monkeypatch, isolated_registry, sample_co
 def test_unknown_action_returns_unknown_intent(monkeypatch, isolated_registry, sample_config):
     parser = _make_parser(isolated_registry, sample_config)
     _mock_post(monkeypatch, json.dumps({"action": "unknown", "parameters": {}}))
-    action_name, intent = parser.parse("what is the weather?")
+    results = parser.parse("what is the weather?")
+    action_name, intent = results[0]
     assert action_name == "unknown"
     assert isinstance(intent, UnknownIntent)
 
@@ -53,7 +55,7 @@ def test_missing_required_param_raises_parse_error(monkeypatch, isolated_registr
     # DummyIntent has 'message' with a default, so let's use CalendarIntent instead
     from assistant.actions.calendar.action import CreateEventAction
     isolated_registry.register(CreateEventAction)
-    parser = OllamaIntentParser(sample_config.ollama, isolated_registry)
+    parser = IntentParser(sample_config, isolated_registry)
     # Missing required fields: date, start_time, end_time
     _mock_post(monkeypatch, json.dumps({"action": "create_event", "parameters": {"title": "X"}}))
     with pytest.raises(ParseError):
@@ -75,7 +77,8 @@ def test_json_in_markdown_block_is_extracted(monkeypatch, isolated_registry, sam
     parser = _make_parser(isolated_registry, sample_config)
     wrapped = "```json\n" + json.dumps({"action": "dummy_action", "parameters": {"message": "test"}}) + "\n```"
     _mock_post(monkeypatch, wrapped)
-    action_name, intent = parser.parse("do dummy")
+    results = parser.parse("do dummy")
+    action_name, intent = results[0]
     assert action_name == "dummy_action"
 
 

@@ -59,10 +59,9 @@ def main() -> None:
     # ------------------------------------------------------------------
     pipeline = Pipeline(config, registry)
 
-    from assistant.intent.parser import OllamaIntentParser
-    if not OllamaIntentParser(config.ollama, registry).health_check():
+    if not pipeline.health_check().get("ollama", True):
         logger.warning(
-            "Ollama is not reachable at %s. Voice commands will not work until "
+            "Ollama is not reachable at %s. Local voice commands will not work until "
             "Ollama is running (`ollama serve`).",
             config.ollama.base_url,
         )
