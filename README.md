@@ -80,3 +80,7 @@ A comprehensive test suite is provided to verify model reasoning and database lo
 ```bash
 python tests/test_ollama_parser.py
 ```
+
+## 🤖 For Developers & AI Assistants
+
+If you are an AI assistant or a developer working on this codebase, please **read [SYSTEM.md](./SYSTEM.md) first**. It contains the full project architecture, recent core enhancements (Streaming STT, Universal LLM Parser), and current state details to help you resume work without loss of context.
