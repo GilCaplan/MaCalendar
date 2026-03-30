@@ -29,16 +29,24 @@ class OllamaError(AssistantError):
     """Ollama LLM error."""
 
 
-class OllamaUnavailableError(OllamaError):
+class LLMUnavailableError(AssistantError):
+    """Raised when the chosen LLM backend cannot be reached."""
+
+
+class LLMTimeoutError(AssistantError):
+    """Raised when the LLM backend times out."""
+
+
+class OllamaUnavailableError(OllamaError, LLMUnavailableError):
     """Cannot connect to Ollama (not running)."""
 
 
-class OllamaTimeoutError(OllamaError):
+class OllamaTimeoutError(OllamaError, LLMTimeoutError):
     """Ollama took too long to respond."""
 
 
 class ParseError(AssistantError):
-    """Failed to parse Ollama response into a valid intent."""
+    """Failed to parse LLM response into a valid intent."""
 
 
 class AuthError(AssistantError):

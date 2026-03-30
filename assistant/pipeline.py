@@ -17,6 +17,8 @@ from assistant.exceptions import (
     AssistantError,
     AudioCaptureError,
     AuthExpiredError,
+    LLMTimeoutError,
+    LLMUnavailableError,
     OllamaUnavailableError,
     ParseError,
 )
@@ -150,9 +152,15 @@ class Pipeline:
         # 3. Parse intent(s)
         try:
             action_list = self._parser.parse(transcript)
-        except OllamaUnavailableError:
-            self._tts.speak("The AI assistant is offline. Please start Ollama and try again.")
-            self._set_status(STATUS_ERROR, "⚠️ Ollama offline")
+        except (LLMUnavailableError, OllamaUnavailableError):
+            engine = self.config.llm_engine
+            self._tts.speak(f"The {engine} assistant is offline. Please check your connection and try again.")
+            self._set_status(STATUS_ERROR, f"⚠️ {engine.title()} offline")
+            return
+        except (LLMTimeoutError, OllamaTimeoutError):
+            engine = self.config.llm_engine
+            self._tts.speak(f"The {engine} assistant is taking too long to respond.")
+            self._set_status(STATUS_ERROR, f"⚠️ {engine.title()} timeout")
             return
         except ParseError as e:
             self._tts.speak("I couldn't understand that request.")
