@@ -516,13 +516,10 @@ class CalendarWindow(QMainWindow):
             self.refresh_todos()
 
     def refresh_calendar(self) -> None:
-        """Reload events from DB in the active view."""
-        if self._view_mode == "month":
-            self._month_view.refresh()
-        elif self._view_mode == "week":
-            self._week_view.refresh()
-        elif self._view_mode != "todo":
-            self._day_view.refresh()
+        """Reload events from DB in all calendar views."""
+        self._month_view.refresh()
+        self._week_view.refresh()
+        self._day_view.refresh()
 
     def refresh_todos(self) -> None:
         """Reload todos from DB in the TodoView."""
