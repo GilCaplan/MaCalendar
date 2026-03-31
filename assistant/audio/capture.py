@@ -12,6 +12,9 @@ from assistant.exceptions import AudioCaptureError
 # Calibration: sample this many seconds at the start to measure ambient noise
 _CALIBRATION_SEC = 0.5
 
+# Global lock — only one InputStream may be open at a time
+_audio_lock = threading.Lock()
+
 
 class AudioCapture:
     """
@@ -32,6 +35,16 @@ class AudioCapture:
     def stop(self) -> None:
         """Signal the current recording to stop immediately."""
         self._stop_event.set()
+
+    def _open_stream(self, chunk_size: int, callback) -> None:
+        with sd.InputStream(
+            samplerate=self.config.sample_rate,
+            channels=1,
+            dtype="float32",
+            blocksize=chunk_size,
+            callback=callback,
+        ):
+            self._stop_event.wait(timeout=self.config.max_recording_sec + 1)
 
     def record_until_silence(
         self,
@@ -101,20 +114,25 @@ class AudioCapture:
                 current_audio = np.concatenate(frames).astype(np.float32)
                 threading.Thread(target=streaming_callback, args=(current_audio,), daemon=True).start()
 
+        if not _audio_lock.acquire(blocking=False):
+            raise AudioCaptureError("Audio capture already in progress.")
+
         try:
-            with sd.InputStream(
-                samplerate=self.config.sample_rate,
-                channels=1,
-                dtype="float32",
-                blocksize=chunk_size,
-                callback=callback,
-            ):
-                self._stop_event.wait(timeout=self.config.max_recording_sec + 1)
-        except sd.PortAudioError as e:
-            raise AudioCaptureError(
-                f"Could not open microphone: {e}\n"
-                "Check System Preferences → Security & Privacy → Microphone."
-            ) from e
+            self._open_stream(chunk_size, callback)
+        except sd.PortAudioError:
+            # PortAudio sometimes needs a full reinitialize after a device change
+            # or macOS revokes the audio unit. Terminate, reinit, and retry once.
+            try:
+                sd._terminate()
+                sd._initialize()
+                self._open_stream(chunk_size, callback)
+            except sd.PortAudioError as e:
+                raise AudioCaptureError(
+                    f"Could not open microphone: {e}\n"
+                    "Check System Preferences → Security & Privacy → Microphone."
+                ) from e
+        finally:
+            _audio_lock.release()
 
         if not frames:
             raise AudioCaptureError("No audio recorded.")

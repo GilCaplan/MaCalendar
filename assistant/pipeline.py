@@ -124,9 +124,14 @@ class Pipeline:
                 streaming_interval_sec=2.5
             )
         except AudioCaptureError as e:
-            self._tts.speak("Microphone error. Please check your audio settings.")
-            logger.error("Audio capture error: %s", e)
-            self._set_status(STATUS_ERROR, "⚠️ Microphone error")
+            msg = str(e)
+            if "already in progress" in msg:
+                logger.warning("Audio capture blocked: already in progress.")
+                self._set_status(STATUS_IDLE, "")
+            else:
+                self._tts.speak("Microphone error. Please check your audio settings.")
+                logger.error("Audio capture error: %s", e)
+                self._set_status(STATUS_ERROR, "⚠️ Microphone error")
             return
 
         # 2. Transcribe
