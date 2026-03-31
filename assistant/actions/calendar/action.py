@@ -287,7 +287,7 @@ def _fmt_time(time_str: str) -> str:
 
 _STOP_WORDS = {
     "a", "an", "the", "my", "i", "of", "to", "in", "on", "at", "for",
-    "it", "is", "be", "was", "and", "or", "with", "that", "this",
+    "it", "is", "be", "was", "and", "or", "that", "this",
 }
 
 
