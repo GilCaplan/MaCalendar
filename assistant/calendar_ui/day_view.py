@@ -28,12 +28,15 @@ from assistant.calendar_ui.styles import (
 
 HOUR_HEIGHT = 56   # slightly taller than week view for readability
 LABEL_WIDTH = 60
+RESIZE_HANDLE = 8  # px at top/bottom edge that activate resize mode
+_SNAP_PX = HOUR_HEIGHT // 4  # 15-minute snap grid
 
 
 class EventBlock(QLabel):
     """Colored block representing one event in the day timeline."""
 
     clicked = pyqtSignal(dict)
+    resized = pyqtSignal(int, dict)  # (event_id, {start_time, end_time})
 
     def __init__(self, event: dict, parent=None):
         super().__init__(parent)
@@ -62,33 +65,91 @@ class EventBlock(QLabel):
             """
         )
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setMouseTracking(True)
         self._drag_start = None
+        # Resize state
+        self._resize_edge: str | None = None  # "top" or "bottom"
+        self._resize_orig_top = 0
+        self._resize_orig_height = 0
+        self._resize_press_y = 0  # parent-relative y at press
+
+    def _edge_at(self, y: int) -> str | None:
+        if y <= RESIZE_HANDLE:
+            return "top"
+        if y >= self.height() - RESIZE_HANDLE:
+            return "bottom"
+        return None
 
     def mousePressEvent(self, event):
-        self._drag_start = event.pos()
+        edge = self._edge_at(event.pos().y())
+        if edge:
+            self._resize_edge = edge
+            self._resize_orig_top = self.y()
+            self._resize_orig_height = self.height()
+            self._resize_press_y = self.mapToParent(event.pos()).y()
+            event.accept()
+        else:
+            self._drag_start = event.pos()
 
     def mouseMoveEvent(self, event):
-        if self._drag_start is None:
+        if self._resize_edge:
+            parent_y = self.mapToParent(event.pos()).y()
+            delta = parent_y - self._resize_press_y
+            min_h = max(_SNAP_PX, 18)
+            orig_bottom = self._resize_orig_top + self._resize_orig_height
+
+            if self._resize_edge == "bottom":
+                raw_bottom = orig_bottom + delta
+                snapped_bottom = round(raw_bottom / _SNAP_PX) * _SNAP_PX
+                new_h = max(snapped_bottom - self._resize_orig_top, min_h)
+                self.setGeometry(self.x(), self._resize_orig_top, self.width(), new_h)
+            else:  # top
+                raw_top = self._resize_orig_top + delta
+                snapped_top = round(raw_top / _SNAP_PX) * _SNAP_PX
+                new_h = max(orig_bottom - snapped_top, min_h)
+                actual_top = orig_bottom - new_h
+                self.setGeometry(self.x(), actual_top, self.width(), new_h)
+            event.accept()
             return
-        if (event.pos() - self._drag_start).manhattanLength() < 8:
+
+        if self._drag_start is not None:
+            if (event.pos() - self._drag_start).manhattanLength() < 8:
+                return
+            drag = QDrag(self)
+            mime = QMimeData()
+            mime.setData("application/x-event-id", QByteArray(str(self.event["id"]).encode()))
+            drag.setMimeData(mime)
+            pixmap = self.grab()
+            transparent = QPixmap(pixmap.size())
+            transparent.fill(QColor(0, 0, 0, 0))
+            p = QPainter(transparent)
+            p.setOpacity(0.75)
+            p.drawPixmap(0, 0, pixmap)
+            p.end()
+            drag.setPixmap(transparent)
+            self._drag_start = None
+            drag.exec(Qt.DropAction.MoveAction)
             return
-        drag = QDrag(self)
-        mime = QMimeData()
-        mime.setData("application/x-event-id", QByteArray(str(self.event["id"]).encode()))
-        drag.setMimeData(mime)
-        pixmap = self.grab()
-        transparent = QPixmap(pixmap.size())
-        transparent.fill(QColor(0, 0, 0, 0))
-        p = QPainter(transparent)
-        p.setOpacity(0.75)
-        p.drawPixmap(0, 0, pixmap)
-        p.end()
-        drag.setPixmap(transparent)
-        self._drag_start = None
-        drag.exec(Qt.DropAction.MoveAction)
+
+        # Hover cursor update
+        edge = self._edge_at(event.pos().y())
+        self.setCursor(Qt.CursorShape.SizeVerCursor if edge else Qt.CursorShape.PointingHandCursor)
 
     def mouseReleaseEvent(self, event):
-        if self._drag_start is not None:
+        if self._resize_edge:
+            top = self.y()
+            bottom = top + self.height()
+            start_min = round(top / HOUR_HEIGHT * 60)
+            end_min = round(bottom / HOUR_HEIGHT * 60)
+            start_min = max(0, min(start_min, 23 * 60))
+            end_min = max(start_min + 15, min(end_min, 24 * 60 - 1))
+            self.resized.emit(self.event["id"], {
+                "start_time": f"{start_min // 60:02d}:{start_min % 60:02d}",
+                "end_time":   f"{end_min   // 60:02d}:{end_min   % 60:02d}",
+            })
+            self._resize_edge = None
+            event.accept()
+        elif self._drag_start is not None:
             self._drag_start = None
             self.clicked.emit(self.event)
 
@@ -126,15 +187,20 @@ class DayTimeline(QWidget):
         for ev in events:
             try:
                 sh, sm = map(int, ev["start_time"].split(":"))
-                eh, em = map(int, ev["end_time"].split(":"))
             except Exception:
                 continue
+            try:
+                eh, em = map(int, ev["end_time"].split(":"))
+            except Exception:
+                end_min = sh * 60 + sm + 60
+                eh, em = min(end_min // 60, 23), end_min % 60
 
             top = (sh * 60 + sm) / 60 * HOUR_HEIGHT
             h = max(((eh * 60 + em) - (sh * 60 + sm)) / 60 * HOUR_HEIGHT, 24)
 
             block = EventBlock(ev, self)
             block.clicked.connect(self.event_clicked)
+            block.resized.connect(self.event_rescheduled)
             block.setGeometry(4, int(top), self.width() - 8, int(h))
             block.show()
             self._event_widgets.append(block)

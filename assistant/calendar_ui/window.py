@@ -493,7 +493,8 @@ class CalendarWindow(QMainWindow):
                     pass
         self._db.update_event(event_id, **updates)
         self.refresh_calendar()
-        self.show_toast("Event moved")
+        action = "Event resized" if ("start_time" in updates and "end_time" in updates) else "Event moved"
+        self.show_toast(action)
 
     # ------------------------------------------------------------------
     # Voice assistant integration

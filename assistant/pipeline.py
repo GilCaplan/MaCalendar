@@ -68,19 +68,37 @@ class Pipeline:
         self._busy = threading.Event()
         self._trigger_lock = threading.Lock()
         self._phase = STATUS_IDLE  # tracks current stage for button re-press logic
+        # Pending session mode: None = no queue, "new" = fresh session, "combine" = append to last transcript
+        self._queued: Optional[str] = None
+        self._last_transcript: str = ""  # retained for combine mode
 
         self.on_auth_expired: Optional[Callable[[], None]] = None
         # Set by the UI when the active view changes; used to inject parse context
         self.current_view: str = "month"
 
     def trigger(self) -> None:
-        """Called by HotkeyListener or mic button."""
+        """Called by HotkeyListener or mic button.
+
+        While idle → start a new session.
+        While listening → stop recording immediately.
+        While processing, cycles through:
+          1st press → queue a new independent session
+          2nd press → switch to combine mode (new audio appended to previous transcript)
+          3rd press → cancel the queued session
+        """
         with self._trigger_lock:
             if self._busy.is_set():
                 if self._phase == STATUS_LISTENING:
                     self.stop_recording()
+                elif self._queued is None:
+                    self._queued = "new"
+                    self._set_status(STATUS_PROCESSING, "🕐 Queued — tap again to combine instead")
+                elif self._queued == "new":
+                    self._queued = "combine"
+                    self._set_status(STATUS_PROCESSING, "🔗 Will combine with previous — tap again to cancel")
                 else:
-                    self._tts.speak("Still processing, please wait.")
+                    self._queued = None
+                    self._set_status(STATUS_PROCESSING, "⏸ Queued session cancelled")
                 return
             # Mark busy before spawning so rapid re-triggers see it immediately
             self._busy.set()
@@ -97,16 +115,28 @@ class Pipeline:
     # Internal
     # ------------------------------------------------------------------
 
-    def _run(self) -> None:
+    def _run(self, combine: bool = False) -> None:
         try:
-            self._run_pipeline()
+            self._run_pipeline(combine=combine)
         finally:
             self._busy.clear()
+            # If a session was queued while we were busy, kick it off now
+            with self._trigger_lock:
+                next_mode = self._queued
+                if next_mode is not None:
+                    self._queued = None
+                    self._busy.set()
+                    threading.Thread(
+                        target=self._run,
+                        kwargs={"combine": next_mode == "combine"},
+                        daemon=True,
+                    ).start()
 
-    def _run_pipeline(self) -> None:
+    def _run_pipeline(self, combine: bool = False) -> None:
         # 1. Listen
         self._phase = STATUS_LISTENING
-        self._set_status(STATUS_LISTENING, "🎙 Listening… (say 'done' or press mic to stop)")
+        listen_hint = "🔗 Listening to add on… (say 'done' or press mic to stop)" if combine else "🎙 Listening… (say 'done' or press mic to stop)"
+        self._set_status(STATUS_LISTENING, listen_hint)
 
         def stream_checker(audio_buffer) -> None:
             if self._phase != STATUS_LISTENING:
@@ -154,6 +184,14 @@ class Pipeline:
 
         # Strip stop keywords from the tail of the transcript
         transcript = _strip_stop_keyword(transcript)
+
+        # Combine mode: prepend previous transcript so the LLM sees one unified request
+        if combine and self._last_transcript:
+            transcript = self._last_transcript + ", " + transcript
+            logger.info("Combined transcript: %s", transcript)
+
+        # Save clean transcript for potential future combine session
+        self._last_transcript = transcript
 
         # Inject view context so the LLM biases routing appropriately
         if self.current_view == "todo":
