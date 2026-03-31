@@ -81,12 +81,12 @@ class UpdateEventAction(BaseAction):
     parameters_schema: ClassVar[dict] = {
         "type": "object",
         "properties": {
-            "match_title": {"type": "string", "description": "Title (or partial title) of the event to find. Or 'it'."},
-            "match_date": {"type": "string", "description": "ISO 8601 date to narrow the search. Optional."},
+            "match_title": {"type": "string", "description": "The event title ONLY — just the name words (e.g. 'dentist', 'standup', 'team sync'). Do NOT include 'my', 'the', 'meeting', dates, or other context words. Use 'it' to refer to the last created/modified event."},
+            "match_date": {"type": "string", "description": "ISO 8601 date of the event to help narrow the search. Only provide if you are confident about the date; omit if unsure."},
             "new_title": {"type": "string", "description": "Replacement title. Omit if unchanged."},
             "new_date": {"type": "string", "description": "New ISO 8601 date. Omit if unchanged."},
             "new_start_time": {"type": "string", "description": "New start time HH:MM. Omit if unchanged."},
-            "new_end_time": {"type": "string", "description": "New end time HH:MM. Omit if unchanged."},
+            "new_end_time": {"type": "string", "description": "New end time HH:MM. Omit if unchanged. Duration is preserved automatically when only start time changes."},
             "new_location": {"type": "string", "description": "New location. Omit if unchanged."},
             "new_description": {"type": "string", "description": "New notes. Omit if unchanged."},
         },
@@ -112,12 +112,25 @@ class UpdateEventAction(BaseAction):
         if intent.new_location:   updates["location"] = intent.new_location
         if intent.new_description: updates["description"] = intent.new_description
 
+        # Preserve original duration when only the start time changes
+        if "start_time" in updates and "end_time" not in updates:
+            try:
+                orig_sh, orig_sm = map(int, event["start_time"].split(":"))
+                orig_eh, orig_em = map(int, event["end_time"].split(":"))
+                duration_min = (orig_eh * 60 + orig_em) - (orig_sh * 60 + orig_sm)
+                if duration_min > 0:
+                    new_sh, new_sm = map(int, updates["start_time"].split(":"))
+                    end_min = min(new_sh * 60 + new_sm + duration_min, 23 * 60 + 59)
+                    updates["end_time"] = f"{end_min // 60:02d}:{end_min % 60:02d}"
+            except Exception:
+                pass
+
         if not updates:
             return f"No changes specified for '{event['title']}'."
 
         db.update_event(event["id"], **updates)
         _last_event_id = event["id"]
-        
+
         display = updates.get("title", event["title"])
         return f"Updated '{display}' successfully."
 
@@ -137,8 +150,8 @@ class DeleteEventAction(BaseAction):
     parameters_schema: ClassVar[dict] = {
         "type": "object",
         "properties": {
-            "match_title": {"type": "string", "description": "Title of the event to delete. Or 'it'."},
-            "match_date": {"type": "string", "description": "ISO 8601 date to narrow the search. Optional."},
+            "match_title": {"type": "string", "description": "The event title ONLY — just the name words (e.g. 'dentist', 'standup'). Do NOT include 'my', 'the', 'meeting', dates, or surrounding context. Use 'it' to refer to the last event."},
+            "match_date": {"type": "string", "description": "ISO 8601 date of the event to help narrow the search. Only provide if you are confident about the date; omit if unsure."},
         },
         "required": ["match_title"],
     }
@@ -272,17 +285,24 @@ def _fmt_time(time_str: str) -> str:
 # Internal helper
 # ---------------------------------------------------------------------------
 
+_STOP_WORDS = {
+    "a", "an", "the", "my", "i", "of", "to", "in", "on", "at", "for",
+    "it", "is", "be", "was", "and", "or", "with", "that", "this",
+    "meeting", "event", "appointment", "call",  # overly generic calendar words
+}
+
+
 def _find_event(db, match_title: str, match_date: Optional[str]) -> Optional[dict]:
     """
     Find the best-matching event by title and optional date.
-    Implements token-based fuzzy matching to handle LLM trailing words.
-    Resolves anaphoric pronouns via global memory bounds.
+    Implements token-based fuzzy matching with stop-word filtering.
+    Resolves anaphoric pronouns via global memory.
     """
     global _last_event_id
     import datetime as dt
     import re
-    
-    # Check for pronoun reference
+
+    # Anaphor resolution
     if match_title.lower() in _ANAPHORS:
         if _last_event_id is not None:
             with db._conn() as conn:
@@ -291,9 +311,26 @@ def _find_event(db, match_title: str, match_date: Optional[str]) -> Optional[dic
                 return dict(row)
         return None
 
-    # Tokenize the search needle into a set of words
-    needle_words = set(re.findall(r'\w+', match_title.lower()))
     today = dt.date.today().isoformat()
+
+    # Strip stop words from the needle so common calendar words don't pollute scores.
+    # Keep at least the full needle if stripping leaves nothing.
+    raw_needle_words = set(re.findall(r'\w+', match_title.lower()))
+    needle_words = raw_needle_words - _STOP_WORDS
+    if not needle_words:
+        needle_words = raw_needle_words
+
+    def _score(row_dict: dict) -> int:
+        title_words = set(re.findall(r'\w+', row_dict["title"].lower()))
+        overlap = len(needle_words.intersection(title_words))
+
+        # Substring boost: normalise dashes/underscores before comparing
+        clean_needle = re.sub(r'[-_]', '', match_title.lower())
+        clean_title  = re.sub(r'[-_]', '', row_dict["title"].lower())
+        if clean_title in clean_needle or clean_needle in clean_title:
+            overlap += 10
+
+        return overlap
 
     with db._conn() as conn:
         if match_date:
@@ -301,37 +338,29 @@ def _find_event(db, match_title: str, match_date: Optional[str]) -> Optional[dic
                 "SELECT * FROM events WHERE date = ? ORDER BY start_time",
                 (match_date,),
             ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT * FROM events WHERE date >= ? ORDER BY date ASC, start_time ASC",
-                (today,),
-            ).fetchall()
+            rows = [dict(r) for r in rows]
+            # If the LLM gave a wrong date, fall back to all events
             if not rows:
                 rows = conn.execute(
-                    "SELECT * FROM events WHERE date < ? ORDER BY date DESC, start_time DESC",
+                    "SELECT * FROM events ORDER BY ABS(julianday(date) - julianday(?)), start_time",
                     (today,),
                 ).fetchall()
+                rows = [dict(r) for r in rows]
+        else:
+            # Search ALL events ordered by proximity to today so upcoming events
+            # win ties over distant past/future ones.
+            rows = conn.execute(
+                "SELECT * FROM events ORDER BY ABS(julianday(date) - julianday(?)), start_time",
+                (today,),
+            ).fetchall()
+            rows = [dict(r) for r in rows]
 
     best_match = None
     best_score = 0
-    
-    for row in rows:
-        row_dict = dict(row)
-        title_words = set(re.findall(r'\w+', row_dict["title"].lower()))
-        
-        # Check intersection score (how many target words exist in the event title)
-        overlap = len(needle_words.intersection(title_words))
-        
-        # Or if the event title is a strict substring of the needle (e.g. "daily stand-up end" contains "daily standup")
-        # Removing dashes for safe comparisons
-        clean_needle = match_title.lower().replace("-", " ")
-        clean_title = row_dict["title"].lower().replace("-", " ")
-        
-        if clean_title in clean_needle or clean_needle in clean_title:
-            overlap += 10  # Massive score boost for substring match
-            
-        if overlap > best_score:
-            best_score = overlap
+    for row_dict in rows:
+        s = _score(row_dict)
+        if s > best_score:
+            best_score = s
             best_match = row_dict
 
     return best_match if best_score > 0 else None
