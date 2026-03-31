@@ -12,6 +12,7 @@ import sys
 # ---------------------------------------------------------------------------
 import assistant.actions.calendar  # noqa: F401  registers CreateEventAction
 import assistant.actions.todo      # noqa: F401  registers todo actions
+import assistant.actions.clarify   # noqa: F401  registers ClarifyAction
 
 from assistant.actions import registry
 from assistant.calendar_ui.window import CalendarWindow

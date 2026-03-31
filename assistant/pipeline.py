@@ -194,7 +194,9 @@ class Pipeline:
         # 4. Confirm + execute each action
         results: List[str] = []
         for action_name, intent in valid:
-            if not self._confirmer.check(action_name, intent):
+            if action_name == "clarify":
+                pass  # never prompt confirmation for a clarification question
+            elif not self._confirmer.check(action_name, intent):
                 self._tts.speak("Cancelled.")
                 self._set_status(STATUS_IDLE, "")
                 return
@@ -224,6 +226,12 @@ class Pipeline:
 
         if results:
             summary = " ".join(results)
+            # Clarify-only responses don't touch the calendar — go straight to idle
+            is_clarify = all(name == "clarify" for name, _ in valid)
+            if is_clarify:
+                self._tts.speak_sync(summary)
+                self._set_status(STATUS_IDLE, "")
+                return
             # Check if any executed action requested a UI view switch
             view_switch = next(
                 (getattr(self.registry.get(n), "view_switch", None) for n, _ in valid
