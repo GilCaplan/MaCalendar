@@ -5,8 +5,8 @@ from __future__ import annotations
 import datetime
 from typing import List
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QPainter, QPen
+from PyQt6.QtCore import Qt, QMimeData, QByteArray, pyqtSignal
+from PyQt6.QtGui import QColor, QDrag, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QGridLayout,
     QLabel,
@@ -45,6 +45,7 @@ class EventBlock(QLabel):
         start = event.get("start_time", "")
         end = event.get("end_time", "")
         self.event = event
+        self._drag_start = None
         self.setText(f"  {event['title']}\n  {start}–{end}")
         self.setWordWrap(True)
         self.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
@@ -63,7 +64,32 @@ class EventBlock(QLabel):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
     def mousePressEvent(self, event):
-        self.clicked.emit(self.event)
+        self._drag_start = event.pos()
+
+    def mouseMoveEvent(self, event):
+        if self._drag_start is None:
+            return
+        if (event.pos() - self._drag_start).manhattanLength() < 8:
+            return
+        drag = QDrag(self)
+        mime = QMimeData()
+        mime.setData("application/x-event-id", QByteArray(str(self.event["id"]).encode()))
+        drag.setMimeData(mime)
+        pixmap = self.grab()
+        transparent = QPixmap(pixmap.size())
+        transparent.fill(QColor(0, 0, 0, 0))
+        p = QPainter(transparent)
+        p.setOpacity(0.75)
+        p.drawPixmap(0, 0, pixmap)
+        p.end()
+        drag.setPixmap(transparent)
+        self._drag_start = None
+        drag.exec(Qt.DropAction.MoveAction)
+
+    def mouseReleaseEvent(self, event):
+        if self._drag_start is not None:
+            self._drag_start = None
+            self.clicked.emit(self.event)
 
 
 class DayColumn(QWidget):
@@ -71,6 +97,7 @@ class DayColumn(QWidget):
 
     slot_double_clicked = pyqtSignal(datetime.datetime)
     event_clicked = pyqtSignal(dict)
+    event_rescheduled = pyqtSignal(int, dict)
 
     def __init__(self, date: datetime.date, parent=None):
         super().__init__(parent)
@@ -82,6 +109,8 @@ class DayColumn(QWidget):
         self.is_today = date == datetime.date.today()
         self.is_weekend = date.weekday() >= 5
         self._event_widgets: List[EventBlock] = []
+        self._drag_hover = False
+        self.setAcceptDrops(True)
         self._apply_bg()
 
     def _apply_bg(self) -> None:
@@ -128,6 +157,34 @@ class DayColumn(QWidget):
         dt = datetime.datetime.combine(self.date, datetime.time(min(hour, 23), minute))
         self.slot_double_clicked.emit(dt)
 
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasFormat("application/x-event-id"):
+            event.acceptProposedAction()
+            self._drag_hover = True
+            self.update()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasFormat("application/x-event-id"):
+            event.acceptProposedAction()
+
+    def dragLeaveEvent(self, event):
+        self._drag_hover = False
+        self.update()
+
+    def dropEvent(self, event):
+        self._drag_hover = False
+        self.update()
+        if event.mimeData().hasFormat("application/x-event-id"):
+            event_id = int(bytes(event.mimeData().data("application/x-event-id")).decode())
+            y = event.position().y()
+            total_min = int(y / HOUR_HEIGHT * 60)
+            total_min = (total_min // 30) * 30
+            new_h = min(total_min // 60, 23)
+            new_m = total_min % 60
+            new_start = f"{new_h:02d}:{new_m:02d}"
+            self.event_rescheduled.emit(event_id, {"date": self.date.isoformat(), "start_time": new_start})
+            event.acceptProposedAction()
+
     def paintEvent(self, event):
         super().paintEvent(event)
         dark = _styles._dark
@@ -140,6 +197,8 @@ class DayColumn(QWidget):
             painter.drawLine(0, y, self.width(), y)
         # Right border
         painter.drawLine(self.width() - 1, 0, self.width() - 1, self.height())
+        if self._drag_hover:
+            painter.fillRect(self.rect(), QColor("#0078d4").lighter(190))
 
 
 class WeekView(QWidget):
@@ -152,12 +211,13 @@ class WeekView(QWidget):
 
     datetime_double_clicked = pyqtSignal(datetime.datetime)
     event_clicked = pyqtSignal(dict)
+    event_rescheduled = pyqtSignal(int, dict)
 
     def __init__(self, db, parent=None):
         super().__init__(parent)
         self._db = db
         today = datetime.date.today()
-        self._week_start = today - datetime.timedelta(days=today.weekday())
+        self._week_start = today - datetime.timedelta(days=(today.weekday() + 1) % 7)
         self._day_columns: List[DayColumn] = []
 
         layout = QVBoxLayout(self)
@@ -302,6 +362,7 @@ class WeekView(QWidget):
             col = DayColumn(date)
             col.slot_double_clicked.connect(self.datetime_double_clicked)
             col.event_clicked.connect(self.event_clicked)
+            col.event_rescheduled.connect(self.event_rescheduled)
             self._col_layout.addWidget(col, 0, i)
             self._col_layout.setColumnStretch(i, 1)
             self._day_columns.append(col)

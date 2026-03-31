@@ -6,8 +6,8 @@ import calendar
 import datetime
 from typing import List, Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QPainter, QPen
+from PyQt6.QtCore import Qt, QMimeData, QByteArray, QPoint, pyqtSignal
+from PyQt6.QtGui import QColor, QDrag, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QGridLayout,
     QLabel,
@@ -29,7 +29,7 @@ from assistant.calendar_ui.styles import (
     WHITE,
 )
 
-DAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+DAY_HEADERS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
 
 class EventPill(QLabel):
@@ -40,6 +40,7 @@ class EventPill(QLabel):
     def __init__(self, event: dict, parent=None):
         super().__init__(parent)
         self.event = event
+        self._drag_start = None
         color = event.get("color", BLUE)
         start = event.get("start_time", "")
         text = f"  {start}  {event['title']}" if start else f"  {event['title']}"
@@ -60,15 +61,42 @@ class EventPill(QLabel):
             f"{event['title']}\n{event.get('date','')}  {start} – {event.get('end_time','')}"
         )
 
-    def mousePressEvent(self, _event):
-        self.clicked.emit(self.event)
+    def mousePressEvent(self, event):
+        self._drag_start = event.pos()
+
+    def mouseMoveEvent(self, event):
+        if self._drag_start is None:
+            return
+        if (event.pos() - self._drag_start).manhattanLength() < 8:
+            return
+        drag = QDrag(self)
+        mime = QMimeData()
+        mime.setData("application/x-event-id", QByteArray(str(self.event["id"]).encode()))
+        drag.setMimeData(mime)
+        # Semi-transparent drag pixmap
+        pixmap = self.grab()
+        transparent = QPixmap(pixmap.size())
+        transparent.fill(QColor(0, 0, 0, 0))
+        p = QPainter(transparent)
+        p.setOpacity(0.75)
+        p.drawPixmap(0, 0, pixmap)
+        p.end()
+        drag.setPixmap(transparent)
+        self._drag_start = None
+        drag.exec(Qt.DropAction.MoveAction)
+
+    def mouseReleaseEvent(self, event):
+        if self._drag_start is not None:
+            self._drag_start = None
+            self.clicked.emit(self.event)
 
 
 class DayCell(QWidget):
     """One cell in the month grid."""
 
-    day_clicked   = pyqtSignal(datetime.date)
-    event_clicked = pyqtSignal(dict)
+    day_clicked    = pyqtSignal(datetime.date)
+    event_clicked  = pyqtSignal(dict)
+    event_rescheduled = pyqtSignal(int, dict)
 
     def __init__(self, date: datetime.date, is_current_month: bool, parent=None):
         super().__init__(parent)
@@ -76,11 +104,13 @@ class DayCell(QWidget):
         self.is_current_month = is_current_month
         self.is_today         = date == datetime.date.today()
         self._selected        = False
+        self._drag_hover      = False
         self._events: List[dict] = []
 
         self.setMinimumHeight(88)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAcceptDrops(True)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 3)
@@ -125,6 +155,28 @@ class DayCell(QWidget):
     def mouseDoubleClickEvent(self, event):
         self.day_clicked.emit(self.date)
 
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasFormat("application/x-event-id"):
+            event.acceptProposedAction()
+            self._drag_hover = True
+            self.update()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasFormat("application/x-event-id"):
+            event.acceptProposedAction()
+
+    def dragLeaveEvent(self, event):
+        self._drag_hover = False
+        self.update()
+
+    def dropEvent(self, event):
+        self._drag_hover = False
+        self.update()
+        if event.mimeData().hasFormat("application/x-event-id"):
+            event_id = int(bytes(event.mimeData().data("application/x-event-id")).decode())
+            self.event_rescheduled.emit(event_id, {"date": self.date.isoformat()})
+            event.acceptProposedAction()
+
     def paintEvent(self, event):
         super().paintEvent(event)
         dark = _styles._dark
@@ -139,6 +191,8 @@ class DayCell(QWidget):
 
         painter = QPainter(self)
         painter.fillRect(self.rect(), QColor(bg))
+        if self._drag_hover:
+            painter.fillRect(self.rect(), QColor("#0078d4").lighter(190))
         painter.setPen(QPen(QColor(border_color)))
         painter.drawLine(self.width() - 1, 0, self.width() - 1, self.height())
         painter.drawLine(0, self.height() - 1, self.width(), self.height() - 1)
@@ -211,6 +265,7 @@ class MonthView(QWidget):
     date_selected       = pyqtSignal(datetime.date)
     date_double_clicked = pyqtSignal(datetime.date)
     event_clicked       = pyqtSignal(dict)
+    event_rescheduled   = pyqtSignal(int, dict)
 
     def __init__(self, db, parent=None):
         super().__init__(parent)
@@ -288,7 +343,7 @@ class MonthView(QWidget):
                 item.widget().deleteLater()
         self._cells.clear()
 
-        cal   = calendar.Calendar(firstweekday=0)
+        cal   = calendar.Calendar(firstweekday=6)
         weeks = cal.monthdatescalendar(self._year, self._month)
         while len(weeks) < 6:
             last = weeks[-1]
@@ -301,6 +356,7 @@ class MonthView(QWidget):
                 cell.set_selected(date == self._selected_date)
                 cell.day_clicked.connect(self._on_cell_clicked)
                 cell.event_clicked.connect(self.event_clicked)
+                cell.event_rescheduled.connect(self.event_rescheduled)
                 self._grid.addWidget(cell, row, col)
                 self._cells.append(cell)
 

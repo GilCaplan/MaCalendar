@@ -62,7 +62,7 @@ class CreateEventAction(BaseAction):
 
         if intent.recurrence:
             return f"Created recurring {intent.recurrence} event '{intent.title}' starting on {intent.date}."
-        return f"Created event '{intent.title}' on {intent.date} from {intent.start_time} to {intent.end_time}."
+        return f"Created event '{intent.title}' on {intent.date} from {_fmt_time(intent.start_time)} to {_fmt_time(intent.end_time)}."
 
 
 # ---------------------------------------------------------------------------
@@ -361,5 +361,15 @@ def _find_event(db, match_title: str, match_date: Optional[str]) -> Optional[dic
         if s > best_score:
             best_score = s
             best_match = row_dict
+
+    # When title search finds nothing but a date was given, return first event on that date
+    if best_match is None and match_date:
+        with db._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM events WHERE date = ? ORDER BY start_time",
+                (match_date,),
+            ).fetchall()
+        if rows:
+            return dict(rows[0])
 
     return best_match if best_score > 0 else None

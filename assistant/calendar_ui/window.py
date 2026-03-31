@@ -193,6 +193,9 @@ class CalendarWindow(QMainWindow):
         self._day_view.datetime_double_clicked.connect(self._on_datetime_double_clicked)
         self._day_view.event_clicked.connect(self._on_event_clicked)
         self._day_view.briefing_requested.connect(self._on_briefing_requested)
+        self._month_view.event_rescheduled.connect(self._on_event_rescheduled)
+        self._week_view.event_rescheduled.connect(self._on_event_rescheduled)
+        self._day_view.event_rescheduled.connect(self._on_event_rescheduled)
         splitter.addWidget(self._stack)
 
         splitter.setSizes([200, 900])
@@ -362,7 +365,7 @@ class CalendarWindow(QMainWindow):
         if self._view_mode == "month":
             self._month_view.navigate(self._current_date.year, self._current_date.month)
         elif self._view_mode == "week":
-            week_start = self._current_date - datetime.timedelta(days=self._current_date.weekday())
+            week_start = self._current_date - datetime.timedelta(days=(self._current_date.weekday() + 1) % 7)
             self._week_view.navigate(week_start)
         else:  # day
             self._day_view.navigate(self._current_date)
@@ -403,7 +406,7 @@ class CalendarWindow(QMainWindow):
         elif self._view_mode == "month":
             self._title_label.setText(self._current_date.strftime("%B %Y"))
         elif self._view_mode == "week":
-            week_start = self._current_date - datetime.timedelta(days=self._current_date.weekday())
+            week_start = self._current_date - datetime.timedelta(days=(self._current_date.weekday() + 1) % 7)
             week_end = week_start + datetime.timedelta(days=6)
             if week_start.month == week_end.month:
                 self._title_label.setText(
@@ -473,6 +476,24 @@ class CalendarWindow(QMainWindow):
                         self._db.update_event(ev_id, **dialog.event_data)
                     self.refresh_calendar()
                     self.show_toast(f"Updated \"{dialog.event_data['title']}\"")
+
+    def _on_event_rescheduled(self, event_id: int, updates: dict) -> None:
+        if "start_time" in updates and "end_time" not in updates:
+            event = self._db.get_event(event_id)
+            if event:
+                try:
+                    orig_sh, orig_sm = map(int, event["start_time"].split(":"))
+                    orig_eh, orig_em = map(int, event["end_time"].split(":"))
+                    duration_min = (orig_eh * 60 + orig_em) - (orig_sh * 60 + orig_sm)
+                    if duration_min > 0:
+                        new_sh, new_sm = map(int, updates["start_time"].split(":"))
+                        end_min = min(new_sh * 60 + new_sm + duration_min, 23 * 60 + 59)
+                        updates["end_time"] = f"{end_min // 60:02d}:{end_min % 60:02d}"
+                except Exception:
+                    pass
+        self._db.update_event(event_id, **updates)
+        self.refresh_calendar()
+        self.show_toast("Event moved")
 
     # ------------------------------------------------------------------
     # Voice assistant integration
