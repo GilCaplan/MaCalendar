@@ -219,8 +219,8 @@ class EventDialog(QDialog):
             dot.setFixedSize(24 if dot.color == self._selected_color else 20, 24 if dot.color == self._selected_color else 20)
 
     def _on_delete(self) -> None:
+        from PyQt6.QtWidgets import QMessageBox
         if self._event and self._event.get("series_id"):
-            from PyQt6.QtWidgets import QMessageBox
             msg = QMessageBox(self)
             msg.setWindowTitle("Delete Event")
             msg.setText("This is a repeating event.")
@@ -229,7 +229,6 @@ class EventDialog(QDialog):
             btn_series = msg.addButton("Entire series", QMessageBox.ButtonRole.DestructiveRole)
             msg.addButton(QMessageBox.StandardButton.Cancel)
             msg.exec()
-            
             if msg.clickedButton() == btn_only_this:
                 self.delete_requested = True
                 self.accept()
@@ -237,8 +236,17 @@ class EventDialog(QDialog):
                 self.delete_series_requested = True
                 self.accept()
         else:
-            self.delete_requested = True
-            self.accept()
+            title = self._event["title"] if self._event else "this event"
+            reply = QMessageBox.question(
+                self,
+                "Delete Event",
+                f"Delete \"{title}\"?\nThis cannot be undone.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.delete_requested = True
+                self.accept()
 
     def _on_save(self) -> None:
         title = self._title.text().strip()
