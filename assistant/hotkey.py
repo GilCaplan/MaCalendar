@@ -48,6 +48,7 @@ class HotkeyListener:
             for keys in [_MODIFIER_MAP[mod]]
         }
         self._pressed: Set = set()
+        self._combo_active: bool = False  # debounce — fire once per press, not on repeat
         self._listener: keyboard.Listener | None = None
 
     def start(self) -> None:
@@ -67,11 +68,17 @@ class HotkeyListener:
     def _on_press(self, key) -> None:
         self._pressed.add(key)
         if self._is_combo_active():
-            logger.debug("Hotkey triggered.")
-            threading.Thread(target=self.callback, daemon=True).start()
+            if not self._combo_active:
+                self._combo_active = True
+                logger.debug("Hotkey triggered.")
+                threading.Thread(target=self.callback, daemon=True).start()
+        else:
+            self._combo_active = False
 
     def _on_release(self, key) -> None:
         self._pressed.discard(key)
+        if not self._is_combo_active():
+            self._combo_active = False
 
     def _is_combo_active(self) -> bool:
         """Return True if all required modifiers and the trigger key are held."""

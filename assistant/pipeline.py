@@ -19,6 +19,7 @@ from assistant.exceptions import (
     AuthExpiredError,
     LLMTimeoutError,
     LLMUnavailableError,
+    OllamaTimeoutError,
     OllamaUnavailableError,
     ParseError,
 )
@@ -65,6 +66,7 @@ class Pipeline:
 
         self.status_queue: queue.Queue[str] = queue.Queue()
         self._busy = threading.Event()
+        self._trigger_lock = threading.Lock()
         self._phase = STATUS_IDLE  # tracks current stage for button re-press logic
 
         self.on_auth_expired: Optional[Callable[[], None]] = None
@@ -73,14 +75,15 @@ class Pipeline:
 
     def trigger(self) -> None:
         """Called by HotkeyListener or mic button."""
-        if self._busy.is_set():
-            if self._phase == STATUS_LISTENING:
-                # Still recording — stop the mic immediately
-                self.stop_recording()
-            else:
-                # Transcribing or LLM parsing — can't interrupt
-                self._tts.speak("Still processing, please wait.")
-            return
+        with self._trigger_lock:
+            if self._busy.is_set():
+                if self._phase == STATUS_LISTENING:
+                    self.stop_recording()
+                else:
+                    self._tts.speak("Still processing, please wait.")
+                return
+            # Mark busy before spawning so rapid re-triggers see it immediately
+            self._busy.set()
         threading.Thread(target=self._run, daemon=True).start()
 
     def stop_recording(self) -> None:
@@ -95,7 +98,6 @@ class Pipeline:
     # ------------------------------------------------------------------
 
     def _run(self) -> None:
-        self._busy.set()
         try:
             self._run_pipeline()
         finally:
