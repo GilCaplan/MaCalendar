@@ -66,8 +66,8 @@ class TodoItemWidget(QWidget):
 
     def _build(self) -> None:
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 4, 8, 4)
-        layout.setSpacing(8)
+        layout.setContentsMargins(14, 6, 10, 6)
+        layout.setSpacing(10)
 
         # Circular checkbox
         self._check = QCheckBox()
@@ -197,7 +197,8 @@ class TodoItemWidget(QWidget):
 class TodoListWidget(QWidget):
     """Displays all todos for a given list_name with add/complete/edit/delete."""
 
-    todo_changed = pyqtSignal()   # bubbles up to TodoView
+    todo_changed  = pyqtSignal()      # bubbles up to TodoView
+    count_changed = pyqtSignal(int)   # pending task count
 
     def __init__(self, db, list_name: str, dark: bool = False, parent=None) -> None:
         super().__init__(parent)
@@ -235,6 +236,9 @@ class TodoListWidget(QWidget):
             self._layout.addWidget(item)
             self._item_widgets.append(item)
 
+        pending = sum(1 for t in todos if not t["completed"])
+        self.count_changed.emit(pending)
+
         # Add "New Task" row
         self._layout.addWidget(self._make_new_task_row())
         self._layout.addStretch()
@@ -242,8 +246,8 @@ class TodoListWidget(QWidget):
     def _make_new_task_row(self) -> QWidget:
         row = QWidget()
         hl = QHBoxLayout(row)
-        hl.setContentsMargins(8, 4, 8, 4)
-        hl.setSpacing(8)
+        hl.setContentsMargins(14, 6, 10, 6)
+        hl.setSpacing(10)
 
         # Placeholder "+" label that converts to an editor on click
         plus_label = QLabel("+ New Task")
@@ -307,10 +311,10 @@ class TodoListWidget(QWidget):
 # ---------------------------------------------------------------------------
 
 class SectionHeader(QWidget):
-    """Section header with a title, optional sync button, sync badge, and settings gear menu."""
+    """Section header with title, task count, optional sync button and gear menu."""
 
-    sync_now_clicked = pyqtSignal()       # direct "sync now" button
-    sync_mode_changed = pyqtSignal(str)   # 'today' | 'general' | 'off' from gear menu
+    sync_now_clicked  = pyqtSignal()
+    sync_mode_changed = pyqtSignal(str)
 
     def __init__(self, title: str, show_sync_button: bool = False,
                  show_sync_gear: bool = False,
@@ -318,7 +322,7 @@ class SectionHeader(QWidget):
         super().__init__(parent)
         self._dark = dark
         hl = QHBoxLayout(self)
-        hl.setContentsMargins(12, 8, 12, 4)
+        hl.setContentsMargins(14, 12, 12, 4)
         hl.setSpacing(6)
 
         # Bold section title
@@ -329,9 +333,21 @@ class SectionHeader(QWidget):
         self._title_lbl.setFont(font)
         hl.addWidget(self._title_lbl)
 
-        # Sync badge (hidden by default, shown when synced)
-        self._sync_badge = QLabel("● synced")
-        self._sync_badge.setStyleSheet("color: #0078d4; font-size: 10px;")
+        # Count badge
+        self._count_lbl = QLabel()
+        self._count_lbl.setStyleSheet(
+            "color: #ffffff; background-color: #1a6fc4; border-radius: 8px;"
+            " font-size: 10px; font-weight: 600; padding: 1px 6px;"
+        )
+        self._count_lbl.hide()
+        hl.addWidget(self._count_lbl)
+
+        # Sync badge (hidden by default)
+        self._sync_badge = QLabel("synced")
+        self._sync_badge.setStyleSheet(
+            "color: #1a6fc4; font-size: 10px; padding: 1px 6px;"
+            " border: 1px solid #1a6fc4; border-radius: 8px;"
+        )
         self._sync_badge.hide()
         hl.addWidget(self._sync_badge)
 
@@ -369,6 +385,14 @@ class SectionHeader(QWidget):
             hl.addWidget(gear)
 
         self._apply_theme(dark)
+
+    def set_count(self, n: int) -> None:
+        """Show or hide the pending-task count badge."""
+        if n > 0:
+            self._count_lbl.setText(str(n))
+            self._count_lbl.show()
+        else:
+            self._count_lbl.hide()
 
     def set_synced(self, synced: bool) -> None:
         self._sync_badge.setVisible(synced)
@@ -440,6 +464,7 @@ class TodoView(QWidget):
 
         self._today_list = TodoListWidget(self._db, "today", dark=self._dark)
         self._today_list.todo_changed.connect(self.refresh)
+        self._today_list.count_changed.connect(self._today_header.set_count)
         self._content_layout.addWidget(self._today_list)
 
         # Separator
@@ -454,6 +479,7 @@ class TodoView(QWidget):
 
         self._general_list = TodoListWidget(self._db, "general", dark=self._dark)
         self._general_list.todo_changed.connect(self.refresh)
+        self._general_list.count_changed.connect(self._general_header.set_count)
         self._content_layout.addWidget(self._general_list)
 
         self._content_layout.addStretch()

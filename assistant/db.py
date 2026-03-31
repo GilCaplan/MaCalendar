@@ -84,9 +84,9 @@ def _next_date(d: datetime.date, recurrence: str) -> datetime.date:
 class CalendarDB:
     """Thread-safe SQLite calendar event store."""
 
-    def __init__(self, path: str = DB_PATH) -> None:
-        self.path = path
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+    def __init__(self, path: str | None = None) -> None:
+        self.path = path if path is not None else DB_PATH
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
         with self._conn() as conn:
             conn.execute(_CREATE_TABLE)
             self._migrate(conn)
@@ -397,7 +397,7 @@ class CalendarDB:
     def get_todos(
         self,
         list_name: Optional[str] = None,
-        include_completed: bool = True,
+        include_completed: bool = False,
     ) -> List[dict]:
         """Return todos, optionally filtered by list and/or completion state."""
         query = "SELECT * FROM todos"
@@ -481,8 +481,9 @@ class CalendarDB:
     def sync_calendar_to_todos(self, list_name: str = "today") -> int:
         """
         Pull calendar events into the todos table with source='calendar_sync'.
-        Wipes previous calendar_sync rows for this list first.
-        Returns the count of todos created.
+        Upserts by source_event_id so manually completed synced tasks keep
+        their completion state across re-syncs.
+        Returns the count of todos created or updated.
         """
         today = datetime.date.today()
         if list_name == "general":
@@ -490,21 +491,30 @@ class CalendarDB:
         else:
             events = self.get_events_for_day(today)
 
-        # Remove old synced rows for this list before re-inserting
-        with self._conn() as conn:
-            conn.execute(
-                "DELETE FROM todos WHERE source = 'calendar_sync' AND list = ?",
-                (list_name,),
-            )
+        # Build lookup of existing synced todos: source_event_id → row
+        existing: dict[int, dict] = {}
+        for row in self.get_todos_by_source("calendar_sync"):
+            if row["source_event_id"] is not None:
+                existing[row["source_event_id"]] = row
+
+        # Remove synced todos whose source event no longer exists
+        incoming_ids = {ev["id"] for ev in events}
+        for ev_id, row in existing.items():
+            if ev_id not in incoming_ids:
+                self.delete_todo(row["id"])
 
         count = 0
         for ev in events:
-            self.create_todo(
-                title=ev["title"],
-                list_name=list_name,
-                source="calendar_sync",
-                source_event_id=ev["id"],
-            )
+            if ev["id"] in existing:
+                # Update title (event may have been renamed) but keep completion state
+                self.update_todo(existing[ev["id"]]["id"], title=ev["title"])
+            else:
+                self.create_todo(
+                    title=ev["title"],
+                    list_name=list_name,
+                    source="calendar_sync",
+                    source_event_id=ev["id"],
+                )
             count += 1
         return count
 
@@ -517,5 +527,11 @@ class CalendarDB:
         with self._conn() as conn:
             conn.execute("DELETE FROM events")
             conn.execute("DELETE FROM sqlite_sequence WHERE name='events'")  # reset IDs
+
+    def clear_all_todos(self) -> None:
+        """Wipe all todos from the database."""
+        with self._conn() as conn:
+            conn.execute("DELETE FROM todos")
+            conn.execute("DELETE FROM sqlite_sequence WHERE name='todos'")  # reset IDs
 
 

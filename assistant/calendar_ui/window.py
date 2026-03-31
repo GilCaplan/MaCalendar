@@ -206,99 +206,114 @@ class CalendarWindow(QMainWindow):
         self._update_title()
 
     def _build_toolbar(self) -> QWidget:
+        from PyQt6.QtWidgets import QFrame
         bar = QWidget()
-        self._toolbar_bar = bar  # keep ref for theme updates
-        bar.setFixedHeight(52)
+        self._toolbar_bar = bar
+        bar.setFixedHeight(54)
         bar.setStyleSheet(f"background-color: {WHITE}; border-bottom: 1px solid {GRAY_BORDER};")
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(12, 0, 12, 0)
-        layout.setSpacing(4)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(2)
 
-        # Nav arrows
+        # ── Group 1: nav arrows ──────────────────────────────────────
         prev_btn = QPushButton("‹")
         prev_btn.setObjectName("nav")
         prev_btn.setFixedSize(28, 28)
+        prev_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         prev_btn.clicked.connect(self._on_prev)
         layout.addWidget(prev_btn)
 
         next_btn = QPushButton("›")
         next_btn.setObjectName("nav")
         next_btn.setFixedSize(28, 28)
+        next_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         next_btn.clicked.connect(self._on_next)
         layout.addWidget(next_btn)
 
-        # Today button
+        layout.addSpacing(4)
+
         today_btn = QPushButton("Today")
         today_btn.setObjectName("flat")
+        today_btn.setFixedHeight(30)
+        today_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         today_btn.clicked.connect(self._on_today)
         layout.addWidget(today_btn)
 
-        # Month/Year title
+        # ── Title ────────────────────────────────────────────────────
+        layout.addSpacing(6)
         self._title_label = QLabel()
         self._title_label.setObjectName("month_title")
         font = QFont()
-        font.setPointSize(16)
+        font.setPointSize(15)
         font.setWeight(QFont.Weight.DemiBold)
         self._title_label.setFont(font)
         layout.addWidget(self._title_label)
 
         layout.addStretch()
 
-        # View toggle
+        # ── Group 2: view toggle tabs ────────────────────────────────
         for label, mode in [("Month", "month"), ("Week", "week"), ("Day", "day"), ("Tasks", "todo")]:
             btn = QPushButton(label)
-            btn.setObjectName("view_btn")
+            btn.setObjectName("seg_btn")
             btn.setProperty("active", mode == self._view_mode)
-            btn.clicked.connect(lambda _, m=mode: self._set_view(m))
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFixedHeight(30)
+            btn.clicked.connect(lambda _, m=mode: self._set_view(m))
             layout.addWidget(btn)
             setattr(self, f"_view_btn_{mode}", btn)
 
+        # ── Separator ────────────────────────────────────────────────
         layout.addSpacing(8)
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setFixedHeight(22)
+        sep.setStyleSheet(f"color: {GRAY_BORDER};")
+        layout.addWidget(sep)
+        layout.addSpacing(6)
 
-        # Settings Popup
-        self._settings_btn = QPushButton("⚙️")
-        self._settings_btn.setObjectName("flat")
-        self._settings_btn.setFixedSize(36, 36)
-        self._settings_btn.setToolTip("Assistant Settings")
-        self._settings_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._settings_btn.clicked.connect(self._on_settings_popup)
-        layout.addWidget(self._settings_btn)
-
-        layout.addSpacing(4)
-
-        # Import button
-        import_btn = QPushButton("⬇ Import")
+        # ── Group 3: tools ───────────────────────────────────────────
+        import_btn = QPushButton("Import")
         import_btn.setObjectName("flat")
+        import_btn.setFixedHeight(30)
         import_btn.setToolTip("Import events from an .ics file or macOS Calendar")
         import_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         import_btn.clicked.connect(self._on_import)
         layout.addWidget(import_btn)
 
-        layout.addSpacing(4)
+        self._settings_btn = QPushButton("⚙")
+        self._settings_btn.setObjectName("icon_btn")
+        self._settings_btn.setFixedSize(30, 30)
+        self._settings_btn.setToolTip("Assistant Settings")
+        self._settings_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._settings_btn.clicked.connect(self._on_settings_popup)
+        layout.addWidget(self._settings_btn)
 
-        # Dark mode toggle
-        self._theme_btn = QPushButton("🌙")
-        self._theme_btn.setObjectName("flat")
-        self._theme_btn.setFixedSize(36, 36)
+        self._theme_btn = QPushButton("○")
+        self._theme_btn.setObjectName("icon_btn")
+        self._theme_btn.setFixedSize(30, 30)
         self._theme_btn.setToolTip("Toggle dark / light mode")
         self._theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._theme_btn.clicked.connect(self._on_toggle_theme)
         layout.addWidget(self._theme_btn)
+        self._update_theme_btn()
 
-        layout.addSpacing(4)
+        layout.addSpacing(2)
 
-        # Mic button (voice assistant status)
         self._mic_btn = QPushButton("🎙")
         self._mic_btn.setObjectName("mic_idle")
-        self._mic_btn.setFixedSize(36, 36)
-        self._mic_btn.setToolTip("Click or press Cmd+Shift+Space to activate voice assistant")
+        self._mic_btn.setFixedSize(30, 30)
+        self._mic_btn.setToolTip("Click or press Ctrl+J to toggle the microphone")
         self._mic_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         if self._pipeline is not None:
             self._mic_btn.clicked.connect(self._pipeline.trigger)
         layout.addWidget(self._mic_btn)
 
         return bar
+
+    def _update_theme_btn(self) -> None:
+        # Show the icon for what the mode will switch TO
+        self._theme_btn.setText("☀" if self._dark else "☾")
+        self._theme_btn.setToolTip("Switch to light mode" if self._dark else "Switch to dark mode")
 
     # ------------------------------------------------------------------
     # Navigation
@@ -374,11 +389,11 @@ class CalendarWindow(QMainWindow):
             if mode == "todo":
                 self._mic_btn.setToolTip(
                     "Tasks mode — voice commands will create/manage tasks\n"
-                    "Click or press Cmd+Shift+Space to speak"
+                    "Click or press Ctrl+J to speak"
                 )
             else:
                 self._mic_btn.setToolTip(
-                    "Click or press Cmd+Shift+Space to activate voice assistant"
+                    "Click or press Ctrl+J to toggle the microphone"
                 )
         self._navigate()
 
@@ -554,7 +569,13 @@ class CalendarWindow(QMainWindow):
         self._toolbar_bar.setStyleSheet(
             f"background-color: {bg}; border-bottom: 1px solid {border};"
         )
-        self._theme_btn.setText("☀️" if dark else "🌙")
+        # Force segmented buttons to repaint with new theme
+        for m in ("month", "week", "day", "todo"):
+            btn = getattr(self, f"_view_btn_{m}", None)
+            if btn:
+                btn.style().unpolish(btn)
+                btn.style().polish(btn)
+        self._update_theme_btn()
         self.show_toast("Dark mode on" if dark else "Light mode on")
 
     def _on_briefing_requested(self) -> None:

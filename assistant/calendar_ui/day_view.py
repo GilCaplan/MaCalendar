@@ -346,6 +346,6 @@ class DayView(QWidget):
         )
         self._time_col.setStyleSheet(f"background-color: {bg};")
         for lbl in self._time_labels:
-            lbl.setStyleSheet(f"font-size: 10px; color: {text2}; padding-top: 2px;")
+            lbl.setStyleSheet(f"font-size: 11px; color: {text2}; padding-top: 2px;")
         self._date_label.setStyleSheet(f"color: {text_main};")
         self._count_label.setStyleSheet(f"color: {text2};")

@@ -37,6 +37,7 @@ class UpdateTodoIntent(BaseIntent):
     new_title: Optional[str] = None
     new_list: Optional[str] = None
     new_priority: Optional[str] = None
+    new_due_date: Optional[str] = None  # ISO date string, e.g. '2026-04-01'
 
 
 class QueryTodoIntent(BaseIntent):

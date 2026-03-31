@@ -237,7 +237,7 @@ class WeekView(QWidget):
         )
         self._time_col.setStyleSheet(f"background-color: {bg};")
         for lbl in self._time_labels:
-            lbl.setStyleSheet(f"font-size: 10px; color: {text2}; padding-top: 2px;")
+            lbl.setStyleSheet(f"font-size: 11px; color: {text2}; padding-top: 2px;")
 
     def navigate(self, week_start: datetime.date) -> None:
         self._week_start = week_start

@@ -41,7 +41,7 @@ def clear_todos():
     with db._conn() as conn:
         conn.execute("DELETE FROM todos")
         conn.execute("DELETE FROM sqlite_sequence WHERE name='todos'")
-    todos = db.get_todos()
+    todos = db.get_todos(include_completed=True)
     assert len(todos) == 0, "Failed to clear todos"
 
 
@@ -172,29 +172,17 @@ def run_direct_tests():
     all_todos = db.get_todos(include_completed=True)
     assert any(t["completed"] for t in all_todos), "Task should be completed"
 
-    # SCENARIO 4: Anaphoric 'it' reference
-    run_test_direct(
+    # SCENARIO 4: Anaphoric 'it' reference — create then delete via "it"
+    todos, results = run_test_direct(
         [
             ("create_todo", CreateTodoIntent(titles=["buy milk"])),
-            ("delete_todo", None),   # placeholder — use anaphoric delete below
+            ("delete_todo", DeleteTodoIntent(match_title="it")),
         ],
         expected_count=0,
         test_name="Anaphoric 'it' Delete",
     )
-    # Re-run manually for anaphor
-    clear_todos()
-    db = _get_db()
-    config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config.yaml"))
-    config = load_config(config_path)
-    create_cls = registry.get("create_todo")
-    delete_cls = registry.get("delete_todo")
-    create_cls().execute(CreateTodoIntent(titles=["buy milk"]), config)
-    from assistant.actions.todo.intent import DeleteTodoIntent
-    result = delete_cls().execute(DeleteTodoIntent(match_title="it"), config)
-    assert "Deleted" in result, f"Expected delete via 'it', got: {result}"
-    assert len(db.get_todos()) == 0, "Todo should be gone"
+    assert any("Deleted" in r for r in results), f"Expected 'Deleted' in results: {results}"
     print("   ✅ Anaphor 'it' deleted the last created todo")
-    print("🟢 Passed Anaphoric 'it' Delete!")
 
     # SCENARIO 5: Update task title and list
     run_test_direct(
@@ -247,20 +235,29 @@ def run_direct_tests():
     assert synced[0]["title"] == "Morning standup"
     print(f"   ✅ Calendar sync created {count} todo(s) from today's events")
 
+    # Re-sync after completing the synced task — completion must be preserved
+    db.toggle_todo_complete(synced[0]["id"])
+    re_count = db.sync_calendar_to_todos(list_name="today")
+    assert re_count == 1, f"Expected 1 on re-sync, got {re_count}"
+    re_synced = db.get_todos_by_source("calendar_sync")
+    assert len(re_synced) == 1
+    assert re_synced[0]["completed"] == 1, "Re-sync should preserve completed state"
+    print(f"   ✅ Re-sync preserved completed state of synced todo")
+
     # Sync off → clears synced todos, manual todos unaffected
     db.create_todo("manual task", list_name="today")
     deleted = db.delete_todos_by_source("calendar_sync")
     assert deleted == 1
-    remaining = db.get_todos()
+    remaining = db.get_todos(include_completed=False)
     assert len(remaining) == 1 and remaining[0]["source"] == "manual"
     print(f"   ✅ Sync-off cleared calendar todos, manual tasks preserved")
     print("🟢 Passed Calendar Sync + Off!")
 
     # SCENARIO 8: Completed tasks don't appear in pending query
     clear_todos()
-    db.create_todo("task X")
+    id_x = db.create_todo("task X")
     db.create_todo("task Y")
-    db.toggle_todo_complete(1)
+    db.toggle_todo_complete(id_x)
     all_todos = db.get_todos(include_completed=True)
     pending = [t for t in all_todos if not t["completed"]]
     assert len(pending) == 1 and pending[0]["title"] == "task Y"

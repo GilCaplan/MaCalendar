@@ -244,6 +244,10 @@ class UpdateTodoAction(BaseAction):
                 "enum": ["none", "low", "medium", "high"],
                 "description": "New priority. Omit if unchanged.",
             },
+            "new_due_date": {
+                "type": "string",
+                "description": "New due date as ISO string (YYYY-MM-DD). Omit if unchanged.",
+            },
         },
         "required": ["match_title"],
     }
@@ -263,6 +267,7 @@ class UpdateTodoAction(BaseAction):
         if intent.new_title:    updates["title"] = intent.new_title
         if intent.new_list:     updates["list"] = intent.new_list
         if intent.new_priority: updates["priority"] = intent.new_priority
+        if intent.new_due_date is not None: updates["due_date"] = intent.new_due_date
 
         if not updates:
             return f"No changes specified for '{todo['title']}'."
@@ -304,6 +309,7 @@ class QueryTodoAction(BaseAction):
     }
 
     def execute(self, intent: QueryTodoIntent, _config) -> str:  # type: ignore[override]
+        import datetime
         from assistant.db import CalendarDB
         db = CalendarDB()
 
@@ -315,14 +321,76 @@ class QueryTodoAction(BaseAction):
         )
 
         pending = [t for t in todos if not t["completed"]]
+
+        # Build task descriptions, appending due date when present
+        def _describe(t: dict) -> str:
+            title = t["title"]
+            due = t.get("due_date", "")
+            if not due:
+                return title
+            try:
+                due_dt = datetime.date.fromisoformat(due)
+                today = datetime.date.today()
+                delta = (due_dt - today).days
+                if delta == 0:
+                    suffix = "due today"
+                elif delta == 1:
+                    suffix = "due tomorrow"
+                elif delta < 0:
+                    suffix = f"overdue by {-delta} day{'s' if -delta != 1 else ''}"
+                else:
+                    suffix = f"due {due_dt.strftime('%b %d')}"
+                return f"{title} ({suffix})"
+            except ValueError:
+                return title
+
+        # For today/all queries, also pull calendar events so the user gets a
+        # unified picture of their day without needing to switch views.
+        calendar_parts: list[str] = []
+        if intent.list_name in ("today", "all"):
+            today = datetime.date.today()
+            events = db.get_events_for_day(today)
+            if events:
+                def _fmt_event(ev: dict) -> str:
+                    t = ev.get("start_time", "")
+                    if t:
+                        try:
+                            h, m = t.split(":")[:2]
+                            hour = int(h)
+                            suffix = "am" if hour < 12 else "pm"
+                            hour12 = hour % 12 or 12
+                            t = f"{hour12}:{m}{suffix}"
+                        except Exception:
+                            pass
+                    return f"{ev['title']} at {t}" if t else ev["title"]
+                calendar_parts = [_fmt_event(ev) for ev in events]
+
         n = len(pending)
+        n_cal = len(calendar_parts)
+
+        # Compose response
+        parts: list[str] = []
 
         if n == 0:
-            return f"No pending tasks in {label}."
+            parts.append(f"No pending tasks in {label}.")
+        else:
+            task_titles = [_describe(t) for t in pending]
+            if n == 1:
+                parts.append(f"You have one task in {label}: {task_titles[0]}.")
+            elif n == 2:
+                parts.append(f"You have 2 tasks in {label}: {task_titles[0]} and {task_titles[1]}.")
+            else:
+                parts.append(
+                    f"You have {n} tasks in {label}: {', '.join(task_titles[:-1])}, and {task_titles[-1]}."
+                )
 
-        titles = [t["title"] for t in pending]
-        if n == 1:
-            return f"You have one task in {label}: {titles[0]}."
-        if n == 2:
-            return f"You have 2 tasks in {label}: {titles[0]} and {titles[1]}."
-        return f"You have {n} tasks in {label}: {', '.join(titles[:-1])}, and {titles[-1]}."
+        if calendar_parts:
+            if n_cal == 1:
+                parts.append(f"You also have 1 calendar event today: {calendar_parts[0]}.")
+            else:
+                parts.append(
+                    f"You also have {n_cal} calendar events today: "
+                    f"{', '.join(calendar_parts[:-1])}, and {calendar_parts[-1]}."
+                )
+
+        return " ".join(parts)
