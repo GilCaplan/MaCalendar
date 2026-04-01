@@ -59,3 +59,8 @@ tts:
   voice: "Samantha"    # run `say -v ?` to list all available voices
   rate: 200            # words per minute
 
+# iPhone API server settings
+api:
+  key: null            # optional secret — set a string to require X-API-Key header on all requests
+                       # recommended when using --tailscale or --lan
+

@@ -126,6 +126,44 @@ python tests/test_todo_parser.py
 pytest tests/
 ```
 
+## 📱 iPhone App
+
+MACalendar includes a Flask REST API so a native iOS app can read and write the same calendar from your iPhone. The Mac is always the source of truth — the iPhone talks to the Mac over the network.
+
+### Starting the API server
+
+```bash
+# Same Wi-Fi only
+python -m assistant.api --lan
+
+# From anywhere via Tailscale (recommended)
+python -m assistant.api --tailscale
+```
+
+### Connecting from anywhere with Tailscale (one-time setup)
+
+1. **Mac:** `brew install tailscale` → open the Tailscale menu bar app → sign in
+2. **iPhone:** Install [Tailscale](https://apps.apple.com/app/tailscale/id1470499037) from the App Store → sign in with the same account
+3. **Start the API:** `python -m assistant.api --tailscale` — it prints your Tailscale IP (e.g. `100.x.x.x`)
+4. **iOS app Settings:** set Server URL to `http://100.x.x.x:5000`
+
+That's it — the app connects from home, coffee shop, anywhere.
+
+### API endpoints (quick reference)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/health` | Server status |
+| GET | `/events?date=YYYY-MM-DD` | Events for a day |
+| POST | `/events` | Create event |
+| POST | `/voice/text` | Voice command as text |
+| GET | `/todos` | Todo list |
+| PATCH | `/todos/<id>/toggle` | Complete a task |
+
+Full API reference: [SYSTEM_IPHONE.md](./SYSTEM_IPHONE.md)
+
+---
+
 ## 🤖 For Developers & AI Assistants
 
 If you are an AI assistant or a developer working on this codebase, please **read [SYSTEM.md](./SYSTEM.md) first**. It contains the full project architecture, recent core enhancements (Streaming STT, Universal LLM Parser), and current state details to help you resume work without loss of context.

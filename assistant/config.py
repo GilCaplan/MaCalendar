@@ -90,6 +90,10 @@ class TodoConfig(BaseModel):
     default_list: Literal["today", "general"] = "today"
 
 
+class ApiConfig(BaseModel):
+    key: Optional[str] = None   # X-API-Key header value; null = no auth required
+
+
 class AppConfig(BaseModel):
     hotkey: HotkeyConfig
     stt_engine: Literal["whisper", "google"] = "whisper"
@@ -105,6 +109,7 @@ class AppConfig(BaseModel):
     audio: AudioConfig = AudioConfig()
     tts: TTSConfig = TTSConfig()
     todo: TodoConfig = TodoConfig()
+    api: ApiConfig = ApiConfig()
 
     @field_validator("confirmation_level")
     @classmethod

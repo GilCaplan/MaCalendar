@@ -8,7 +8,7 @@ SwiftUI native iOS app backed by a Flask REST API running on the same Mac. The M
 
 ```
 iPhone (SwiftUI)
-  ↕ HTTP/LAN (Wi-Fi / USB tunnel)
+  ↕ HTTP  (same Wi-Fi  OR  Tailscale VPN from anywhere)
 Mac Flask API  (assistant/api/server.py)
   ↕ Python imports
 Existing Mac logic: IntentParser, WhisperSTT, CalendarDB, Actions
@@ -18,12 +18,41 @@ The Mac app and iPhone API server run simultaneously. The iPhone never touches t
 
 ---
 
+## Connectivity
+
+| Mode | Command | When to use |
+|------|---------|-------------|
+| Local only | `python -m assistant.api` | Testing on the same machine |
+| Same Wi-Fi | `python -m assistant.api --lan` | iPhone on the same network |
+| **Tailscale** | `python -m assistant.api --tailscale` | iPhone anywhere — recommended |
+| USB tunnel | `iproxy 5000 5000` + `--lan` | No Wi-Fi, plugged in |
+
+### Tailscale setup (one-time)
+1. Install Tailscale on Mac: `brew install tailscale` → `sudo tailscaled` → `tailscale up`
+2. Install Tailscale on iPhone: App Store → **Tailscale**
+3. Sign in with the same account on both devices
+4. Start the API: `python -m assistant.api --tailscale` — it prints your Tailscale IP
+5. In the iOS app Settings, set Server URL to `http://<tailscale-ip>:5000`
+
+The Tailscale IP (`100.x.x.x`) is stable — set it once and the app connects from anywhere.
+
+### Optional API key auth
+Set `api.key` in `config.yaml` to require an `X-API-Key` header on all requests:
+```yaml
+api:
+  key: "your-secret-key"
+```
+Enter the same key in the iOS app Settings. Recommended when using Tailscale.
+
+---
+
 ## Flask API (`assistant/api/`)
 
 ### Starting the server
 ```bash
-python -m assistant.api            # binds 127.0.0.1:5000 (local only)
-python -m assistant.api --lan      # binds 0.0.0.0:5000  (LAN access for iPhone)
+python -m assistant.api                # binds 127.0.0.1:5000 (local only)
+python -m assistant.api --lan          # binds 0.0.0.0:5000  (LAN access for iPhone)
+python -m assistant.api --tailscale    # binds 0.0.0.0:5000 + prints Tailscale IP
 ```
 
 Or launched automatically alongside the Mac app via `Launch Calendar.command`.

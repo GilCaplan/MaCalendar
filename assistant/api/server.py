@@ -71,7 +71,7 @@ def create_app() -> Flask:
         @wraps(f)
         def decorated(*args, **kwargs):
             cfg = load_config()
-            expected = getattr(getattr(cfg, "api", None), "key", None)
+            expected = cfg.api.key
             if expected:
                 provided = request.headers.get("X-API-Key", "")
                 if provided != expected:
