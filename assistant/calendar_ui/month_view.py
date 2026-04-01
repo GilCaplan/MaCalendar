@@ -184,7 +184,7 @@ class DayCell(QWidget):
 
         if self._selected and not self.is_today:
             bg = _styles.D_BLUE_LIGHT if dark else SELECTED_BG
-        elif self.date.weekday() % 2 == 0:   # Mon, Wed, Fri, Sun → shaded stripe
+        elif self.date.weekday() in (1, 3, 5, 6):  # Tue, Thu, Sat, Sun → shaded stripe
             bg = _styles.D_WEEKEND_BG if dark else WEEKEND_BG
         else:
             bg = _styles.D_WHITE if dark else WHITE
