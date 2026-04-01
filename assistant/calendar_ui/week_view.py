@@ -142,12 +142,15 @@ class EventBlock(QLabel):
             end_min = round(bottom / HOUR_HEIGHT * 60)
             start_min = max(0, min(start_min, 23 * 60))
             end_min = max(start_min + 15, min(end_min, 24 * 60 - 1))
-            self.resized.emit(self.event["id"], {
+            payload = {
                 "start_time": f"{start_min // 60:02d}:{start_min % 60:02d}",
                 "end_time":   f"{end_min   // 60:02d}:{end_min   % 60:02d}",
-            })
+            }
+            event_id = self.event["id"]
             self._resize_edge = None
             event.accept()
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(0, lambda: self.resized.emit(event_id, payload))
         elif self._drag_start is not None:
             self._drag_start = None
             self.clicked.emit(self.event)

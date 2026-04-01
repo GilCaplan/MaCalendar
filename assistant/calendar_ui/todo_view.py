@@ -266,12 +266,14 @@ class TodoListWidget(QWidget):
 
         def _commit():
             title = editor.text().strip()
+            editor.blockSignals(True)
             editor.clear()
             editor.hide()
             plus_label.show()
             if title:
                 self._db.create_todo(title=title, list_name=self._list_name)
-                self.todo_changed.emit()
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(0, self.todo_changed.emit)
 
         def _cancel():
             editor.clear()
@@ -290,15 +292,18 @@ class TodoListWidget(QWidget):
     def _on_toggled(self, todo_id: int, checked: bool) -> None:
         completed_at = datetime.datetime.now().isoformat() if checked else ""
         self._db.update_todo(todo_id, completed=int(checked), completed_at=completed_at)
-        self.todo_changed.emit()
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(0, self.todo_changed.emit)
 
     def _on_edited(self, todo_id: int, new_title: str) -> None:
         self._db.update_todo(todo_id, title=new_title)
-        self.todo_changed.emit()
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(0, self.todo_changed.emit)
 
     def _on_deleted(self, todo_id: int) -> None:
         self._db.delete_todo(todo_id)
-        self.todo_changed.emit()
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(0, self.todo_changed.emit)
 
     def apply_theme(self, dark: bool) -> None:
         self._dark = dark

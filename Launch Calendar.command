@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 VENV_PYTHON=""
 if [ -f ".venv/bin/python" ]; then
     # Validate the venv's Python interpreter actually exists (not a broken symlink)
-    INTERP=$(head -1 .venv/bin/python 2>/dev/null | sed 's/#\!//')
+    INTERP=$(head -1 .venv/bin/python 2>/dev/null | LC_ALL=C sed 's/#\!//')
     if python3 -c "import sys; sys.exit(0 if sys.version_info >= (3,11) else 1)" 2>/dev/null && \
        .venv/bin/python -c "import PyQt6" 2>/dev/null; then
         source .venv/bin/activate
