@@ -41,25 +41,34 @@ class EventPill(QLabel):
         super().__init__(parent)
         self.event = event
         self._drag_start = None
-        color = event.get("color", BLUE)
+        self._color = event.get("color", BLUE)
         start = event.get("start_time", "")
-        text = f"  {start}  {event['title']}" if start else f"  {event['title']}"
-        self.setText(text)
+        self._pill_text = f"{start}  {event['title']}" if start else event['title']
+        self.setText(self._pill_text)
         self.setFixedHeight(20)
-        self.setStyleSheet(f"""
-            QLabel {{
-                background-color: {color};
-                color: white;
-                border-radius: 4px;
-                font-size: 11px;
-                font-weight: 500;
-                padding: 0 4px;
-            }}
-        """)
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.setStyleSheet("background: transparent;")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setToolTip(
             f"{event['title']}\n{event.get('date','')}  {start} – {event.get('end_time','')}"
         )
+
+    def paintEvent(self, _event):  # noqa: ARG002
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setBrush(QColor(self._color))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(self.rect(), 4, 4)
+        painter.setPen(QColor("white"))
+        font = self.font()
+        font.setPointSize(8)
+        font.setWeight(font.Weight.Medium)
+        painter.setFont(font)
+        fm = painter.fontMetrics()
+        elided = fm.elidedText(self._pill_text, Qt.TextElideMode.ElideRight, self.width() - 8)
+        painter.drawText(self.rect().adjusted(4, 0, -4, 0),
+                         Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, elided)
 
     def mousePressEvent(self, event):
         self._drag_start = event.pos()
