@@ -9,6 +9,7 @@ from assistant.actions.calendar.intent import CalendarIntent, DeleteEventIntent,
 
 # Global memory to remember the most recently created or modified event
 _last_event_id: Optional[int] = None
+_last_event_date: Optional[str] = None   # ISO date of last create/update (for UI navigation)
 
 # Anaphoric pronouns that trigger the memory fallback
 _ANAPHORS = {"it", "that", "this", "this event", "that event", "the last one", "the last event", "the event"}
@@ -49,16 +50,16 @@ class CreateEventAction(BaseAction):
         """
         Save the event to the local SQLite database.
         """
-        global _last_event_id
-        
-        from assistant.db import CalendarDB
-        db = CalendarDB()
+        global _last_event_id, _last_event_date
+
+        from assistant.db import get_db
+        db = get_db()
 
         from assistant.calendar_ui.styles import BLUE
         event_id = db.create_event(intent, color=BLUE)
-        
-        # Cache the ID so the user can say "Delete it" in their next breath
+
         _last_event_id = event_id
+        _last_event_date = intent.date
 
         if intent.recurrence:
             return f"Created recurring {intent.recurrence} event '{intent.title}' starting on {intent.date}."
@@ -95,8 +96,8 @@ class UpdateEventAction(BaseAction):
 
     def execute(self, intent: UpdateEventIntent, _config) -> str:  # type: ignore[override]
         global _last_event_id
-        from assistant.db import CalendarDB
-        db = CalendarDB()
+        from assistant.db import get_db
+        db = get_db()
 
         event = _find_event(db, intent.match_title, intent.match_date)
         if event is None:
@@ -130,6 +131,7 @@ class UpdateEventAction(BaseAction):
 
         db.update_event(event["id"], **updates)
         _last_event_id = event["id"]
+        _last_event_date = updates.get("date", event["date"])
 
         display = updates.get("title", event["title"])
         return f"Updated '{display}' successfully."
@@ -158,8 +160,8 @@ class DeleteEventAction(BaseAction):
 
     def execute(self, intent: DeleteEventIntent, _config) -> str:  # type: ignore[override]
         global _last_event_id
-        from assistant.db import CalendarDB
-        db = CalendarDB()
+        from assistant.db import get_db
+        db = get_db()
 
         event = _find_event(db, intent.match_title, intent.match_date)
         if event is None:
@@ -208,8 +210,8 @@ class QueryScheduleAction(BaseAction):
 
     def execute(self, intent: QueryScheduleIntent, _config) -> str:  # type: ignore[override]
         import datetime as dt
-        from assistant.db import CalendarDB
-        db = CalendarDB()
+        from assistant.db import get_db
+        db = get_db()
 
         today = dt.date.today()
         if intent.scope == "tomorrow":
@@ -303,12 +305,26 @@ def _find_event(db, match_title: str, match_date: Optional[str]) -> Optional[dic
 
     # Anaphor resolution
     if match_title.lower() in _ANAPHORS:
-        if _last_event_id is not None:
+        # If a date is given alongside an anaphor ("the event on Thursday"),
+        # prefer searching by date over memory — the user is pointing at a
+        # specific day's event, not necessarily the last touched one.
+        if match_date:
+            with db._conn() as conn:
+                rows = conn.execute(
+                    "SELECT * FROM events WHERE date = ? ORDER BY start_time",
+                    (match_date,),
+                ).fetchall()
+            if rows:
+                return dict(rows[0])
+            # Date given but nothing on that day — fall through to global search below
+        elif _last_event_id is not None:
             with db._conn() as conn:
                 row = conn.execute("SELECT * FROM events WHERE id = ?", (_last_event_id,)).fetchone()
             if row:
                 return dict(row)
-        return None
+            return None
+        else:
+            return None
 
     today = dt.date.today().isoformat()
 

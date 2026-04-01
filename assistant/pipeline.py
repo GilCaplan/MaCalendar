@@ -133,19 +133,26 @@ class Pipeline:
                     ).start()
 
     def _run_pipeline(self, combine: bool = False) -> None:
+        t_start = time.perf_counter()
+
         # 1. Listen
         self._phase = STATUS_LISTENING
         listen_hint = "🔗 Listening to add on… (say 'done' or press mic to stop)" if combine else "🎙 Listening… (say 'done' or press mic to stop)"
         self._set_status(STATUS_LISTENING, listen_hint)
+
+        # Stream-checker: transcribe growing buffer every 2.5 s to detect stop words.
+        # Cache the last result so we can reuse it and skip the final full transcription.
+        _last_partial: List[str] = ["", 0.0]  # [transcript, timestamp]
 
         def stream_checker(audio_buffer) -> None:
             if self._phase != STATUS_LISTENING:
                 return
             try:
                 partial = self._stt.transcribe(audio_buffer).lower()
-                import re
-                if re.search(r'\b(execute|done|stop|end)\b', partial):
-                    logger.info("Early termination text detected implicitly in stream: %s", partial)
+                _last_partial[0] = partial
+                _last_partial[1] = time.perf_counter()
+                if re.search(r'\b(execute|done|stop|end|go)\b', partial):
+                    logger.info("Early termination detected in stream: %s", partial)
                     self.stop_recording()
             except Exception as e:
                 logger.error("Stream checker error: %s", e)
@@ -166,16 +173,27 @@ class Pipeline:
                 self._set_status(STATUS_ERROR, "⚠️ Microphone error")
             return
 
-        # 2. Transcribe
+        t_recorded = time.perf_counter()
+        logger.info("⏱ Recording: %.2fs", t_recorded - t_start)
+
+        # 2. Transcribe — reuse stream-checker result if it's fresh (within 3 s)
         self._phase = STATUS_PROCESSING
-        self._set_status(STATUS_PROCESSING, "⏳ Transcribing…")
-        try:
-            transcript = self._stt.transcribe(audio)
-        except AssistantError as e:
-            self._tts.speak("I couldn't understand that. Please try again.")
-            logger.error("STT error: %s", e)
-            self._set_status(STATUS_ERROR, "⚠️ Transcription failed")
-            return
+        partial_text, partial_ts = _last_partial
+        reuse = partial_text and (t_recorded - partial_ts) < 3.0
+
+        if reuse:
+            transcript = partial_text
+            logger.info("⏱ Transcription: reused stream-checker result (0.00s)")
+        else:
+            self._set_status(STATUS_PROCESSING, "⏳ Transcribing…")
+            try:
+                transcript = self._stt.transcribe(audio)
+            except AssistantError as e:
+                self._tts.speak("I couldn't understand that. Please try again.")
+                logger.error("STT error: %s", e)
+                self._set_status(STATUS_ERROR, "⚠️ Transcription failed")
+                return
+            logger.info("⏱ Transcription: %.2fs", time.perf_counter() - t_recorded)
 
         if not transcript or len(transcript.strip()) < 3:
             self._tts.speak("I didn't catch that.")
@@ -202,6 +220,7 @@ class Pipeline:
         self._set_status(STATUS_PROCESSING, f'💭 "{snippet}"')
 
         # 3. Parse intent(s)
+        t_llm = time.perf_counter()
         try:
             action_list = self._parser.parse(transcript)
         except (LLMUnavailableError, OllamaUnavailableError):
@@ -219,6 +238,7 @@ class Pipeline:
             logger.error("Parse error: %s", e)
             self._set_status(STATUS_ERROR, "⚠️ Couldn't parse request")
             return
+        logger.info("⏱ LLM parse: %.2fs", time.perf_counter() - t_llm)
 
         # Filter unknowns
         valid = [(name, intent) for name, intent in action_list
@@ -230,6 +250,7 @@ class Pipeline:
             return
 
         # 4. Confirm + execute each action
+        t_exec = time.perf_counter()
         results: List[str] = []
         for action_name, intent in valid:
             if action_name == "clarify":
@@ -261,6 +282,7 @@ class Pipeline:
                 logger.error("Action error: %s", e)
                 self._set_status(STATUS_ERROR, "⚠️ Action failed")
                 return
+        logger.info("⏱ Execute: %.2fs", time.perf_counter() - t_exec)
 
         if results:
             summary = " ".join(results)
@@ -279,8 +301,9 @@ class Pipeline:
             ui_status = view_switch if view_switch else "refresh"
             self._set_status(ui_status, results[0][:80])
             self._tts.speak(summary)
-            time.sleep(2)
+            time.sleep(0.3)  # brief pause for UI toast to render before going idle
 
+        logger.info("⏱ Total pipeline: %.2fs", time.perf_counter() - t_start)
         self._phase = STATUS_IDLE
         self._set_status(STATUS_IDLE, "")
 

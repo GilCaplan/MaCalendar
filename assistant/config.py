@@ -28,6 +28,7 @@ class WhisperConfig(BaseModel):
     compute_type: str = "int8"
     device: str = "cpu"
     language: Optional[str] = "en"
+    beam_size: int = 1  # 1 = greedy decode; faster for short voice commands
 
 
 class GoogleSTTConfig(BaseModel):
