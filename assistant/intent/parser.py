@@ -101,8 +101,26 @@ class IntentParser:
     # Backends
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _estimate_timeout(transcript: str, base: int) -> int:
+        """
+        Scale timeout by estimated number of actions in the transcript.
+        Counts action-separating signals (conjunctions, commas between clauses)
+        to guess how many JSON objects the LLM must produce.
+        Each extra action adds 15 s on top of the base.
+        """
+        separators = re.findall(
+            r'\b(and also|and then|also|then|plus|additionally|,)\b',
+            transcript.lower()
+        )
+        estimated_actions = 1 + len(separators)
+        return base + (estimated_actions - 1) * 15
+
     def _call_ollama(self, sys: str, user: str, schema: dict) -> str:
         conf = self.config.ollama
+        timeout = self._estimate_timeout(user, conf.timeout_seconds)
+        logger.debug("Ollama timeout: %ds (estimated %d action(s))", timeout,
+                     1 + len(re.findall(r'\b(and also|and then|also|then|plus|additionally|,)\b', user.lower())))
         payload = {
             "model": conf.model,
             "messages": [{"role": "system", "content": sys}, {"role": "user", "content": user}],
@@ -111,7 +129,7 @@ class IntentParser:
             "options": {"temperature": conf.temperature},
         }
         try:
-            resp = self._session.post(f"{conf.base_url}/api/chat", json=payload, timeout=conf.timeout_seconds)
+            resp = self._session.post(f"{conf.base_url}/api/chat", json=payload, timeout=timeout)
             resp.raise_for_status()
             return resp.json()["message"]["content"]
         except requests.ConnectionError as e:
