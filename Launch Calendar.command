@@ -45,4 +45,13 @@ if [ -z "$VENV_PYTHON" ]; then
     echo ""
 fi
 
+# Start the iPhone API server in the background (Tailscale mode)
+python -m assistant.api --tailscale --port 5000 &
+API_PID=$!
+echo "📱 iPhone API started (PID $API_PID) — connect at the Tailscale IP shown above"
+
+# Start the Mac calendar app (foreground — closing this window stops everything)
 python -m assistant.main
+
+# When the Mac app exits, shut down the API server too
+kill $API_PID 2>/dev/null
