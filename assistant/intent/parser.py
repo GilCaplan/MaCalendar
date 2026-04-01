@@ -43,6 +43,22 @@ class IntentParser:
         self.registry = registry
         self._session = requests.Session()
         self._session.headers["Content-Type"] = "application/json"
+        # Cached prompt/schema — rebuilt only when the date rolls over
+        self._schema = self.registry.build_ollama_schema()
+        self._prompt_date: str = ""
+        self._system_prompt: str = ""
+
+    def _get_system_prompt(self) -> str:
+        """Return cached system prompt, refreshing it if the date has changed."""
+        today = datetime.date.today().isoformat()
+        if today != self._prompt_date:
+            try:
+                tz = str(datetime.datetime.now().astimezone().tzname())
+            except Exception:
+                tz = "UTC"
+            self._system_prompt = self.registry.build_system_prompt(today, tz)
+            self._prompt_date = today
+        return self._system_prompt
 
     def parse(self, transcript: str) -> list[tuple[str, BaseIntent]]:
         """
@@ -58,14 +74,8 @@ class IntentParser:
             logger.warning("Potential prompt injection detected: %r", transcript)
             return [("unknown", UnknownIntent())]
 
-        today = datetime.date.today().isoformat()
-        try:
-            tz = str(datetime.datetime.now().astimezone().tzname())
-        except Exception:
-            tz = "UTC"
-
-        system_prompt = self.registry.build_system_prompt(today, tz)
-        schema = self.registry.build_ollama_schema() # Reusing schema structure
+        system_prompt = self._get_system_prompt()
+        schema = self._schema
 
         # Route to specific provider call
         engine = self.config.llm_engine
@@ -73,11 +83,11 @@ class IntentParser:
             if engine == "ollama":
                 raw_content = self._call_ollama(system_prompt, transcript, schema)
             elif engine == "openai":
-                raw_content = self._call_openai(system_prompt, transcript, schema)
+                raw_content = self._call_openai(system_prompt, transcript)
             elif engine == "gemini":
-                raw_content = self._call_gemini(system_prompt, transcript, schema)
+                raw_content = self._call_gemini(system_prompt, transcript)
             elif engine == "claude":
-                raw_content = self._call_claude(system_prompt, transcript, schema)
+                raw_content = self._call_claude(system_prompt, transcript)
             else:
                 raise ParseError(f"Unsupported LLM engine: {engine}")
         except AssistantError:
@@ -109,7 +119,7 @@ class IntentParser:
         except requests.Timeout as e:
             raise OllamaTimeoutError("Ollama timed out") from e
 
-    def _call_openai(self, sys: str, user: str, schema: dict) -> str:
+    def _call_openai(self, sys: str, user: str) -> str:
         conf = self.config.openai
         if not conf.api_key:
             raise ParseError("OpenAI API key missing in config.yaml")
@@ -130,7 +140,7 @@ class IntentParser:
         except requests.Timeout as e:
             raise LLMTimeoutError("OpenAI request timed out") from e
 
-    def _call_gemini(self, sys: str, user: str, schema: dict) -> str:
+    def _call_gemini(self, sys: str, user: str) -> str:
         conf = self.config.gemini
         if not conf.api_key:
             raise ParseError("Gemini API key missing in config.yaml")
@@ -149,7 +159,7 @@ class IntentParser:
         except requests.Timeout as e:
             raise LLMTimeoutError("Gemini request timed out") from e
 
-    def _call_claude(self, sys: str, user: str, schema: dict) -> str:
+    def _call_claude(self, sys: str, user: str) -> str:
         conf = self.config.claude
         if not conf.api_key:
             raise ParseError("Claude API key (Anthropic) missing in config.yaml")

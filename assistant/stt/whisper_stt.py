@@ -26,6 +26,7 @@ class WhisperSTT(STTProvider):
             ) from e
 
         self._language = config.language
+        self._beam_size = config.beam_size
         try:
             self._model = WhisperModel(
                 config.model_size,
@@ -40,7 +41,7 @@ class WhisperSTT(STTProvider):
             segments, _ = self._model.transcribe(
                 audio,
                 language=self._language,
-                beam_size=5,
+                beam_size=self._beam_size,
                 vad_filter=True,  # built-in VAD strips silence
             )
             return " ".join(seg.text.strip() for seg in segments).strip()

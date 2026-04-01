@@ -102,8 +102,8 @@ class CreateTodoAction(BaseAction):
 
     def execute(self, intent: CreateTodoIntent, _config) -> str:  # type: ignore[override]
         global _last_todo_id
-        from assistant.db import CalendarDB
-        db = CalendarDB()
+        from assistant.db import get_db
+        db = get_db()
 
         created = []
         for title in intent.titles:
@@ -152,8 +152,8 @@ class CompleteTodoAction(BaseAction):
 
     def execute(self, intent: CompleteTodoIntent, _config) -> str:  # type: ignore[override]
         global _last_todo_id
-        from assistant.db import CalendarDB
-        db = CalendarDB()
+        from assistant.db import get_db
+        db = get_db()
 
         todo = _find_todo(db, intent.match_title)
         if todo is None:
@@ -196,8 +196,8 @@ class DeleteTodoAction(BaseAction):
 
     def execute(self, intent: DeleteTodoIntent, _config) -> str:  # type: ignore[override]
         global _last_todo_id
-        from assistant.db import CalendarDB
-        db = CalendarDB()
+        from assistant.db import get_db
+        db = get_db()
 
         todo = _find_todo(db, intent.match_title)
         if todo is None:
@@ -254,8 +254,8 @@ class UpdateTodoAction(BaseAction):
 
     def execute(self, intent: UpdateTodoIntent, _config) -> str:  # type: ignore[override]
         global _last_todo_id
-        from assistant.db import CalendarDB
-        db = CalendarDB()
+        from assistant.db import get_db
+        db = get_db()
 
         todo = _find_todo(db, intent.match_title)
         if todo is None:
@@ -310,8 +310,8 @@ class QueryTodoAction(BaseAction):
 
     def execute(self, intent: QueryTodoIntent, _config) -> str:  # type: ignore[override]
         import datetime
-        from assistant.db import CalendarDB
-        db = CalendarDB()
+        from assistant.db import get_db
+        db = get_db()
 
         list_name = None if intent.list_name == "all" else intent.list_name
         todos = db.get_todos(list_name=list_name, include_completed=intent.include_completed)

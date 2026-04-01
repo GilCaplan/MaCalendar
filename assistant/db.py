@@ -63,6 +63,13 @@ _MIGRATIONS = [
 ]
 
 
+_CREATE_INDEXES = """
+CREATE INDEX IF NOT EXISTS idx_events_date   ON events(date);
+CREATE INDEX IF NOT EXISTS idx_events_series ON events(series_id);
+CREATE INDEX IF NOT EXISTS idx_todos_list    ON todos(list, completed);
+"""
+
+
 def _next_date(d: datetime.date, recurrence: str) -> datetime.date:
     """Advance d by one recurrence period."""
     if recurrence == "daily":
@@ -92,6 +99,10 @@ class CalendarDB:
             self._migrate(conn)
             conn.execute(_CREATE_TODOS_TABLE)
             self._migrate_todos(conn)
+            for stmt in _CREATE_INDEXES.strip().splitlines():
+                stmt = stmt.strip()
+                if stmt:
+                    conn.execute(stmt)
 
     def _migrate(self, conn: sqlite3.Connection) -> None:
         """Apply any missing schema migrations safely."""
@@ -535,3 +546,16 @@ class CalendarDB:
             conn.execute("DELETE FROM sqlite_sequence WHERE name='todos'")  # reset IDs
 
 
+# ---------------------------------------------------------------------------
+# Module-level singleton — avoids re-running migrations on every action call
+# ---------------------------------------------------------------------------
+
+_db_instance: Optional[CalendarDB] = None
+
+
+def get_db() -> CalendarDB:
+    """Return the shared CalendarDB instance, creating it once on first call."""
+    global _db_instance
+    if _db_instance is None:
+        _db_instance = CalendarDB()
+    return _db_instance
