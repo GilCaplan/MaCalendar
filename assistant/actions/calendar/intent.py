@@ -1,6 +1,6 @@
 from typing import List, Optional, Any
 import json
-from pydantic import Field, field_validator
+from pydantic import field_validator, model_validator
 
 from assistant.actions.base import BaseIntent
 
@@ -15,6 +15,25 @@ class CalendarIntent(BaseIntent):
     description: Optional[str] = None
     recurrence: Optional[str] = None         # 'daily', 'weekly', 'monthly'
     recur_until: Optional[str] = None        # ISO 8601 date, e.g. "2026-12-31"
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def title_required(cls, v: Any) -> str:
+        if not v or not str(v).strip():
+            raise ValueError("Event title cannot be empty")
+        return str(v).strip()
+
+    @model_validator(mode="after")
+    def fix_end_time(self) -> "CalendarIntent":
+        """Default end_time to start_time + 1 hour when the LLM omits it."""
+        if not self.end_time and self.start_time:
+            try:
+                h, m = map(int, self.start_time.split(":"))
+                end_min = h * 60 + m + 60
+                self.end_time = f"{min(end_min // 60, 23):02d}:{end_min % 60:02d}"
+            except Exception:
+                self.end_time = self.start_time
+        return self
 
     @field_validator("attendees", mode="before")
     @classmethod
