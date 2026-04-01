@@ -39,7 +39,7 @@ class OllamaConfig(BaseModel):
     base_url: str = "http://localhost:11434"
     model: str = "llama3.1:8b"
     temperature: float = 0.1
-    timeout_seconds: int = 180
+    timeout_seconds: int = 60
 
 
 class OpenAIConfig(BaseModel):
