@@ -10,9 +10,9 @@ import sys
 # Register action plugins — add new `import assistant.actions.<name>` lines
 # here to activate additional plugins.
 # ---------------------------------------------------------------------------
-import assistant.actions.calendar  # noqa: F401  registers CreateEventAction
-import assistant.actions.todo      # noqa: F401  registers todo actions
-import assistant.actions.clarify   # noqa: F401  registers ClarifyAction
+import assistant.actions.calendar  # noqa: F401, PLC0415  registers CreateEventAction
+import assistant.actions.todo      # noqa: F401, PLC0415  registers todo actions
+import assistant.actions.clarify   # noqa: F401, PLC0415  registers ClarifyAction
 
 from assistant.actions import registry
 from assistant.calendar_ui.window import CalendarWindow
@@ -38,7 +38,6 @@ logger = logging.getLogger(__name__)
 
 def main() -> None:
     from PyQt6.QtWidgets import QApplication
-    from PyQt6.QtGui import QIcon
 
     app = QApplication(sys.argv)
     app.setApplicationName("Calendar")
@@ -55,6 +54,16 @@ def main() -> None:
         sys.exit(1)
 
     logger.info("Loaded config from %s", config_path)
+
+    # ------------------------------------------------------------------
+    # Audio device probe — detect native rate, dtype, permissions once
+    # so the first recording never hits a PortAudio / AUHAL error.
+    # ------------------------------------------------------------------
+    from assistant.audio.probe import probe_audio
+    audio_profile = probe_audio()
+    logger.info("Audio device probe:\n%s", audio_profile)
+    for w in audio_profile.warnings:
+        logger.warning("Audio probe: %s", w)
 
     # ------------------------------------------------------------------
     # Build pipeline + hotkey
