@@ -64,13 +64,24 @@ def get_app_style(dark: bool = False) -> str:
     text    = D_GRAY_DARK  if dark else GRAY_DARK
     text2   = D_GRAY_TEXT  if dark else GRAY_TEXT
     pressed = "#2e2e30"    if dark else "#e8e8ea"
+    sel_bg  = D_BLUE_LIGHT if dark else SELECTED_BG
 
     return f"""
-QMainWindow, QWidget {{
+QMainWindow, QWidget, QScrollArea, QStackedWidget, QListWidget, QListView {{
     background-color: {bg};
     font-family: -apple-system, "Segoe UI", Arial, sans-serif;
     font-size: 13px;
     color: {text};
+    outline: none;
+}}
+QListWidget::item:selected {{
+    background-color: {sel_bg};
+    color: {text};
+    border-radius: 4px;
+}}
+QListWidget::item:hover {{
+    background-color: {bg2};
+    border-radius: 4px;
 }}
 
 /* ── Toolbar ── */
@@ -302,6 +313,15 @@ QLineEdit#title_input:focus {{
 QFormLayout QLabel {{
     font-size: 12px;
     color: {text2};
+}}
+QLineEdit#todo_editor, QLineEdit#new_todo_editor {{
+    background-color: {bg};
+    border: none;
+    padding: 2px 4px;
+    color: {text};
+}}
+QLineEdit#todo_editor:focus, QLineEdit#new_todo_editor:focus {{
+    border-bottom: 2px solid {BLUE};
 }}
 
 /* ── Scrollbar ── */

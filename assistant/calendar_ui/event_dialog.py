@@ -69,7 +69,7 @@ class EventDialog(QDialog):
         self.delete_series_requested: bool = False
 
         self.setWindowTitle("New Event" if event is None else "Edit Event")
-        self.setMinimumWidth(480)
+        self.setMinimumWidth(520)
         self.setModal(True)
 
         self._build_ui(default_date or datetime.date.today())
@@ -144,6 +144,7 @@ class EventDialog(QDialog):
         # Repeat
         self._repeat = QComboBox()
         self._repeat.addItems(["None", "Daily", "Weekly", "Monthly"])
+        self._repeat.setMinimumWidth(120)
         if self._event and self._event.get("recurrence"):
             idx = {"daily": 1, "weekly": 2, "monthly": 3}.get(self._event["recurrence"], 0)
             self._repeat.setCurrentIndex(idx)
@@ -152,16 +153,24 @@ class EventDialog(QDialog):
         # Until (Date)
         self._until = QDateEdit()
         self._until.setCalendarPopup(True)
+        self._until.setMinimumWidth(220)
         self._until.setDisplayFormat("dddd, MMMM d, yyyy")
         if self._event and self._event.get("recurrence_end"):
             self._until.setDate(QDate.fromString(self._event["recurrence_end"], "yyyy-MM-dd"))
         else:
             self._until.setDate(QDate.fromString(d, "yyyy-MM-dd").addYears(1))
         
+        # Ensure focus/selection works properly by refreshing on visibility change
+        def on_repeat_changed(idx: int) -> None:
+            visible = idx > 0
+            self._until.setVisible(visible)
+            if visible:
+                # Force a resize/layout update so the date is visible immediately
+                self._until.updateGeometry()
+                self._until.repaint()
+
         self._until.setVisible(self._repeat.currentIndex() > 0)
-        self._repeat.currentIndexChanged.connect(
-            lambda idx: self._until.setVisible(idx > 0)
-        )
+        self._repeat.currentIndexChanged.connect(on_repeat_changed)
         form.addRow("Until", self._until)
 
         # Color

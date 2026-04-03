@@ -45,6 +45,7 @@ class EventBlock(QLabel):
         end = event.get("end_time", "")
         location = event.get("location") or ""
         self.event = event
+        self._font_size = 12
 
         text = f"  {event['title']}\n  {start}–{end}"
         if location:
@@ -58,7 +59,7 @@ class EventBlock(QLabel):
                 background-color: {color};
                 color: white;
                 border-radius: 4px;
-                font-size: 12px;
+                font-size: {self._font_size}px;
                 padding: 4px 6px;
                 border-left: 4px solid rgba(0,0,0,0.2);
             }}
@@ -174,6 +175,7 @@ class DayTimeline(QWidget):
         self.setFixedHeight(HOUR_HEIGHT * 24)
         self._event_widgets: List[EventBlock] = []
         self._drag_hover = False
+        self._ui_config = None
         self.setAcceptDrops(True)
         self._apply_bg()
 
@@ -201,7 +203,9 @@ class DayTimeline(QWidget):
             top = (sh * 60 + sm) / 60 * HOUR_HEIGHT
             h = max(((eh * 60 + em) - (sh * 60 + sm)) / 60 * HOUR_HEIGHT, 24)
 
+            fs = 12 if not self._ui_config else self._ui_config.font_day
             block = EventBlock(ev, self)
+            block._font_size = fs
             block.clicked.connect(self.event_clicked)
             block.resized.connect(self.event_rescheduled)
             block.setGeometry(4, int(top), self.width() - 8, int(h))
@@ -293,6 +297,7 @@ class DayView(QWidget):
         self._db = db
         self._date = datetime.date.today()
         self._timeline: DayTimeline | None = None
+        self._ui_config = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -412,6 +417,13 @@ class DayView(QWidget):
             self._timeline._apply_bg()
         self.refresh()
 
+    def apply_ui_config(self, ui_config) -> None:
+        self._ui_config = ui_config
+        self._apply_theme_styles()
+        if self._timeline:
+            self._timeline._ui_config = ui_config
+        self.refresh()
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -476,7 +488,13 @@ class DayView(QWidget):
             f"background-color: {bg}; border-bottom: 1px solid {border};"
         )
         self._time_col.setStyleSheet(f"background-color: {bg};")
+        fs = 11 if not self._ui_config else self._ui_config.font_day - 2
         for lbl in self._time_labels:
-            lbl.setStyleSheet(f"font-size: 11px; color: {text2}; padding-top: 2px;")
+            lbl.setStyleSheet(f"font-size: {fs}px; color: {text2}; padding-top: 2px;")
+        
+        main_fs = 14 if not self._ui_config else self._ui_config.font_day + 1
+        font = self._date_label.font()
+        font.setPointSize(main_fs)
+        self._date_label.setFont(font)
         self._date_label.setStyleSheet(f"color: {text_main};")
         self._count_label.setStyleSheet(f"color: {text2};")

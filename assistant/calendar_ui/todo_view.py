@@ -5,14 +5,17 @@ from __future__ import annotations
 import datetime
 from typing import Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMenu,
     QPushButton,
     QScrollArea,
@@ -61,6 +64,7 @@ class TodoItemWidget(QWidget):
         self._todo = todo
         self._dark = dark
         self._editing = False
+        self._font_size = 13
         self._build()
         self.setMouseTracking(True)
 
@@ -68,6 +72,13 @@ class TodoItemWidget(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(14, 6, 10, 6)
         layout.setSpacing(10)
+
+        # Drag grip handle
+        self._grip = QLabel("⠿")
+        self._grip.setFixedWidth(14)
+        self._grip.setCursor(Qt.CursorShape.SizeAllCursor)
+        self._grip.setToolTip("Drag to reorder")
+        layout.addWidget(self._grip)
 
         # Circular checkbox
         self._check = QCheckBox()
@@ -83,8 +94,8 @@ class TodoItemWidget(QWidget):
         self._label.mousePressEvent = self._start_edit  # type: ignore[assignment]
         layout.addWidget(self._label)
 
-        # Inline editor (hidden by default)
         self._editor = QLineEdit(self._todo["title"])
+        self._editor.setObjectName("todo_editor")
         self._editor.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self._editor.hide()
         self._editor.editingFinished.connect(self._commit_edit)
@@ -122,9 +133,12 @@ class TodoItemWidget(QWidget):
 
     def _apply_theme(self, dark: bool) -> None:
         self._dark = dark
+        self.setStyleSheet("background: transparent;")
         text_color = D_GRAY_DARK if dark else GRAY_DARK
-        border = D_GRAY_BORDER if dark else GRAY_BORDER
         check_border = D_GRAY_MID if dark else GRAY_MID
+        grip_color = D_GRAY_MID if dark else GRAY_MID
+
+        self._grip.setStyleSheet(f"color: {grip_color}; font-size: {self._font_size - 1}px;")
 
         self._check.setStyleSheet(f"""
             QCheckBox::indicator {{
@@ -143,13 +157,13 @@ class TodoItemWidget(QWidget):
         self._del_btn.setStyleSheet(f"""
             QPushButton {{
                 color: {del_color}; background: transparent;
-                border: none; font-size: 14px; font-weight: bold;
+                border: none; font-size: {self._font_size + 1}px; font-weight: bold;
             }}
             QPushButton:hover {{ color: #ff0000; }}
         """)
-
+ 
         if not self._todo["completed"]:
-            self._label.setStyleSheet(f"color: {text_color};")
+            self._label.setStyleSheet(f"color: {text_color}; font-size: {self._font_size}px;")
 
     def enterEvent(self, event) -> None:
         self._del_btn.show()
@@ -191,11 +205,14 @@ class TodoItemWidget(QWidget):
 
 
 # ---------------------------------------------------------------------------
-# TodoListWidget — a scrollable section of tasks for one list
+# TodoListWidget — draggable QListWidget for one list
 # ---------------------------------------------------------------------------
 
 class TodoListWidget(QWidget):
-    """Displays all todos for a given list_name with add/complete/edit/delete."""
+    """
+    Displays all todos for a given list_name with add/complete/edit/delete/reorder.
+    Uses a QListWidget internally for native drag-and-drop row reordering.
+    """
 
     todo_changed  = pyqtSignal()      # bubbles up to TodoView
     count_changed = pyqtSignal(int)   # pending task count
@@ -206,42 +223,58 @@ class TodoListWidget(QWidget):
         self._list_name = list_name
         self._dark = dark
         self._item_widgets: list[TodoItemWidget] = []
+        self._reorder_enabled = True
+        self._font_size = 13
 
-        self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(0, 0, 0, 0)
-        self._layout.setSpacing(0)
-        self._layout.addStretch()
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        # Draggable list
+        self._list_widget = QListWidget()
+        self._list_widget.setDragEnabled(True)
+        self._list_widget.setAcceptDrops(True)
+        self._list_widget.setDropIndicatorShown(True)
+        self._list_widget.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+        self._list_widget.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self._list_widget.setFrameShape(QFrame.Shape.NoFrame)
+        self._list_widget.setSpacing(0)
+        self._list_widget.model().rowsMoved.connect(self._on_reorder)
+        outer.addWidget(self._list_widget)
+
+        # "New Task" row below the list
+        outer.addWidget(self._make_new_task_row())
 
     def populate(self, show_completed: bool = False) -> None:
         """Clear and rebuild the list from the database."""
-        # Remove all existing widgets
-        for w in self._item_widgets:
-            w.setParent(None)
-            w.deleteLater()
+        self._reorder_enabled = False
+        self._list_widget.clear()
         self._item_widgets.clear()
-
-        # Remove the stretch and "New Task" row (they'll be re-added)
-        while self._layout.count():
-            item = self._layout.takeAt(0)
-            if item.widget():
-                item.widget().setParent(None)
 
         todos = self._db.get_todos(list_name=self._list_name, include_completed=show_completed)
 
         for todo in todos:
-            item = TodoItemWidget(todo, dark=self._dark)
-            item.toggled.connect(self._on_toggled)
-            item.edited.connect(self._on_edited)
-            item.deleted.connect(self._on_deleted)
-            self._layout.addWidget(item)
-            self._item_widgets.append(item)
+            item = QListWidgetItem(self._list_widget)
+            item.setData(Qt.ItemDataRole.UserRole, todo["id"])
+            widget = TodoItemWidget(todo, dark=self._dark)
+            widget._font_size = self._font_size
+            widget.toggled.connect(self._on_toggled)
+            widget.edited.connect(self._on_edited)
+            widget.deleted.connect(self._on_deleted)
+            item.setSizeHint(widget.sizeHint())
+            self._list_widget.setItemWidget(item, widget)
+            self._item_widgets.append(widget)
+
+        # Resize list widget to fit content
+        total_h = sum(
+            self._list_widget.sizeHintForRow(i) + self._list_widget.spacing()
+            for i in range(self._list_widget.count())
+        ) + 4
+        self._list_widget.setFixedHeight(max(total_h, 10))
 
         pending = sum(1 for t in todos if not t["completed"])
         self.count_changed.emit(pending)
-
-        # Add "New Task" row
-        self._layout.addWidget(self._make_new_task_row())
-        self._layout.addStretch()
+        self._reorder_enabled = True
 
     def _make_new_task_row(self) -> QWidget:
         row = QWidget()
@@ -249,60 +282,77 @@ class TodoListWidget(QWidget):
         hl.setContentsMargins(14, 6, 10, 6)
         hl.setSpacing(10)
 
-        # Placeholder "+" label that converts to an editor on click
-        plus_label = QLabel("+ New Task")
-        plus_label.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._plus_label = QLabel("+ New Task")
+        self._plus_label.setCursor(Qt.CursorShape.PointingHandCursor)
         add_color = D_GRAY_TEXT if self._dark else GRAY_TEXT
-        plus_label.setStyleSheet(f"color: {add_color}; font-style: italic;")
+        self._plus_label.setStyleSheet(f"color: {add_color}; font-style: italic; font-size: {self._font_size}px;")
 
-        editor = QLineEdit()
-        editor.setPlaceholderText("Task title…")
-        editor.hide()
+        self._new_task_editor = QLineEdit()
+        self._new_task_editor.setObjectName("new_todo_editor")
+        self._new_task_editor.setPlaceholderText("Task title…")
+        self._new_task_editor.hide()
 
         def _start(_event):
-            plus_label.hide()
-            editor.show()
-            editor.setFocus()
+            self._plus_label.hide()
+            self._new_task_editor.show()
+            self._new_task_editor.setFocus()
 
         def _commit():
-            title = editor.text().strip()
-            editor.blockSignals(True)
-            editor.clear()
-            editor.hide()
-            plus_label.show()
+            title = self._new_task_editor.text().strip()
+            self._new_task_editor.blockSignals(True)
+            self._new_task_editor.clear()
+            self._new_task_editor.hide()
+            self._plus_label.show()
             if title:
                 self._db.create_todo(title=title, list_name=self._list_name)
-                from PyQt6.QtCore import QTimer
                 QTimer.singleShot(0, self.todo_changed.emit)
 
         def _cancel():
-            editor.clear()
-            editor.hide()
-            plus_label.show()
+            self._new_task_editor.clear()
+            self._new_task_editor.hide()
+            self._plus_label.show()
 
-        editor.returnPressed.connect(_commit)
-        editor.editingFinished.connect(lambda: _cancel() if not editor.text().strip() else _commit())
-        plus_label.mousePressEvent = _start  # type: ignore[assignment]
+        self._new_task_editor.returnPressed.connect(_commit)
+        self._new_task_editor.editingFinished.connect(lambda: _cancel() if not self._new_task_editor.text().strip() else _commit())
+        self._plus_label.mousePressEvent = _start  # type: ignore[assignment]
 
-        hl.addWidget(plus_label)
-        hl.addWidget(editor)
+        hl.addWidget(self._plus_label)
+        hl.addWidget(self._new_task_editor)
         hl.addStretch()
         return row
+
+    # ------------------------------------------------------------------
+    # Drag-drop reorder
+    # ------------------------------------------------------------------
+
+    def _on_reorder(self, _parent, _start, _end, _dest, _row) -> None:
+        if not self._reorder_enabled:
+            return
+        ids = []
+        for i in range(self._list_widget.count()):
+            item = self._list_widget.item(i)
+            if item:
+                todo_id = item.data(Qt.ItemDataRole.UserRole)
+                if todo_id is not None:
+                    ids.append(todo_id)
+        if ids:
+            self._db.reorder_todos(self._list_name, ids)
+
+    # ------------------------------------------------------------------
+    # Signal handlers
+    # ------------------------------------------------------------------
 
     def _on_toggled(self, todo_id: int, checked: bool) -> None:
         completed_at = datetime.datetime.now().isoformat() if checked else ""
         self._db.update_todo(todo_id, completed=int(checked), completed_at=completed_at)
-        from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, self.todo_changed.emit)
 
     def _on_edited(self, todo_id: int, new_title: str) -> None:
         self._db.update_todo(todo_id, title=new_title)
-        from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, self.todo_changed.emit)
 
     def _on_deleted(self, todo_id: int) -> None:
         self._db.delete_todo(todo_id)
-        from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, self.todo_changed.emit)
 
     def apply_theme(self, dark: bool) -> None:
@@ -310,22 +360,28 @@ class TodoListWidget(QWidget):
         for w in self._item_widgets:
             w.apply_theme(dark)
 
+        # Update "New Task" row colors
+        add_color = D_GRAY_TEXT if dark else GRAY_TEXT
+        self._plus_label.setStyleSheet(f"color: {add_color}; font-style: italic;")
+
 
 # ---------------------------------------------------------------------------
-# SectionHeader — bold title + sync badge + gear menu
+# SectionHeader — bold title + sync badge + gear menu + clear-completed button
 # ---------------------------------------------------------------------------
 
 class SectionHeader(QWidget):
-    """Section header with title, task count, optional sync button and gear menu."""
+    """Section header with title, task count, optional sync button, gear menu, and clear-completed."""
 
-    sync_now_clicked  = pyqtSignal()
-    sync_mode_changed = pyqtSignal(str)
+    sync_now_clicked    = pyqtSignal()
+    sync_mode_changed   = pyqtSignal(str)
+    clear_completed_clicked = pyqtSignal()
 
     def __init__(self, title: str, show_sync_button: bool = False,
                  show_sync_gear: bool = False,
                  dark: bool = False, parent=None) -> None:
         super().__init__(parent)
         self._dark = dark
+        self._font_size = 13
         hl = QHBoxLayout(self)
         hl.setContentsMargins(14, 12, 12, 4)
         hl.setSpacing(6)
@@ -333,7 +389,7 @@ class SectionHeader(QWidget):
         # Bold section title
         self._title_lbl = QLabel(title)
         font = QFont()
-        font.setPointSize(13)
+        font.setPointSize(self._font_size)
         font.setBold(True)
         self._title_lbl.setFont(font)
         hl.addWidget(self._title_lbl)
@@ -358,8 +414,24 @@ class SectionHeader(QWidget):
 
         hl.addStretch()
 
+        # Clear Completed button (hidden until there are completed tasks)
+        self._clear_btn = QPushButton("Clear Completed")
+        self._clear_btn.setToolTip("Delete all completed tasks in this section")
+        self._clear_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._clear_btn.setFixedHeight(22)
+        self._clear_btn.hide()
+        self._clear_btn.setStyleSheet("""
+            QPushButton {
+                color: #cc0000; background: transparent;
+                border: 1px solid #cc0000; border-radius: 4px;
+                padding: 0 8px; font-size: 10px;
+            }
+            QPushButton:hover { background-color: #ffeaea; }
+        """)
+        self._clear_btn.clicked.connect(self.clear_completed_clicked.emit)
+        hl.addWidget(self._clear_btn)
+
         if show_sync_button:
-            # Prominent "🔄 Sync Today" button
             self._sync_btn = QPushButton("🔄 Sync Today")
             self._sync_btn.setToolTip("Pull today's calendar events into this list")
             self._sync_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -380,7 +452,6 @@ class SectionHeader(QWidget):
             hl.addWidget(self._sync_btn)
 
         if show_sync_gear:
-            # Gear for advanced sync settings
             gear = QPushButton("⚙")
             gear.setFixedSize(24, 24)
             gear.setToolTip("Sync settings")
@@ -392,7 +463,6 @@ class SectionHeader(QWidget):
         self._apply_theme(dark)
 
     def set_count(self, n: int) -> None:
-        """Show or hide the pending-task count badge."""
         if n > 0:
             self._count_lbl.setText(str(n))
             self._count_lbl.show()
@@ -401,6 +471,10 @@ class SectionHeader(QWidget):
 
     def set_synced(self, synced: bool) -> None:
         self._sync_badge.setVisible(synced)
+
+    def set_has_completed(self, has_completed: bool) -> None:
+        """Show or hide the Clear Completed button."""
+        self._clear_btn.setVisible(has_completed)
 
     def _show_sync_menu(self) -> None:
         menu = QMenu(self)
@@ -439,6 +513,7 @@ class TodoView(QWidget):
         self._dark = False
         self._show_completed = config.todo.show_completed if config else False
         self._sync_mode = config.todo.sync.mode if config else "off"
+        self._ui_config = config.ui if config else None
         self._build_ui()
 
     # ------------------------------------------------------------------
@@ -450,7 +525,6 @@ class TodoView(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        # Scrollable content
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -462,9 +536,14 @@ class TodoView(QWidget):
         self._content_layout.setSpacing(0)
 
         # ── Today section ──
-        self._today_header = SectionHeader("Today", show_sync_button=True, show_sync_gear=True, dark=self._dark)
+        self._today_header = SectionHeader(
+            "Today", show_sync_button=True, show_sync_gear=True, dark=self._dark
+        )
         self._today_header.sync_now_clicked.connect(self._on_sync_now)
         self._today_header.sync_mode_changed.connect(self._on_sync_mode_changed)
+        self._today_header.clear_completed_clicked.connect(
+            lambda: self._clear_completed("today")
+        )
         self._content_layout.addWidget(self._today_header)
 
         self._today_list = TodoListWidget(self._db, "today", dark=self._dark)
@@ -472,14 +551,16 @@ class TodoView(QWidget):
         self._today_list.count_changed.connect(self._today_header.set_count)
         self._content_layout.addWidget(self._today_list)
 
-        # Separator
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
         sep.setStyleSheet(f"color: {GRAY_BORDER};")
         self._content_layout.addWidget(sep)
 
         # ── General section ──
-        self._general_header = SectionHeader("General", show_sync_gear=False, dark=self._dark)
+        self._general_header = SectionHeader("General", dark=self._dark)
+        self._general_header.clear_completed_clicked.connect(
+            lambda: self._clear_completed("general")
+        )
         self._content_layout.addWidget(self._general_header)
 
         self._general_list = TodoListWidget(self._db, "general", dark=self._dark)
@@ -492,7 +573,6 @@ class TodoView(QWidget):
         scroll.setWidget(content)
         root.addWidget(scroll)
 
-        # Initial population
         self.refresh()
 
     # ------------------------------------------------------------------
@@ -504,67 +584,70 @@ class TodoView(QWidget):
         self._today_list.populate(self._show_completed)
         self._general_list.populate(self._show_completed)
         self._apply_sync_badge()
+        self._update_clear_buttons()
 
     def apply_theme(self, dark: bool) -> None:
-        """Restyle all child widgets for dark/light mode."""
         self._dark = dark
         bg = D_WHITE if dark else WHITE
-        border = D_GRAY_BORDER if dark else GRAY_BORDER
         self.setStyleSheet(f"background-color: {bg};")
-
-        self._today_header.apply_theme(dark)
         self._general_header.apply_theme(dark)
         self._today_list.apply_theme(dark)
         self._general_list.apply_theme(dark)
+        self.refresh()
 
-        sep_color = D_GRAY_BORDER if dark else GRAY_BORDER
-        # Repopulate to pick up new theme on item widgets
+    def apply_ui_config(self, ui_config) -> None:
+        self._ui_config = ui_config
+        fs = ui_config.font_tasks
+        self._today_header._font_size = fs
+        self._general_header._font_size = fs
+        self._today_list._font_size = fs
+        self._general_list._font_size = fs
         self.refresh()
 
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
 
+    def _update_clear_buttons(self) -> None:
+        today_todos = self._db.get_todos(list_name="today", include_completed=True)
+        general_todos = self._db.get_todos(list_name="general", include_completed=True)
+        self._today_header.set_has_completed(any(t["completed"] for t in today_todos))
+        self._general_header.set_has_completed(any(t["completed"] for t in general_todos))
+
+    def _clear_completed(self, list_name: str) -> None:
+        self._db.delete_completed_todos(list_name=list_name)
+        self.refresh()
+
     def _apply_sync_badge(self) -> None:
         synced = self._sync_mode != "off"
         self._today_header.set_synced(synced and self._sync_mode == "today")
 
     def _on_sync_now(self) -> None:
-        """Direct 'Sync Today' button — pull today's calendar events into the Today list."""
         count = self._db.sync_calendar_to_todos(list_name="today")
         self._sync_mode = "today"
         if self._config is not None:
             self._config.todo.sync.mode = "today"
             self._write_sync_mode_to_config("today")
         self.refresh()
-        # Brief visual feedback on the button
         if hasattr(self._today_header, "_sync_btn"):
             btn = self._today_header._sync_btn
             btn.setText(f"✓ {count} synced" if count else "✓ Up to date")
-            from PyQt6.QtCore import QTimer
             QTimer.singleShot(2000, lambda: btn.setText("🔄 Sync Today"))
 
     def _on_sync_mode_changed(self, mode: str) -> None:
-        """Handle sync mode selection from the gear menu."""
         self._sync_mode = mode
-
         if mode == "off":
             self._db.delete_todos_by_source("calendar_sync")
         else:
             self._db.sync_calendar_to_todos(list_name=mode)
-
-        # Persist to config.yaml if config is available
         if self._config is not None:
             self._config.todo.sync.mode = mode
             self._write_sync_mode_to_config(mode)
-
         self.refresh()
 
     def _write_sync_mode_to_config(self, mode: str) -> None:
-        """Update the todo.sync.mode value in config.yaml using regex replacement."""
         import os
         import re
-
         config_path = os.path.abspath("config.yaml")
         if not os.path.exists(config_path):
             return
@@ -580,4 +663,4 @@ class TodoView(QWidget):
             with open(config_path, "w") as f:
                 f.write(txt)
         except Exception:
-            pass  # non-fatal if config write fails
+            pass

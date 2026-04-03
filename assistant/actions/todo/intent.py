@@ -10,7 +10,7 @@ from assistant.actions.base import BaseIntent
 
 
 class CreateTodoIntent(BaseIntent):
-    titles: List[str]
+    titles: List[str] = []
     list_name: str = "today"   # 'today' | 'general'
     priority: str = "none"     # 'none' | 'low' | 'medium' | 'high'
     due_date: Optional[str] = None

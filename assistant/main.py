@@ -53,7 +53,7 @@ def main() -> None:
         print(f"[Error] {e}", file=sys.stderr)
         sys.exit(1)
 
-    logger.info("Loaded config from %s", config_path)
+    logger.info("🖥️ Loaded config from %s", config_path)
 
     # ------------------------------------------------------------------
     # Audio device probe — detect native rate, dtype, permissions once
@@ -61,9 +61,9 @@ def main() -> None:
     # ------------------------------------------------------------------
     from assistant.audio.probe import probe_audio
     audio_profile = probe_audio()
-    logger.info("Audio device probe:\n%s", audio_profile)
+    logger.info("🖥️ Audio device probe:\n%s", audio_profile)
     for w in audio_profile.warnings:
-        logger.warning("Audio probe: %s", w)
+        logger.warning("🖥️ Audio probe: %s", w)
 
     # ------------------------------------------------------------------
     # Build pipeline + hotkey
@@ -79,7 +79,7 @@ def main() -> None:
 
     hotkey = HotkeyListener(config.hotkey, callback=pipeline.trigger)
     hotkey.start()
-    logger.info("Hotkey: %s+%s", "+".join(config.hotkey.modifiers), config.hotkey.key)
+    logger.info("🖥️ Hotkey: %s+%s", "+".join(config.hotkey.modifiers), config.hotkey.key)
 
     # ------------------------------------------------------------------
     # Launch calendar window (blocks until closed)

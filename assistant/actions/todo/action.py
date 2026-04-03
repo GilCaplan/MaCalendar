@@ -14,9 +14,7 @@ from assistant.actions.todo.intent import (
     QueryTodoIntent,
     UpdateTodoIntent,
 )
-
-# Global memory — remember the last created/modified todo for anaphoric reference
-_last_todo_id: Optional[int] = None
+from assistant.intent.context import context_memory
 
 _ANAPHORS = {"it", "that", "this", "the task", "that task", "the last one", "the last task"}
 
@@ -24,14 +22,12 @@ _ANAPHORS = {"it", "that", "this", "the task", "that task", "the last one", "the
 def _find_todo(db, match_title: str) -> Optional[dict]:
     """
     Find the best-matching todo by title.
-    Resolves anaphoric pronouns via global memory.
+    Resolves anaphoric pronouns via context memory.
     Uses token-based fuzzy scoring identical to the calendar _find_event pattern.
     """
-    global _last_todo_id
-
     if match_title.lower().strip() in _ANAPHORS:
-        if _last_todo_id is not None:
-            return db.get_todo(_last_todo_id)
+        if context_memory.last_todo_id is not None:
+            return db.get_todo(context_memory.last_todo_id)
         return None
 
     needle_words = set(re.findall(r"\w+", match_title.lower()))
@@ -101,7 +97,6 @@ class CreateTodoAction(BaseAction):
     }
 
     def execute(self, intent: CreateTodoIntent, _config) -> str:  # type: ignore[override]
-        global _last_todo_id
         from assistant.db import get_db
         db = get_db()
 
@@ -113,7 +108,7 @@ class CreateTodoAction(BaseAction):
                 priority=intent.priority,
                 due_date=intent.due_date or "",
             )
-            _last_todo_id = todo_id
+            context_memory.update_todo(todo_id, title)
             created.append(title)
 
         list_label = "Today" if intent.list_name == "today" else "General"
@@ -151,7 +146,6 @@ class CompleteTodoAction(BaseAction):
     }
 
     def execute(self, intent: CompleteTodoIntent, _config) -> str:  # type: ignore[override]
-        global _last_todo_id
         from assistant.db import get_db
         db = get_db()
 
@@ -161,7 +155,7 @@ class CompleteTodoAction(BaseAction):
                 return "I don't remember the last task."
             return f"I couldn't find a task matching '{intent.match_title}'."
 
-        _last_todo_id = todo["id"]
+        context_memory.update_todo(todo["id"], todo["title"])
         if intent.complete:
             db.update_todo(todo["id"], completed=1,
                            completed_at=__import__("datetime").datetime.now().isoformat())
@@ -195,7 +189,6 @@ class DeleteTodoAction(BaseAction):
     }
 
     def execute(self, intent: DeleteTodoIntent, _config) -> str:  # type: ignore[override]
-        global _last_todo_id
         from assistant.db import get_db
         db = get_db()
 
@@ -206,8 +199,7 @@ class DeleteTodoAction(BaseAction):
             return f"I couldn't find a task matching '{intent.match_title}'."
 
         db.delete_todo(todo["id"])
-        if _last_todo_id == todo["id"]:
-            _last_todo_id = None
+        context_memory.clear_todo()
         return f"Deleted '{todo['title']}'."
 
 
@@ -253,7 +245,6 @@ class UpdateTodoAction(BaseAction):
     }
 
     def execute(self, intent: UpdateTodoIntent, _config) -> str:  # type: ignore[override]
-        global _last_todo_id
         from assistant.db import get_db
         db = get_db()
 
@@ -273,7 +264,7 @@ class UpdateTodoAction(BaseAction):
             return f"No changes specified for '{todo['title']}'."
 
         db.update_todo(todo["id"], **updates)
-        _last_todo_id = todo["id"]
+        context_memory.update_todo(todo["id"], updates.get("title", todo["title"]))
         display = updates.get("title", todo["title"])
         return f"Updated '{display}'."
 

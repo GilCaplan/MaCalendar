@@ -90,6 +90,14 @@ class TodoConfig(BaseModel):
     default_list: Literal["today", "general"] = "today"
 
 
+class UIConfig(BaseModel):
+    font_month: int = 11
+    font_week: int = 11
+    font_day: int = 13
+    font_tasks: int = 13
+    compact_ui: bool = False
+
+
 class ApiConfig(BaseModel):
     key: Optional[str] = None   # X-API-Key header value; null = no auth required
 
@@ -106,10 +114,13 @@ class AppConfig(BaseModel):
     claude: ClaudeConfig = ClaudeConfig()
     microsoft: Optional[MicrosoftConfig] = None
     confirmation_level: int = 1
+    verify_fast_path: bool = True   # background LLM check of rule-parser results
     audio: AudioConfig = AudioConfig()
     tts: TTSConfig = TTSConfig()
     todo: TodoConfig = TodoConfig()
     api: ApiConfig = ApiConfig()
+    theme: Literal["light", "dark"] = "light"
+    ui: UIConfig = UIConfig()
 
     @field_validator("confirmation_level")
     @classmethod

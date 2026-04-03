@@ -42,12 +42,13 @@ class EventBlock(QLabel):
     clicked = pyqtSignal(dict)
     resized = pyqtSignal(int, dict)  # (event_id, {start_time, end_time})
 
-    def __init__(self, event: dict, parent=None):
+    def __init__(self, event: dict, font_size: int = 11, parent=None):
         super().__init__(parent)
         color = event.get("color", BLUE)
         start = event.get("start_time", "")
         end = event.get("end_time", "")
         self.event = event
+        self._font_size = font_size
         self._drag_start = None
         self.setText(f"  {event['title']}\n  {start}–{end}")
         self.setWordWrap(True)
@@ -58,7 +59,7 @@ class EventBlock(QLabel):
                 background-color: {color};
                 color: white;
                 border-radius: 3px;
-                font-size: 11px;
+                font-size: {self._font_size}px;
                 padding: 2px 4px;
                 border-left: 3px solid rgba(0,0,0,0.2);
             }}
@@ -174,6 +175,7 @@ class DayColumn(QWidget):
         self.is_weekend = date.weekday() >= 5
         self._event_widgets: List[EventBlock] = []
         self._drag_hover = False
+        self._ui_config = None
         self.setAcceptDrops(True)
         self._apply_bg()
 
@@ -206,7 +208,8 @@ class DayColumn(QWidget):
             top = (sh * 60 + sm) / 60 * HOUR_HEIGHT
             h = max(((eh * 60 + em) - (sh * 60 + sm)) / 60 * HOUR_HEIGHT, 18)
 
-            block = EventBlock(ev, self)
+            fs = 11 if not self._ui_config else self._ui_config.font_week
+            block = EventBlock(ev, font_size=fs, parent=self)
             block.clicked.connect(self.event_clicked)
             block.resized.connect(self.event_rescheduled)
             block.setGeometry(2, int(top), self.width() - 4, int(h))
@@ -288,6 +291,7 @@ class WeekView(QWidget):
         today = datetime.date.today()
         self._week_start = today - datetime.timedelta(days=(today.weekday() + 1) % 7)
         self._day_columns: List[DayColumn] = []
+        self._ui_config = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -355,6 +359,11 @@ class WeekView(QWidget):
         self._apply_theme_styles()
         self._rebuild_columns()
 
+    def apply_ui_config(self, ui_config) -> None:
+        self._ui_config = ui_config
+        self._apply_theme_styles()
+        self._rebuild_columns()
+
     def _apply_theme_styles(self) -> None:
         """Reapply stylesheet constants that depend on the current theme."""
         dark = _styles._dark
@@ -365,8 +374,9 @@ class WeekView(QWidget):
             f"background-color: {bg}; border-bottom: 1px solid {border};"
         )
         self._time_col.setStyleSheet(f"background-color: {bg};")
+        fs = 11 if not self._ui_config else self._ui_config.font_week
         for lbl in self._time_labels:
-            lbl.setStyleSheet(f"font-size: 11px; color: {text2}; padding-top: 2px;")
+            lbl.setStyleSheet(f"font-size: {fs}px; color: {text2}; padding-top: 2px;")
 
     def navigate(self, week_start: datetime.date) -> None:
         self._week_start = week_start
@@ -429,6 +439,7 @@ class WeekView(QWidget):
 
             # Day column
             col = DayColumn(date)
+            col._ui_config = self._ui_config
             col.slot_double_clicked.connect(self.datetime_double_clicked)
             col.event_clicked.connect(self.event_clicked)
             col.event_rescheduled.connect(self.event_rescheduled)

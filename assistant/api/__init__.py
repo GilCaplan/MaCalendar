@@ -1,9 +1,9 @@
 """Entry point for the iPhone API server.
 
 Usage:
-    python -m assistant.api                # binds 127.0.0.1:5000 (local only)
-    python -m assistant.api --lan          # binds 0.0.0.0:5000  (same Wi-Fi)
-    python -m assistant.api --tailscale    # binds 0.0.0.0:5000 + prints Tailscale IP
+    python -m assistant.api                # binds 127.0.0.1:8080 (local only)
+    python -m assistant.api --lan          # binds 0.0.0.0:8080  (same Wi-Fi)
+    python -m assistant.api --tailscale    # binds 0.0.0.0:8080 + prints Tailscale IP
     python -m assistant.api --port 8080
 """
 
@@ -37,7 +37,7 @@ def main() -> None:
     parser.add_argument("--lan", action="store_true", help="Bind to 0.0.0.0 (same Wi-Fi access)")
     parser.add_argument("--tailscale", action="store_true", help="Bind to 0.0.0.0 and print Tailscale IP")
     parser.add_argument("--host", default=None, help="Override bind host explicitly")
-    parser.add_argument("--port", type=int, default=5000)
+    parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
 
