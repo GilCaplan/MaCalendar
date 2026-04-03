@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QSpinBox,
+    QGridLayout,
 )
 
 from assistant.calendar_ui.day_view import DayView
@@ -128,14 +129,15 @@ class CalendarWindow(QMainWindow):
         self._current_date = datetime.date.today()
         self._view_mode = "month"  # "month" | "week" | "day" | "todo"
 
-        self._dark = False
-
+        self._dark = (config.theme == "dark") if config else False
+        
         self.setWindowTitle("Calendar")
         self.setMinimumSize(900, 640)
         self.resize(1100, 720)
-        self.setStyleSheet(get_app_style(False))
-
+        
         self._build_ui()
+        self._apply_theme(self._dark, show_toast=False)
+        self._apply_ui_config()
 
         # Auto-sync todos from calendar on open if configured
         if config and config.todo.sync.auto_sync_on_open and config.todo.sync.mode != "off":
@@ -469,13 +471,27 @@ class CalendarWindow(QMainWindow):
                 
                 if ev_id:
                     if series_id:
-                        # For now, UI saves edits to just THIS instance
-                        # (A more complex UI could ask "Apply changes to all?")
-                        self._db.update_event(ev_id, **dialog.event_data)
+                        msg = QMessageBox(self)
+                        msg.setWindowTitle("Update Recurring Event")
+                        msg.setText("This is a repeating event.")
+                        msg.setInformativeText("Do you want to update only this instance, or the entire series?")
+                        btn_only_this = msg.addButton("Only this instance", QMessageBox.ButtonRole.ActionRole)
+                        btn_series = msg.addButton("Entire series", QMessageBox.ButtonRole.AcceptRole)
+                        msg.addButton(QMessageBox.StandardButton.Cancel)
+                        msg.exec()
+                        
+                        if msg.clickedButton() == btn_only_this:
+                            self._db.update_event(ev_id, **dialog.event_data)
+                            self.refresh_calendar()
+                            self.show_toast(f"Updated this instance of \"{dialog.event_data['title']}\"")
+                        elif msg.clickedButton() == btn_series:
+                            self._db.update_series(series_id, ev_id, **dialog.event_data)
+                            self.refresh_calendar()
+                            self.show_toast(f"Updated series \"{dialog.event_data['title']}\"")
                     else:
                         self._db.update_event(ev_id, **dialog.event_data)
-                    self.refresh_calendar()
-                    self.show_toast(f"Updated \"{dialog.event_data['title']}\"")
+                        self.refresh_calendar()
+                        self.show_toast(f"Updated \"{dialog.event_data['title']}\"")
 
     def _on_event_rescheduled(self, event_id: int, updates: dict) -> None:
         if "start_time" in updates and "end_time" not in updates:
@@ -574,7 +590,9 @@ class CalendarWindow(QMainWindow):
 
     def _on_toggle_theme(self) -> None:
         self._dark = not self._dark
-        dark = self._dark
+        self._apply_theme(self._dark, show_toast=True)
+
+    def _apply_theme(self, dark: bool, show_toast: bool = False) -> None:
         self.setStyleSheet(get_app_style(dark))
         self._month_view.apply_theme(dark)
         self._week_view.apply_theme(dark)
@@ -582,12 +600,14 @@ class CalendarWindow(QMainWindow):
         self._sidebar.apply_theme(dark)
         if hasattr(self, "_todo_view"):
             self._todo_view.apply_theme(dark)
+
         # Re-style toolbar
         bg = _styles.D_WHITE if dark else WHITE
         border = _styles.D_GRAY_BORDER if dark else GRAY_BORDER
-        self._toolbar_bar.setStyleSheet(
-            f"background-color: {bg}; border-bottom: 1px solid {border};"
-        )
+        if hasattr(self, "_toolbar_bar"):
+            self._toolbar_bar.setStyleSheet(
+                f"background-color: {bg}; border-bottom: 1px solid {border};"
+            )
         # Force segmented buttons to repaint with new theme
         for m in ("month", "week", "day", "todo"):
             btn = getattr(self, f"_view_btn_{m}", None)
@@ -595,7 +615,18 @@ class CalendarWindow(QMainWindow):
                 btn.style().unpolish(btn)
                 btn.style().polish(btn)
         self._update_theme_btn()
-        self.show_toast("Dark mode on" if dark else "Light mode on")
+        if show_toast:
+            self.show_toast("Dark mode on" if dark else "Light mode on")
+
+    def _apply_ui_config(self) -> None:
+        """Apply font sizes and other UI constants from config."""
+        ui = self._config.ui
+        self._month_view.apply_ui_config(ui)
+        self._week_view.apply_ui_config(ui)
+        self._day_view.apply_ui_config(ui)
+        if hasattr(self, "_todo_view"):
+            self._todo_view.apply_ui_config(ui)
+        self.refresh_calendar()
 
     def _on_briefing_requested(self) -> None:
         """Query today's events and read them aloud via TTS."""
@@ -630,20 +661,88 @@ class CalendarWindow(QMainWindow):
             
         dialog = QDialog(self)
         dialog.setWindowTitle("Assistant Settings")
-        dialog.setFixedSize(320, 240)
+        dialog.setMinimumSize(420, 440)
         
         layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(8)
         
+        # Compact check
+        compact_cb = QCheckBox("Compact Layout Density")
+        compact_cb.setChecked(self._config.ui.compact_ui)
+        layout.addWidget(compact_cb)
+        
+        def update_style(compact: bool):
+            if compact:
+                dialog.setFixedSize(420, 430)
+                layout.setSpacing(6)
+            else:
+                dialog.setMinimumSize(420, 440)
+                dialog.setMaximumHeight(800)
+                # Let stretches handle the "stretching"
+        
+        compact_cb.toggled.connect(update_style)
+
         # Auto-Approve check
         auto_cb = QCheckBox("Auto-Approve Actions (No Confirmations)")
         auto_cb.setChecked(self._pipeline._confirmer.level == 0)
         layout.addWidget(auto_cb)
+
+        layout.addStretch(1)
+
+        # Default Theme 
+        theme_layout = QHBoxLayout()
+        theme_layout.addWidget(QLabel("Default Theme (on startup):"))
+        theme_combo = QComboBox()
+        theme_combo.addItems(["Light", "Dark"])
+        theme_combo.setCurrentText("Dark" if (self._config.theme == "dark") else "Light")
+        theme_layout.addWidget(theme_combo)
+        layout.addLayout(theme_layout)
+
+        layout.addStretch(1)
+
+        # Font Sizes
+        layout.addWidget(QLabel("Font Sizes:"))
+        font_grid = QGridLayout()
+        font_grid.setVerticalSpacing(5)
+        font_grid.setHorizontalSpacing(15)
+        font_grid.setContentsMargins(0, 0, 0, 8)
+        
+        font_grid.addWidget(QLabel("Month:"), 0, 0)
+        month_spin = QSpinBox()
+        month_spin.setRange(8, 24)
+        month_spin.setValue(self._config.ui.font_month)
+        font_grid.addWidget(month_spin, 0, 1)
+        
+        font_grid.addWidget(QLabel("Week:"), 0, 2)
+        week_spin = QSpinBox()
+        week_spin.setRange(8, 24)
+        week_spin.setValue(self._config.ui.font_week)
+        font_grid.addWidget(week_spin, 0, 3)
+        
+        font_grid.addWidget(QLabel("Day:"), 1, 0)
+        day_spin = QSpinBox()
+        day_spin.setRange(8, 24)
+        day_spin.setValue(self._config.ui.font_day)
+        font_grid.addWidget(day_spin, 1, 1)
+        
+        font_grid.addWidget(QLabel("Tasks:"), 1, 2)
+        tasks_spin = QSpinBox()
+        tasks_spin.setRange(8, 24)
+        tasks_spin.setValue(self._config.ui.font_tasks)
+        font_grid.addWidget(tasks_spin, 1, 3)
+        
+        layout.addLayout(font_grid)
+
+        layout.addStretch(1)
 
         # Mute check
         mute_cb = QCheckBox("Mute Voice Output")
         mute_cb.setChecked(self._pipeline._tts.mute)
         layout.addWidget(mute_cb)
         
+        layout.addStretch(1)
+
         # Speed 
         speed_layout = QHBoxLayout()
         speed_layout.addWidget(QLabel("Talking Speed:"))
@@ -653,6 +752,8 @@ class CalendarWindow(QMainWindow):
         speed_layout.addWidget(speed_spin)
         layout.addLayout(speed_layout)
         
+        layout.addStretch(1)
+
         # Voice Dropdown
         voice_layout = QHBoxLayout()
         voice_layout.addWidget(QLabel("Voice Type:"))
@@ -680,6 +781,8 @@ class CalendarWindow(QMainWindow):
         voice_layout.addWidget(voice_combo)
         layout.addLayout(voice_layout)
         
+        layout.addStretch(2)
+
         # Test & Save
         btn_layout = QHBoxLayout()
         test_btn = QPushButton("Test Audio")
@@ -713,10 +816,26 @@ class CalendarWindow(QMainWindow):
                     txt = re.sub(r"voice:\s*\"[^\"]+\"", f'voice: "{voice_combo.currentText()}"', txt, count=1)
                     txt = re.sub(r"rate:\s*\d+", f"rate: {speed_spin.value()}", txt, count=1)
                     txt = re.sub(r"confirmation_level:\s*\d+", f"confirmation_level: {0 if auto_cb.isChecked() else 1}", txt, count=1)
+                    txt = re.sub(r"theme:\s*\"[^\"]+\"", f'theme: "{theme_combo.currentText().lower()}"', txt, count=1)
+                    # Update UI Font Sizes
+                    txt = re.sub(r"font_month:\s*\d+", f"font_month: {month_spin.value()}", txt, count=1)
+                    txt = re.sub(r"font_week:\s*\d+", f"font_week: {week_spin.value()}", txt, count=1)
+                    txt = re.sub(r"font_day:\s*\d+", f"font_day: {day_spin.value()}", txt, count=1)
+                    txt = re.sub(r"font_tasks:\s*\d+", f"font_tasks: {tasks_spin.value()}", txt, count=1)
+                    txt = re.sub(r"compact_ui:\s*(true|false)", f"compact_ui: {'true' if compact_cb.isChecked() else 'false'}", txt, count=1)
                     with open(c_path, "w") as f:
                         f.write(txt)
+                    
+                    # Apply changes immediately
+                    self._config.ui.font_month = month_spin.value()
+                    self._config.ui.font_week = week_spin.value()
+                    self._config.ui.font_day = day_spin.value()
+                    self._config.ui.font_tasks = tasks_spin.value()
+                    self._config.ui.compact_ui = compact_cb.isChecked()
+                    self._apply_ui_config()
+                
             except Exception as e:
-                print("Failed saving to config.yaml:", e)
+                QMessageBox.critical(self, "Error Saving", f"Could not save config.yaml: {e}")
                 
             self.show_toast("Settings applied!")
             dialog.accept()

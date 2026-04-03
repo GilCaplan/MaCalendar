@@ -5,11 +5,7 @@ from typing import ClassVar, List, Optional, Type
 from assistant.actions import register
 from assistant.actions.base import BaseAction, BaseIntent
 from assistant.actions.calendar.intent import CalendarIntent, DeleteEventIntent, QueryScheduleIntent, UpdateEventIntent
-
-
-# Global memory to remember the most recently created or modified event
-_last_event_id: Optional[int] = None
-_last_event_date: Optional[str] = None   # ISO date of last create/update (for UI navigation)
+from assistant.intent.context import context_memory
 
 # Anaphoric pronouns that trigger the memory fallback
 _ANAPHORS = {"it", "that", "this", "this event", "that event", "the last one", "the last event", "the event"}
@@ -43,23 +39,20 @@ class CreateEventAction(BaseAction):
             "recurrence": {"type": "string", "description": "Optional: 'daily', 'weekly', or 'monthly'"},
             "recur_until": {"type": "string", "description": "Optional: ISO 8601 end date for recurrence"},
         },
-        "required": ["title", "date", "start_time", "end_time"],
+        "required": ["title"],
     }
 
     def execute(self, intent: CalendarIntent, _config) -> str:  # type: ignore[override]
         """
         Save the event to the local SQLite database.
         """
-        global _last_event_id, _last_event_date
-
         from assistant.db import get_db
         db = get_db()
 
         from assistant.calendar_ui.styles import BLUE
         event_id = db.create_event(intent, color=BLUE)
 
-        _last_event_id = event_id
-        _last_event_date = intent.date
+        context_memory.update_event(event_id, intent.title, intent.date)
 
         if intent.recurrence:
             return f"Created recurring {intent.recurrence} event '{intent.title}' starting on {intent.date}."
@@ -76,34 +69,46 @@ class UpdateEventAction(BaseAction):
     description: ClassVar[str] = (
         "Modify an existing calendar event. Triggers on phrases like "
         "'move my meeting', 'reschedule', 'change the time of', 'rename', "
-        "'update my appointment', 'shift the standup'. If modifying the last interacted event, title may be 'it'."
+        "'update my appointment', 'shift the standup', 'extend the 2pm event to 4pm', "
+        "'lengthen my meeting', 'shorten the appointment', 'stretch the call to 3pm'. "
+        "If modifying the last interacted event, title may be 'it'. "
+        "EXTEND/LENGTHEN/SHORTEN: 'to Xpm' means new_end_time, NOT new_start_time. "
+        "Identify the event with match_start_time when no title is given (e.g. 'extend the 1pm event')."
     )
     intent_model: ClassVar[Type[BaseIntent]] = UpdateEventIntent
     parameters_schema: ClassVar[dict] = {
         "type": "object",
         "properties": {
-            "match_title": {"type": "string", "description": "The event title ONLY — just the name words (e.g. 'dentist', 'standup', 'team sync'). Do NOT include 'my', 'the', 'meeting', dates, or other context words. Use 'it' to refer to the last created/modified event."},
-            "match_date": {"type": "string", "description": "ISO 8601 date of the event to help narrow the search. Only provide if you are confident about the date; omit if unsure."},
+            "match_title": {"type": "string", "description": "The event's actual name words only (e.g. 'dentist', 'standup', 'team sync'). Omit generic words ('event', 'meeting', 'appointment') and NEVER include dates, days, or times here. If the user says 'the event at 1pm on Sunday', leave this empty and use match_date/match_start_time instead. Use 'it' to refer to the last created/modified event."},
+            "match_date": {"type": "string", "description": "ISO 8601 date of the event. Always provide when the user mentions a specific day or date — this is the primary way to locate the event."},
+            "match_start_time": {"type": "string", "description": "24-hour HH:MM start time. Always provide when the user identifies the event by time (e.g. 'the 1pm event', 'event starting at 2'). Combined with match_date, this uniquely locates the event without needing a title."},
             "new_title": {"type": "string", "description": "Replacement title. Omit if unchanged."},
             "new_date": {"type": "string", "description": "New ISO 8601 date. Omit if unchanged."},
-            "new_start_time": {"type": "string", "description": "New start time HH:MM. Omit if unchanged."},
-            "new_end_time": {"type": "string", "description": "New end time HH:MM. Omit if unchanged. Duration is preserved automatically when only start time changes."},
+            "new_start_time": {"type": "string", "description": "New start time HH:MM. Omit if unchanged. For move/reschedule only — NOT for extend/shorten."},
+            "new_end_time": {"type": "string", "description": "New end time HH:MM. For extend/lengthen/shorten, 'to Xpm' always sets this. Duration is preserved automatically when only new_start_time changes."},
             "new_location": {"type": "string", "description": "New location. Omit if unchanged."},
             "new_description": {"type": "string", "description": "New notes. Omit if unchanged."},
         },
-        "required": ["match_title"],
+        "required": [],
     }
 
     def execute(self, intent: UpdateEventIntent, _config) -> str:  # type: ignore[override]
-        global _last_event_id
         from assistant.db import get_db
         db = get_db()
 
-        event = _find_event(db, intent.match_title, intent.match_date)
+        event = _find_event(db, intent.match_title or "", intent.match_date, intent.match_start_time)
         if event is None:
-            if intent.match_title.lower() in _ANAPHORS:
+            if intent.match_title and intent.match_title.lower() in _ANAPHORS:
                 return "I can't do that. I don't remember the last event."
-            return f"I couldn't find an event matching '{intent.match_title}'."
+            if intent.match_title:
+                return f"I couldn't find an event matching '{intent.match_title}'."
+            parts = []
+            if intent.match_start_time:
+                parts.append(f"at {intent.match_start_time}")
+            if intent.match_date:
+                parts.append(f"on {intent.match_date}")
+            info = " " + " ".join(parts) if parts else ""
+            return f"I couldn't find an event{info}."
 
         updates: dict = {}
         if intent.new_title:      updates["title"] = intent.new_title
@@ -130,8 +135,7 @@ class UpdateEventAction(BaseAction):
             return f"No changes specified for '{event['title']}'."
 
         db.update_event(event["id"], **updates)
-        _last_event_id = event["id"]
-        _last_event_date = updates.get("date", event["date"])
+        context_memory.update_event(event["id"], updates.get("title", event["title"]), updates.get("date", event["date"]))
 
         display = updates.get("title", event["title"])
         return f"Updated '{display}' successfully."
@@ -152,25 +156,33 @@ class DeleteEventAction(BaseAction):
     parameters_schema: ClassVar[dict] = {
         "type": "object",
         "properties": {
-            "match_title": {"type": "string", "description": "The event title ONLY — just the name words (e.g. 'dentist', 'standup'). Do NOT include 'my', 'the', 'meeting', dates, or surrounding context. Use 'it' to refer to the last event."},
-            "match_date": {"type": "string", "description": "ISO 8601 date of the event to help narrow the search. Only provide if you are confident about the date; omit if unsure."},
+            "match_title": {"type": "string", "description": "The event's actual name words only (e.g. 'dentist', 'team sync'). Omit generic words ('event', 'meeting', 'appointment') and NEVER include dates, days, or times here. If the user says 'the event at 3pm' or 'the meeting on Friday', leave this empty and use match_date/match_start_time instead. Use 'it' to refer to the last event."},
+            "match_date": {"type": "string", "description": "ISO 8601 date of the event. Always provide when the user mentions a specific day or date."},
+            "match_start_time": {"type": "string", "description": "24-hour HH:MM start time. Always provide when the user identifies the event by time (e.g. 'the 3pm event', 'event at 6')."},
         },
-        "required": ["match_title"],
+        "required": [],
     }
 
     def execute(self, intent: DeleteEventIntent, _config) -> str:  # type: ignore[override]
-        global _last_event_id
         from assistant.db import get_db
         db = get_db()
 
-        event = _find_event(db, intent.match_title, intent.match_date)
+        event = _find_event(db, intent.match_title or "", intent.match_date, intent.match_start_time)
         if event is None:
-            if intent.match_title.lower() in _ANAPHORS:
+            if intent.match_title and intent.match_title.lower() in _ANAPHORS:
                 return "I can't do that. I don't remember the last event."
-            return f"I couldn't find an event matching '{intent.match_title}'."
+            if intent.match_title:
+                return f"I couldn't find an event matching '{intent.match_title}'."
+            parts = []
+            if intent.match_start_time:
+                parts.append(f"at {intent.match_start_time}")
+            if intent.match_date:
+                parts.append(f"on {intent.match_date}")
+            info = " " + " ".join(parts) if parts else ""
+            return f"I couldn't find an event{info}."
 
         db.delete_event(event["id"])
-        _last_event_id = None
+        context_memory.clear_event()
         return f"Deleted '{event['title']}' from your calendar."
 
 
@@ -292,34 +304,71 @@ _STOP_WORDS = {
     "it", "is", "be", "was", "and", "or", "that", "this",
 }
 
+# Words that are generic/contextual and shouldn't drive title matching.
+# When all needle words after stop-word filtering fall into this set, the title
+# carries no useful identity signal — fall back to date/time lookup instead.
+_GENERIC_TITLE_WORDS = frozenset({
+    # Generic calendar object nouns
+    "meeting", "event", "appointment", "sync", "call", "session",
+    "standup", "stand", "up", "interview", "class", "lecture", "conference",
+    "seminar", "webinar", "calendar", "agenda", "schedule", "activity",
+    # Day/time words the LLM sometimes leaks into match_title
+    "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+    "today", "tomorrow", "yesterday", "morning", "afternoon", "evening", "night",
+    "january", "february", "march", "april", "may", "june",
+    "july", "august", "september", "october", "november", "december",
+    "week", "weekend", "noon", "midnight",
+})
 
-def _find_event(db, match_title: str, match_date: Optional[str]) -> Optional[dict]:
+
+def _find_event(db, match_title: str, match_date: Optional[str], match_start_time: Optional[str] = None) -> Optional[dict]:
     """
     Find the best-matching event by title and optional date.
     Implements token-based fuzzy matching with stop-word filtering.
-    Resolves anaphoric pronouns via global memory.
+    Resolves anaphoric pronouns via context memory.
     """
-    global _last_event_id
     import datetime as dt
     import re
 
+    # Empty title: use date/time context directly (no title-based scoring)
+    if not match_title:
+        if match_date or match_start_time:
+            with db._conn() as conn:
+                query = "SELECT * FROM events WHERE 1=1"
+                params = []
+                if match_date:
+                    query += " AND date = ?"
+                    params.append(match_date)
+                if match_start_time:
+                    query += " AND start_time = ?"
+                    params.append(match_start_time)
+                query += " ORDER BY start_time"
+                rows = conn.execute(query, tuple(params)).fetchall()
+            return dict(rows[0]) if rows else None
+        return None
+
     # Anaphor resolution
     if match_title.lower() in _ANAPHORS:
-        # If a date is given alongside an anaphor ("the event on Thursday"),
-        # prefer searching by date over memory — the user is pointing at a
-        # specific day's event, not necessarily the last touched one.
-        if match_date:
+        # If a date/time is given alongside an anaphor ("the event on Thursday at 6"),
+        # prefer searching by explicit filters over memory.
+        if match_date or match_start_time:
             with db._conn() as conn:
-                rows = conn.execute(
-                    "SELECT * FROM events WHERE date = ? ORDER BY start_time",
-                    (match_date,),
-                ).fetchall()
+                query = "SELECT * FROM events WHERE 1=1"
+                params = []
+                if match_date:
+                    query += " AND date = ?"
+                    params.append(match_date)
+                if match_start_time:
+                    query += " AND start_time = ?"
+                    params.append(match_start_time)
+                query += " ORDER BY start_time"
+                rows = conn.execute(query, tuple(params)).fetchall()
             if rows:
                 return dict(rows[0])
-            # Date given but nothing on that day — fall through to global search below
-        elif _last_event_id is not None:
+            # Filter given but nothing matches — fall through to global search below
+        elif context_memory.last_event_id is not None:
             with db._conn() as conn:
-                row = conn.execute("SELECT * FROM events WHERE id = ?", (_last_event_id,)).fetchone()
+                row = conn.execute("SELECT * FROM events WHERE id = ?", (context_memory.last_event_id,)).fetchone()
             if row:
                 return dict(row)
             return None
@@ -335,6 +384,25 @@ def _find_event(db, match_title: str, match_date: Optional[str]) -> Optional[dic
     if not needle_words:
         needle_words = raw_needle_words
 
+    # If all remaining words are generic calendar/date terms (no real event name),
+    # skip fuzzy title matching and use direct date+time lookup instead.
+    # This handles both rule-parser cases ("the event at 6pm") and LLM cases
+    # where match_title leaks date/day words ("the event on Sunday").
+    meaningful_words = needle_words - _GENERIC_TITLE_WORDS
+    if not meaningful_words and (match_date or match_start_time):
+        with db._conn() as conn:
+            query = "SELECT * FROM events WHERE 1=1"
+            params: list = []
+            if match_date:
+                query += " AND date = ?"
+                params.append(match_date)
+            if match_start_time:
+                query += " AND start_time = ?"
+                params.append(match_start_time)
+            query += " ORDER BY start_time"
+            rows = conn.execute(query, tuple(params)).fetchall()
+        return dict(rows[0]) if rows else None
+
     def _score(row_dict: dict) -> int:
         title_words = set(re.findall(r'\w+', row_dict["title"].lower()))
         overlap = len(needle_words.intersection(title_words))
@@ -344,6 +412,10 @@ def _find_event(db, match_title: str, match_date: Optional[str]) -> Optional[dic
         clean_title  = re.sub(r'[-_]', '', row_dict["title"].lower())
         if clean_title in clean_needle or clean_needle in clean_title:
             overlap += 10
+
+        # Start time match boost
+        if match_start_time and row_dict.get("start_time") == match_start_time:
+            overlap += 30
 
         return overlap
 

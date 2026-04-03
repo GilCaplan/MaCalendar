@@ -1,8 +1,8 @@
 """Flask REST API — exposes calendar, todos, voice, and config endpoints.
 
 Start with:
-    python -m assistant.api           # localhost:5000
-    python -m assistant.api --lan     # 0.0.0.0:5000  (iPhone access over LAN)
+    python -m assistant.api           # localhost:8080
+    python -m assistant.api --lan     # 0.0.0.0:8080  (iPhone access over LAN)
 """
 
 from __future__ import annotations
@@ -29,7 +29,17 @@ logger = logging.getLogger(__name__)
 
 _registry: ActionRegistry | None = None
 _parser = None
+_rule_parser = None
 _stt = None
+
+# ---------------------------------------------------------------------------
+# iOS background verification store
+# {token: {"correction": dict|None, "ready": bool, "expires": float}}
+# ---------------------------------------------------------------------------
+import threading as _threading
+import time as _time
+_verify_store: dict = {}
+_verify_lock = _threading.Lock()
 
 
 def _get_registry() -> ActionRegistry:
@@ -49,6 +59,67 @@ def _get_parser():
         cfg = load_config()
         _parser = IntentParser(cfg, _get_registry())
     return _parser
+
+
+def _get_rule_parser():
+    global _rule_parser
+    if _rule_parser is None:
+        from assistant.intent.rule_parser import (
+            RuleBasedParser,
+            _RULE_PARSER_AVAILABLE,
+        )
+        if _RULE_PARSER_AVAILABLE:
+            _rule_parser = RuleBasedParser(_get_registry())
+    return _rule_parser
+
+
+def _run_server_verify(token: str, transcript: str, rule_result) -> None:
+    """Background worker: runs LLM verification and stores result for iOS polling.
+
+    The iOS app polls GET /voice/verify/<token> every ~5 s after receiving a
+    rule-path voice response. This function populates the store so the poll
+    can return the correction (if any) or {"ok": true}.
+
+    Three-tier outcome — matches pipeline.py logic:
+      • ok=true            → {"ok": true}  — iOS takes no action
+      • severity="minor"  → {"ok": false, "severity": "minor", "patch": {...},
+                             "speech": "...", "refresh": "events"|"todos"}
+      • severity="major"  → {"ok": false, "severity": "major",
+                             "action": "...", "parameters": {...},
+                             "speech": "...", "refresh": "..."}
+    iOS re-executes major corrections via the normal REST endpoints
+    (create/patch/delete) and plays the speech string locally.
+    """
+    try:
+        parser = _get_parser()
+        correction = parser.verify_fast_path_async(transcript, rule_result)
+
+        result: dict
+        if correction is None:
+            result = {"ok": True}
+        else:
+            severity = correction.get("severity", "major")
+            # Determine which entity type to refresh
+            action = correction.get("action", "")
+            refresh = "events" if "event" in action else "todos" if "todo" in action else ""
+            result = {**correction, "ok": False, "refresh": refresh}
+
+        logger.info("📱 Server verify token=%s result=%s", token[:8], result)
+    except Exception as exc:
+        logger.warning("📱 Server verify failed: %s", exc)
+        result = {"ok": True}  # assume correct on error — don't confuse the user
+
+    with _verify_lock:
+        if token in _verify_store:
+            _verify_store[token]["correction"] = result
+            _verify_store[token]["ready"] = True
+
+    # Purge expired tokens (housekeeping)
+    now = _time.time()
+    with _verify_lock:
+        expired = [t for t, v in _verify_store.items() if v["expires"] < now]
+        for t in expired:
+            del _verify_store[t]
 
 
 def _get_stt():
@@ -94,18 +165,81 @@ def create_app() -> Flask:
         })
 
     # ------------------------------------------------------------------
+    # Background verification polling (iOS)
+    # ------------------------------------------------------------------
+
+    @app.get("/voice/verify/<token>")
+    def voice_verify(token: str):
+        """Poll for background LLM verification of a rule-path voice command.
+
+        iOS calls this once ~5 s after receiving a voice response with a
+        'verify_token'. Returns immediately with {"pending": true} if not ready yet.
+
+        When ready, returns {"ok": true} or a correction object:
+          • minor: {"ok": false, "severity": "minor", "patch": {...}, "speech": "...", "refresh": "..."}
+          • major: {"ok": false, "severity": "major", "action": "...", "parameters": {...},
+                    "speech": "...", "refresh": "..."}
+
+        iOS re-executes major corrections via the normal REST endpoints
+        and plays the speech string via AVSpeechSynthesizer.
+        The token is consumed on first ready response.
+        """
+        with _verify_lock:
+            entry = _verify_store.get(token)
+        if entry is None:
+            return jsonify({"error": "Unknown or expired token", "code": 404}), 404
+        if not entry["ready"]:
+            return jsonify({"pending": True})
+        # Consume the token
+        with _verify_lock:
+            _verify_store.pop(token, None)
+        return jsonify(entry["correction"])
+
+    # ------------------------------------------------------------------
     # Voice endpoints
     # ------------------------------------------------------------------
 
     def _run_transcript(transcript: str) -> dict[str, Any]:
         """Parse and execute a transcript; return the API response dict."""
+        from assistant.intent.rule_parser import RULE_THRESHOLD, RuleParserSkip
         parser = _get_parser()
+        rule_parser = _get_rule_parser()
         cfg = load_config()
 
-        try:
-            parsed = parser.parse(transcript)
-        except AssistantError as e:
-            return {"message": str(e), "actions": [], "refresh": ""}
+        parsed = None
+        parse_path = "llm"
+
+        if rule_parser is not None:
+            try:
+                rule_result = rule_parser.analyze(transcript)
+                if rule_result.confidence >= RULE_THRESHOLD and not rule_result.missing_slots:
+                    parsed = rule_result.intents
+                    parse_path = "rule"
+                    logger.info(
+                        "📱 Rule fast-path: confidence=%.2f actions=%s",
+                        rule_result.confidence, [n for n, _ in parsed],
+                    )
+                else:
+                    logger.info(
+                        "📱 Rule partial handoff: confidence=%.2f missing=%s",
+                        rule_result.confidence, rule_result.missing_slots,
+                    )
+                    try:
+                        parsed = parser.parse_with_context(transcript, rule_result)
+                        parse_path = "hybrid"
+                    except AssistantError:
+                        parsed = None  # fall through to full LLM below
+            except RuleParserSkip as e:
+                logger.debug("📱 Rule parser skipped: %s", e)
+
+        if parsed is None:
+            try:
+                parsed = parser.parse(transcript)
+            except AssistantError as e:
+                logger.warning("📱 Parse error: %s", e)
+                return {"message": str(e), "actions": [], "refresh": "", "parse": "error"}
+
+        logger.info("📱 Parsed actions: %s", [a for a, _ in parsed])
 
         messages: list[str] = []
         action_names: list[str] = []
@@ -113,23 +247,25 @@ def create_app() -> Flask:
 
         for action_name, intent in parsed:
             if action_name == "unknown":
+                logger.warning("📱 Unknown intent for transcript: %s", transcript)
                 messages.append("Sorry, I didn't understand that.")
                 continue
             registry = _get_registry()
             action_cls = registry.get(action_name)
             if action_cls is None:
+                logger.warning("📱 No action class for: %s", action_name)
                 continue
             try:
                 result = action_cls().execute(intent, cfg)
+                logger.info("📱 Action %s → %s", action_name, result)
                 messages.append(result or "")
                 action_names.append(action_name)
-                # Determine what to refresh
                 if "event" in action_name:
                     refresh_set.add("events")
                 elif "todo" in action_name:
                     refresh_set.add("todos")
             except Exception as e:
-                logger.exception("Action %s failed", action_name)
+                logger.exception("📱 Action %s failed: %s", action_name, e)
                 messages.append(f"Error: {e}")
 
         if "events" in refresh_set and "todos" in refresh_set:
@@ -139,11 +275,36 @@ def create_app() -> Flask:
         else:
             refresh = ""
 
-        return {
-            "message": " ".join(m for m in messages if m),
+        response_msg = " ".join(m for m in messages if m)
+        logger.info("📱 Response: %s | refresh=%s | parse=%s", response_msg, refresh or "none", parse_path)
+
+        # For rule-path results: kick off background LLM verification
+        # and hand the iOS app a token it can poll with GET /voice/verify/<token>
+        verify_token: str | None = None
+        if parse_path == "rule" and rule_result is not None:
+            import uuid
+            verify_token = str(uuid.uuid4())
+            with _verify_lock:
+                _verify_store[verify_token] = {
+                    "ready": False,
+                    "correction": None,
+                    "expires": _time.time() + 90,   # 90 s TTL
+                }
+            _threading.Thread(
+                target=_run_server_verify,
+                args=(verify_token, transcript, rule_result),
+                daemon=True,
+            ).start()
+
+        resp: dict = {
+            "message": response_msg,
             "actions": action_names,
             "refresh": refresh,
+            "parse": parse_path,
         }
+        if verify_token:
+            resp["verify_token"] = verify_token
+        return resp
 
     @app.post("/voice")
     def voice_audio():
@@ -152,10 +313,12 @@ def create_app() -> Flask:
             return jsonify({"error": "Missing 'audio' file field", "code": 400}), 400
 
         audio_bytes = request.files["audio"].read()
+        logger.info("📱 Audio received: %.1f KB", len(audio_bytes) / 1024)
         try:
             from assistant.api.audio_utils import audio_bytes_to_numpy
             audio_np = audio_bytes_to_numpy(audio_bytes)
         except Exception as e:
+            logger.error("📱 Audio decode failed: %s", e)
             return jsonify({"error": f"Audio decode failed: {e}", "code": 422}), 422
 
         try:
@@ -167,6 +330,7 @@ def create_app() -> Flask:
         if not transcript.strip():
             return jsonify({"message": "I didn't catch that.", "actions": [], "refresh": ""})
 
+        logger.info("📱 Transcript: %s", transcript)
         return jsonify(_run_transcript(transcript))
 
     @app.post("/voice/text")
@@ -176,6 +340,7 @@ def create_app() -> Flask:
         transcript = body.get("transcript", "").strip()
         if not transcript:
             return jsonify({"error": "Missing 'transcript' field", "code": 400}), 400
+        logger.info("📱 Text command: %s", transcript)
         return jsonify(_run_transcript(transcript))
 
     # ------------------------------------------------------------------
@@ -305,6 +470,24 @@ def create_app() -> Flask:
         db = get_db()
         count = db.sync_calendar_to_todos(list_name=list_name)
         return jsonify({"synced": count, "list": list_name})
+
+    @app.post("/todos/reorder")
+    def todos_reorder():
+        data = request.get_json(silent=True) or {}
+        list_name = data.get("list")
+        ids = data.get("ids", [])
+        if not list_name or not isinstance(ids, list):
+            return jsonify({"error": "Missing 'list' or 'ids'", "code": 400}), 400
+        db = get_db()
+        db.reorder_todos(list_name, [int(i) for i in ids])
+        return jsonify({"ok": True})
+
+    @app.delete("/todos/completed")
+    def todos_clear_completed():
+        list_name = request.args.get("list")  # optional filter
+        db = get_db()
+        count = db.delete_completed_todos(list_name=list_name or None)
+        return jsonify({"deleted": count})
 
     # ------------------------------------------------------------------
     # Config

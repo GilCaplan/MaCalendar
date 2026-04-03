@@ -128,26 +128,22 @@ pytest tests/
 
 ## 📱 iPhone App
 
-MACalendar includes a Flask REST API so a native iOS app can read and write the same calendar from your iPhone. The Mac is always the source of truth — the iPhone talks to the Mac over the network.
+MACalendar includes a native SwiftUI companion app and a Flask REST API. The Mac acts as the source of truth, and the iPhone connects via Tailscale to manage events and tasks from anywhere.
 
-### Starting the API server
+### 1. Deploy the App (via Xcode)
+1. Open `MACalendar-iOS/MACalendar-iOS.xcodeproj` in **Xcode**.
+2. Set your **Signing Team** in *Signing & Capabilities*.
+3. Connect your iPhone and click **Run**.
+4. (First time) Go to iPhone **Settings → General → VPN & Device Management** and **Trust** your developer profile.
 
-```bash
-# Same Wi-Fi only
-python -m assistant.api --lan
+### 2. Connect via Tailscale (Recommended)
+Tailscale provides a secure, private tunnel between your Mac and iPhone without port forwarding.
+1. **Mac:** `brew install tailscale` → Sign in.
+2. **iPhone:** Install [Tailscale](https://apps.apple.com/app/tailscale/id1470499037) → Sign in.
+3. **Start API:** `python -m assistant.api --tailscale` (Prints your 100.x.x.x IP).
+4. **App Settings:** Set Server URL to `http://<your-tailscale-ip>:8080`.
 
-# From anywhere via Tailscale (recommended)
-python -m assistant.api --tailscale
-```
-
-### Connecting from anywhere with Tailscale (one-time setup)
-
-1. **Mac:** `brew install tailscale` → open the Tailscale menu bar app → sign in
-2. **iPhone:** Install [Tailscale](https://apps.apple.com/app/tailscale/id1470499037) from the App Store → sign in with the same account
-3. **Start the API:** `python -m assistant.api --tailscale` — it prints your Tailscale IP (e.g. `100.x.x.x`)
-4. **iOS app Settings:** set Server URL to `http://100.x.x.x:5000`
-
-That's it — the app connects from home, coffee shop, anywhere.
+For full deployment details and API reference, see [**SYSTEM_IPHONE.md**](./SYSTEM_IPHONE.md).
 
 ### API endpoints (quick reference)
 

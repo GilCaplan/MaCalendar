@@ -6,8 +6,12 @@ import datetime
 import json
 import logging
 import re
+from typing import TYPE_CHECKING
 
 import requests
+
+if TYPE_CHECKING:
+    from assistant.intent.rule_parser import RuleParseResult
 
 from assistant.actions import ActionRegistry
 from assistant.actions.base import BaseIntent
@@ -71,7 +75,7 @@ class IntentParser:
         ]
         lowered = transcript.lower()
         if any(f in lowered for f in forbidden):
-            logger.warning("Potential prompt injection detected: %r", transcript)
+            logger.warning("🖥️ Potential prompt injection detected: %r", transcript)
             return [("unknown", UnknownIntent())]
 
         system_prompt = self._get_system_prompt()
@@ -96,6 +100,166 @@ class IntentParser:
             raise ParseError(f"Error calling {engine}: {e}") from e
 
         return self._parse_response(raw_content)
+
+    def parse_with_context(
+        self,
+        transcript: str,
+        partial: "RuleParseResult",
+    ) -> list[tuple[str, BaseIntent]]:
+        """Called when RuleBasedParser has partial results (low confidence or missing slots).
+
+        Prepends a pre-analysis context block to the user message so the LLM only
+        has to fill gaps rather than re-parse from scratch. The system prompt and
+        schema cache are left untouched.
+        """
+        context_hint = self._build_partial_context(partial)
+        augmented = f"{context_hint}\n\nUser command: {transcript}"
+        return self.parse(augmented)
+
+    @staticmethod
+    def _build_partial_context(partial: "RuleParseResult") -> str:
+        lines = [
+            "[RULE PARSER PRE-ANALYSIS — use this to fill gaps; do not contradict filled slots]",
+            f"Normalized transcript: {partial.transcript!r}",
+            f"Rule confidence: {partial.confidence:.2f}",
+        ]
+        for action_name, raw_slots in partial.raw_slots.items():
+            lines.append(f"Identified action: {action_name}")
+            filled = {k: v for k, v in raw_slots.items() if v or v == 0}
+            empty = [k for k, v in raw_slots.items() if not v and v != 0]
+            for slot, value in filled.items():
+                lines.append(f"  Filled slot '{slot}': {value!r}")
+            for slot in empty:
+                lines.append(f"  Empty slot '{slot}': (needs your resolution)")
+        if partial.missing_slots:
+            lines.append(
+                f"Required slots still missing: {', '.join(partial.missing_slots)}"
+            )
+        return "\n".join(lines)
+
+    def verify_fast_path_async(
+        self,
+        transcript: str,
+        rule_result: "RuleParseResult",
+    ) -> "dict | None":
+        """Send the rule-parser's interpretation to the LLM for background severity judgment.
+
+        Returns a correction dict or None (confirmed correct).
+        Safe to call from a daemon thread — exceptions are caught and logged.
+
+        Return schema when correction needed:
+            {
+              "severity": "minor",            # patch a few fields on the existing record
+              "patch": {"start_time": "16:00"},
+              "speech": "Fixed the time to 4 PM"
+            }
+            or
+            {
+              "severity": "major",            # completely wrong — undo + redo
+              "action": "create_todo",
+              "parameters": {"titles": ["call mom"]},
+              "speech": "I think you meant a reminder, not a calendar event"
+            }
+        """
+        try:
+            return self._run_verification(transcript, rule_result)
+        except Exception as e:
+            logger.debug("Fast-path verification skipped: %s", e)
+            return None
+
+    def _run_verification(
+        self,
+        transcript: str,
+        rule_result: "RuleParseResult",
+    ) -> "dict | None":
+        """Build a severity-tiered verification prompt and call the active LLM backend."""
+        action_summaries = []
+        for action_name, raw_slots in rule_result.raw_slots.items():
+            filled = {k: v for k, v in raw_slots.items() if v or v == 0}
+            action_summaries.append(
+                f"  action={action_name!r}, slots={json.dumps(filled, default=str)}"
+            )
+        actions_block = "\n".join(action_summaries) if action_summaries else "  (none)"
+
+        verify_sys = (
+            "You are a voice-command verifier. A fast rule parser already executed a command. "
+            "Judge if it was correct, then respond with ONLY a JSON object — no prose.\n\n"
+            "Severity rules:\n"
+            '  • Correct → {"ok": true}\n'
+            '  • Minor error (wrong time, date, or title but right action) →\n'
+            '    {"ok": false, "severity": "minor",\n'
+            '     "patch": {<only the fields that need fixing>},\n'
+            '     "speech": "<under 15 words for TTS>"}\n'
+            '  • Major error (wrong action, wrong entity type) →\n'
+            '    {"ok": false, "severity": "major",\n'
+            '     "action": "<correct_action_name>",\n'
+            '     "parameters": {<full correct params>},\n'
+            '     "speech": "<under 15 words for TTS>"}\n'
+            "Valid action names: create_event, update_event, delete_event, query_schedule, "
+            "create_todo, complete_todo, delete_todo, update_todo, query_todo.\n\n"
+            "Key semantic rules for update_event:\n"
+            "  • EXTEND/LENGTHEN/SHORTEN/STRETCH: 'to Xpm' is new_end_time (NOT new_start_time).\n"
+            "    The event is identified by match_start_time (e.g. 'extend the 1pm event to 3pm'\n"
+            "    → match_start_time='13:00', new_end_time='15:00'). This is CORRECT.\n"
+            "  • MOVE/RESCHEDULE: 'to Xpm' or 'at Xpm' is new_start_time.\n"
+            "  • match_title may be absent when match_start_time uniquely identifies the event —\n"
+            "    this is valid, not a missing-slot error.\n"
+            "  • Generic words ('event', 'appointment', 'meeting') as match_title are wrong;\n"
+            "    the event should be identified by time or its actual name."
+        )
+        verify_user = (
+            f"Voice command: {transcript!r}\n\n"
+            f"Rule parser executed:\n{actions_block}\n\n"
+            "Judge the severity:"
+        )
+
+        engine = self.config.llm_engine
+        try:
+            if engine == "ollama":
+                raw = self._call_ollama_verify(verify_sys, verify_user)
+            elif engine == "openai":
+                raw = self._call_openai(verify_sys, verify_user)
+            elif engine == "gemini":
+                raw = self._call_gemini(verify_sys, verify_user)
+            elif engine == "claude":
+                raw = self._call_claude(verify_sys, verify_user)
+            else:
+                return None
+        except Exception as e:
+            logger.debug("Verification LLM call failed: %s", e)
+            return None
+
+        json_str = self._extract_json(raw)
+        try:
+            data = json.loads(json_str)
+        except json.JSONDecodeError:
+            return None
+
+        if data.get("ok") is True:
+            logger.debug("🖥️ Background verify: confirmed ✓")
+            return None  # silent — rule parser was right
+
+        severity = data.get("severity", "major")
+        logger.info(
+            "🖥️ Background verify correction — severity=%s action=%r patch=%r",
+            severity, data.get("action"), data.get("patch"),
+        )
+        return data  # pipeline decides what to do with minor vs major
+
+    def _call_ollama_verify(self, sys: str, user: str) -> str:
+        """Lightweight Ollama call without format schema — faster for verification."""
+        conf = self.config.ollama
+        payload = {
+            "model": conf.model,
+            "messages": [{"role": "system", "content": sys}, {"role": "user", "content": user}],
+            "stream": False,
+            "options": {"temperature": 0.0},  # deterministic judgment
+        }
+        resp = self._session.post(
+            f"{conf.base_url}/api/chat", json=payload, timeout=25
+        )
+        resp.raise_for_status()
+        return resp.json()["message"]["content"]
 
     # ------------------------------------------------------------------
     # Backends

@@ -153,7 +153,7 @@ class AudioCapture:
         try:
             self._open_stream(rate, channels, dtype, chunk_size, callback)
         except sd.PortAudioError:
-            logger.warning("PortAudio error on stream open — reinitialising and retrying.")
+            logger.warning("🖥️ PortAudio error on stream open — reinitialising and retrying.")
             try:
                 sd._terminate()
                 sd._initialize()

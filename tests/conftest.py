@@ -25,6 +25,19 @@ from assistant.config import (
 
 
 # ---------------------------------------------------------------------------
+# Context memory reset — clears anaphora state between tests
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def reset_context_memory():
+    """Clear ContextMemory before each test to prevent anaphora state leaking."""
+    from assistant.intent.context import context_memory
+    context_memory.reset()
+    yield
+    context_memory.reset()
+
+
+# ---------------------------------------------------------------------------
 # Registry isolation — MUST run before each test to prevent pollution
 # ---------------------------------------------------------------------------
 

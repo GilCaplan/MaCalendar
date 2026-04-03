@@ -2,6 +2,11 @@
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["assistant*"]
+exclude = ["DOCUMENTATION*", "tests*", "MACalendar-iOS*"]
+
 [project]
 name = "assistant-tools"
 version = "0.1.0"
@@ -22,10 +27,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+nlp = [
+    "spacy>=3.7,<4.0",
+    "recognizers-text-date-time>=1.0.2a0",
+]
 dev = [
     "pytest>=8.0",
     "pytest-mock",
     "pytest-cov",
+    "spacy>=3.7,<4.0",
+    "recognizers-text-date-time>=1.0.2a0",
 ]
 
 [project.scripts]

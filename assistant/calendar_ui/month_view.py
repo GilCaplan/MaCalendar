@@ -37,9 +37,10 @@ class EventPill(QLabel):
 
     clicked = pyqtSignal(dict)
 
-    def __init__(self, event: dict, parent=None):
+    def __init__(self, event: dict, font_size: int = 8, parent=None):
         super().__init__(parent)
         self.event = event
+        self._font_size = font_size
         self._drag_start = None
         self._color = event.get("color", BLUE)
         start = event.get("start_time", "")
@@ -62,7 +63,7 @@ class EventPill(QLabel):
         painter.drawRoundedRect(self.rect(), 4, 4)
         painter.setPen(QColor("white"))
         font = self.font()
-        font.setPointSize(8)
+        font.setPointSize(self._font_size)
         font.setWeight(font.Weight.Medium)
         painter.setFont(font)
         fm = painter.fontMetrics()
@@ -115,6 +116,7 @@ class DayCell(QWidget):
         self._selected        = False
         self._drag_hover      = False
         self._events: List[dict] = []
+        self._ui_config       = None
 
         self.setMinimumHeight(88)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -148,14 +150,16 @@ class DayCell(QWidget):
                 item.widget().deleteLater()
 
         self._events = events
+        pill_fs = 8 if not self._ui_config else max(6, self._ui_config.font_month - 3)
         for ev in events[:3]:
-            pill = EventPill(ev)
+            pill = EventPill(ev, font_size=pill_fs)
             pill.clicked.connect(self.event_clicked)
             self._event_layout.addWidget(pill)
         if len(events) > 3:
+            more_fs = 11 if not self._ui_config else self._ui_config.font_month
             text_color = _styles.D_GRAY_TEXT if _styles._dark else GRAY_TEXT
             more = QLabel(f"  +{len(events) - 3} more")
-            more.setStyleSheet(f"font-size: 11px; color: {text_color}; padding: 0 2px;")
+            more.setStyleSheet(f"font-size: {more_fs}px; color: {text_color}; padding: 0 2px;")
             self._event_layout.addWidget(more)
 
     def mousePressEvent(self, event):
@@ -215,12 +219,17 @@ class DayNumberLabel(QLabel):
         self.is_today         = is_today
         self.is_current_month = is_current_month
         self._selected        = False
+        self._font_size       = 12
         self.setFixedSize(26, 26)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._refresh_style()
 
     def set_selected(self, selected: bool) -> None:
         self._selected = selected
+        self._refresh_style()
+
+    def apply_ui_config(self, ui_config) -> None:
+        self._font_size = ui_config.font_month + 1
         self._refresh_style()
 
     def _refresh_style(self) -> None:
@@ -231,7 +240,7 @@ class DayNumberLabel(QLabel):
                     background-color: {TODAY_BG};
                     color: {TODAY_TEXT};
                     border-radius: 13px;
-                    font-size: 12px;
+                    font-size: {self._font_size}px;
                     font-weight: 700;
                 }}
             """)
@@ -242,7 +251,7 @@ class DayNumberLabel(QLabel):
                     border: 2px solid {BLUE};
                     color: {BLUE};
                     border-radius: 13px;
-                    font-size: 12px;
+                    font-size: {self._font_size}px;
                     font-weight: 600;
                 }}
             """)
@@ -255,7 +264,7 @@ class DayNumberLabel(QLabel):
                 QLabel {{
                     background: transparent;
                     border: none;
-                    font-size: 12px;
+                    font-size: {self._font_size}px;
                     font-weight: 400;
                     color: {text};
                 }}
@@ -283,6 +292,7 @@ class MonthView(QWidget):
         self._month = datetime.date.today().month
         self._cells: List[DayCell]       = []
         self._selected_date: Optional[datetime.date] = datetime.date.today()
+        self._ui_config = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -322,13 +332,19 @@ class MonthView(QWidget):
         self._header.setStyleSheet(
             f"background-color: {bg}; border-bottom: 1px solid {border};"
         )
+        fs = 11 if not self._ui_config else self._ui_config.font_month
         for lbl in self._header_labels:
             lbl.setStyleSheet(
-                f"font-size: 11px; font-weight: 600; color: {color}; letter-spacing: 0.5px;"
+                f"font-size: {fs}px; font-weight: 600; color: {color}; letter-spacing: 0.5px;"
             )
 
     def apply_theme(self, dark: bool) -> None:
         _styles._dark = dark
+        self._apply_header_style()
+        self._rebuild_grid()
+
+    def apply_ui_config(self, ui_config) -> None:
+        self._ui_config = ui_config
         self._apply_header_style()
         self._rebuild_grid()
 
@@ -362,6 +378,10 @@ class MonthView(QWidget):
             self._grid.setRowStretch(row, 1)
             for col, date in enumerate(week):
                 cell = DayCell(date, date.month == self._month)
+                cell._ui_config = self._ui_config
+                if self._ui_config:
+                    cell._num_label._font_size = self._ui_config.font_month + 1
+                    cell._num_label._refresh_style()
                 cell.set_selected(date == self._selected_date)
                 cell.day_clicked.connect(self._on_cell_clicked)
                 cell.event_clicked.connect(self.event_clicked)

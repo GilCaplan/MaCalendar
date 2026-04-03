@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS todos (
     source          TEXT    NOT NULL DEFAULT 'manual',
     source_event_id INTEGER,
     created_at      TEXT    NOT NULL,
-    completed_at    TEXT    NOT NULL DEFAULT ''
+    completed_at    TEXT    NOT NULL DEFAULT '',
+    position        INTEGER NOT NULL DEFAULT 0
 )
 """
 
@@ -35,6 +36,7 @@ _TODO_MIGRATIONS = [
     "ALTER TABLE todos ADD COLUMN notes TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE todos ADD COLUMN source_event_id INTEGER",
     "ALTER TABLE todos ADD COLUMN completed_at TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE todos ADD COLUMN position INTEGER NOT NULL DEFAULT 0",
 ]
 
 _CREATE_TABLE = """
@@ -338,6 +340,66 @@ class CalendarDB:
         with self._conn() as conn:
             conn.execute(f"UPDATE events SET {set_clause} WHERE id = ?", values)
 
+    def update_series(self, series_id: int, start_from_instance_id: int, **fields) -> None:
+        """
+        Update this instance and all future instances in the series.
+        If recurrence or recurrence_end changes, future instances are re-generated.
+        """
+        instance = self.get_event(start_from_instance_id)
+        if not instance:
+            return
+
+        recurrence = fields.get("recurrence", instance.get("recurrence", ""))
+        recur_until = fields.get("recurrence_end", instance.get("recurrence_end", ""))
+        
+        # 1. Update properties for ALL instances in the series (past and future)
+        # We update title, start/end time, color, attendees, etc.
+        common = {"title", "start_time", "end_time", "attendees", "location", "description", "color"}
+        updates = {k: v for k, v in fields.items() if k in common}
+        
+        with self._conn() as conn:
+            if updates:
+                set_clause = ", ".join(f"{k} = ?" for k in updates)
+                values = list(updates.values()) + [series_id, series_id]
+                conn.execute(f"UPDATE events SET {set_clause} WHERE series_id = ? OR id = ?", values)
+
+            # 2. Check if the series schedule needs re-generating
+            # If recurrence type or end date changed, we delete future instances and re-generate them.
+            # We also redo this if the title/color changed to keep it SIMPLE.
+            old_recur = instance.get("recurrence", "")
+            old_until = instance.get("recurrence_end", "")
+            
+            # If important series-defining fields changed, re-sync the series
+            if recurrence != old_recur or recur_until != old_until or recurrence:
+                # Delete all future instances of this series starting from the EDITED instance's DATE (exclusive)
+                conn.execute(
+                    "DELETE FROM events WHERE (series_id = ? OR id = ?) AND date > ?",
+                    (series_id, series_id, instance["date"]),
+                )
+                
+                # Update the EDITED instance's recurrence info
+                conn.execute(
+                    "UPDATE events SET recurrence = ?, recurrence_end = ? WHERE id = ?",
+                    (recurrence, recur_until, start_from_instance_id),
+                )
+                
+                # Re-generate from the edited instance's date
+                if recurrence:
+                    # Build a 'FakeIntent' for re-generation
+                    class _FakeIntent:
+                        title = fields.get("title", instance["title"])
+                        date = instance["date"]
+                        start_time = fields.get("start_time", instance["start_time"])
+                        end_time = fields.get("end_time", instance["end_time"])
+                        attendees = fields.get("attendees", instance["attendees"]).split(", ")
+                        location = fields.get("location", instance["location"])
+                        description = fields.get("description", instance["description"])
+
+                    self._create_series_instances(
+                        conn, series_id, _FakeIntent(), recurrence, recur_until,
+                        fields.get("color", instance["color"])
+                    )
+
     # ------------------------------------------------------------------
     # Delete
     # ------------------------------------------------------------------
@@ -381,12 +443,16 @@ class CalendarDB:
     ) -> int:
         """Insert a new todo item. Returns the new row id."""
         with self._conn() as conn:
+            max_pos = conn.execute(
+                "SELECT COALESCE(MAX(position), -1) FROM todos WHERE list = ?",
+                (list_name,),
+            ).fetchone()[0]
             cur = conn.execute(
                 """
                 INSERT INTO todos
                     (title, list, completed, priority, due_date, notes,
-                     source, source_event_id, created_at, completed_at)
-                VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, '')
+                     source, source_event_id, created_at, completed_at, position)
+                VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, '', ?)
                 """,
                 (
                     title,
@@ -397,6 +463,7 @@ class CalendarDB:
                     source,
                     source_event_id,
                     datetime.datetime.now().isoformat(),
+                    max_pos + 1,
                 ),
             )
             return cur.lastrowid
@@ -421,7 +488,7 @@ class CalendarDB:
             conditions.append("completed = 0")
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
-        query += " ORDER BY completed ASC, created_at ASC"
+        query += " ORDER BY completed ASC, position ASC, created_at ASC"
         with self._conn() as conn:
             rows = conn.execute(query, params).fetchall()
         return [dict(r) for r in rows]
@@ -484,6 +551,26 @@ class CalendarDB:
         with self._conn() as conn:
             cur = conn.execute("DELETE FROM todos WHERE source = ?", (source,))
             return cur.rowcount
+
+    def delete_completed_todos(self, list_name: Optional[str] = None) -> int:
+        """Delete all completed todos, optionally filtered by list. Returns count deleted."""
+        with self._conn() as conn:
+            if list_name:
+                cur = conn.execute(
+                    "DELETE FROM todos WHERE completed = 1 AND list = ?", (list_name,)
+                )
+            else:
+                cur = conn.execute("DELETE FROM todos WHERE completed = 1")
+            return cur.rowcount
+
+    def reorder_todos(self, list_name: str, ids: List[int]) -> None:
+        """Update position of todos in list_name to match the given id order."""
+        with self._conn() as conn:
+            for pos, todo_id in enumerate(ids):
+                conn.execute(
+                    "UPDATE todos SET position = ? WHERE id = ? AND list = ?",
+                    (pos, todo_id, list_name),
+                )
 
     # ------------------------------------------------------------------
     # Todos: Calendar Sync
