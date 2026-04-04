@@ -343,7 +343,10 @@ class CalendarDB:
     def update_series(self, series_id: int, start_from_instance_id: int, **fields) -> None:
         """
         Update this instance and all future instances in the series.
-        If recurrence or recurrence_end changes, future instances are re-generated.
+        Series-wide properties (title, times, recurrence, recurrence_end, etc.) are
+        propagated to ALL instances (past and future) so that any instance always
+        reflects the current series definition.  Future instances are then re-generated
+        whenever the schedule changes.
         """
         instance = self.get_event(start_from_instance_id)
         if not instance:
@@ -351,47 +354,48 @@ class CalendarDB:
 
         recurrence = fields.get("recurrence", instance.get("recurrence", ""))
         recur_until = fields.get("recurrence_end", instance.get("recurrence_end", ""))
-        
-        # 1. Update properties for ALL instances in the series (past and future)
-        # We update title, start/end time, color, attendees, etc.
-        common = {"title", "start_time", "end_time", "attendees", "location", "description", "color"}
+
+        # Fields that are series-wide and should be propagated to ALL instances
+        # (including past ones) so every instance always reflects the current series state.
+        # recurrence + recurrence_end are included so past instances show the right until date.
+        common = {
+            "title", "start_time", "end_time", "attendees",
+            "location", "description", "color",
+            "recurrence", "recurrence_end",
+        }
         updates = {k: v for k, v in fields.items() if k in common}
-        
+
         with self._conn() as conn:
             if updates:
                 set_clause = ", ".join(f"{k} = ?" for k in updates)
                 values = list(updates.values()) + [series_id, series_id]
-                conn.execute(f"UPDATE events SET {set_clause} WHERE series_id = ? OR id = ?", values)
+                conn.execute(
+                    f"UPDATE events SET {set_clause} WHERE series_id = ? OR id = ?",
+                    values,
+                )
 
-            # 2. Check if the series schedule needs re-generating
-            # If recurrence type or end date changed, we delete future instances and re-generate them.
-            # We also redo this if the title/color changed to keep it SIMPLE.
+            # Re-generate future instances whenever the series has any recurrence
+            # (keeps things simple: title/time changes also re-sync future slots).
             old_recur = instance.get("recurrence", "")
             old_until = instance.get("recurrence_end", "")
-            
-            # If important series-defining fields changed, re-sync the series
             if recurrence != old_recur or recur_until != old_until or recurrence:
-                # Delete all future instances of this series starting from the EDITED instance's DATE (exclusive)
+                # Delete all future instances after the edited one
                 conn.execute(
                     "DELETE FROM events WHERE (series_id = ? OR id = ?) AND date > ?",
                     (series_id, series_id, instance["date"]),
                 )
-                
-                # Update the EDITED instance's recurrence info
-                conn.execute(
-                    "UPDATE events SET recurrence = ?, recurrence_end = ? WHERE id = ?",
-                    (recurrence, recur_until, start_from_instance_id),
-                )
-                
-                # Re-generate from the edited instance's date
+
+                # Re-generate from the edited instance's date forward
                 if recurrence:
-                    # Build a 'FakeIntent' for re-generation
+                    attendees_str = fields.get("attendees", instance.get("attendees", ""))
+                    attendees_list = [a for a in attendees_str.split(", ") if a]
+
                     class _FakeIntent:
                         title = fields.get("title", instance["title"])
                         date = instance["date"]
                         start_time = fields.get("start_time", instance["start_time"])
                         end_time = fields.get("end_time", instance["end_time"])
-                        attendees = fields.get("attendees", instance["attendees"]).split(", ")
+                        attendees = attendees_list
                         location = fields.get("location", instance["location"])
                         description = fields.get("description", instance["description"])
 
@@ -405,8 +409,37 @@ class CalendarDB:
     # ------------------------------------------------------------------
 
     def delete_event(self, event_id: int) -> None:
-        """Delete a single event instance."""
+        """Delete a single event instance.
+
+        If the deleted instance is the series root (series_id == id), the series is
+        re-rooted to the next chronological instance so remaining instances keep a
+        valid series_id reference and can still be edited/extended as a group.
+        """
         with self._conn() as conn:
+            # Check whether this event is the series root
+            row = conn.execute(
+                "SELECT id FROM events WHERE id = ? AND series_id = id",
+                (event_id,),
+            ).fetchone()
+            if row:
+                # Find the earliest remaining instance to become the new root
+                next_row = conn.execute(
+                    "SELECT id FROM events WHERE series_id = ? AND id != ? ORDER BY date, start_time LIMIT 1",
+                    (event_id, event_id),
+                ).fetchone()
+                if next_row:
+                    new_root = next_row["id"]
+                    # Point all sibling instances at the new root
+                    conn.execute(
+                        "UPDATE events SET series_id = ? WHERE series_id = ?",
+                        (new_root, event_id),
+                    )
+                    # Make the new root self-referential
+                    conn.execute(
+                        "UPDATE events SET series_id = ? WHERE id = ?",
+                        (new_root, new_root),
+                    )
+
             conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
 
     def delete_series(self, series_id: int) -> int:
@@ -419,8 +452,35 @@ class CalendarDB:
             return cur.rowcount
 
     def delete_series_from(self, series_id: int, from_date: str) -> int:
-        """Delete this event and all future instances in the series."""
+        """Delete this event and all future instances in the series.
+
+        If the root instance falls within the deleted range, re-roots the series
+        to the latest remaining instance so past instances stay properly linked.
+        """
         with self._conn() as conn:
+            # Check if the root is being deleted
+            root_row = conn.execute(
+                "SELECT id FROM events WHERE id = ? AND id = series_id AND date >= ?",
+                (series_id, from_date),
+            ).fetchone()
+            if root_row:
+                # Find the latest past instance to become new root
+                prev_row = conn.execute(
+                    "SELECT id FROM events WHERE (series_id = ? OR id = ?) AND date < ? "
+                    "ORDER BY date DESC, start_time DESC LIMIT 1",
+                    (series_id, series_id, from_date),
+                ).fetchone()
+                if prev_row:
+                    new_root = prev_row["id"]
+                    conn.execute(
+                        "UPDATE events SET series_id = ? WHERE series_id = ? AND date < ?",
+                        (new_root, series_id, from_date),
+                    )
+                    conn.execute(
+                        "UPDATE events SET series_id = ? WHERE id = ?",
+                        (new_root, new_root),
+                    )
+
             cur = conn.execute(
                 "DELETE FROM events WHERE (series_id = ? OR id = ?) AND date >= ?",
                 (series_id, series_id, from_date),
