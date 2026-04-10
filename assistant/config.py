@@ -71,6 +71,14 @@ class AudioConfig(BaseModel):
     silence_threshold: float = 0.01
     silence_duration_sec: float = 20.0   # stop after 20s of silence
     max_recording_sec: int = 120         # hard cap
+    # Comma-separated words/phrases that trigger early recording stop.
+    # Merged with the built-in defaults (execute, done, stop, …).
+    stop_phrases: List[str] = []
+    # Optional spoken separator between multiple events in one recording.
+    # When non-empty, the transcript is split on this phrase and each
+    # segment is parsed independently (faster — avoids LLM for multi-event).
+    # Recommended: "next event"  e.g. "meeting at 10am next event lunch at noon"
+    event_separator: str = ""
 
 
 class TTSConfig(BaseModel):

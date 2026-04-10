@@ -237,6 +237,12 @@ def create_app() -> Flask:
                 parsed = parser.parse(transcript)
             except AssistantError as e:
                 logger.warning("📱 Parse error: %s", e)
+                from assistant.pipeline import Pipeline as _Pipeline
+                _threading.Thread(
+                    target=_Pipeline._append_nlu_log,
+                    args=(transcript, "llm", False, [], [], False, f"parse_error: {e}", "ios"),
+                    daemon=True,
+                ).start()
                 return {"message": str(e), "actions": [], "refresh": "", "parse": "error"}
 
         logger.info("📱 Parsed actions: %s", [a for a, _ in parsed])
@@ -277,6 +283,19 @@ def create_app() -> Flask:
 
         response_msg = " ".join(m for m in messages if m)
         logger.info("📱 Response: %s | refresh=%s | parse=%s", response_msg, refresh or "none", parse_path)
+
+        # NLU tracking
+        from assistant.pipeline import Pipeline as _Pipeline
+        _success = bool(action_names)
+        _failure_reason = "" if _success else ("unknown_intent" if not any(a != "unknown" for a, _ in parsed) else "action_failed")
+        _threading.Thread(
+            target=_Pipeline._append_nlu_log,
+            args=(transcript, parse_path, parse_path == "rule",
+                  action_names or [a for a, _ in parsed if a != "unknown"],
+                  messages if _success else [],
+                  _success, _failure_reason, "ios"),
+            daemon=True,
+        ).start()
 
         # For rule-path results: kick off background LLM verification
         # and hand the iOS app a token it can poll with GET /voice/verify/<token>
@@ -396,6 +415,8 @@ def create_app() -> Flask:
         if db.get_event(event_id) is None:
             return jsonify({"error": "Event not found", "code": 404}), 404
         db.update_event(event_id, **data)
+        if data.get("recurrence"):
+            db.promote_to_series(event_id)
         return jsonify({"id": event_id})
 
     @app.delete("/events/<int:event_id>")

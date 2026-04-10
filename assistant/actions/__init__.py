@@ -57,20 +57,47 @@ class ActionRegistry:
         today_dt = datetime.date.fromisoformat(today)
         day_name = today_dt.strftime("%A")  # e.g. "Tuesday"
 
-        # Build next-7-days map so the LLM can resolve relative dates accurately
-        upcoming = []
-        for i in range(8):
+        # Build 14-day reference so the LLM can resolve relative dates accurately.
+        # Days 0-6 are labelled "this [Day]" (or today/tomorrow), days 7-13 "next [Day]".
+        this_week = []
+        next_week = []
+        for i in range(14):
             d = today_dt + datetime.timedelta(days=i)
-            label = "today" if i == 0 else ("tomorrow" if i == 1 else d.strftime("%A"))
-            upcoming.append(f"  {label} = {d.isoformat()}")
-        upcoming_str = "\n".join(upcoming)
+            if i == 0:
+                label = f"today ({day_name})"
+            elif i == 1:
+                label = f"tomorrow ({d.strftime('%A')})"
+            elif i <= 6:
+                label = f"this {d.strftime('%A')}"
+            else:
+                label = f"next {d.strftime('%A')}"
+            entry = f"  {label} = {d.isoformat()}"
+            if i <= 6:
+                this_week.append(entry)
+            else:
+                next_week.append(entry)
+
+        next_week_start = today_dt + datetime.timedelta(days=7)
+        next_week_end = today_dt + datetime.timedelta(days=13)
+        upcoming_str = (
+            "This week:\n" + "\n".join(this_week) +
+            f"\n\nNext week ({next_week_start.strftime('%b %d')}–{next_week_end.strftime('%b %d')}):\n" +
+            "\n".join(next_week)
+        )
 
         lines = [
             "You are a voice assistant intent parser for a calendar and task management application.",
             f"Today is {day_name}, {today}. Timezone: {timezone}.",
             "",
-            "Upcoming date reference (use these to resolve relative dates):",
+            "Date reference — use ONLY these to resolve relative dates:",
             upcoming_str,
+            "",
+            "Rules for relative dates:",
+            "  - 'next [Day]' = the entry labelled 'next [Day]' above (in next week's block).",
+            "  - 'next week on [Day]' = that day in the 'Next week' block above.",
+            "  - 'this [Day]' = the entry labelled 'this [Day]' in this week's block.",
+            "  - If the user specifies an explicit calendar date number (e.g., 'the 14th', 'April 15'), use that date directly — do not apply any additional week offset on top of it.",
+            "  - Never guess — always copy the exact ISO date from the table above.",
             "",
             "Return ONLY valid JSON. The format MUST be exactly:",
             '{"actions": [{"action": "<name>", "parameters": {...}}, ...]}',

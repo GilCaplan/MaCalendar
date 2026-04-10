@@ -9,7 +9,7 @@ import queue
 import re
 import threading
 import time
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional
 
 from assistant.actions import ActionRegistry
 from assistant.audio.capture import AudioCapture
@@ -154,6 +154,7 @@ class Pipeline:
         # Stream-checker: transcribe growing buffer every 2.5 s to detect stop words.
         # Cache the last result so we can reuse it and skip the final full transcription.
         _last_partial: List[str] = ["", 0.0]  # [transcript, timestamp]
+        _stream_stop_re = _build_stop_re(self.config.audio.stop_phrases)
 
         def stream_checker(audio_buffer) -> None:
             if self._phase != STATUS_LISTENING:
@@ -162,7 +163,7 @@ class Pipeline:
                 partial = self._stt.transcribe(audio_buffer).lower()
                 _last_partial[0] = partial
                 _last_partial[1] = time.perf_counter()
-                if re.search(r'\b(execute|done|stop|end|go)\b', partial):
+                if _stream_stop_re.search(partial):
                     logger.info("🖥️ Early termination detected in stream: %s", partial)
                     self.stop_recording()
             except Exception as e:
@@ -212,7 +213,7 @@ class Pipeline:
             return
 
         # Strip stop keywords from the tail of the transcript
-        transcript = _strip_stop_keyword(transcript)
+        transcript = _strip_stop_keyword(transcript, self.config.audio.stop_phrases)
 
         # Combine mode: prepend previous transcript so the LLM sees one unified request
         if combine and self._last_transcript:
@@ -230,17 +231,35 @@ class Pipeline:
         snippet = transcript[:60] + ("…" if len(transcript) > 60 else "")
         self._set_status(STATUS_PROCESSING, f'💭 "{snippet}"')
 
-        # 3. Parse intent(s) — try rule-based fast-path first
+        # 3. Parse intent(s)
         t_llm = time.perf_counter()
         action_list = None
         _fast_path_rule_result = None  # set when fast-path executes, used for background verify
 
-        if self._rule_parser is not None:
+        # Event separator: split transcript into independent segments so each
+        # short, single-event command can hit the rule fast-path instead of LLM.
+        separator = self.config.audio.event_separator.strip()
+        if separator:
+            raw_segs = re.split(re.escape(separator), transcript, flags=re.IGNORECASE)
+            segments = [s.strip() for s in raw_segs if s.strip()]
+            if len(segments) > 1:
+                logger.info("🖥️ Separator %r split transcript into %d segments", separator, len(segments))
+                all_actions: list[tuple[str, object]] = []
+                for seg in segments:
+                    seg_actions = self._parse_segment(seg)
+                    if seg_actions:
+                        all_actions.extend(seg_actions)
+                action_list = all_actions if all_actions else None
+
+        _parse_method = "separator" if action_list is not None else "llm"
+
+        if action_list is None and self._rule_parser is not None:
             try:
                 rule_result = self._rule_parser.analyze(transcript, current_view=self.current_view)
                 if rule_result.confidence >= RULE_THRESHOLD and not rule_result.missing_slots:
                     action_list = rule_result.intents
                     _fast_path_rule_result = rule_result
+                    _parse_method = "rule"
                     logger.info(
                         "🖥️ Rule fast-path: confidence=%.2f actions=%s (%.3fs)",
                         rule_result.confidence,
@@ -248,6 +267,7 @@ class Pipeline:
                         time.perf_counter() - t_llm,
                     )
                 else:
+                    _parse_method = "hybrid"
                     logger.info(
                         "🖥️ Rule partial handoff: confidence=%.2f missing=%s",
                         rule_result.confidence, rule_result.missing_slots,
@@ -261,6 +281,7 @@ class Pipeline:
                 logger.debug("🖥️ Rule parser skipped: %s", e)
 
         if action_list is None:
+            _parse_method = "llm"
             self._set_status(STATUS_PROCESSING, "💭 Thinking…")
             try:
                 action_list = self._parser.parse(transcript)
@@ -278,11 +299,10 @@ class Pipeline:
                 self._tts.speak("I couldn't understand that request.")
                 logger.error("🖥️ Parse error: %s", e)
                 self._set_status(STATUS_ERROR, "⚠️ Couldn't parse request")
-                self._append_scenario_bug(
-                    transcript,
-                    issue_type="parse_error",
-                    details=str(e),
-                )
+                self._append_scenario_bug(transcript, issue_type="parse_error", details=str(e))
+                threading.Thread(target=self._append_nlu_log, args=(
+                    transcript, _parse_method, False, [], [], False, f"parse_error: {e}",
+                ), daemon=True).start()
                 return
 
         logger.info("🖥️ ⏱ Parse total: %.2fs", time.perf_counter() - t_llm)
@@ -294,11 +314,11 @@ class Pipeline:
         if not valid:
             self._tts.speak("I'm not sure what you'd like me to do.")
             self._set_status(STATUS_IDLE, "")
-            self._append_scenario_bug(
-                transcript,
-                issue_type="unknown_intent",
-                details="LLM returned no recognisable action (all results were UnknownIntent).",
-            )
+            self._append_scenario_bug(transcript, issue_type="unknown_intent",
+                                      details="LLM returned no recognisable action.")
+            threading.Thread(target=self._append_nlu_log, args=(
+                transcript, _parse_method, False, [], [], False, "unknown_intent",
+            ), daemon=True).start()
             return
 
         # 4. Confirm + execute each action
@@ -333,12 +353,13 @@ class Pipeline:
                 self._tts.speak("Something went wrong. Check the logs for details.")
                 logger.error("🖥️ Action error: %s", e)
                 self._set_status(STATUS_ERROR, "⚠️ Action failed")
-                self._append_scenario_bug(
-                    transcript,
-                    issue_type="action_failed",
-                    details=f"Action {action_name!r} raised: {e}",
-                    extra={"Intent": str(intent)},
-                )
+                self._append_scenario_bug(transcript, issue_type="action_failed",
+                                          details=f"Action {action_name!r} raised: {e}",
+                                          extra={"Intent": str(intent)})
+                threading.Thread(target=self._append_nlu_log, args=(
+                    transcript, _parse_method, _fast_path_rule_result is not None,
+                    [action_name], [], False, f"action_failed: {e}",
+                ), daemon=True).start()
                 return
         logger.info("🖥️ ⏱ Execute: %.2fs", time.perf_counter() - t_exec)
 
@@ -383,6 +404,15 @@ class Pipeline:
                     args=(transcript, _fast_path_rule_result, verify_snapshot),
                     daemon=True,
                 ).start()
+
+        # NLU tracking — log all successful actions
+        if valid and results:
+            threading.Thread(
+                target=self._append_nlu_log,
+                args=(transcript, _parse_method, _fast_path_rule_result is not None,
+                      [n for n, _ in valid], results),
+                daemon=True,
+            ).start()
 
         logger.info("🖥️ ⏱ Total pipeline: %.2fs", time.perf_counter() - t_start)
         self._phase = STATUS_IDLE
@@ -592,6 +622,87 @@ class Pipeline:
         except Exception as exc:
             logger.warning("🖥️ Could not append scenario bug: %s", exc)
 
+    def _parse_segment(self, segment: str) -> "list[tuple[str, object]] | None":
+        """Parse a single transcript segment using rule fast-path then LLM fallback.
+
+        Used when the event separator splits the transcript into multiple parts.
+        Returns a list of (action_name, intent) tuples, or None on failure.
+        """
+        if self._rule_parser is not None:
+            try:
+                rule_result = self._rule_parser.analyze(segment, current_view=self.current_view)
+                if rule_result.confidence >= RULE_THRESHOLD and not rule_result.missing_slots:
+                    logger.info("🖥️ Segment rule fast-path: %r → %s", segment[:50], [n for n, _ in rule_result.intents])
+                    return rule_result.intents
+                try:
+                    return self._parser.parse_with_context(segment, rule_result)
+                except Exception:
+                    pass
+            except RuleParserSkip:
+                pass
+        try:
+            return self._parser.parse(segment)
+        except Exception as exc:
+            logger.warning("🖥️ Segment parse failed for %r: %s", segment[:50], exc)
+            return None
+
+    @staticmethod
+    def _append_nlu_log(
+        transcript: str,
+        parse_method: str,
+        fast_path_used: bool,
+        actions: "list[str]",
+        result_messages: "list[str]",
+        success: bool = True,
+        failure_reason: str = "",
+        source: str = "mac",
+    ) -> None:
+        """Append an entry to DOCUMENTATION/NLU_TRACKING.md.
+
+        Covers successes and failures so the file is a complete picture of all
+        NLU attempts. Failed entries are also written to SCENARIO_BUG.md via
+        the existing _append_scenario_bug path — this just adds the NLU label.
+
+        Args:
+            transcript:      The cleaned user transcript.
+            parse_method:    "rule", "hybrid", "llm", or "separator".
+            fast_path_used:  True when the rule parser ran without any LLM call.
+            actions:         Action names that were attempted.
+            result_messages: Confirmation strings (empty list on failure).
+            success:         False for parse errors, unknown intents, action failures.
+            failure_reason:  Short description of what went wrong (failure only).
+        """
+        try:
+            repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            path = os.path.join(repo_root, "DOCUMENTATION", "NLU_TRACKING.md")
+            ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            if success:
+                status_label = "✅ rule fast-path" if fast_path_used else f"🤖 {parse_method}"
+            else:
+                status_label = f"❌ failed ({parse_method})"
+
+            source_label = "🖥️ Mac" if source == "mac" else "📱 iOS"
+            lines = [
+                f"## [{ts}] {'SUCCESS' if success else 'FAILED'} — {source_label}\n",
+                f"**Transcript:** `{transcript}`\n\n",
+                f"**Parse:** {status_label}",
+            ]
+            if actions:
+                lines.append(f" | **Actions:** {', '.join(actions)}")
+            lines.append("\n\n")
+            if result_messages:
+                for msg in result_messages:
+                    lines.append(f"- {msg}\n")
+            if failure_reason:
+                lines.append(f"**Reason:** {failure_reason}\n")
+            lines.append("\n---\n\n")
+
+            with open(path, "a", encoding="utf-8") as f:
+                f.writelines(lines)
+        except Exception as exc:
+            logger.warning("🖥️ Could not append NLU log: %s", exc)
+
     def _set_status(self, status: str, message: str = "") -> None:
         """Push (status, message) to the queue. Message is shown as a UI toast."""
         self.status_queue.put((status, message))
@@ -601,10 +712,11 @@ class Pipeline:
 # Stop-keyword helper
 # ---------------------------------------------------------------------------
 
-# Ordered longest-first so "set events" matches before "set event"
-_STOP_PATTERNS = [
+# Built-in stop patterns (longest first so "set events" beats "set event")
+_BUILTIN_STOP_PATTERNS = [
     r"\bset\s+events?\b",
     r"\bexecute\b",
+    r"\bxq\b",        # STT mishearing of "execute"
     r"\bdone\b",
     r"\bstop\b",
     r"\bsubmit\b",
@@ -612,13 +724,33 @@ _STOP_PATTERNS = [
     r"\bthat'?s?\s+it\b",
     r"\bok\s+go\b",
 ]
-_STOP_RE = re.compile(
-    r"[\s,.!?]*(?:" + "|".join(_STOP_PATTERNS) + r")[\s,.!?]*$",
-    re.IGNORECASE,
-)
 
 
-def _strip_stop_keyword(transcript: str) -> str:
+def _build_stop_re(extra_phrases: "list[str] | None" = None) -> "re.Pattern[str]":
+    """Build a stop-keyword regex from built-ins plus any user-configured phrases.
+
+    ``extra_phrases`` is the list from ``config.audio.stop_phrases``.
+    Each phrase is converted to a word-boundary regex; multi-word phrases are
+    matched literally (spaces collapse to ``\\s+``).
+    """
+    patterns = list(_BUILTIN_STOP_PATTERNS)
+    for phrase in (extra_phrases or []):
+        phrase = phrase.strip()
+        if not phrase:
+            continue
+        # Escape and allow flexible internal whitespace
+        escaped = r"\s+".join(re.escape(w) for w in phrase.split())
+        patterns.append(r"\b" + escaped + r"\b")
+    combined = r"[\s,.!?]*(?:" + "|".join(patterns) + r")[\s,.!?]*$"
+    return re.compile(combined, re.IGNORECASE)
+
+
+# Module-level default (no extra phrases); pipeline rebuilds per-call with config.
+_STOP_RE = _build_stop_re()
+
+
+def _strip_stop_keyword(transcript: str, extra_phrases: "list[str] | None" = None) -> str:
     """Remove trailing stop keywords from the transcript."""
-    cleaned = _STOP_RE.sub("", transcript).strip()
+    stop_re = _build_stop_re(extra_phrases) if extra_phrases else _STOP_RE
+    cleaned = stop_re.sub("", transcript).strip()
     return cleaned if cleaned else transcript

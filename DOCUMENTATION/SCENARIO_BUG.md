@@ -7,3 +7,30 @@ When fixing bugs, append as a test case to the test file to verify that you fixe
 P.S can remove a bug once we fixed from this md file.
 
 
+## [2026-04-06 17:51:08] fast_path_wrong/major
+**Transcript:** `on this coming thursday, please send an event for me at 1pm to go to tellmond to visit my friend tal with idor`
+
+**Issue:** Rule parser chose wrong action. Fast-path: create_todo({'titles': ['event'], 'due_date': '2026-04-16', 'list_name': 'today'}). LLM says: action=create_event params={'title': 'visit my friend tal with idor at 1pm on Thursday', 'start_time': '2026-04-16T13:00'}
+
+**Speech correction:** `Create an event to visit your friend at 1 pm this Thursday`
+
+---
+
+## [2026-04-06 17:53:10] fast_path_wrong/major
+**Transcript:** `create event this coming thursday to go visit my friend tal at 1 p.m. on the night. got`
+
+**Issue:** Rule parser chose wrong action. Fast-path: create_event({'title': 'event', 'date': '2026-04-16', 'start_time': '13:00', 'end_time': ''}). LLM says: action=create_event params={'title': 'visit my friend tal', 'date': '2026-04-16', 'start_time': '13:00'}
+
+**Speech correction:** `Create event to visit my friend Tal at 1 p.m. on Thursday`
+
+---
+
+## [2026-04-06 17:56:50] fast_path_wrong/major
+**Transcript:** `this week on friday set for 12 o'clock defend my eurovision homox execute at 12`
+
+**Issue:** Rule parser chose wrong action. Fast-path: create_event({'title': 'eurovision homox execute', 'date': '2026-04-10', 'start_time': '12:00', 'end_time': ''}). LLM says: action=create_event params={'title': 'Eurovision Contest', 'date': 'this week on Friday', 'start_time': "12 o'clock"}
+
+**Speech correction:** `Create event for Eurovision contest this Friday at 12 o'clock`
+
+---
+

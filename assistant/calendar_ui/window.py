@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QSpinBox,
     QGridLayout,
+    QLineEdit,
 )
 
 from assistant.calendar_ui.day_view import DayView
@@ -490,6 +491,10 @@ class CalendarWindow(QMainWindow):
                             self.show_toast(f"Updated series \"{dialog.event_data['title']}\"")
                     else:
                         self._db.update_event(ev_id, **dialog.event_data)
+                        # If recurrence was added to a previously non-recurring event,
+                        # promote it to a series root and generate future instances.
+                        if dialog.event_data.get("recurrence"):
+                            self._db.promote_to_series(ev_id)
                         self.refresh_calendar()
                         self.show_toast(f"Updated \"{dialog.event_data['title']}\"")
 
@@ -560,9 +565,10 @@ class CalendarWindow(QMainWindow):
         self._day_view.refresh()
 
     def refresh_todos(self) -> None:
-        """Reload todos from DB in the TodoView."""
+        """Reload todos from DB in the TodoView and calendar (for deadline pills)."""
         if hasattr(self, "_todo_view"):
             self._todo_view.refresh()
+        self.refresh_calendar()
 
     def show_toast(self, message: str) -> None:
         self._toast.show_message(message)
@@ -781,6 +787,34 @@ class CalendarWindow(QMainWindow):
         voice_layout.addWidget(voice_combo)
         layout.addLayout(voice_layout)
         
+        layout.addStretch(1)
+
+        # Stop Phrases
+        stop_phrases_layout = QVBoxLayout()
+        stop_phrases_layout.setSpacing(3)
+        stop_phrases_lbl = QLabel("Stop Phrases (comma-separated, triggers early mic stop):")
+        stop_phrases_lbl.setWordWrap(True)
+        stop_phrases_layout.addWidget(stop_phrases_lbl)
+        stop_phrases_edit = QLineEdit()
+        stop_phrases_edit.setPlaceholderText("e.g. finish, that's all, stop recording")
+        stop_phrases_edit.setText(", ".join(self._config.audio.stop_phrases))
+        stop_phrases_layout.addWidget(stop_phrases_edit)
+        layout.addLayout(stop_phrases_layout)
+
+        layout.addStretch(1)
+
+        # Event Separator
+        sep_layout = QVBoxLayout()
+        sep_layout.setSpacing(3)
+        sep_lbl = QLabel("Event Separator (spoken keyword between multiple events — leave blank to disable):")
+        sep_lbl.setWordWrap(True)
+        sep_layout.addWidget(sep_lbl)
+        sep_edit = QLineEdit()
+        sep_edit.setPlaceholderText('e.g. "next event" — say: "meeting at 10am next event lunch at noon"')
+        sep_edit.setText(self._config.audio.event_separator)
+        sep_layout.addWidget(sep_edit)
+        layout.addLayout(sep_layout)
+
         layout.addStretch(2)
 
         # Test & Save
@@ -805,9 +839,13 @@ class CalendarWindow(QMainWindow):
             self._pipeline._tts.mute = mute_cb.isChecked()
             self._pipeline._tts.rate = speed_spin.value()
             self._pipeline._tts.voice = voice_combo.currentText()
+            # Parse stop phrases from the text field
+            raw_phrases = [p.strip() for p in stop_phrases_edit.text().split(",") if p.strip()]
+            self._config.audio.stop_phrases = raw_phrases
+            self._config.audio.event_separator = sep_edit.text().strip()
             # Try to write to config.yaml safely
             try:
-                import os, re
+                import os, re, yaml as _yaml
                 c_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "config.yaml")
                 if os.path.exists(c_path):
                     with open(c_path, "r") as f:
@@ -823,6 +861,12 @@ class CalendarWindow(QMainWindow):
                     txt = re.sub(r"font_day:\s*\d+", f"font_day: {day_spin.value()}", txt, count=1)
                     txt = re.sub(r"font_tasks:\s*\d+", f"font_tasks: {tasks_spin.value()}", txt, count=1)
                     txt = re.sub(r"compact_ui:\s*(true|false)", f"compact_ui: {'true' if compact_cb.isChecked() else 'false'}", txt, count=1)
+                    # Stop phrases — write as YAML list
+                    phrases_yaml = _yaml.dump(raw_phrases, default_flow_style=True).strip()
+                    txt = re.sub(r"stop_phrases:\s*\[.*?\]", f"stop_phrases: {phrases_yaml}", txt, count=1)
+                    # Event separator
+                    sep_val = sep_edit.text().strip()
+                    txt = re.sub(r'event_separator:\s*"[^"]*"', f'event_separator: "{sep_val}"', txt, count=1)
                     with open(c_path, "w") as f:
                         f.write(txt)
                     
