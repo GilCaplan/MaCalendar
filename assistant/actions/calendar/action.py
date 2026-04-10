@@ -1,11 +1,21 @@
 """Calendar voice actions — create, update, and delete events."""
 
+import datetime as _dt_module
 from typing import ClassVar, List, Optional, Type
 
 from assistant.actions import register
 from assistant.actions.base import BaseAction, BaseIntent
 from assistant.actions.calendar.intent import CalendarIntent, DeleteEventIntent, QueryScheduleIntent, UpdateEventIntent
 from assistant.intent.context import context_memory
+
+
+def _fmt_date(date_str: str) -> str:
+    """Format 'YYYY-MM-DD' as 'Monday, Apr 14, 2026'."""
+    try:
+        d = _dt_module.date.fromisoformat(date_str)
+        return d.strftime("%A, %b %-d, %Y")
+    except (ValueError, TypeError):
+        return date_str
 
 # Anaphoric pronouns that trigger the memory fallback
 _ANAPHORS = {"it", "that", "this", "this event", "that event", "the last one", "the last event", "the event"}
@@ -55,8 +65,8 @@ class CreateEventAction(BaseAction):
         context_memory.update_event(event_id, intent.title, intent.date)
 
         if intent.recurrence:
-            return f"Created recurring {intent.recurrence} event '{intent.title}' starting on {intent.date}."
-        return f"Created event '{intent.title}' on {intent.date} from {_fmt_time(intent.start_time)} to {_fmt_time(intent.end_time)}."
+            return f"Created recurring {intent.recurrence} event '{intent.title}' starting on {_fmt_date(intent.date)}."
+        return f"Created event '{intent.title}' on {_fmt_date(intent.date)} from {_fmt_time(intent.start_time)} to {_fmt_time(intent.end_time)}."
 
 
 # ---------------------------------------------------------------------------

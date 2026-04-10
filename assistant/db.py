@@ -37,7 +37,19 @@ _TODO_MIGRATIONS = [
     "ALTER TABLE todos ADD COLUMN source_event_id INTEGER",
     "ALTER TABLE todos ADD COLUMN completed_at TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE todos ADD COLUMN position INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE todos ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]'",
 ]
+
+_CREATE_SUBTASKS_TABLE = """
+CREATE TABLE IF NOT EXISTS subtasks (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    todo_id    INTEGER NOT NULL,
+    title      TEXT    NOT NULL,
+    completed  INTEGER NOT NULL DEFAULT 0,
+    position   INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT    NOT NULL
+)
+"""
 
 _CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS events (
@@ -66,9 +78,10 @@ _MIGRATIONS = [
 
 
 _CREATE_INDEXES = """
-CREATE INDEX IF NOT EXISTS idx_events_date   ON events(date);
-CREATE INDEX IF NOT EXISTS idx_events_series ON events(series_id);
-CREATE INDEX IF NOT EXISTS idx_todos_list    ON todos(list, completed);
+CREATE INDEX IF NOT EXISTS idx_events_date    ON events(date);
+CREATE INDEX IF NOT EXISTS idx_events_series  ON events(series_id);
+CREATE INDEX IF NOT EXISTS idx_todos_list     ON todos(list, completed);
+CREATE INDEX IF NOT EXISTS idx_subtasks_todo  ON subtasks(todo_id, position);
 """
 
 
@@ -101,6 +114,7 @@ class CalendarDB:
             self._migrate(conn)
             conn.execute(_CREATE_TODOS_TABLE)
             self._migrate_todos(conn)
+            conn.execute(_CREATE_SUBTASKS_TABLE)
             for stmt in _CREATE_INDEXES.strip().splitlines():
                 stmt = stmt.strip()
                 if stmt:
@@ -339,6 +353,36 @@ class CalendarDB:
         values = list(updates.values()) + [event_id]
         with self._conn() as conn:
             conn.execute(f"UPDATE events SET {set_clause} WHERE id = ?", values)
+
+    def promote_to_series(self, event_id: int) -> None:
+        """Promote a standalone event that already has recurrence set into a full series.
+
+        Called when the user adds recurrence to a previously non-recurring event via the
+        edit dialog.  The event becomes the series root and all future instances are
+        generated.  No-op if the event already belongs to a series or has no recurrence.
+        """
+        event = self.get_event(event_id)
+        if not event or not event.get("recurrence") or event.get("series_id"):
+            return
+
+        recurrence = event["recurrence"]
+        recur_until = event.get("recurrence_end", "")
+        attendees_str = event.get("attendees", "")
+
+        class _FakeIntent:
+            title = event["title"]
+            date = event["date"]
+            start_time = event["start_time"]
+            end_time = event["end_time"]
+            attendees = [a for a in attendees_str.split(", ") if a]
+            location = event.get("location", "")
+            description = event.get("description", "")
+
+        with self._conn() as conn:
+            self._create_series_instances(
+                conn, event_id, _FakeIntent(), recurrence, recur_until,
+                event.get("color", "#0078d4"),
+            )
 
     def update_series(self, series_id: int, start_from_instance_id: int, **fields) -> None:
         """
@@ -579,7 +623,7 @@ class CalendarDB:
     # ------------------------------------------------------------------
 
     def update_todo(self, todo_id: int, **fields) -> None:
-        allowed = {"title", "list", "completed", "priority", "due_date", "notes", "completed_at"}
+        allowed = {"title", "list", "completed", "priority", "due_date", "notes", "completed_at", "attachments"}
         updates = {k: v for k, v in fields.items() if k in allowed}
         if not updates:
             return
@@ -630,6 +674,60 @@ class CalendarDB:
                 conn.execute(
                     "UPDATE todos SET position = ? WHERE id = ? AND list = ?",
                     (pos, todo_id, list_name),
+                )
+
+    # ------------------------------------------------------------------
+    # Subtasks: CRUD
+    # ------------------------------------------------------------------
+
+    def get_subtasks(self, todo_id: int) -> List[dict]:
+        """Return all subtasks for a todo, ordered by position then created_at."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM subtasks WHERE todo_id = ? ORDER BY position ASC, created_at ASC",
+                (todo_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def create_subtask(self, todo_id: int, title: str) -> int:
+        """Insert a new subtask. Returns the new row id."""
+        with self._conn() as conn:
+            max_pos = conn.execute(
+                "SELECT COALESCE(MAX(position), -1) FROM subtasks WHERE todo_id = ?",
+                (todo_id,),
+            ).fetchone()[0]
+            cur = conn.execute(
+                "INSERT INTO subtasks (todo_id, title, completed, position, created_at) VALUES (?, ?, 0, ?, ?)",
+                (todo_id, title, max_pos + 1, datetime.datetime.now().isoformat()),
+            )
+            return cur.lastrowid
+
+    def update_subtask(self, subtask_id: int, **fields) -> None:
+        allowed = {"title", "completed", "position"}
+        updates = {k: v for k, v in fields.items() if k in allowed}
+        if not updates:
+            return
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        values = list(updates.values()) + [subtask_id]
+        with self._conn() as conn:
+            conn.execute(f"UPDATE subtasks SET {set_clause} WHERE id = ?", values)
+
+    def delete_subtask(self, subtask_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute("DELETE FROM subtasks WHERE id = ?", (subtask_id,))
+
+    def delete_subtasks_for_todo(self, todo_id: int) -> None:
+        """Delete all subtasks belonging to a todo. Call before delete_todo()."""
+        with self._conn() as conn:
+            conn.execute("DELETE FROM subtasks WHERE todo_id = ?", (todo_id,))
+
+    def reorder_subtasks(self, todo_id: int, ids: List[int]) -> None:
+        """Update position of subtasks to match the given id order."""
+        with self._conn() as conn:
+            for pos, subtask_id in enumerate(ids):
+                conn.execute(
+                    "UPDATE subtasks SET position = ? WHERE id = ? AND todo_id = ?",
+                    (pos, subtask_id, todo_id),
                 )
 
     # ------------------------------------------------------------------

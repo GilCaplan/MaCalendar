@@ -75,7 +75,7 @@ Hotkey (Ctrl+J) or Mic Button
 | `assistant/calendar_ui/day_view.py` | Hourly timeline, resize handles (8px top/bottom), drag-to-move. |
 | `assistant/calendar_ui/week_view.py` | 7-column week grid, resize handles, drag-to-move. |
 | `assistant/calendar_ui/month_view.py` | Month grid, shades Sun/Tue/Thu/Sat columns. |
-| `assistant/calendar_ui/todo_view.py` | Tasks panel. All signals deferred via `QTimer.singleShot(0)` to prevent re-entrant crashes. |
+| `assistant/calendar_ui/todo_view.py` | Tasks panel. All signals deferred via `QTimer.singleShot(0)` to prevent re-entrant crashes. `TodoItemWidget` (L700) has inline `▸` expand button → `TodoDetailPanel` (L160) with notes/subtasks/attachments/due-date/priority. |
 
 ---
 
@@ -107,6 +107,9 @@ Set `view_switch = "switch_today"` / `"switch_todo"` on a `BaseAction` subclass.
 
 ### Crash Prevention Pattern
 All signals that trigger widget rebuild (`todo_changed`, `resized`) are deferred with `QTimer.singleShot(0, signal.emit)` to prevent use-after-free from re-entrant `deleteLater()` calls.
+
+### Code Map
+For precise file + line pointers across all subsystems see **[CODE_MAP.md](CODE_MAP.md)**.
 
 ---
 

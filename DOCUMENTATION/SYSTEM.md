@@ -4,6 +4,15 @@
 |----------|-----|
 | **Mac App** (PyQt6 voice assistant) | [SYSTEM_MAC.md](SYSTEM_MAC.md) |
 | **iPhone App** (SwiftUI + Flask API) | [SYSTEM_IPHONE.md](SYSTEM_IPHONE.md) |
+| **Code map** (file + line pointers for every subsystem) | [CODE_MAP.md](CODE_MAP.md) |
+
+## For AI Agents Working on This Repo
+
+Before fixing a bug or adding a feature, **read `CODE_MAP.md`** — it has precise file+line pointers for every subsystem so you can jump straight to relevant code without broad codebase searches.
+
+**When to update `CODE_MAP.md`:** After touching a file in a non-trivial way (new class, moved method, changed a key line), update the relevant table row. Do this only for the specific rows that changed — don't rewrite the whole file. Skip it for cosmetic or one-liner fixes.
+
+**Don't over-document:** Only record things that are *surprising*, *non-obvious*, or *hard to find by name search*. Common patterns, obvious method names, and things grep finds in one try don't need a pointer.
 
 ## Quick Facts
 - **DB**: `~/.assistant_tools/calendar.db` (SQLite, Mac is source of truth)
@@ -11,6 +20,8 @@
 - **Mac launch**: `python -m assistant.main` or `Launch Calendar.command`
 - **iPhone API**: `python -m assistant.api --tailscale` (auto-started by `Launch Calendar.command`)
 - **LLM engine**: configured via `config.yaml` → `llm_engine` (ollama/openai/gemini/claude)
+- **NLU Tracking**: `DOCUMENTATION/NLU_TRACKING.md` — auto-appended after every action (success + failure) from both Mac and iOS, labelled by parse method and source
+- **Scenario Bugs**: `DOCUMENTATION/SCENARIO_BUG.md` — auto-appended on failures (parse errors, unknown intents, action errors) for regression review
 - **Cross-Platform Sync**: Tasks and recurring events synchronized between Mac (PyQt) and iOS (SwiftUI).
 - **Customizable Appearance**: Persistent Dark/Light mode and granular font size controls for all calendar views (Month, Week, Day, Tasks).
 - **Dynamic Density**: Interactive "stretch/tighten" Settings dialog on Mac with a dedicated "Compact Layout" toggle.

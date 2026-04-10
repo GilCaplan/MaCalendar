@@ -7,7 +7,7 @@ import datetime
 from typing import List, Optional
 
 from PyQt6.QtCore import Qt, QMimeData, QByteArray, QPoint, pyqtSignal
-from PyQt6.QtGui import QColor, QDrag, QPainter, QPen, QPixmap
+from PyQt6.QtGui import QColor, QDrag, QPainter, QPen, QPixmap, QBrush
 from PyQt6.QtWidgets import (
     QGridLayout,
     QLabel,
@@ -101,6 +101,42 @@ class EventPill(QLabel):
             self.clicked.emit(self.event)
 
 
+TEAL = "#0e9f8c"
+
+
+class TodoDeadlinePill(QLabel):
+    """A read-only outlined pill showing a task deadline in a day cell."""
+
+    def __init__(self, todo: dict, font_size: int = 8, parent=None):
+        super().__init__(parent)
+        self.todo = todo
+        self._font_size = font_size
+        self._pill_text = f"⊙ {todo['title']}"
+        self.setText(self._pill_text)
+        self.setFixedHeight(20)
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.setStyleSheet("background: transparent;")
+        self.setToolTip(f"Task due: {todo['title']}")
+
+    def paintEvent(self, _event):  # noqa: ARG002
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        color = QColor(TEAL)
+        painter.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), 28)))
+        painter.setPen(QPen(color, 1))
+        painter.drawRoundedRect(self.rect().adjusted(0, 1, -1, -2), 4, 4)
+        painter.setPen(color)
+        font = self.font()
+        font.setPointSize(self._font_size)
+        font.setWeight(font.Weight.Medium)
+        painter.setFont(font)
+        fm = painter.fontMetrics()
+        elided = fm.elidedText(self._pill_text, Qt.TextElideMode.ElideRight, self.width() - 8)
+        painter.drawText(self.rect().adjusted(4, 0, -4, 0),
+                         Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, elided)
+
+
 class DayCell(QWidget):
     """One cell in the month grid."""
 
@@ -116,6 +152,7 @@ class DayCell(QWidget):
         self._selected        = False
         self._drag_hover      = False
         self._events: List[dict] = []
+        self._todos: List[dict]  = []
         self._ui_config       = None
 
         self.setMinimumHeight(88)
@@ -128,7 +165,8 @@ class DayCell(QWidget):
         layout.setSpacing(2)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        self._num_label = DayNumberLabel(date.day, self.is_today, self.is_current_month)
+        is_weekend = date.weekday() in (5, 6)
+        self._num_label = DayNumberLabel(date.day, self.is_today, self.is_current_month, is_weekend=is_weekend)
         layout.addWidget(self._num_label, alignment=Qt.AlignmentFlag.AlignLeft)
 
         self._event_layout = QVBoxLayout()
@@ -144,21 +182,32 @@ class DayCell(QWidget):
             self.update()
 
     def load_events(self, events: List[dict]) -> None:
+        self._events = events
+        self._render_pills()
+
+    def load_todos(self, todos: List[dict]) -> None:
+        self._todos = todos
+        self._render_pills()
+
+    def _render_pills(self) -> None:
         while self._event_layout.count():
             item = self._event_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
-        self._events = events
         pill_fs = 8 if not self._ui_config else max(6, self._ui_config.font_month - 3)
-        for ev in events[:3]:
-            pill = EventPill(ev, font_size=pill_fs)
-            pill.clicked.connect(self.event_clicked)
+        all_items = [("event", e) for e in self._events] + [("todo", t) for t in self._todos]
+        for tag, item in all_items[:3]:
+            if tag == "todo":
+                pill = TodoDeadlinePill(item, font_size=pill_fs)
+            else:
+                pill = EventPill(item, font_size=pill_fs)
+                pill.clicked.connect(self.event_clicked)
             self._event_layout.addWidget(pill)
-        if len(events) > 3:
+        if len(all_items) > 3:
             more_fs = 11 if not self._ui_config else self._ui_config.font_month
             text_color = _styles.D_GRAY_TEXT if _styles._dark else GRAY_TEXT
-            more = QLabel(f"  +{len(events) - 3} more")
+            more = QLabel(f"  +{len(all_items) - 3} more")
             more.setStyleSheet(f"font-size: {more_fs}px; color: {text_color}; padding: 0 2px;")
             self._event_layout.addWidget(more)
 
@@ -214,10 +263,11 @@ class DayCell(QWidget):
 class DayNumberLabel(QLabel):
     """Day number — blue filled circle for today, outlined ring when selected."""
 
-    def __init__(self, day: int, is_today: bool, is_current_month: bool = True, parent=None):
+    def __init__(self, day: int, is_today: bool, is_current_month: bool = True, is_weekend: bool = False, parent=None):
         super().__init__(str(day), parent)
         self.is_today         = is_today
         self.is_current_month = is_current_month
+        self.is_weekend       = is_weekend
         self._selected        = False
         self._font_size       = 12
         self.setFixedSize(26, 26)
@@ -257,9 +307,13 @@ class DayNumberLabel(QLabel):
             """)
         else:
             if self.is_current_month:
-                text = _styles.D_GRAY_DARK if dark else GRAY_DARK
+                if self.is_weekend:
+                    text = "#e61919"  # Red for weekends
+                else:
+                    text = _styles.D_GRAY_DARK if dark else GRAY_DARK
             else:
                 text = _styles.D_OTHER_MONTH_TEXT if dark else _styles.OTHER_MONTH_TEXT
+
             self.setStyleSheet(f"""
                 QLabel {{
                     background: transparent;
@@ -310,6 +364,7 @@ class MonthView(QWidget):
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._header_labels.append(lbl)
             header_layout.addWidget(lbl, 0, col)
+            header_layout.setColumnStretch(col, 1)
         layout.addWidget(self._header)
 
         # Grid
@@ -333,9 +388,11 @@ class MonthView(QWidget):
             f"background-color: {bg}; border-bottom: 1px solid {border};"
         )
         fs = 11 if not self._ui_config else self._ui_config.font_month
-        for lbl in self._header_labels:
+        for i, lbl in enumerate(self._header_labels):
+            # Sunday (0) and Saturday (6) in red
+            lbl_color = "#e61919" if i in (0, 6) else color
             lbl.setStyleSheet(
-                f"font-size: {fs}px; font-weight: 600; color: {color}; letter-spacing: 0.5px;"
+                f"font-size: {fs}px; font-weight: 600; color: {lbl_color};"
             )
 
     def apply_theme(self, dark: bool) -> None:
@@ -358,8 +415,18 @@ class MonthView(QWidget):
         events_by_date: dict[str, list] = {}
         for ev in events:
             events_by_date.setdefault(ev["date"], []).append(ev)
+
+        month_prefix = f"{self._year:04d}-{self._month:02d}"
+        todos_by_date: dict[str, list] = {}
+        for t in self._db.get_todos(include_completed=False):
+            due = t.get("due_date", "")
+            if due and due.startswith(month_prefix):
+                todos_by_date.setdefault(due, []).append(t)
+
         for cell in self._cells:
-            cell.load_events(events_by_date.get(cell.date.isoformat(), []))
+            date_str = cell.date.isoformat()
+            cell.load_events(events_by_date.get(date_str, []))
+            cell.load_todos(todos_by_date.get(date_str, []))
 
     def _rebuild_grid(self) -> None:
         while self._grid.count():

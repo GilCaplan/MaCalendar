@@ -7,7 +7,9 @@ import datetime
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from PyQt6.QtWidgets import (
     QCalendarWidget,
+    QHeaderView,
     QPushButton,
+    QTableView,
     QVBoxLayout,
     QWidget,
 )
@@ -26,6 +28,12 @@ class MiniCalendar(QCalendarWidget):
         self.setHorizontalHeaderFormat(QCalendarWidget.HorizontalHeaderFormat.ShortDayNames)
         self.setNavigationBarVisible(True)
         self.setMaximumHeight(200)
+
+        # Force the internal table's header columns to stretch so day names fit
+        table = self.findChild(QTableView)
+        if table:
+            table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+
         self.apply_theme(False)
 
     def apply_theme(self, dark: bool) -> None:
@@ -79,7 +87,7 @@ class Sidebar(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("sidebar")
-        self.setFixedWidth(200)
+        self.setFixedWidth(240)
         self._apply_bg(False)
 
         layout = QVBoxLayout(self)
