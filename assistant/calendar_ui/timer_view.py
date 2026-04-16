@@ -855,6 +855,9 @@ class TimerCard(QWidget):
         self._timer = timer
         self._db = db
         self._expanded = False
+        # Cached sessions list — updated only when the timer state changes,
+        # not on every 1-second tick.  None means "needs a fresh fetch".
+        self._cached_sessions: list[dict] | None = None
         self._build()
 
     def _build(self) -> None:
@@ -960,6 +963,7 @@ class TimerCard(QWidget):
         # ── Sessions panel (hidden by default) ──────────────────────────
         self._sessions_panel = SessionsPanel(self._timer["id"], self._db, card)
         self._sessions_panel.sessions_changed.connect(self.changed.emit)
+        self._sessions_panel.sessions_changed.connect(self._invalidate_cache)
         self._sessions_panel.sessions_changed.connect(self.tick)
         self._sessions_panel.hide()
         card_layout.addWidget(self._sessions_panel)
@@ -967,9 +971,26 @@ class TimerCard(QWidget):
         self.tick()
 
     # ------------------------------------------------------------------
+    def _invalidate_cache(self) -> None:
+        """Force the next tick() to re-fetch sessions from the DB."""
+        self._cached_sessions = None
+
     def tick(self) -> None:
-        """Refresh elapsed time and earnings from DB (called every second)."""
-        sessions = self._db.get_timer_sessions(self._timer["id"])
+        """Refresh elapsed time and earnings.
+
+        Uses a cached session list — only re-queries the DB when
+        _cached_sessions is None (set after any state change) or when a
+        session is currently running (end_time is None, so the elapsed
+        time grows every second and we need an accurate 'now' snapshot).
+        """
+        is_running_cached = self._cached_sessions is not None and any(
+            s.get("end_time") is None for s in self._cached_sessions
+        )
+        # Re-fetch only when: cache is cold, or a timer is actively ticking.
+        if self._cached_sessions is None or is_running_cached:
+            self._cached_sessions = self._db.get_timer_sessions(self._timer["id"])
+
+        sessions = self._cached_sessions
         total = _sessions_total_secs(sessions)
         is_running = any(s.get("end_time") is None for s in sessions)
 
@@ -996,15 +1017,9 @@ class TimerCard(QWidget):
             self._action_btn.setObjectName("pause_btn")
             self._stop_btn.setEnabled(True)
         else:
-            running_session = self._db.get_running_session(self._timer["id"])
-            if running_session is None:
-                self._action_btn.setText("Start")
-                self._action_btn.setObjectName("start_btn")
-                self._stop_btn.setEnabled(False)
-            else:
-                self._action_btn.setText("Pause")
-                self._action_btn.setObjectName("pause_btn")
-                self._stop_btn.setEnabled(True)
+            self._action_btn.setText("Start")
+            self._action_btn.setObjectName("start_btn")
+            self._stop_btn.setEnabled(False)
 
         self._action_btn.style().unpolish(self._action_btn)
         self._action_btn.style().polish(self._action_btn)
@@ -1019,6 +1034,7 @@ class TimerCard(QWidget):
             if t["id"] == self._timer["id"]:
                 self._timer = t
                 break
+        self._invalidate_cache()
         self.tick()
 
     # ------------------------------------------------------------------
@@ -1030,6 +1046,7 @@ class TimerCard(QWidget):
         else:
             # Start / Resume: open a new session
             self._db.create_timer_session(self._timer["id"])
+        self._invalidate_cache()
         self.tick()
         if self._expanded:
             self._sessions_panel.reload()
@@ -1039,6 +1056,7 @@ class TimerCard(QWidget):
         running = self._db.get_running_session(self._timer["id"])
         if running:
             self._db.stop_timer_session(running["id"])
+        self._invalidate_cache()
         self.tick()
         if self._expanded:
             self._sessions_panel.reload()
@@ -1138,13 +1156,28 @@ class TimerView(QWidget):
 
         self._build()
 
-        # 1-second tick for live clocks
+        # 1-second tick for live clocks.
+        # The timer is paused via hideEvent/showEvent so it only fires while
+        # the Timer tab is actually visible — no CPU or DB work on other tabs.
         self._tick_timer = QTimer(self)
         self._tick_timer.setInterval(1000)
         self._tick_timer.timeout.connect(self._tick)
-        self._tick_timer.start()
+        # Don't start here — showEvent will start it when the tab becomes visible.
 
         self.reload()
+
+    # ------------------------------------------------------------------
+    # Visibility — pause/resume tick so we do zero work on other tabs
+    # ------------------------------------------------------------------
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._tick_timer.start()
+        self._tick()  # immediate refresh so clocks are current when tab opens
+
+    def hideEvent(self, event) -> None:
+        super().hideEvent(event)
+        self._tick_timer.stop()
 
     # ------------------------------------------------------------------
     # Build
@@ -1241,16 +1274,25 @@ class TimerView(QWidget):
         self._empty_lbl.setVisible(empty)
 
     def _update_summary(self) -> None:
-        """Recompute daily total and earnings across all timers."""
-        timers = self._db.get_timers()
+        """Recompute daily total and earnings across all timers.
+
+        Reuses each TimerCard's cached session list so we issue zero extra
+        DB queries when the timers are not running.  The cards already
+        refreshed from the DB (if needed) in their own tick() calls.
+        """
         today = datetime.date.today().isoformat()
         total_secs = 0.0
         # Accumulate earnings per currency separately (timers can use different currencies)
         earn_by_currency: dict[str, float] = {}
         any_running = False
 
-        for t in timers:
-            sessions = self._db.get_timer_sessions(t["id"])
+        for timer_id, card in self._cards.items():
+            t = card._timer
+            # Use the card's session cache; fall back to a DB query only if
+            # the card hasn't been ticked yet (e.g. on the very first reload).
+            sessions = card._cached_sessions
+            if sessions is None:
+                sessions = self._db.get_timer_sessions(timer_id)
             is_work = t.get("timer_type", "work") == "work"
             currency = t.get("currency", _DEFAULT_CURRENCY)
             for s in sessions:

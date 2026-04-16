@@ -32,28 +32,63 @@ from typing import TYPE_CHECKING
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Optional imports with graceful degradation
+# Optional imports — availability probed at import time, models loaded lazily
+# on first parse call so the ~80 MB spaCy + thinc footprint is deferred until
+# the user actually uses voice input.
 # ---------------------------------------------------------------------------
 
-try:
-    import spacy
+import importlib.util as _iutil
+import threading as _thr
 
-    _NLP = spacy.load("en_core_web_sm")
-    _RULE_PARSER_AVAILABLE = True
-except (ImportError, OSError) as _spacy_err:
-    _RULE_PARSER_AVAILABLE = False
-    _NLP = None  # type: ignore[assignment]
-    logger.warning("RuleBasedParser disabled: %s", _spacy_err)
+# --- spaCy ---
+_RULE_PARSER_AVAILABLE: bool = _iutil.find_spec("spacy") is not None
+_NLP = None          # set by _ensure_nlp()
+_nlp_lock = _thr.Lock()
+_nlp_loaded = False
 
-try:
-    from recognizers_date_time import DateTimeRecognizer, Culture as _Culture
+def _ensure_nlp() -> None:
+    """Load the spaCy model on first call (thread-safe)."""
+    global _NLP, _nlp_loaded
+    if _nlp_loaded:
+        return
+    with _nlp_lock:
+        if _nlp_loaded:
+            return
+        try:
+            import spacy as _spacy
+            _NLP = _spacy.load("en_core_web_sm")
+            _nlp_loaded = True
+            logger.info("spaCy model loaded (lazy).")
+        except (ImportError, OSError) as exc:
+            global _RULE_PARSER_AVAILABLE
+            _RULE_PARSER_AVAILABLE = False
+            logger.warning("RuleBasedParser disabled: %s", exc)
+            _nlp_loaded = True  # don't retry
 
-    _DT_MODEL = DateTimeRecognizer(_Culture.English).get_datetime_model()
-    _DT_AVAILABLE = True
-except Exception as _dt_err:
-    _DT_AVAILABLE = False
-    _DT_MODEL = None  # type: ignore[assignment]
-    logger.warning("DateTime recognizer disabled: %s", _dt_err)
+# --- recognizers-text-date-time ---
+_DT_AVAILABLE: bool = _iutil.find_spec("recognizers_date_time") is not None
+_DT_MODEL = None     # set by _ensure_dt()
+_dt_lock = _thr.Lock()
+_dt_loaded = False
+
+def _ensure_dt() -> None:
+    """Load the date/time recognizer model on first call (thread-safe)."""
+    global _DT_MODEL, _dt_loaded
+    if _dt_loaded:
+        return
+    with _dt_lock:
+        if _dt_loaded:
+            return
+        try:
+            from recognizers_date_time import DateTimeRecognizer, Culture as _Culture
+            _DT_MODEL = DateTimeRecognizer(_Culture.English).get_datetime_model()
+            _dt_loaded = True
+            logger.info("DateTime recognizer loaded (lazy).")
+        except Exception as exc:
+            global _DT_AVAILABLE
+            _DT_AVAILABLE = False
+            logger.warning("DateTime recognizer disabled: %s", exc)
+            _dt_loaded = True  # don't retry
 
 if TYPE_CHECKING:
     from assistant.actions.base import BaseIntent
@@ -299,6 +334,10 @@ def _preprocess(transcript: str) -> tuple[str, bool]:
     if not _RULE_PARSER_AVAILABLE:
         return transcript, True
 
+    _ensure_nlp()
+    if not _RULE_PARSER_AVAILABLE:  # may have been cleared by load failure
+        return transcript, True
+
     text = transcript.strip().lower()
 
     # Strip view-context prefix injected by pipeline
@@ -436,6 +475,8 @@ def _extract_temporal(span_text: str, today: datetime.date) -> dict:
         "_domain_inferred": False,
     }
 
+    if _DT_AVAILABLE:
+        _ensure_dt()
     if _DT_AVAILABLE and _DT_MODEL is not None:
         dt_ref = datetime.datetime.combine(today, datetime.time())
         recognized = _DT_MODEL.parse(span_text, dt_ref)

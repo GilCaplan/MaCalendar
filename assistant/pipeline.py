@@ -87,6 +87,16 @@ class Pipeline:
         # Set by the UI when the active view changes; used to inject parse context
         self.current_view: str = "month"
 
+        # Warm up the spaCy / recognizer models in the background so the first
+        # voice command doesn't block while 80 MB of model data loads.
+        if _RULE_PARSER_AVAILABLE:
+            from assistant.intent.rule_parser import _ensure_nlp, _ensure_dt
+            threading.Thread(
+                target=lambda: (_ensure_nlp(), _ensure_dt()),
+                daemon=True,
+                name="nlp-warmup",
+            ).start()
+
     def trigger(self) -> None:
         """Called by HotkeyListener or mic button.
 
