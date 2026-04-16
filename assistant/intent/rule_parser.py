@@ -189,6 +189,15 @@ INTENT_MAP: dict[tuple[str, str | None], str] = {
     ("complete", None): "complete_todo",
     ("finish", None): "complete_todo",
     ("done", None): "complete_todo",
+    # --- Todo update ---
+    ("update", "todo"): "update_todo",
+    ("edit", "todo"): "update_todo",
+    ("change", "todo"): "update_todo",
+    ("set", "todo"): "update_todo",
+    ("rename", "todo"): "update_todo",
+    ("move", "todo"): "update_todo",    # "move task X to general" — overrides calendar "move"
+    ("note", "todo"): "update_todo",
+    ("annotate", None): "update_todo",
     # --- Todo delete ---
     ("delete", "todo"): "delete_todo",
     ("remove", "todo"): "delete_todo",
@@ -211,7 +220,7 @@ _CALENDAR_SIGNALS = frozenset({
 # Words that strongly signal the todo/task domain
 _TODO_SIGNALS = frozenset({
     "task", "todo", "to-do", "reminder", "list", "grocery", "groceries",
-    "errand", "chore", "shopping", "item",
+    "errand", "chore", "shopping", "item", "priority", "subtask",
 })
 
 # Scope keywords for query_schedule
@@ -251,6 +260,9 @@ _REQUIRED_SLOTS: dict[str, list[str]] = {
     "delete_todo": ["match_title"],
     "update_todo": ["match_title"],
     "query_todos": [],
+    "add_subtask": ["parent_title", "subtask_title"],
+    "complete_subtask": ["parent_title", "subtask_title"],
+    "delete_subtask": ["parent_title", "subtask_title"],
 }
 
 # Optional slots whose presence boosts confidence
@@ -258,8 +270,20 @@ _BONUS_SLOTS: dict[str, list[str]] = {
     "create_event": ["end_time", "attendees"],
     "update_event": ["new_start_time", "new_date", "match_start_time"],
     "delete_event": ["match_date", "match_start_time"],
-    "create_todo": ["due_date"],
+    "create_todo": ["due_date", "priority"],
+    "update_todo": ["new_priority", "new_due_date"],
 }
+
+# Priority keyword → priority level
+_PRIORITY_KEYWORDS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"\b(urgent|critical|asap|important|high[- ]priority)\b"), "high"),
+    (re.compile(r"\bmedium[- ]priority\b"), "medium"),
+    (re.compile(r"\blow[- ]priority\b"), "low"),
+]
+
+# Priority name words used in "set priority to X" patterns
+_PRIORITY_NAMES = {"high": "high", "medium": "medium", "low": "low",
+                   "urgent": "high", "critical": "high", "important": "high"}
 
 # ---------------------------------------------------------------------------
 # Pre-processing helpers
@@ -425,9 +449,15 @@ def _extract_temporal(span_text: str, today: datetime.date) -> dict:
                     raw = val.get("value", "")
                     if raw and raw != "not resolved":
                         parts = raw.split(" ")
-                        result["date"] = parts[0]
-                        if len(parts) > 1 and not result["start_time"]:
-                            result["start_time"] = parts[1][:5]  # HH:MM
+                        date_part = parts[0]
+                        time_part = parts[1][:5] if len(parts) > 1 else None
+                        if date_part >= today.isoformat():
+                            result["date"] = date_part
+                            if time_part and not result["start_time"]:
+                                result["start_time"] = time_part
+                        elif "_dt_past_fallback" not in result:
+                            # Past date — keep as fallback in case no future value follows
+                            result["_dt_past_fallback"] = (date_part, time_part)
 
                 elif timex_type == "date" and not result["date"]:
                     raw = val.get("value", "")
@@ -450,6 +480,15 @@ def _extract_temporal(span_text: str, today: datetime.date) -> dict:
                         result["start_time"] = _normalize_time(start_v)
                     if end_v and not result["end_time"]:
                         result["end_time"] = _normalize_time(end_v)
+
+        # Apply past-datetime fallback if no future date was resolved
+        if not result["date"] and "_dt_past_fallback" in result:
+            date_part, time_part = result.pop("_dt_past_fallback")
+            result["date"] = date_part
+            if time_part and not result["start_time"]:
+                result["start_time"] = time_part
+        else:
+            result.pop("_dt_past_fallback", None)
 
         # Handle datetime with AM/PM ambiguity (two values returned)
         if recognized:
@@ -542,6 +581,22 @@ def _extract_temporal(span_text: str, today: datetime.date) -> dict:
             # For update_event "to X" → new_start_time (not end_time)
             result["start_time"] = f"{h:02d}:{mins}"
             result["_source"] = "regex_fallback"
+
+    # Post-process: business-hours PM heuristic for recognizer-extracted times.
+    # "2 o'clock", "3 o'clock" etc. without explicit AM context are almost
+    # always afternoon in a calendar/meeting context — convert 1–7 to PM.
+    if result["start_time"]:
+        _has_am = re.search(
+            r"\b(am|a\.m\.|morning|midnight)\b", span_text, re.IGNORECASE
+        )
+        if not _has_am:
+            try:
+                _h, _m = result["start_time"].split(":")
+                _h = int(_h)
+                if 1 <= _h <= 7:
+                    result["start_time"] = f"{_h + 12:02d}:{_m}"
+            except (ValueError, AttributeError):
+                pass
 
     return result
 
@@ -851,6 +906,11 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
             slots["list_name"] = "general"
         else:
             slots["list_name"] = "today"
+        # Extract priority from keywords ("urgent", "high priority", etc.)
+        for pattern, level in _PRIORITY_KEYWORDS:
+            if pattern.search(span_lower):
+                slots["priority"] = level
+                break
 
     elif action_name in ("delete_todo", "complete_todo", "update_todo"):
         # For complete/update/delete, also try extracting the subject noun
@@ -866,10 +926,12 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
                 slots["match_title"] = candidate
         elif title:
             slots["match_title"] = title
-        # "rename X to Y" → new_title from pobj of "to"
+
         if action_name == "update_todo":
+            span_lower = span.text.lower()
+            # "rename X to Y" / "rename X as Y" → new_title from pobj of "to"/"as"
             for tok in span:
-                if tok.lower_ == "to" and tok.dep_ in ("prep", "dative"):
+                if tok.lower_ in ("to", "as") and tok.dep_ in ("prep", "dative"):
                     pobj_chunks = [
                         c for c in span.noun_chunks
                         if c.root.head == tok and not any(_in_temporal(t, temporal_spans) for t in c)
@@ -877,6 +939,23 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
                     if pobj_chunks:
                         slots["new_title"] = _clean_title(pobj_chunks[0].text)
                         break
+            # "set priority to high/medium/low" or "make it high priority"
+            # Only match explicit priority-level words to avoid false hits like "grocery priority"
+            _PRI_WORDS = r"(high|medium|low|urgent|critical|important)"
+            m = re.search(rf"\bpriority\s+(?:to\s+)?{_PRI_WORDS}\b", span_lower)
+            if not m:
+                m = re.search(rf"\b{_PRI_WORDS}\s+priority\b", span_lower)
+            if m:
+                word = m.group(1).lower()
+                slots["new_priority"] = _PRIORITY_NAMES.get(word, word)
+            # "set due date to Friday" / "change due date to next Monday"
+            if temporal.get("date") and re.search(r"\bdue\b", span_lower):
+                slots["new_due_date"] = temporal["date"]
+            # "move to general / today list"
+            if re.search(r"\b(general|someday|later|backlog)\b", span_lower):
+                slots["new_list"] = "general"
+            elif re.search(r"\btoday\b", span_lower):
+                slots["new_list"] = "today"
 
     elif action_name == "query_todos":
         span_lower = span.text.lower()

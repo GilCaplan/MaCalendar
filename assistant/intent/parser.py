@@ -197,6 +197,14 @@ class IntentParser:
             '     "speech": "<under 15 words for TTS>"}\n'
             "Valid action names: create_event, update_event, delete_event, query_schedule, "
             "create_todo, complete_todo, delete_todo, update_todo, query_todo.\n\n"
+            "Key routing rules (apply these FIRST before judging):\n"
+            "  • If the command says 'set/create/schedule/book a meeting/appointment/call/session'\n"
+            "    AND includes a specific time or date → it is ALWAYS create_event. Never create_todo.\n"
+            "  • 'Meeting', 'appointment', 'call', 'session' with a time are calendar events, not tasks.\n"
+            "  • Only classify as create_todo when the request is clearly a task/reminder with no\n"
+            "    scheduled time (e.g. 'remind me to buy groceries', 'add task: call dentist').\n"
+            "  • The title for create_event may be a generic word like 'meeting' or 'appointment' —\n"
+            "    that is CORRECT as a title; do not flag it as wrong.\n\n"
             "Key semantic rules for update_event:\n"
             "  • EXTEND/LENGTHEN/SHORTEN/STRETCH: 'to Xpm' is new_end_time (NOT new_start_time).\n"
             "    The event is identified by match_start_time (e.g. 'extend the 1pm event to 3pm'\n"
@@ -204,8 +212,8 @@ class IntentParser:
             "  • MOVE/RESCHEDULE: 'to Xpm' or 'at Xpm' is new_start_time.\n"
             "  • match_title may be absent when match_start_time uniquely identifies the event —\n"
             "    this is valid, not a missing-slot error.\n"
-            "  • Generic words ('event', 'appointment', 'meeting') as match_title are wrong;\n"
-            "    the event should be identified by time or its actual name."
+            "  • Generic words ('event', 'appointment', 'meeting') as match_title for update/delete\n"
+            "    are ambiguous; the event should be identified by time or its actual name."
         )
         verify_user = (
             f"Voice command: {transcript!r}\n\n"
