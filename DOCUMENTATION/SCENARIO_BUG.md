@@ -34,3 +34,81 @@ P.S can remove a bug once we fixed from this md file.
 
 ---
 
+## [2026-04-12 12:13:09] fast_path_wrong/major
+**Transcript:** `a certain meeting on wednesday at 5.15pm to meet with rina for magsha meme bagru progress update`
+
+**Issue:** Rule parser chose wrong action. Fast-path: update_event({'match_title': 'rina', 'new_start_time': '17:15', 'new_date': '2026-04-08'}). LLM says: action=create_todo params={'title': 'Magsha meme bagru progress update with Rina'}
+
+**Speech correction:** `Update event to meet with Rina on Wednesday at 5.15pm`
+
+---
+
+## [2026-04-13 11:56:06] fast_path_wrong/major
+**Transcript:** `set an appointment for tomorrow morning on tuesday at 910am`
+
+**Issue:** Rule parser chose wrong action. Fast-path: create_event({'title': 'appointment', 'date': '2026-04-14', 'start_time': '09:10', 'end_time': ''}). LLM says: action=create_event params={'title': '', 'date': '2024-04-14', 'start_time': '09:10'}
+
+**Speech correction:** `Set an event for tomorrow morning at 910am`
+
+---
+
+## [2026-04-13 11:56:06] correction_failed
+**Transcript:** `set an appointment for tomorrow morning on tuesday at 910am`
+
+**Issue:** LLM correction action='create_event' failed to execute: 1 validation error for CalendarIntent
+title
+  Value error, Event title cannot be empty [type=value_error, input_value='', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.12/v/value_error
+
+**Corrected params:** `{'title': '', 'date': '2024-04-14', 'start_time': '09:10'}`
+
+---
+
+## [2026-04-13 21:01:47] fast_path_wrong/major
+**Transcript:** `set a meeting tomorrow on tuesday at 6pm with ofir`
+
+**Issue:** Rule parser chose wrong action. Fast-path: create_event({'title': 'meeting', 'date': '2026-04-14', 'start_time': '18:00', 'end_time': '', 'attendees': ['ofir']}). LLM says: action=create_todo params={'title': 'meeting with ofir', 'date': '2026-04-14', 'start_time': '18:00'}
+
+**Speech correction:** `Create a todo for meeting with Ofir tomorrow at 6pm`
+
+---
+
+## [2026-04-13 21:02:25] fast_path_wrong/major
+**Transcript:** `again, create an event tomorrow at 6pm with ofeer`
+
+**Issue:** Rule parser chose wrong action. Fast-path: create_event({'title': 'event', 'date': '2026-04-14', 'start_time': '18:00', 'end_time': '', 'attendees': ['ofeer']}). LLM says: action=create_event params={'title': 'appointment', 'date': '2026-04-14', 'start_time': '18:00', 'attendees': ['ofeer']}
+
+**Speech correction:** `Create event with correct title and attendees`
+
+---
+
+## [2026-04-14 18:27:32] fast_path_wrong/major
+**Transcript:** `set a meeting tomorrow at 2 o'clock meeting with adin for project`
+
+**Issue:** Rule parser chose wrong action. Fast-path: create_event({'title': 'meeting', 'date': '2026-04-15', 'start_time': '02:00', 'end_time': '', 'attendees': ['adin']}). LLM says: action=create_event params={'title': '', 'date': '2024-04-15', 'start_time': '14:00', 'attendees': ['adin']}
+
+**Speech correction:** `Create event with correct date and time`
+
+---
+
+## [2026-04-14 18:27:32] correction_failed
+**Transcript:** `set a meeting tomorrow at 2 o'clock meeting with adin for project`
+
+**Issue:** LLM correction action='create_event' failed to execute: 1 validation error for CalendarIntent
+title
+  Value error, Event title cannot be empty [type=value_error, input_value='', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.12/v/value_error
+
+**Corrected params:** `{'title': '', 'date': '2024-04-15', 'start_time': '14:00', 'attendees': ['adin']}`
+
+---
+
+## [2026-04-14 18:29:29] fast_path_wrong/major
+**Transcript:** `create a meeting tomorrow at 2pm on wednesday meeting with adin for the project`
+
+**Issue:** Rule parser chose wrong action. Fast-path: create_event({'title': 'meeting', 'date': '2026-04-15', 'start_time': '14:00', 'end_time': '', 'attendees': ['adin']}). LLM says: action=create_todo params={'title': 'meeting with adin for the project'}
+
+**Speech correction:** `Create a todo item meeting with Adin for the project`
+
+---
+
