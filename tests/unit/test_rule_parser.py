@@ -41,14 +41,16 @@ def parser(isolated_registry):
         CreateEventAction, UpdateEventAction, DeleteEventAction, QueryScheduleAction
     )
     from assistant.actions.todo.action import (
-        CreateTodoAction, CompleteTodoAction, DeleteTodoAction, UpdateTodoAction, QueryTodoAction
+        CreateTodoAction, CompleteTodoAction, DeleteTodoAction, UpdateTodoAction,
+        QueryTodoAction, AddSubtaskAction, CompleteSubtaskAction, DeleteSubtaskAction,
     )
     from assistant.actions.clarify import ClarifyAction
 
     for cls in [
         CreateEventAction, UpdateEventAction, DeleteEventAction, QueryScheduleAction,
         CreateTodoAction, CompleteTodoAction, DeleteTodoAction, UpdateTodoAction,
-        QueryTodoAction, ClarifyAction,
+        QueryTodoAction, AddSubtaskAction, CompleteSubtaskAction, DeleteSubtaskAction,
+        ClarifyAction,
     ]:
         isolated_registry._actions[cls.action_name] = cls
 
@@ -380,3 +382,163 @@ def test_delete_event_relative_clause_skips_to_llm(parser):
     """
     with pytest.raises(RuleParserSkip):
         parser.analyze("delete the event you create today on friday", current_view="month")
+
+
+# ---------------------------------------------------------------------------
+# Regression: Bug 2026-04-12 — bare day-of-week + time must resolve to FUTURE
+# ---------------------------------------------------------------------------
+
+def _next_weekday(weekday: int) -> str:
+    """Return the ISO date of the next occurrence of weekday (Mon=0…Sun=6).
+
+    If today IS that weekday, return today (not +7 days).
+    """
+    today = datetime.date.today()
+    days_ahead = (weekday - today.weekday()) % 7
+    return (today + datetime.timedelta(days=days_ahead)).isoformat()
+
+
+def test_create_event_bare_weekday_with_time_resolves_future(parser):
+    """'Schedule a meeting on wednesday at 3pm' → date = upcoming Wednesday, not last Wednesday.
+
+    Regression for bug where Recognizers-Text returned a datetime type and the
+    parser blindly took the first (past) value instead of the future one.
+    """
+    result = parser.analyze("Schedule a meeting on wednesday at 3pm", current_view="month")
+
+    assert "create_event" in result.raw_slots
+    date = result.raw_slots["create_event"].get("date")
+    assert date is not None
+    assert date >= datetime.date.today().isoformat(), (
+        f"Expected future/today date, got past date: {date}"
+    )
+    assert date == _next_weekday(2), f"Expected next Wednesday ({_next_weekday(2)}), got {date}"
+
+
+def test_update_event_bare_weekday_with_time_resolves_future(parser):
+    """'Update the meeting on wednesday at 5:15pm' → match_date = upcoming Wednesday.
+
+    This is the exact scenario that triggered the original bug report.
+    """
+    result = parser.analyze(
+        "update content creation meeting on wednesday at 5:15pm", current_view="month"
+    )
+
+    assert "update_event" in result.raw_slots
+    slots = result.raw_slots["update_event"]
+    # Either match_date or new_date should be the upcoming Wednesday
+    date = slots.get("match_date") or slots.get("new_date") or slots.get("date")
+    assert date is not None
+    assert date >= datetime.date.today().isoformat(), (
+        f"Expected future/today date, got past date: {date}"
+    )
+    assert date == _next_weekday(2), f"Expected next Wednesday ({_next_weekday(2)}), got {date}"
+
+
+def test_create_event_bare_friday_with_time_resolves_future(parser):
+    """'Schedule gym on friday at 7am' → date = upcoming Friday."""
+    result = parser.analyze("Schedule gym on friday at 7am", current_view="month")
+
+    assert "create_event" in result.raw_slots
+    date = result.raw_slots["create_event"].get("date")
+    assert date is not None
+    assert date >= datetime.date.today().isoformat(), (
+        f"Expected future/today date, got past date: {date}"
+    )
+    assert date == _next_weekday(4), f"Expected next Friday ({_next_weekday(4)}), got {date}"
+
+
+# ---------------------------------------------------------------------------
+# create_todo: priority extraction
+# ---------------------------------------------------------------------------
+
+def test_create_todo_urgent_keyword_sets_high_priority(parser):
+    """'Add urgent task: submit report' → create_todo priority=high."""
+    result = parser.analyze("Add urgent task submit report", current_view="todo")
+
+    assert "create_todo" in result.raw_slots
+    slots = result.raw_slots["create_todo"]
+    assert slots.get("priority") == "high", f"Expected high, got {slots.get('priority')}"
+
+
+def test_create_todo_high_priority_keyword(parser):
+    """'Buy milk high priority' → create_todo priority=high."""
+    result = parser.analyze("Buy milk high priority", current_view="month")
+
+    assert "create_todo" in result.raw_slots
+    slots = result.raw_slots["create_todo"]
+    assert slots.get("priority") == "high"
+
+
+def test_create_todo_medium_priority_keyword(parser):
+    """'Add task call dentist medium priority' → create_todo priority=medium."""
+    result = parser.analyze("Add task call dentist medium priority", current_view="todo")
+
+    assert "create_todo" in result.raw_slots
+    slots = result.raw_slots["create_todo"]
+    assert slots.get("priority") == "medium"
+
+
+def test_create_todo_with_due_date_and_priority(parser):
+    """'Buy milk tomorrow urgent' → create_todo with due_date + priority=high."""
+    result = parser.analyze("Buy milk tomorrow urgent", current_view="month")
+
+    assert "create_todo" in result.raw_slots
+    slots = result.raw_slots["create_todo"]
+    assert slots.get("due_date") == _tomorrow()
+    assert slots.get("priority") == "high"
+
+
+# ---------------------------------------------------------------------------
+# update_todo: priority, due date, list extraction
+# ---------------------------------------------------------------------------
+
+def test_update_todo_set_priority_to_high(parser):
+    """'Set grocery priority to high' → update_todo new_priority=high."""
+    result = parser.analyze("Set grocery priority to high", current_view="todo")
+
+    assert "update_todo" in result.raw_slots
+    slots = result.raw_slots["update_todo"]
+    assert slots.get("new_priority") == "high", f"Expected high, got {slots.get('new_priority')}"
+
+
+def test_update_todo_set_priority_to_medium(parser):
+    """'Change grocery task priority to medium' → update_todo new_priority=medium."""
+    result = parser.analyze("Change grocery task priority to medium", current_view="todo")
+
+    assert "update_todo" in result.raw_slots
+    slots = result.raw_slots["update_todo"]
+    assert slots.get("new_priority") == "medium"
+
+
+def test_update_todo_set_due_date(parser):
+    """'Set due date of grocery task to tomorrow' → update_todo new_due_date=tomorrow."""
+    result = parser.analyze("Set due date of grocery task to tomorrow", current_view="todo")
+
+    assert "update_todo" in result.raw_slots
+    slots = result.raw_slots["update_todo"]
+    assert slots.get("new_due_date") == _tomorrow(), (
+        f"Expected {_tomorrow()}, got {slots.get('new_due_date')}"
+    )
+
+
+def test_update_todo_move_to_general(parser):
+    """'Move grocery task to general list' → update_todo new_list=general."""
+    result = parser.analyze("Move grocery task to general list", current_view="todo")
+
+    assert "update_todo" in result.raw_slots
+    slots = result.raw_slots["update_todo"]
+    assert slots.get("new_list") == "general", f"Expected general, got {slots.get('new_list')}"
+
+
+# ---------------------------------------------------------------------------
+# create_todo: general list keyword
+# ---------------------------------------------------------------------------
+
+def test_create_todo_someday_goes_to_general(parser):
+    """'Add learn Spanish someday' → create_todo list_name=general."""
+    result = parser.analyze("Add learn Spanish someday", current_view="todo")
+
+    assert "create_todo" in result.raw_slots
+    slots = result.raw_slots["create_todo"]
+    assert slots.get("list_name") == "general"

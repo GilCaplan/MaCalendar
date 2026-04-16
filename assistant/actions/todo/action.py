@@ -1,4 +1,4 @@
-"""Todo voice actions — create, complete, update, delete, and query tasks."""
+"""Todo voice actions — create, complete, update, delete, query, and subtask management."""
 
 from __future__ import annotations
 
@@ -8,8 +8,11 @@ from typing import ClassVar, List, Optional, Type
 from assistant.actions import register
 from assistant.actions.base import BaseAction, BaseIntent
 from assistant.actions.todo.intent import (
+    AddSubtaskIntent,
     CompleteTodoIntent,
+    CompleteSubtaskIntent,
     CreateTodoIntent,
+    DeleteSubtaskIntent,
     DeleteTodoIntent,
     QueryTodoIntent,
     UpdateTodoIntent,
@@ -52,6 +55,25 @@ def _find_todo(db, match_title: str) -> Optional[dict]:
     return best_match if best_score > 0 else None
 
 
+def _find_subtask(db, todo_id: int, subtask_title: str) -> Optional[dict]:
+    """Find the best-matching subtask under a given todo."""
+    subtasks = db.get_subtasks(todo_id)
+    needle_words = set(re.findall(r"\w+", subtask_title.lower()))
+    best_match = None
+    best_score = 0
+    for s in subtasks:
+        title_words = set(re.findall(r"\w+", s["title"].lower()))
+        overlap = len(needle_words & title_words)
+        clean_needle = subtask_title.lower().replace("-", " ")
+        clean_title = s["title"].lower().replace("-", " ")
+        if clean_title in clean_needle or clean_needle in clean_title:
+            overlap += 10
+        if overlap > best_score:
+            best_score = overlap
+            best_match = s
+    return best_match if best_score > 0 else None
+
+
 # ---------------------------------------------------------------------------
 # Create
 # ---------------------------------------------------------------------------
@@ -65,7 +87,8 @@ class CreateTodoAction(BaseAction):
         "Triggers on: 'add task X', 'remind me to X', 'add tasks X, Y, Z', "
         "'add to my list: X and Y', 'create a todo for X'. "
         "IMPORTANT: for multi-task phrases like 'add tasks: wash dishes, buy groceries', "
-        "extract ALL tasks into the 'titles' array."
+        "extract ALL tasks into the 'titles' array. "
+        "Supports priority ('high priority', 'urgent') and due date ('due Friday', 'by April 20')."
     )
     intent_model: ClassVar[Type[BaseIntent]] = CreateTodoIntent
     parameters_schema: ClassVar[dict] = {
@@ -90,7 +113,19 @@ class CreateTodoAction(BaseAction):
             "priority": {
                 "type": "string",
                 "enum": ["none", "low", "medium", "high"],
-                "description": "Optional priority. Default: 'none'.",
+                "description": (
+                    "Task priority. Default: 'none'. "
+                    "Use 'high' for 'urgent', 'important', 'high priority'. "
+                    "Use 'medium' for 'medium priority'. Use 'low' for 'low priority'."
+                ),
+            },
+            "due_date": {
+                "type": "string",
+                "description": (
+                    "Due date as ISO string YYYY-MM-DD. "
+                    "Extract from 'due Friday', 'by April 20', 'for next Monday', etc. "
+                    "Omit if no date mentioned."
+                ),
             },
         },
         "required": ["titles"],
@@ -112,8 +147,9 @@ class CreateTodoAction(BaseAction):
             created.append(title)
 
         list_label = "Today" if intent.list_name == "today" else "General"
+        priority_label = "" if intent.priority == "none" else f" ({intent.priority} priority)"
         if len(created) == 1:
-            return f"Added '{created[0]}' to {list_label}."
+            return f"Added '{created[0]}'{priority_label} to {list_label}."
         return f"Added {len(created)} tasks to {list_label}."
 
 
@@ -198,6 +234,7 @@ class DeleteTodoAction(BaseAction):
                 return "I don't remember the last task."
             return f"I couldn't find a task matching '{intent.match_title}'."
 
+        db.delete_subtasks_for_todo(todo["id"])
         db.delete_todo(todo["id"])
         context_memory.clear_todo()
         return f"Deleted '{todo['title']}'."
@@ -211,8 +248,10 @@ class DeleteTodoAction(BaseAction):
 class UpdateTodoAction(BaseAction):
     action_name: ClassVar[str] = "update_todo"
     description: ClassVar[str] = (
-        "Edit an existing task's title, list, or priority. "
-        "Triggers on: 'rename task X to Y', 'move X to general list', 'set X priority to high'."
+        "Edit an existing task's title, list, priority, due date, or notes. "
+        "Triggers on: 'rename task X to Y', 'move X to general list', "
+        "'set X priority to high', 'set due date of X to Friday', "
+        "'add note to X: ...', 'change X's due date to next Monday'."
     )
     intent_model: ClassVar[Type[BaseIntent]] = UpdateTodoIntent
     parameters_schema: ClassVar[dict] = {
@@ -234,11 +273,21 @@ class UpdateTodoAction(BaseAction):
             "new_priority": {
                 "type": "string",
                 "enum": ["none", "low", "medium", "high"],
-                "description": "New priority. Omit if unchanged.",
+                "description": "New priority level. Omit if unchanged.",
             },
             "new_due_date": {
                 "type": "string",
-                "description": "New due date as ISO string (YYYY-MM-DD). Omit if unchanged.",
+                "description": (
+                    "New due date as ISO string (YYYY-MM-DD). "
+                    "Use empty string '' to clear the due date. Omit if unchanged."
+                ),
+            },
+            "new_notes": {
+                "type": "string",
+                "description": (
+                    "Set or replace the task notes. "
+                    "Extract from 'add note: ...', 'set notes to ...'. Omit if unchanged."
+                ),
             },
         },
         "required": ["match_title"],
@@ -255,18 +304,170 @@ class UpdateTodoAction(BaseAction):
             return f"I couldn't find a task matching '{intent.match_title}'."
 
         updates: dict = {}
-        if intent.new_title:    updates["title"] = intent.new_title
-        if intent.new_list:     updates["list"] = intent.new_list
-        if intent.new_priority: updates["priority"] = intent.new_priority
-        if intent.new_due_date is not None: updates["due_date"] = intent.new_due_date
+        if intent.new_title:                        updates["title"] = intent.new_title
+        if intent.new_list:                         updates["list"] = intent.new_list
+        if intent.new_priority:                     updates["priority"] = intent.new_priority
+        if intent.new_due_date is not None:         updates["due_date"] = intent.new_due_date
+        if intent.new_notes is not None:            updates["notes"] = intent.new_notes
 
         if not updates:
             return f"No changes specified for '{todo['title']}'."
 
         db.update_todo(todo["id"], **updates)
         context_memory.update_todo(todo["id"], updates.get("title", todo["title"]))
+
+        # Build a human-readable summary of what changed
+        changed_parts: List[str] = []
+        if "title" in updates:
+            changed_parts.append(f"renamed to '{updates['title']}'")
+        if "list" in updates:
+            changed_parts.append(f"moved to {updates['list'].capitalize()}")
+        if "priority" in updates:
+            changed_parts.append(f"priority set to {updates['priority']}")
+        if "due_date" in updates:
+            changed_parts.append("due date cleared" if updates["due_date"] == "" else f"due date set to {updates['due_date']}")
+        if "notes" in updates:
+            changed_parts.append("notes updated")
+
         display = updates.get("title", todo["title"])
-        return f"Updated '{display}'."
+        summary = ", ".join(changed_parts) if changed_parts else "updated"
+        return f"'{display}' — {summary}."
+
+
+# ---------------------------------------------------------------------------
+# Add subtask
+# ---------------------------------------------------------------------------
+
+@register
+class AddSubtaskAction(BaseAction):
+    action_name: ClassVar[str] = "add_subtask"
+    view_switch: ClassVar[str] = "switch_todo"
+    description: ClassVar[str] = (
+        "Add a subtask to an existing task. "
+        "Triggers on: 'add subtask X to task Y', 'add step X under Y', "
+        "'break down Y with subtask X'."
+    )
+    intent_model: ClassVar[Type[BaseIntent]] = AddSubtaskIntent
+    parameters_schema: ClassVar[dict] = {
+        "type": "object",
+        "properties": {
+            "parent_title": {
+                "type": "string",
+                "description": "Title or partial title of the parent task.",
+            },
+            "subtask_title": {
+                "type": "string",
+                "description": "Title of the new subtask to add.",
+            },
+        },
+        "required": ["parent_title", "subtask_title"],
+    }
+
+    def execute(self, intent: AddSubtaskIntent, _config) -> str:  # type: ignore[override]
+        from assistant.db import get_db
+        db = get_db()
+
+        parent = _find_todo(db, intent.parent_title)
+        if parent is None:
+            return f"I couldn't find a task matching '{intent.parent_title}'."
+
+        db.create_subtask(parent["id"], intent.subtask_title)
+        context_memory.update_todo(parent["id"], parent["title"])
+        return f"Added subtask '{intent.subtask_title}' to '{parent['title']}'."
+
+
+# ---------------------------------------------------------------------------
+# Complete subtask
+# ---------------------------------------------------------------------------
+
+@register
+class CompleteSubtaskAction(BaseAction):
+    action_name: ClassVar[str] = "complete_subtask"
+    description: ClassVar[str] = (
+        "Mark a subtask as done or uncomplete it. "
+        "Triggers on: 'complete subtask X in Y', 'mark step X done under Y', "
+        "'check off subtask X from Y'."
+    )
+    intent_model: ClassVar[Type[BaseIntent]] = CompleteSubtaskIntent
+    parameters_schema: ClassVar[dict] = {
+        "type": "object",
+        "properties": {
+            "parent_title": {
+                "type": "string",
+                "description": "Title or partial title of the parent task.",
+            },
+            "subtask_title": {
+                "type": "string",
+                "description": "Title or partial title of the subtask to complete.",
+            },
+            "complete": {
+                "type": "boolean",
+                "description": "True to mark done, False to uncheck. Default: true.",
+            },
+        },
+        "required": ["parent_title", "subtask_title"],
+    }
+
+    def execute(self, intent: CompleteSubtaskIntent, _config) -> str:  # type: ignore[override]
+        from assistant.db import get_db
+        db = get_db()
+
+        parent = _find_todo(db, intent.parent_title)
+        if parent is None:
+            return f"I couldn't find a task matching '{intent.parent_title}'."
+
+        subtask = _find_subtask(db, parent["id"], intent.subtask_title)
+        if subtask is None:
+            return f"I couldn't find a subtask matching '{intent.subtask_title}' under '{parent['title']}'."
+
+        db.update_subtask(subtask["id"], completed=int(intent.complete))
+        context_memory.update_todo(parent["id"], parent["title"])
+        verb = "Completed" if intent.complete else "Unchecked"
+        return f"{verb} subtask '{subtask['title']}' under '{parent['title']}'."
+
+
+# ---------------------------------------------------------------------------
+# Delete subtask
+# ---------------------------------------------------------------------------
+
+@register
+class DeleteSubtaskAction(BaseAction):
+    action_name: ClassVar[str] = "delete_subtask"
+    description: ClassVar[str] = (
+        "Remove a subtask from a task. "
+        "Triggers on: 'delete subtask X from Y', 'remove step X under Y'."
+    )
+    intent_model: ClassVar[Type[BaseIntent]] = DeleteSubtaskIntent
+    parameters_schema: ClassVar[dict] = {
+        "type": "object",
+        "properties": {
+            "parent_title": {
+                "type": "string",
+                "description": "Title or partial title of the parent task.",
+            },
+            "subtask_title": {
+                "type": "string",
+                "description": "Title or partial title of the subtask to delete.",
+            },
+        },
+        "required": ["parent_title", "subtask_title"],
+    }
+
+    def execute(self, intent: DeleteSubtaskIntent, _config) -> str:  # type: ignore[override]
+        from assistant.db import get_db
+        db = get_db()
+
+        parent = _find_todo(db, intent.parent_title)
+        if parent is None:
+            return f"I couldn't find a task matching '{intent.parent_title}'."
+
+        subtask = _find_subtask(db, parent["id"], intent.subtask_title)
+        if subtask is None:
+            return f"I couldn't find a subtask matching '{intent.subtask_title}' under '{parent['title']}'."
+
+        db.delete_subtask(subtask["id"])
+        context_memory.update_todo(parent["id"], parent["title"])
+        return f"Deleted subtask '{subtask['title']}' from '{parent['title']}'."
 
 
 # ---------------------------------------------------------------------------
@@ -313,31 +514,39 @@ class QueryTodoAction(BaseAction):
 
         pending = [t for t in todos if not t["completed"]]
 
-        # Build task descriptions, appending due date when present
         def _describe(t: dict) -> str:
             title = t["title"]
-            due = t.get("due_date", "")
-            if not due:
-                return title
-            try:
-                due_dt = datetime.date.fromisoformat(due)
-                today = datetime.date.today()
-                delta = (due_dt - today).days
-                if delta == 0:
-                    suffix = "due today"
-                elif delta == 1:
-                    suffix = "due tomorrow"
-                elif delta < 0:
-                    suffix = f"overdue by {-delta} day{'s' if -delta != 1 else ''}"
-                else:
-                    suffix = f"due {due_dt.strftime('%b %d')}"
-                return f"{title} ({suffix})"
-            except ValueError:
-                return title
+            parts: List[str] = []
 
-        # For today/all queries, also pull calendar events so the user gets a
-        # unified picture of their day without needing to switch views.
-        calendar_parts: list[str] = []
+            # Priority — mention high/medium but not low/none to keep it brief
+            priority = t.get("priority", "none") or "none"
+            if priority == "high":
+                parts.append("urgent")
+            elif priority == "medium":
+                parts.append("medium priority")
+
+            # Due date
+            due = t.get("due_date", "")
+            if due:
+                try:
+                    due_dt = datetime.date.fromisoformat(due)
+                    today = datetime.date.today()
+                    delta = (due_dt - today).days
+                    if delta == 0:
+                        parts.append("due today")
+                    elif delta == 1:
+                        parts.append("due tomorrow")
+                    elif delta < 0:
+                        parts.append(f"overdue by {-delta} day{'s' if -delta != 1 else ''}")
+                    else:
+                        parts.append(f"due {due_dt.strftime('%b %d')}")
+                except ValueError:
+                    pass
+
+            return f"{title} ({', '.join(parts)})" if parts else title
+
+        # For today/all queries also read out calendar events
+        calendar_parts: List[str] = []
         if intent.list_name in ("today", "all"):
             today = datetime.date.today()
             events = db.get_events_for_day(today)
@@ -359,8 +568,7 @@ class QueryTodoAction(BaseAction):
         n = len(pending)
         n_cal = len(calendar_parts)
 
-        # Compose response
-        parts: list[str] = []
+        parts: List[str] = []
 
         if n == 0:
             parts.append(f"No pending tasks in {label}.")

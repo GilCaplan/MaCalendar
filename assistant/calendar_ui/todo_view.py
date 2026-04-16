@@ -7,7 +7,7 @@ import json
 import os
 from typing import Optional
 
-from PyQt6.QtCore import Qt, QDate, QTimer, QUrl, pyqtSignal
+from PyQt6.QtCore import Qt, QDate, QEvent, QTimer, QUrl, pyqtSignal
 from PyQt6.QtGui import QFont, QPixmap
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -53,15 +53,36 @@ from assistant.calendar_ui.styles import (
 )
 
 _PRIORITY_COLORS = {
-    "high":   "#d83b01",
-    "medium": "#ca5010",
-    "low":    "#107c10",
+    "high":   "#e04040",
+    "medium": "#e0a020",
+    "low":    "#4a9edd",
     "none":   "",
 }
 
 _PRIORITY_LABELS = ["none", "low", "medium", "high"]
 
 IMG_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tiff", ".heic"}
+
+
+class _TodayDefaultDateEdit(QDateEdit):
+    """QDateEdit that navigates the calendar popup to today when no date is set."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        # Install event filter on the calendar after it's created
+        QTimer.singleShot(0, self._install_cal_filter)
+
+    def _install_cal_filter(self) -> None:
+        cal = self.calendarWidget()
+        if cal is not None:
+            cal.installEventFilter(self)
+
+    def eventFilter(self, obj, event) -> bool:
+        if event.type() == QEvent.Type.Show and obj is self.calendarWidget():
+            if self.date() == self.minimumDate():
+                today = QDate.currentDate()
+                obj.setCurrentPage(today.year(), today.month())
+        return super().eventFilter(obj, event)
 
 
 # ---------------------------------------------------------------------------
@@ -267,18 +288,20 @@ class TodoDetailPanel(QWidget):
         def _make_toolbar_btn(label: str, tooltip: str) -> QPushButton:
             btn = QPushButton(label)
             btn.setToolTip(tooltip)
-            btn.setFixedSize(24, 22)
+            btn.setFixedHeight(24)
+            btn.setMinimumWidth(28)
             btn.setStyleSheet(
-                "QPushButton { background: transparent; border: 1px solid #aaa; "
-                "border-radius: 3px; font-size: 11px; font-weight: bold; }"
-                "QPushButton:hover { background: #e0e0e0; }"
-                "QPushButton:pressed { background: #c8c8c8; }"
+                "QPushButton { background: transparent; border: 1px solid #888; "
+                "border-radius: 3px; font-size: 12px; font-weight: bold; "
+                "color: palette(text); padding: 0 6px; }"
+                "QPushButton:hover { background: rgba(128,128,128,0.2); }"
+                "QPushButton:pressed { background: rgba(128,128,128,0.35); }"
             )
             return btn
 
-        self._btn_bold   = _make_toolbar_btn("B", "Bold (Ctrl+B)")
-        self._btn_italic = _make_toolbar_btn("I", "Italic (Ctrl+I)")
-        self._btn_link   = _make_toolbar_btn("🔗", "Insert link")
+        self._btn_bold   = _make_toolbar_btn("B",    "Bold (Ctrl+B)")
+        self._btn_italic = _make_toolbar_btn("I",    "Italic (Ctrl+I)")
+        self._btn_link   = _make_toolbar_btn("Link", "Insert link")
         self._notes_toolbar.addWidget(self._btn_bold)
         self._notes_toolbar.addWidget(self._btn_italic)
         self._notes_toolbar.addWidget(self._btn_link)
@@ -297,17 +320,21 @@ class TodoDetailPanel(QWidget):
         self._notes_browser.setOpenLinks(False)
         self._notes_browser.setPlaceholderText("Add notes…")
         self._notes_browser.setFrameShape(QFrame.Shape.NoFrame)
-        self._notes_browser.setFixedHeight(72)
+        self._notes_browser.setFixedHeight(90)
         self._notes_browser.anchorClicked.connect(
             lambda url: QDesktopServices.openUrl(url)
         )
         self._notes_browser.mousePressEvent = self._switch_to_edit  # type: ignore[assignment]
+        _notes_font = self._notes_browser.font()
+        _notes_font.setPointSize(13)
+        self._notes_browser.setFont(_notes_font)
 
         self._notes_editor = QTextEdit()
         self._notes_editor.setObjectName("detail_notes_editor")
         self._notes_editor.setFrameShape(QFrame.Shape.NoFrame)
-        self._notes_editor.setFixedHeight(72)
+        self._notes_editor.setFixedHeight(90)
         self._notes_editor.setAcceptRichText(True)
+        self._notes_editor.setFont(_notes_font)
         self._notes_editor.textChanged.connect(self._on_notes_changed)
 
         self._notes_stack.addWidget(self._notes_browser)  # index 0 = read
@@ -366,7 +393,7 @@ class TodoDetailPanel(QWidget):
         due_lbl.setStyleSheet("font-size: 11px; color: #888;")
         meta_row.addWidget(due_lbl)
 
-        self._due_edit = QDateEdit()
+        self._due_edit = _TodayDefaultDateEdit()
         self._due_edit.setCalendarPopup(True)
         self._due_edit.setDisplayFormat("MMM d, yyyy")
         self._due_edit.setFixedWidth(130)
@@ -712,18 +739,20 @@ class TodoItemWidget(QWidget):
     deleted      = pyqtSignal(int)        # (todo_id,)
     detail_saved = pyqtSignal()           # any field in detail panel auto-saved
 
-    def __init__(self, todo: dict, db, dark: bool = False, parent=None) -> None:
+    def __init__(self, todo: dict, db, dark: bool = False, font_size: int = 13, parent=None) -> None:
         super().__init__(parent)
         self._todo = todo
         self._db = db
         self._dark = dark
         self._editing = False
         self._expanded = False
-        self._font_size = 13
+        self._font_size = font_size
         self._detail_panel: Optional[TodoDetailPanel] = None
         self._list_item: Optional[QListWidgetItem] = None
         self._list_widget: Optional[QListWidget] = None
+        self._subtask_count: tuple[int, int] = (0, 0)  # (done, total)
         self._build()
+        self._refresh_meta()
         self.setMouseTracking(True)
 
     # ------------------------------------------------------------------
@@ -798,16 +827,34 @@ class TodoItemWidget(QWidget):
         self._expand_btn.mousePressEvent = lambda _e: self._toggle_expand()  # type: ignore[assignment]
         title_row.addWidget(self._expand_btn)
 
-        # Delete button (hidden until hover)
-        self._del_btn = QPushButton("×")
-        self._del_btn.setFixedSize(20, 20)
-        self._del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._del_btn.setToolTip("Delete task")
-        self._del_btn.hide()
-        self._del_btn.clicked.connect(lambda: self.deleted.emit(self._todo["id"]))
-        title_row.addWidget(self._del_btn)
+        # No inline delete button — deletion is via right-click context menu so
+        # that the margin space to the right of the expand arrow is inert.
 
         outer.addLayout(title_row)
+
+        # Collapsed metadata row — shown only when detail panel is hidden
+        self._meta_row = QWidget()
+        self._meta_row.setContentsMargins(0, 0, 0, 0)
+        meta_layout = QHBoxLayout(self._meta_row)
+        meta_layout.setContentsMargins(56, 0, 14, 5)  # left-align under title (past grip+check)
+        meta_layout.setSpacing(8)
+
+        self._meta_subtasks = QLabel()
+        self._meta_subtasks.setObjectName("meta_chip")
+        meta_layout.addWidget(self._meta_subtasks)
+
+        self._meta_due = QLabel()
+        self._meta_due.setObjectName("meta_chip")
+        self._meta_due.setFixedWidth(90)  # always reserves space so priority stays aligned
+        meta_layout.addWidget(self._meta_due)
+
+        self._meta_priority = QLabel()
+        self._meta_priority.setObjectName("meta_chip")
+        meta_layout.addWidget(self._meta_priority)
+
+        meta_layout.addStretch()
+        self._meta_row.hide()  # hidden until we know there's something to show
+        outer.addWidget(self._meta_row)
 
         self._apply_completion_style()
         self._apply_theme(self._dark)
@@ -816,6 +863,65 @@ class TodoItemWidget(QWidget):
     # Expand / collapse
     # ------------------------------------------------------------------
 
+    def _refresh_meta(self) -> None:
+        """Reload subtask counts from DB and update collapsed metadata chips."""
+        subtasks = self._db.get_subtasks(self._todo["id"])
+        total = len(subtasks)
+        done = sum(1 for s in subtasks if s.get("completed"))
+        self._subtask_count = (done, total)
+
+        chips_visible = 0
+
+        # Subtasks chip
+        if total > 0:
+            self._meta_subtasks.setText(f"☑ {done}/{total}")
+            self._meta_subtasks.show()
+            chips_visible += 1
+        else:
+            self._meta_subtasks.hide()
+
+        # Due date chip — always visible (fixed width) so priority stays aligned;
+        # empty text when no date is set.
+        due = self._todo.get("due_date")
+        if due:
+            try:
+                d = datetime.date.fromisoformat(due[:10])
+                today = datetime.date.today()
+                diff = (d - today).days
+                if diff < 0:
+                    label = f"⚑ {d.strftime('%b %-d')} overdue"
+                elif diff == 0:
+                    label = "⚑ Today"
+                elif diff == 1:
+                    label = "⚑ Tomorrow"
+                else:
+                    label = f"⚑ {d.strftime('%b %-d')}"
+                self._meta_due.setText(label)
+                chips_visible += 1
+            except ValueError:
+                self._meta_due.setText("")
+        else:
+            self._meta_due.setText("")
+
+        # Priority chip
+        priority = self._todo.get("priority", "none") or "none"
+        if priority != "none":
+            self._meta_priority.setText(priority.capitalize())
+            color = _PRIORITY_COLORS.get(priority, "")
+            self._meta_priority.setStyleSheet(
+                f"color: {color}; font-size: {self._font_size - 3}px; font-weight: 600;"
+            )
+            self._meta_priority.show()
+            chips_visible += 1
+        else:
+            self._meta_priority.hide()
+
+        # Only show the meta row if not expanded AND there's something to display
+        if not self._expanded and chips_visible > 0:
+            self._meta_row.show()
+        else:
+            self._meta_row.hide()
+
     def _toggle_expand(self) -> None:
         self._expanded = not self._expanded
 
@@ -823,10 +929,12 @@ class TodoItemWidget(QWidget):
             if self._detail_panel is None:
                 self._detail_panel = TodoDetailPanel(self._db, self._todo, self._dark, self)
                 self._detail_panel.changed.connect(self.detail_saved)
+                self._detail_panel.changed.connect(self._on_detail_changed)
                 self.layout().addWidget(self._detail_panel)
             else:
                 self._detail_panel.load(self._todo)
             self._detail_panel.show()
+            self._meta_row.hide()
             self._expand_btn.setText("▾")
             self._expand_btn.setToolTip("Hide details")
         else:
@@ -834,9 +942,16 @@ class TodoItemWidget(QWidget):
                 self._detail_panel.hide()
             self._expand_btn.setText("▸")
             self._expand_btn.setToolTip("Show details")
+            self._refresh_meta()
 
         # Defer so show()/hide() fully propagates before we query sizeHint()
         QTimer.singleShot(0, self._update_item_size)
+
+    def _on_detail_changed(self) -> None:
+        """Sync todo dict from DB so meta row reflects latest changes when collapsed."""
+        updated = self._db.get_todo(self._todo["id"])
+        if updated:
+            self._todo = updated
 
     def _update_item_size(self) -> None:
         """Recalculate this item's size hint and update the list widget height."""
@@ -888,17 +1003,27 @@ class TodoItemWidget(QWidget):
             f"color: {expand_color}; font-size: 12px;"
         )
 
-        del_color = "#cc0000" if not dark else "#ff6666"
-        self._del_btn.setStyleSheet(f"""
-            QPushButton {{
-                color: {del_color}; background: transparent;
-                border: none; font-size: {self._font_size + 1}px; font-weight: bold;
-            }}
-            QPushButton:hover {{ color: #ff0000; }}
-        """)
-
         if not self._todo["completed"]:
             self._label.setStyleSheet(f"color: {text_color}; font-size: {self._font_size}px;")
+
+        self._editor.setStyleSheet(
+            f"color: {text_color}; font-size: {self._font_size}px; background: transparent; border: none; border-bottom: 1px solid {BLUE};"
+        )
+        self._editor.setMinimumHeight(self._font_size + 12)
+
+        # Meta chips share a muted style; priority chip keeps its own color set in _refresh_meta
+        chip_size = self._font_size - 3
+        chip_color = D_GRAY_TEXT if dark else GRAY_TEXT
+        chip_style = f"color: {chip_color}; font-size: {chip_size}px;"
+        self._meta_subtasks.setStyleSheet(chip_style)
+        self._meta_due.setStyleSheet(chip_style)
+        # Priority label keeps its own color — only re-apply size
+        priority = self._todo.get("priority", "none") or "none"
+        if priority != "none":
+            pcolor = _PRIORITY_COLORS.get(priority, chip_color)
+            self._meta_priority.setStyleSheet(
+                f"color: {pcolor}; font-size: {chip_size}px; font-weight: 600;"
+            )
 
         if self._detail_panel is not None:
             self._detail_panel.apply_theme(dark)
@@ -907,13 +1032,12 @@ class TodoItemWidget(QWidget):
     # Events
     # ------------------------------------------------------------------
 
-    def enterEvent(self, event) -> None:
-        self._del_btn.show()
-        super().enterEvent(event)
-
-    def leaveEvent(self, event) -> None:
-        self._del_btn.hide()
-        super().leaveEvent(event)
+    def contextMenuEvent(self, event) -> None:
+        menu = QMenu(self)
+        delete_action = menu.addAction("Delete task")
+        action = menu.exec(event.globalPos())
+        if action == delete_action:
+            self.deleted.emit(self._todo["id"])
 
     def _on_toggled(self, checked: bool) -> None:
         self._todo["completed"] = int(checked)
@@ -967,6 +1091,7 @@ class TodoListWidget(QWidget):
         self._item_widgets: list[TodoItemWidget] = []
         self._reorder_enabled = True
         self._font_size = 13
+        self._sort_mode: str = "manual"  # "manual" | "priority" | "due_date"
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -987,6 +1112,40 @@ class TodoListWidget(QWidget):
         # "New Task" row below the list
         outer.addWidget(self._make_new_task_row())
 
+    # ------------------------------------------------------------------
+    # Sort
+    # ------------------------------------------------------------------
+
+    _PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2, "none": 3, None: 3, "": 3}
+
+    def set_sort_mode(self, mode: str) -> None:
+        """mode: 'manual' | 'priority' | 'due_date'"""
+        self._sort_mode = mode
+        drag_on = (mode == "manual")
+        self._list_widget.setDragEnabled(drag_on)
+        self._list_widget.setAcceptDrops(drag_on)
+
+    def _sorted_todos(self, todos: list) -> list:
+        if self._sort_mode == "priority":
+            return sorted(
+                todos,
+                key=lambda t: self._PRIORITY_ORDER.get(t.get("priority") or "none", 3),
+            )
+        if self._sort_mode == "due_date":
+            _far = datetime.date(9999, 12, 31)
+            def _due_key(t):
+                raw = t.get("due_date") or ""
+                try:
+                    return datetime.date.fromisoformat(raw[:10]) if raw else _far
+                except ValueError:
+                    return _far
+            return sorted(todos, key=_due_key)
+        return todos  # manual — preserve DB order
+
+    # ------------------------------------------------------------------
+    # Populate
+    # ------------------------------------------------------------------
+
     def populate(self, show_completed: bool = False) -> None:
         """Clear and rebuild the list from the database."""
         self._reorder_enabled = False
@@ -994,16 +1153,18 @@ class TodoListWidget(QWidget):
         self._item_widgets.clear()
 
         todos = self._db.get_todos(list_name=self._list_name, include_completed=show_completed)
+        todos = self._sorted_todos(todos)
 
         for todo in todos:
             item = QListWidgetItem(self._list_widget)
             item.setData(Qt.ItemDataRole.UserRole, todo["id"])
-            widget = TodoItemWidget(todo, self._db, dark=self._dark)
-            widget._font_size = self._font_size
+            widget = TodoItemWidget(todo, self._db, dark=self._dark, font_size=self._font_size)
             widget.toggled.connect(self._on_toggled)
             widget.edited.connect(self._on_edited)
             widget.deleted.connect(self._on_deleted)
-            widget.detail_saved.connect(lambda: QTimer.singleShot(0, self.todo_changed.emit))
+            # detail_saved fires when notes/subtasks auto-save; the panel writes
+            # directly to DB so no list rebuild is needed — skip todo_changed to
+            # avoid populate() collapsing the expanded row while the user types.
             item.setSizeHint(widget.sizeHint())
             self._list_widget.setItemWidget(item, widget)
             widget.set_list_item(item, self._list_widget)
@@ -1019,6 +1180,14 @@ class TodoListWidget(QWidget):
         pending = sum(1 for t in todos if not t["completed"])
         self.count_changed.emit(pending)
         self._reorder_enabled = True
+
+        # Refresh "New Task" label and editor to pick up any font size change
+        add_color = D_GRAY_TEXT if self._dark else GRAY_TEXT
+        self._plus_label.setStyleSheet(
+            f"color: {add_color}; font-style: italic; font-size: {self._font_size}px;"
+        )
+        self._new_task_editor.setStyleSheet(f"font-size: {self._font_size}px;")
+        self._new_task_editor.setMinimumHeight(self._font_size + 12)
 
     def _make_new_task_row(self) -> QWidget:
         row = QWidget()
@@ -1094,6 +1263,10 @@ class TodoListWidget(QWidget):
 
     def _on_edited(self, todo_id: int, new_title: str) -> None:
         self._db.update_todo(todo_id, title=new_title)
+        # If this task was synced from a calendar event, keep the event title in sync too
+        todo = self._db.get_todo(todo_id)
+        if todo and todo.get("source_event_id"):
+            self._db.update_event(todo["source_event_id"], title=new_title)
         QTimer.singleShot(0, self.todo_changed.emit)
 
     def _on_deleted(self, todo_id: int) -> None:
@@ -1109,6 +1282,81 @@ class TodoListWidget(QWidget):
         # Update "New Task" row colors
         add_color = D_GRAY_TEXT if dark else GRAY_TEXT
         self._plus_label.setStyleSheet(f"color: {add_color}; font-style: italic;")
+
+
+# ---------------------------------------------------------------------------
+# _SortBar — compact segmented sort control
+# ---------------------------------------------------------------------------
+
+class _SortBar(QWidget):
+    """Three-button segmented control: Manual | Priority | Due Date."""
+
+    sort_changed = pyqtSignal(str)  # emits "manual" | "priority" | "due_date"
+
+    _MODES = [("manual", "Manual"), ("priority", "Priority"), ("due_date", "Due Date")]
+
+    def __init__(self, dark: bool = False, parent=None) -> None:
+        super().__init__(parent)
+        self._dark = dark
+        self._active = "manual"
+        self._btns: dict[str, QLabel] = {}
+
+        hl = QHBoxLayout(self)
+        hl.setContentsMargins(14, 4, 14, 4)
+        hl.setSpacing(0)
+
+        sort_lbl = QLabel("Sort:")
+        sort_lbl.setStyleSheet("font-size: 11px; color: #888; margin-right: 6px;")
+        hl.addWidget(sort_lbl)
+
+        for i, (mode, label) in enumerate(self._MODES):
+            btn = QLabel(label)
+            btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFixedHeight(22)
+            btn.setContentsMargins(10, 0, 10, 0)
+            # Round left end / right end / flat middle
+            if i == 0:
+                radius = "border-radius: 0; border-top-left-radius: 4px; border-bottom-left-radius: 4px;"
+            elif i == len(self._MODES) - 1:
+                radius = "border-radius: 0; border-top-right-radius: 4px; border-bottom-right-radius: 4px;"
+            else:
+                radius = "border-radius: 0;"
+            btn.setProperty("_radius", radius)
+            btn.mousePressEvent = lambda _e, m=mode: self._select(m)  # type: ignore[assignment]
+            self._btns[mode] = btn
+            hl.addWidget(btn)
+
+        hl.addStretch()
+        self._apply_theme(dark)
+
+    def _select(self, mode: str) -> None:
+        if mode == self._active:
+            return
+        self._active = mode
+        self._apply_theme(self._dark)
+        self.sort_changed.emit(mode)
+
+    def _apply_theme(self, dark: bool) -> None:
+        self._dark = dark
+        border = D_GRAY_BORDER if dark else GRAY_BORDER
+        inactive_bg = D_GRAY_BG if dark else GRAY_BG
+        inactive_fg = D_GRAY_TEXT if dark else GRAY_TEXT
+        for mode, btn in self._btns.items():
+            radius = btn.property("_radius") or ""
+            if mode == self._active:
+                btn.setStyleSheet(
+                    f"background: {BLUE}; color: #ffffff; font-size: 11px; font-weight: 600;"
+                    f" border: 1px solid {BLUE}; {radius}"
+                )
+            else:
+                btn.setStyleSheet(
+                    f"background: {inactive_bg}; color: {inactive_fg}; font-size: 11px;"
+                    f" border: 1px solid {border}; {radius}"
+                )
+
+    def apply_theme(self, dark: bool) -> None:
+        self._apply_theme(dark)
 
 
 # ---------------------------------------------------------------------------
@@ -1237,6 +1485,9 @@ class SectionHeader(QWidget):
         self._dark = dark
         text = D_GRAY_DARK if dark else GRAY_DARK
         self._title_lbl.setStyleSheet(f"color: {text};")
+        font = self._title_lbl.font()
+        font.setPointSize(self._font_size)
+        self._title_lbl.setFont(font)
 
     def apply_theme(self, dark: bool) -> None:
         self._apply_theme(dark)
@@ -1280,6 +1531,11 @@ class TodoView(QWidget):
         self._content_layout = QVBoxLayout(content)
         self._content_layout.setContentsMargins(0, 0, 0, 16)
         self._content_layout.setSpacing(0)
+
+        # ── Sort bar ──
+        self._sort_bar = _SortBar(dark=self._dark)
+        self._sort_bar.sort_changed.connect(self._on_sort_changed)
+        self._content_layout.addWidget(self._sort_bar)
 
         # ── Today section ──
         self._today_header = SectionHeader(
@@ -1336,6 +1592,7 @@ class TodoView(QWidget):
         self._dark = dark
         bg = D_WHITE if dark else WHITE
         self.setStyleSheet(f"background-color: {bg};")
+        self._sort_bar.apply_theme(dark)
         self._general_header.apply_theme(dark)
         self._today_list.apply_theme(dark)
         self._general_list.apply_theme(dark)
@@ -1348,11 +1605,18 @@ class TodoView(QWidget):
         self._general_header._font_size = fs
         self._today_list._font_size = fs
         self._general_list._font_size = fs
+        self._today_header.apply_theme(self._dark)
+        self._general_header.apply_theme(self._dark)
         self.refresh()
 
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
+
+    def _on_sort_changed(self, mode: str) -> None:
+        self._today_list.set_sort_mode(mode)
+        self._general_list.set_sort_mode(mode)
+        self.refresh()
 
     def _update_clear_buttons(self) -> None:
         today_todos = self._db.get_todos(list_name="today", include_completed=True)
