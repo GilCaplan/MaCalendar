@@ -4,7 +4,7 @@ import Foundation
 class APIClient: ObservableObject {
     @Published var isLoading  = false
     @Published var lastError: String?
-    @Published var isOnline   = false
+    @Published var isOnline   = true
 
     private let settings: AppSettings
 
@@ -28,7 +28,7 @@ class APIClient: ObservableObject {
         guard !base.isEmpty, !isPlaceholder, let url = URL(string: base + path) else {
             throw APIError.badURL
         }
-        var req = URLRequest(url: url, timeoutInterval: 15)
+        var req = URLRequest(url: url, timeoutInterval: 8)
         req.httpMethod = method
         if !settings.apiKey.isEmpty {
             req.setValue(settings.apiKey, forHTTPHeaderField: "X-API-Key")
@@ -144,6 +144,7 @@ class APIClient: ObservableObject {
         do {
             _ = try await request("/events/\(id)", method: "PATCH", body: fields)
         } catch APIError.offline, APIError.badURL {
+            LocalStore.shared.patchEvent(id, fields: fields)   // keep local cache current
             LocalStore.shared.enqueue(method: "PATCH", path: "/events/\(id)", body: fields)
         }
     }
@@ -212,12 +213,20 @@ class APIClient: ObservableObject {
                               body: ["list": list, "ids": ids])
     }
 
-    func updateTodo(id: Int, title: String? = nil, list: String? = nil) async throws {
+    func updateTodo(id: Int, title: String? = nil, list: String? = nil,
+                    priority: String? = nil, dueDate: String? = nil) async throws {
         var fields: [String: Any] = [:]
-        if let title { fields["title"] = title }
-        if let list  { fields["list_name"] = list }
+        if let title    { fields["title"]    = title }
+        if let list     { fields["list_name"] = list }
+        if let priority { fields["priority"] = priority }
+        if let dueDate  { fields["due_date"] = dueDate }
         guard !fields.isEmpty else { return }
-        _ = try await request("/todos/\(id)", method: "PATCH", body: fields)
+        do {
+            _ = try await request("/todos/\(id)", method: "PATCH", body: fields)
+        } catch APIError.offline, APIError.badURL {
+            LocalStore.shared.patchTodo(id, fields: fields)   // keep local cache current
+            LocalStore.shared.enqueue(method: "PATCH", path: "/todos/\(id)", body: fields)
+        }
     }
 
     func clearCompletedTodos(list: String? = nil) async throws {

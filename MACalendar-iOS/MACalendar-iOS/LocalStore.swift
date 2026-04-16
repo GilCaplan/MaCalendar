@@ -45,6 +45,9 @@ class LocalStore: ObservableObject {
         todos   = (try? d.decode([Todo].self,          from: Data(contentsOf: url("mc_todos.json"))))   ?? []
         pending = (try? d.decode([PendingChange].self, from: Data(contentsOf: url("mc_pending.json")))) ?? []
         pendingCount = pending.count
+        // Prevent temp-ID collisions after a restart: start below the lowest existing negative ID.
+        let negIDs = events.map { $0.id }.filter { $0 < 0 } + todos.map { $0.id }.filter { $0 < 0 }
+        nextTemp = (negIDs.min().map { $0 - 1 }) ?? -1
     }
 
     func persist() {
@@ -102,6 +105,17 @@ class LocalStore: ObservableObject {
         return e
     }
 
+    func patchEvent(_ id: Int, fields: [String: Any]) {
+        guard let i = events.firstIndex(where: { $0.id == id }) else { return }
+        if let v = fields["title"]      as? String { events[i].title     = v }
+        if let v = fields["date"]       as? String { events[i].date      = v }
+        if let v = fields["start_time"] as? String { events[i].startTime = v }
+        if let v = fields["end_time"]   as? String { events[i].endTime   = v }
+        if let v = fields["location"]   as? String { events[i].location  = v }
+        if let v = fields["attendees"]  as? String { events[i].attendees = v }
+        persist()
+    }
+
     func removeEvent(_ id: Int) { events.removeAll { $0.id == id }; persist() }
 
     // MARK: - Todos
@@ -133,6 +147,15 @@ class LocalStore: ObservableObject {
         todos[i].completed = todos[i].completed == 0 ? 1 : 0
         persist()
         return todos[i].completed != 0
+    }
+
+    func patchTodo(_ id: Int, fields: [String: Any]) {
+        guard let i = todos.firstIndex(where: { $0.id == id }) else { return }
+        if let v = fields["title"]     as? String { todos[i].title    = v }
+        if let v = fields["list_name"] as? String { todos[i].list     = v }
+        if let v = fields["priority"]  as? String { todos[i].priority = v }
+        if let v = fields["due_date"]  as? String { todos[i].dueDate  = v }
+        persist()
     }
 
     func removeTodo(_ id: Int) { todos.removeAll { $0.id == id }; persist() }
