@@ -28,16 +28,42 @@ struct EventDetailView: View {
         _attendees = State(initialValue: event.attendees)
     }
 
+    // MARK: - Computed helpers
+
+    /// Returns e.g. "Monday, Apr 14, 2026" or nil if the date string is invalid.
+    private var parsedDayLabel: String? {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        guard let d = fmt.date(from: date) else { return nil }
+        let out = DateFormatter()
+        out.dateFormat = "EEEE, MMM d, yyyy"
+        return out.string(from: d)
+    }
+
+    // MARK: - Body
+
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section(header: Text("Event")) {
                     TextField("Title", text: $title)
-                    TextField("Date (YYYY-MM-DD)", text: $date)
-                        .keyboardType(.numbersAndPunctuation)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        TextField("Date (YYYY-MM-DD)", text: $date)
+                            .keyboardType(.numbersAndPunctuation)
+                        if let label = parsedDayLabel {
+                            Text(label)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
                     HStack {
                         TextField("Start (HH:MM)", text: $startTime)
                             .keyboardType(.numbersAndPunctuation)
+                            .onChange(of: startTime) { newVal in
+                                autoUpdateEndTime(from: newVal)
+                            }
                         Text("–")
                         TextField("End (HH:MM)", text: $endTime)
                             .keyboardType(.numbersAndPunctuation)
@@ -72,6 +98,20 @@ struct EventDetailView: View {
             }
         }
     }
+
+    // MARK: - Auto end-time
+
+    /// When the user changes the start time, push the end time to exactly 1 hour later.
+    private func autoUpdateEndTime(from start: String) {
+        let parts = start.split(separator: ":").compactMap { Int($0) }
+        guard parts.count == 2 else { return }
+        let totalMins = parts[0] * 60 + parts[1] + 60
+        let h = (totalMins / 60) % 24
+        let m = totalMins % 60
+        endTime = String(format: "%02d:%02d", h, m)
+    }
+
+    // MARK: - Actions
 
     private func save() {
         saving = true

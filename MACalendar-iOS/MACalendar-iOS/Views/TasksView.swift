@@ -49,7 +49,8 @@ struct TasksView: View {
                             TaskRowView(
                                 todo: todo,
                                 onToggle: { toggle(todo) },
-                                onDelete: { delete(todo) }
+                                onDelete: { delete(todo) },
+                                onSave:   { title, priority, dueDate in save(todo, title: title, priority: priority, dueDate: dueDate) }
                             )
                             .onDrag { NSItemProvider(object: "\(todo.id)" as NSString) }
                         }
@@ -69,7 +70,8 @@ struct TasksView: View {
                             TaskRowView(
                                 todo: todo,
                                 onToggle: { toggle(todo) },
-                                onDelete: { delete(todo) }
+                                onDelete: { delete(todo) },
+                                onSave:   { title, priority, dueDate in save(todo, title: title, priority: priority, dueDate: dueDate) }
                             )
                             .onDrag { NSItemProvider(object: "\(todo.id)" as NSString) }
                         }
@@ -144,10 +146,12 @@ struct TasksView: View {
     }
 
     private func toggle(_ todo: Todo) {
-        Task {
-            _ = try? await api.toggleTodo(id: todo.id)
-            load()
+        // Immediate optimistic UI update so the checkbox responds instantly,
+        // even when offline (no waiting for the 8 s network timeout).
+        if let i = todos.firstIndex(where: { $0.id == todo.id }) {
+            todos[i].completed = todos[i].completed == 0 ? 1 : 0
         }
+        Task { _ = try? await api.toggleTodo(id: todo.id) }
     }
 
     private func delete(_ todo: Todo) {
@@ -192,6 +196,16 @@ struct TasksView: View {
             }
         }
         return true
+    }
+
+    private func save(_ todo: Todo, title: String, priority: String, dueDate: String) {
+        // Optimistic local update
+        if let i = todos.firstIndex(where: { $0.id == todo.id }) {
+            todos[i].title    = title
+            todos[i].priority = priority
+            todos[i].dueDate  = dueDate
+        }
+        Task { try? await api.updateTodo(id: todo.id, title: title, priority: priority, dueDate: dueDate) }
     }
 
     private func clearCompleted() {

@@ -53,6 +53,7 @@ struct ContentView: View {
                         Divider()
 
                         TabView(selection: $calendarView) {
+
                             // ── Month ──
                             VStack(spacing: 0) {
                                 HStack {
@@ -85,20 +86,57 @@ struct ContentView: View {
 
                             // ── Week ──
                             VStack(spacing: 0) {
+                                HStack {
+                                    Button { shiftWeek(-1) } label: {
+                                        Image(systemName: "chevron.left")
+                                    }
+                                    Spacer()
+                                    Text(weekTitle).font(.headline)
+                                    Spacer()
+                                    Button { shiftWeek(1) } label: {
+                                        Image(systemName: "chevron.right")
+                                    }
+                                }
+                                .padding(.horizontal)
+                                .padding(.vertical, 8)
+
                                 WeekView(
                                     selectedDate: $selectedDate,
                                     events: monthEvents,
-                                    onDateSelected: { date in viewedDate = date }
+                                    onDateSelected: { date in
+                                        selectedDate = date
+                                        viewedDate = date
+                                        Task { await loadMonth() }
+                                    }
                                 )
-                                Spacer()
                             }
                             .tag(CalendarMode.week)
-                            .onAppear { viewedDate = selectedDate }
-                            .task { await loadMonth() }
+                            .onAppear {
+                                viewedDate = selectedDate
+                                Task { await loadMonth() }
+                            }
 
                             // ── Day ──
-                            DayView(date: selectedDate)
-                                .tag(CalendarMode.day)
+                            VStack(spacing: 0) {
+                                HStack {
+                                    Button { shiftDay(-1) } label: {
+                                        Image(systemName: "chevron.left")
+                                    }
+                                    Spacer()
+                                    Text(dayTitle).font(.headline)
+                                    Spacer()
+                                    Button { shiftDay(1) } label: {
+                                        Image(systemName: "chevron.right")
+                                    }
+                                }
+                                .padding(.horizontal)
+                                .padding(.vertical, 8)
+
+                                DayView(date: selectedDate)
+                            }
+                            .tag(CalendarMode.day)
+                            .onAppear { viewedDate = selectedDate }
+
                         }
                         .tabViewStyle(.page(indexDisplayMode: .never))
 
@@ -108,7 +146,11 @@ struct ContentView: View {
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
-                            Button("Today") { selectedDate = Date() }
+                            Button("Today") {
+                                selectedDate = Date()
+                                viewedDate = Date()
+                                Task { await loadMonth() }
+                            }
                         }
                     }
                     .overlay(alignment: .bottom) {
@@ -149,9 +191,9 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showCreateSheet) {
-            let year  = Calendar.current.component(.year, from: selectedDate)
-            let month = Calendar.current.component(.month, from: selectedDate)
-            let day   = Calendar.current.component(.day, from: selectedDate)
+            let year    = Calendar.current.component(.year,  from: selectedDate)
+            let month   = Calendar.current.component(.month, from: selectedDate)
+            let day     = Calendar.current.component(.day,   from: selectedDate)
             let dateStr = String(format: "%04d-%02d-%02d", year, month, day)
 
             EventDetailView(
@@ -175,7 +217,7 @@ struct ContentView: View {
             }
         }
         .task {
-            // While the app is open, retry sync every 30s so pending
+            // While the app is open, retry sync every 30 s so pending
             // changes upload as soon as the Mac comes back online.
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 30_000_000_000)
@@ -193,14 +235,45 @@ struct ContentView: View {
         return f.string(from: viewedDate)
     }
 
+    private var weekTitle: String {
+        var cal = Calendar(identifier: .gregorian)
+        cal.firstWeekday = 1
+        let weekday = cal.component(.weekday, from: selectedDate) - 1
+        guard let sunday   = cal.date(byAdding: .day, value: -weekday,    to: selectedDate),
+              let saturday = cal.date(byAdding: .day, value: 6 - weekday, to: selectedDate) else { return "" }
+        let f = DateFormatter()
+        f.dateFormat = "MMM d"
+        let year = Calendar.current.component(.year, from: sunday)
+        return "\(f.string(from: sunday)) – \(f.string(from: saturday)), \(year)"
+    }
+
+    private var dayTitle: String {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE, MMM d, yyyy"
+        return f.string(from: selectedDate)
+    }
+
     private func shiftMonth(_ delta: Int) {
         guard let d = Calendar.current.date(byAdding: .month, value: delta, to: viewedDate) else { return }
         viewedDate = d
-        // Day only switches selection if user explicitly taps in MonthGridView
+    }
+
+    private func shiftWeek(_ delta: Int) {
+        guard let d = Calendar.current.date(byAdding: .day, value: delta * 7, to: selectedDate) else { return }
+        selectedDate = d
+        viewedDate = d
+        Task { await loadMonth() }
+    }
+
+    private func shiftDay(_ delta: Int) {
+        guard let d = Calendar.current.date(byAdding: .day, value: delta, to: selectedDate) else { return }
+        selectedDate = d
+        viewedDate = d
+        Task { await loadMonth() }
     }
 
     private func loadMonth() async {
-        let year  = Calendar.current.component(.year, from: viewedDate)
+        let year  = Calendar.current.component(.year,  from: viewedDate)
         let month = Calendar.current.component(.month, from: viewedDate)
         loadingMonth = true
         monthEvents = (try? await api.eventsForMonth(year: year, month: month)) ?? []

@@ -5,7 +5,8 @@ struct DayView: View {
     @EnvironmentObject var api: APIClient
     @State private var events: [CalendarEvent] = []
     @State private var selected: CalendarEvent?
-    @State private var showDetail = false
+    @State private var now: Date = Date()
+    private let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
     private let hourHeight: CGFloat = 56
     private let startHour = 7
@@ -38,11 +39,20 @@ struct DayView: View {
                             EventBlock(event: ev, height: height)
                                 .offset(x: 44, y: top)
                                 .padding(.trailing, 8)
-                                .onTapGesture {
-                                    selected = ev
-                                    showDetail = true
-                                }
+                                .onTapGesture { selected = ev }
                         }
+                    }
+
+                    // Current time redline (today only)
+                    if Calendar.current.isDate(date, inSameDayAs: now) {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 10, height: 10)
+                            .offset(x: 39, y: nowY - 5)
+                        Color.red
+                            .frame(height: 2)
+                            .padding(.trailing, 8)
+                            .offset(x: 49, y: nowY - 1)
                     }
                 }
                 .padding(.top, 8)
@@ -51,17 +61,37 @@ struct DayView: View {
                 proxy.scrollTo(startHour, anchor: .top)
                 load()
             }
-        }
-        .sheet(isPresented: $showDetail) {
-            if let ev = selected {
-                EventDetailView(event: ev, onDismiss: load)
+            .onChange(of: date) { _ in
+                // Show local cache for the new date immediately so the
+                // user never sees the previous day's events while waiting
+                // for the network (or offline fallback) to respond.
+                let d = DateFormatter.isoDay.string(from: date)
+                events = LocalStore.shared.eventsForDate(d)
+                proxy.scrollTo(startHour, anchor: .top)
+                load()
             }
+        }
+        // .sheet(item:) is safe: the sheet only opens when selected is
+        // non-nil, so we can never get a blank grey sheet from a nil guard.
+        .onReceive(timer) { d in now = d }
+        .sheet(item: $selected) { ev in
+            EventDetailView(event: ev, onDismiss: load)
         }
     }
 
+    private var nowY: CGFloat {
+        let comps = Calendar.current.dateComponents([.hour, .minute], from: now)
+        return CGFloat((comps.hour ?? 0) * 60 + (comps.minute ?? 0)) / 60 * hourHeight
+    }
+
     private func load() {
+        let targetDate = date          // capture before entering the Task
         Task {
-            events = (try? await api.eventsForDay(date)) ?? []
+            let fresh = (try? await api.eventsForDay(targetDate)) ?? []
+            // Guard against a stale response overwriting a newer date's events.
+            if date == targetDate {
+                events = fresh
+            }
         }
     }
 
