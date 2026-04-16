@@ -129,3 +129,150 @@ to cover those patterns.
 
 ---
 
+## [2026-04-12 12:12:59] SUCCESS — 🖥️ Mac
+**Transcript:** `a certain meeting on wednesday at 5.15pm to meet with vika for magsha meme bagru progress update`
+
+**Parse:** ✅ rule fast-path | **Actions:** update_event
+
+- Updated 'Content creation meeting with Vika' successfully.
+
+---
+
+## [2026-04-12 14:23:14] SUCCESS — 🖥️ Mac
+**Transcript:** `for this coming tuesday on to do two events one at four o'clock meeting with pelic and another meeting at five o'clock with ido`
+
+**Parse:** 🤖 llm | **Actions:** create_event, create_event
+
+- Created event 'Meeting with Pelic' on Tuesday, Apr 14, 2026 from 4 PM to 5 PM.
+- Created event 'Meeting with Ido' on Tuesday, Apr 14, 2026 from 5 PM to 6 PM.
+
+---
+
+## [2026-04-12 18:17:59] SUCCESS — 🖥️ Mac
+**Transcript:** `at a meeting tomorrow monday, 13th, for a zoom ae pie zoom at 8 o'clock pm`
+
+**Parse:** 🤖 llm | **Actions:** create_event
+
+- Created event 'Zoom AE Pie Meeting' on Monday, Apr 13, 2026 from 8 PM to 9 PM.
+
+---
+
+## [2026-04-13 11:55:54] SUCCESS — 🖥️ Mac
+**Transcript:** `set an appointment for tomorrow morning on tuesday at 910am`
+
+**Parse:** ✅ rule fast-path | **Actions:** create_event
+
+- Created event 'appointment' on Tuesday, Apr 14, 2026 from 9:10 AM to 10:10 AM.
+
+---
+
+## [2026-04-13 18:55:41] SUCCESS — 🖥️ Mac
+**Transcript:** `i have a dense squirmant tomorrow morning at 9.10am`
+
+**Parse:** 🤖 llm | **Actions:** create_event
+
+- Created event 'dense squirmant' on Tuesday, Apr 14, 2026 from 9:10 AM to 10:10 AM.
+
+---
+
+## [2026-04-13 21:01:14] SUCCESS — 🖥️ Mac
+**Transcript:** `reading tomorrow at six p.m. with it time`
+
+**Parse:** ✅ rule fast-path | **Actions:** query_schedule
+
+- You have 5 events tomorrow: Dentist appointment at 9:10 AM, Meeting W Menachem - simulation on project at 2 PM, Meeting with Ora for Project at 3 PM, Meeting with Peleg at 4 PM, and Meeting with Ido at 5 PM.
+
+---
+
+## [2026-04-13 21:01:37] SUCCESS — 🖥️ Mac
+**Transcript:** `set a meeting tomorrow on tuesday at 6pm with etai`
+
+**Parse:** ✅ rule fast-path | **Actions:** create_event
+
+- Created event 'meeting' on Tuesday, Apr 14, 2026 from 6 PM to 7 PM.
+
+---
+
+## [2026-04-13 21:02:15] SUCCESS — 🖥️ Mac
+**Transcript:** `again, create an event tomorrow at 6pm with etie`
+
+**Parse:** ✅ rule fast-path | **Actions:** create_event
+
+- Created event 'event' on Tuesday, Apr 14, 2026 from 6 PM to 7 PM.
+
+---
+
+## [2026-04-13 22:35:10] SUCCESS — 🖥️ Mac
+**Transcript:** `start emitting for me on wednesday at 6.30. excuse me. excuse me.`
+
+**Parse:** 🤖 llm | **Actions:** create_event
+
+- Created event 'Meeting' on Wednesday, Apr 15, 2026 from 6:30 PM to 7:30 PM.
+
+---
+
+## [2026-04-14 18:27:22] SUCCESS — 🖥️ Mac
+**Transcript:** `set a meeting tomorrow at 2 o'clock meeting with omri for project`
+
+**Parse:** ✅ rule fast-path | **Actions:** create_event
+
+- Created event 'meeting' on Wednesday, Apr 15, 2026 from 2 AM to 3 AM.
+
+---
+
+## [2026-04-14 18:29:24] SUCCESS — 🖥️ Mac
+**Transcript:** `create a meeting tomorrow at 2pm on wednesday meeting with omri for the project`
+
+**Parse:** ✅ rule fast-path | **Actions:** create_event
+
+- Created event 'meeting' on Wednesday, Apr 15, 2026 from 2 PM to 3 PM.
+
+---
+
+## [2026-04-15 15:11:29] SUCCESS — 🖥️ Mac
+**Transcript:** `set a meeting for me tomorrow at 11 a.m. and also set meeting for 5.30 p.m. to 6.30 p.m. tomorrow as well`
+
+**Parse:** 🤖 llm | **Actions:** create_event, create_event
+
+- Created event 'Meeting' on Thursday, Apr 16, 2026 from 11 AM to 12 PM.
+- Created event 'Meeting' on Thursday, Apr 16, 2026 from 5:30 PM to 6:30 PM.
+
+---
+
+## [2026-04-15 18:01:07] SUCCESS — 🖥️ Mac
+**Transcript:** `meeting on monday next week, the 20th of april 10 o'clock meeting with victoria on content, execute`
+
+**Parse:** 🤖 llm | **Actions:** create_event
+
+- Created event 'Meeting with Victoria on Content' on Monday, Apr 20, 2026 from 10 AM to 11 AM.
+
+---
+
+## [2026-04-15 20:38:25] SUCCESS — 🖥️ Mac
+**Transcript:** `set meaning for tomorrow at 7 p.m. with noah`
+
+**Parse:** ✅ rule fast-path | **Actions:** create_event
+
+- Created event 'meaning' on Thursday, Apr 16, 2026 from 7 PM to 8 PM.
+
+---
+
+## [2026-04-15 22:22:38] SUCCESS — 🖥️ Mac
+**Transcript:** `meeting tomorrow at full pm with dad for brokerage advice tomorrow at thursday`
+
+**Parse:** 🤖 llm | **Actions:** create_event
+
+- Created event 'Meeting with Dad' on Thursday, Apr 16, 2026 from 6 PM to 7 PM.
+
+---
+
+## [2026-04-16 10:28:23] SUCCESS — 🖥️ Mac
+**Transcript:** `set a meeting at 4pm today, but it is only 20 minutes meeting with one moment meeting with reards, okay, then let's do another meeting from 6 from 6 o'clock to 640 meetings with kids for project defense`
+
+**Parse:** 🤖 llm | **Actions:** create_event, create_event
+
+- Created event 'Meeting' on Thursday, Apr 16, 2026 from 4 PM to 4:20 PM.
+- Created event 'Meeting' on Thursday, Apr 16, 2026 from 6 PM to 7:40 PM.
+
+---
+
