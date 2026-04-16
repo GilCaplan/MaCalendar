@@ -128,7 +128,7 @@ class CalendarWindow(QMainWindow):
         self._config = config
         self._db = CalendarDB()
         self._current_date = datetime.date.today()
-        self._view_mode = "month"  # "month" | "week" | "day" | "todo"
+        self._view_mode = "month"  # "month" | "week" | "day" | "todo" | "timer"
 
         self._dark = (config.theme == "dark") if config else False
         
@@ -177,17 +177,20 @@ class CalendarWindow(QMainWindow):
         self._sidebar.date_selected.connect(self._on_sidebar_date)
         splitter.addWidget(self._sidebar)
 
-        # Stacked: month / week / day / todo
+        # Stacked: month / week / day / todo / timer
         from assistant.calendar_ui.todo_view import TodoView
+        from assistant.calendar_ui.timer_view import TimerView as _TimerView
         self._stack = QStackedWidget()
         self._month_view = MonthView(self._db)
         self._week_view = WeekView(self._db)
         self._day_view = DayView(self._db)
         self._todo_view = TodoView(self._db, config=self._config)
+        self._timer_view = _TimerView(self._db)
         self._stack.addWidget(self._month_view)
         self._stack.addWidget(self._week_view)
         self._stack.addWidget(self._day_view)
         self._stack.addWidget(self._todo_view)
+        self._stack.addWidget(self._timer_view)
         self._month_view.date_selected.connect(self._on_day_selected)
         self._month_view.date_double_clicked.connect(self._on_day_double_clicked)
         self._month_view.event_clicked.connect(self._on_event_clicked)
@@ -258,7 +261,7 @@ class CalendarWindow(QMainWindow):
         layout.addStretch()
 
         # ── Group 2: view toggle tabs ────────────────────────────────
-        for label, mode in [("Month", "month"), ("Week", "week"), ("Day", "day"), ("Tasks", "todo")]:
+        for label, mode in [("Month", "month"), ("Week", "week"), ("Day", "day"), ("Tasks", "todo"), ("Timer", "timer")]:
             btn = QPushButton(label)
             btn.setObjectName("seg_btn")
             btn.setProperty("active", mode == self._view_mode)
@@ -326,7 +329,7 @@ class CalendarWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def _on_prev(self) -> None:
-        if self._view_mode == "todo":
+        if self._view_mode in ("todo", "timer"):
             return
         if self._view_mode == "month":
             d = self._current_date.replace(day=1) - datetime.timedelta(days=1)
@@ -338,7 +341,7 @@ class CalendarWindow(QMainWindow):
         self._navigate()
 
     def _on_next(self) -> None:
-        if self._view_mode == "todo":
+        if self._view_mode in ("todo", "timer"):
             return
         if self._view_mode == "month":
             d = self._current_date.replace(day=28) + datetime.timedelta(days=4)
@@ -362,7 +365,7 @@ class CalendarWindow(QMainWindow):
         self._update_title()
 
     def _navigate(self) -> None:
-        if self._view_mode == "todo":
+        if self._view_mode in ("todo", "timer"):
             self._update_title()
             return
         if self._view_mode == "month":
@@ -381,9 +384,10 @@ class CalendarWindow(QMainWindow):
             "week": self._week_view,
             "day": self._day_view,
             "todo": self._todo_view,
+            "timer": self._timer_view,
         }.get(mode, self._month_view)
         self._stack.setCurrentWidget(widget)
-        for m in ("month", "week", "day", "todo"):
+        for m in ("month", "week", "day", "todo", "timer"):
             btn = getattr(self, f"_view_btn_{m}", None)
             if btn:
                 btn.setProperty("active", m == mode)
@@ -404,6 +408,9 @@ class CalendarWindow(QMainWindow):
         self._navigate()
 
     def _update_title(self) -> None:
+        if self._view_mode == "timer":
+            self._title_label.setText("Timer")
+            return
         if self._view_mode == "todo":
             self._title_label.setText("Tasks")
         elif self._view_mode == "month":
@@ -606,6 +613,8 @@ class CalendarWindow(QMainWindow):
         self._sidebar.apply_theme(dark)
         if hasattr(self, "_todo_view"):
             self._todo_view.apply_theme(dark)
+        if hasattr(self, "_timer_view"):
+            self._timer_view.apply_theme(dark)
 
         # Re-style toolbar
         bg = _styles.D_WHITE if dark else WHITE
@@ -615,7 +624,7 @@ class CalendarWindow(QMainWindow):
                 f"background-color: {bg}; border-bottom: 1px solid {border};"
             )
         # Force segmented buttons to repaint with new theme
-        for m in ("month", "week", "day", "todo"):
+        for m in ("month", "week", "day", "todo", "timer"):
             btn = getattr(self, f"_view_btn_{m}", None)
             if btn:
                 btn.style().unpolish(btn)
@@ -632,6 +641,8 @@ class CalendarWindow(QMainWindow):
         self._day_view.apply_ui_config(ui)
         if hasattr(self, "_todo_view"):
             self._todo_view.apply_ui_config(ui)
+        if hasattr(self, "_timer_view"):
+            self._timer_view.apply_ui_config(ui)
         self.refresh_calendar()
 
     def _on_briefing_requested(self) -> None:

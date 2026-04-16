@@ -77,11 +77,42 @@ _MIGRATIONS = [
 ]
 
 
+_CREATE_TIMERS_TABLE = """
+CREATE TABLE IF NOT EXISTS timers (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    title       TEXT    NOT NULL DEFAULT 'Untitled Timer',
+    hourly_rate REAL    NOT NULL DEFAULT 0.0,
+    color       TEXT    NOT NULL DEFAULT '#1a6fc4',
+    created_at  TEXT    NOT NULL,
+    archived    INTEGER NOT NULL DEFAULT 0,
+    timer_type  TEXT    NOT NULL DEFAULT 'work',
+    currency    TEXT    NOT NULL DEFAULT 'ILS'
+)
+"""
+
+_TIMER_MIGRATIONS = [
+    "ALTER TABLE timers ADD COLUMN timer_type TEXT NOT NULL DEFAULT 'work'",
+    "ALTER TABLE timers ADD COLUMN currency TEXT NOT NULL DEFAULT 'ILS'",
+]
+
+_CREATE_TIMER_SESSIONS_TABLE = """
+CREATE TABLE IF NOT EXISTS timer_sessions (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    timer_id   INTEGER NOT NULL,
+    title      TEXT    NOT NULL DEFAULT '',
+    start_time TEXT    NOT NULL,
+    end_time   TEXT,
+    notes      TEXT    NOT NULL DEFAULT '',
+    created_at TEXT    NOT NULL
+)
+"""
+
 _CREATE_INDEXES = """
-CREATE INDEX IF NOT EXISTS idx_events_date    ON events(date);
-CREATE INDEX IF NOT EXISTS idx_events_series  ON events(series_id);
-CREATE INDEX IF NOT EXISTS idx_todos_list     ON todos(list, completed);
-CREATE INDEX IF NOT EXISTS idx_subtasks_todo  ON subtasks(todo_id, position);
+CREATE INDEX IF NOT EXISTS idx_events_date      ON events(date);
+CREATE INDEX IF NOT EXISTS idx_events_series    ON events(series_id);
+CREATE INDEX IF NOT EXISTS idx_todos_list       ON todos(list, completed);
+CREATE INDEX IF NOT EXISTS idx_subtasks_todo    ON subtasks(todo_id, position);
+CREATE INDEX IF NOT EXISTS idx_timer_sessions   ON timer_sessions(timer_id);
 """
 
 
@@ -115,6 +146,9 @@ class CalendarDB:
             conn.execute(_CREATE_TODOS_TABLE)
             self._migrate_todos(conn)
             conn.execute(_CREATE_SUBTASKS_TABLE)
+            conn.execute(_CREATE_TIMERS_TABLE)
+            self._migrate_timers(conn)
+            conn.execute(_CREATE_TIMER_SESSIONS_TABLE)
             for stmt in _CREATE_INDEXES.strip().splitlines():
                 stmt = stmt.strip()
                 if stmt:
@@ -135,6 +169,17 @@ class CalendarDB:
         """Apply any missing todos schema migrations safely."""
         existing = {r[1] for r in conn.execute("PRAGMA table_info(todos)")}
         for stmt in _TODO_MIGRATIONS:
+            col = stmt.split("ADD COLUMN")[1].strip().split()[0]
+            if col not in existing:
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError:
+                    pass  # already exists
+
+    def _migrate_timers(self, conn: sqlite3.Connection) -> None:
+        """Apply any missing timers schema migrations safely."""
+        existing = {r[1] for r in conn.execute("PRAGMA table_info(timers)")}
+        for stmt in _TIMER_MIGRATIONS:
             col = stmt.split("ADD COLUMN")[1].strip().split()[0]
             if col not in existing:
                 try:
@@ -777,6 +822,142 @@ class CalendarDB:
     # ------------------------------------------------------------------
     # Util
     # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Timers
+    # ------------------------------------------------------------------
+
+    def create_timer(
+        self,
+        title: str = "Untitled Timer",
+        hourly_rate: float = 0.0,
+        color: str = "#1a6fc4",
+        timer_type: str = "work",
+        currency: str = "ILS",
+    ) -> int:
+        """Create a new timer project. Returns new row id."""
+        with self._conn() as conn:
+            cur = conn.execute(
+                "INSERT INTO timers (title, hourly_rate, color, created_at, timer_type, currency) VALUES (?, ?, ?, ?, ?, ?)",
+                (title, hourly_rate, color, datetime.datetime.now().isoformat(), timer_type, currency),
+            )
+            return cur.lastrowid
+
+    def get_timers(self, include_archived: bool = False) -> List[dict]:
+        """Return all timer projects as dicts, newest first."""
+        with self._conn() as conn:
+            where = "" if include_archived else "WHERE archived = 0"
+            rows = conn.execute(
+                f"SELECT * FROM timers {where} ORDER BY created_at DESC"
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def update_timer(self, timer_id: int, **kwargs) -> None:
+        """Update allowed fields on a timer."""
+        allowed = {"title", "hourly_rate", "color", "archived", "timer_type", "currency"}
+        fields = {k: v for k, v in kwargs.items() if k in allowed}
+        if not fields:
+            return
+        sets = ", ".join(f"{k} = ?" for k in fields)
+        with self._conn() as conn:
+            conn.execute(
+                f"UPDATE timers SET {sets} WHERE id = ?",
+                (*fields.values(), timer_id),
+            )
+
+    def delete_timer(self, timer_id: int) -> None:
+        """Delete a timer and all its sessions."""
+        with self._conn() as conn:
+            conn.execute("DELETE FROM timer_sessions WHERE timer_id = ?", (timer_id,))
+            conn.execute("DELETE FROM timers WHERE id = ?", (timer_id,))
+
+    # ------------------------------------------------------------------
+    # Timer Sessions
+    # ------------------------------------------------------------------
+
+    def create_timer_session(self, timer_id: int, title: str = "", start_time: Optional[str] = None) -> int:
+        """Start a new session for a timer. Returns new row id."""
+        now = datetime.datetime.now().isoformat()
+        with self._conn() as conn:
+            cur = conn.execute(
+                "INSERT INTO timer_sessions (timer_id, title, start_time, end_time, notes, created_at) VALUES (?, ?, ?, NULL, '', ?)",
+                (timer_id, title, start_time or now, now),
+            )
+            return cur.lastrowid
+
+    def get_timer_sessions(self, timer_id: int) -> List[dict]:
+        """Return all sessions for a timer, oldest first."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM timer_sessions WHERE timer_id = ? ORDER BY start_time ASC",
+                (timer_id,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_running_session(self, timer_id: int) -> Optional[dict]:
+        """Return the currently running (open) session for a timer, or None."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM timer_sessions WHERE timer_id = ? AND end_time IS NULL LIMIT 1",
+                (timer_id,),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def update_timer_session(self, session_id: int, **kwargs) -> None:
+        """Update allowed fields on a timer session."""
+        allowed = {"title", "start_time", "end_time", "notes"}
+        fields = {k: v for k, v in kwargs.items() if k in allowed}
+        if not fields:
+            return
+        sets = ", ".join(f"{k} = ?" for k in fields)
+        with self._conn() as conn:
+            conn.execute(
+                f"UPDATE timer_sessions SET {sets} WHERE id = ?",
+                (*fields.values(), session_id),
+            )
+
+    def stop_timer_session(self, session_id: int, end_time: Optional[str] = None) -> None:
+        """Close an open session by setting end_time."""
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE timer_sessions SET end_time = ? WHERE id = ?",
+                (end_time or datetime.datetime.now().isoformat(), session_id),
+            )
+
+    def delete_timer_session(self, session_id: int) -> None:
+        """Delete a single timer session."""
+        with self._conn() as conn:
+            conn.execute("DELETE FROM timer_sessions WHERE id = ?", (session_id,))
+
+    def split_timer_session(self, session_id: int, split_at: Optional[str] = None) -> int:
+        """
+        Split a session at split_at (ISO datetime string) or its midpoint.
+        Closes the original session at split_at and creates a new one.
+        Returns the id of the new session.
+        """
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM timer_sessions WHERE id = ?", (session_id,)
+            ).fetchone()
+            if not row:
+                raise ValueError(f"Session {session_id} not found")
+            session = dict(row)
+
+        start = datetime.datetime.fromisoformat(session["start_time"])
+        end_raw = session.get("end_time")
+        end = datetime.datetime.fromisoformat(end_raw) if end_raw else datetime.datetime.now()
+
+        if split_at:
+            mid = datetime.datetime.fromisoformat(split_at)
+        else:
+            mid = start + (end - start) / 2
+
+        self.update_timer_session(session_id, end_time=mid.isoformat())
+        return self.create_timer_session(
+            session["timer_id"],
+            title=session["title"],
+            start_time=mid.isoformat(),
+        )
 
     def clear_all(self) -> None:
         """Wipe all events from the database."""

@@ -35,6 +35,19 @@
 | `delete_subtasks_for_todo` (call before `delete_todo`) | L745 |
 | `reorder_subtasks` | L751 |
 
+**Timer CRUD:**
+| What | Location |
+|------|----------|
+| `create_timer` / `get_timers` / `update_timer` / `delete_timer` | L811 / L820 / L829 / L842 |
+| `create_timer_session` / `get_timer_sessions` / `get_running_session` | L852 / L862 / L871 |
+| `update_timer_session` / `stop_timer_session` / `delete_timer_session` | L880 / L893 / L901 |
+| `split_timer_session` (splits at midpoint or given ISO datetime) | L906 |
+
+**Schema — `timers` table:** `id, title, hourly_rate, color, created_at, archived`  
+**Schema — `timer_sessions` table:** `id, timer_id, title, start_time, end_time (NULL=running), notes, created_at`
+
+---
+
 **Schema — `todos` table columns:**
 `id, title, list, completed, priority, due_date, notes, source, source_event_id, created_at, completed_at, position, attachments`
 
@@ -202,6 +215,20 @@ All signals that trigger widget rebuild use `QTimer.singleShot(0, signal.emit)` 
 
 **QListWidget expand pattern:**  
 `_toggle_expand()` → `_detail_panel.show()/hide()` → `_update_item_size()` → `item.setSizeHint(self.sizeHint())` + `list_widget.setFixedHeight(recalculated)`.
+
+### Timer View — `timer_view.py`
+| What | Location |
+|------|----------|
+| `TimerView` | L433 — main container, 1s `QTimer` drives all live displays |
+| `TimerCard` | L252 — single timer card (header + collapsible sessions) |
+| `SessionsPanel` | L197 — collapsible list of `SessionRow` widgets |
+| `SessionRow` | L153 — title, date range, duration, edit/split/delete buttons |
+| `TimerDialog` | L107 — create/edit title, hourly rate, colour |
+| `SessionEditDialog` | L162 — edit session title, start/end time, notes |
+| `_fmt_duration` / `_fmt_earnings` | L73 / L80 — HH:MM:SS and $X.XX helpers |
+| `split_timer_session` in DB | db.py:L906 — midpoint-split a session |
+
+**Adding a new timer tab action:** Timer is purely UI-local (no voice action). Data stays in local SQLite, never synced to iOS.
 
 ### Other Views
 | File | Class | Key method |
