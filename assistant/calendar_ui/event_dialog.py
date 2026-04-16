@@ -195,6 +195,8 @@ class EventDialog(QDialog):
             del_btn = QPushButton("🗑 Delete")
             del_btn.setObjectName("delete_btn")
             del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            del_btn.setAutoDefault(False)
+            del_btn.setDefault(False)
             del_btn.setStyleSheet(
                 "QPushButton { background-color: #d83b01; color: white; "
                 "border: none; border-radius: 4px; padding: 5px 14px; font-weight: 600; }"

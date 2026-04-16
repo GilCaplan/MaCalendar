@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 from typing import List
 
-from PyQt6.QtCore import Qt, QMimeData, QByteArray, pyqtSignal
+from PyQt6.QtCore import Qt, QMimeData, QByteArray, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QDrag, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QGridLayout,
@@ -34,6 +34,30 @@ HOUR_HEIGHT = 48   # px per hour
 LABEL_WIDTH = 52   # px for time labels on left
 RESIZE_HANDLE = 7  # px at top/bottom edge that activate resize mode
 _SNAP_PX = HOUR_HEIGHT // 4  # 15-minute snap grid (12px)
+
+
+class TimeIndicatorOverlay(QWidget):
+    """Transparent overlay that paints the current-time red line on top of event blocks."""
+
+    def __init__(self, date: datetime.date, parent: "QWidget"):
+        super().__init__(parent)
+        self._date = date
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
+        self.setAutoFillBackground(False)
+        self.resize(parent.size())
+
+    def paintEvent(self, event):
+        if self._date != datetime.date.today():
+            return
+        now = datetime.datetime.now()
+        y = int((now.hour * 60 + now.minute) / 60 * HOUR_HEIGHT)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(QPen(QColor("#d13438"), 2))
+        painter.setBrush(QColor("#d13438"))
+        painter.drawEllipse(0, y - 5, 10, 10)
+        painter.drawLine(10, y, self.width(), y)
 
 
 class EventBlock(QLabel):
@@ -178,6 +202,10 @@ class DayColumn(QWidget):
         self._ui_config = None
         self.setAcceptDrops(True)
         self._apply_bg()
+        self._overlay: TimeIndicatorOverlay | None = None
+        if self.is_today:
+            self._overlay = TimeIndicatorOverlay(self.date, self)
+            self._overlay.raise_()
 
     def _apply_bg(self) -> None:
         dark = _styles._dark
@@ -215,12 +243,17 @@ class DayColumn(QWidget):
             block.setGeometry(2, int(top), self.width() - 4, int(h))
             block.show()
             self._event_widgets.append(block)
+        if self._overlay:
+            self._overlay.raise_()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         # Re-layout event blocks on resize
         for block in self._event_widgets:
             block.setGeometry(2, block.y(), self.width() - 4, block.height())
+        if self._overlay:
+            self._overlay.resize(self.size())
+            self._overlay.raise_()
 
     def mouseDoubleClickEvent(self, event):
         y = event.pos().y()
@@ -352,6 +385,17 @@ class WeekView(QWidget):
 
         self._rebuild_columns()
         self._apply_theme_styles()
+
+        # Refresh current-time indicator every minute
+        self._tick_timer = QTimer(self)
+        self._tick_timer.setInterval(900_000)  # 15 minutes
+        self._tick_timer.timeout.connect(self._tick_time)
+        self._tick_timer.start()
+
+    def _tick_time(self) -> None:
+        for col in self._day_columns:
+            if col._overlay:
+                col._overlay.update()
 
     def apply_theme(self, dark: bool) -> None:
         """Switch between light and dark theme and rebuild."""

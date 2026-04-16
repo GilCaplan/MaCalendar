@@ -37,11 +37,16 @@ logger = logging.getLogger(__name__)
 
 
 def main() -> None:
+    from PyQt6.QtGui import QIcon
     from PyQt6.QtWidgets import QApplication
 
     app = QApplication(sys.argv)
     app.setApplicationName("Calendar")
     app.setOrganizationName("VoiceAssistant")
+
+    _icon_path = os.path.join(os.path.dirname(__file__), "app_icon.icns")
+    if os.path.exists(_icon_path):
+        app.setWindowIcon(QIcon(_icon_path))
 
     # ------------------------------------------------------------------
     # Load config

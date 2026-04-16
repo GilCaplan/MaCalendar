@@ -26,10 +26,13 @@ from assistant.calendar_ui.styles import (
     WHITE,
 )
 
-HOUR_HEIGHT = 56   # slightly taller than week view for readability
+HOUR_HEIGHT = 60   # px per hour
 LABEL_WIDTH = 60
 RESIZE_HANDLE = 8  # px at top/bottom edge that activate resize mode
 _SNAP_PX = HOUR_HEIGHT // 4  # 15-minute snap grid
+_COL_GAP = 3       # px gap between side-by-side event columns
+_LEFT_PAD = 4      # px left of first column
+_RIGHT_PAD = 6     # px right of last column
 
 
 class EventBlock(QLabel):
@@ -47,32 +50,40 @@ class EventBlock(QLabel):
         self.event = event
         self._font_size = 12
 
-        text = f"  {event['title']}\n  {start}–{end}"
+        title_line = f"<b>{event['title']}</b>"
+        time_line = f"<span style='opacity:0.85;font-size:{self._font_size - 1}px'>{start}–{end}</span>"
+        html = title_line + "<br>" + time_line
         if location:
-            text += f"\n  \U0001f4cd {location}"
-        self.setText(text)
+            html += f"<br><span style='opacity:0.8;font-size:{self._font_size - 1}px'>📍 {location}</span>"
+        self.setText(html)
+        self.setTextFormat(Qt.TextFormat.RichText)
         self.setWordWrap(True)
         self.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        self.setStyleSheet(
-            f"""
-            QLabel {{
-                background-color: {color};
-                color: white;
-                border-radius: 4px;
-                font-size: {self._font_size}px;
-                padding: 4px 6px;
-                border-left: 4px solid rgba(0,0,0,0.2);
-            }}
-            """
-        )
+        self._color = color
+        self._apply_block_style()
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setMouseTracking(True)
         self._drag_start = None
+        self._col_x = 0        # set by DayTimeline layout
+        self._col_w = 0        # set by DayTimeline layout
         # Resize state
         self._resize_edge: str | None = None  # "top" or "bottom"
         self._resize_orig_top = 0
         self._resize_orig_height = 0
         self._resize_press_y = 0  # parent-relative y at press
+
+    def _apply_block_style(self) -> None:
+        fs = self._font_size
+        self.setStyleSheet(f"""
+            QLabel {{
+                background-color: {self._color};
+                color: white;
+                border-radius: 6px;
+                font-size: {fs}px;
+                padding: 5px 8px 4px 10px;
+                border-left: 5px solid rgba(0,0,0,0.25);
+            }}
+        """)
 
     def _edge_at(self, y: int) -> str | None:
         if y <= RESIZE_HANDLE:
@@ -158,10 +169,35 @@ class EventBlock(QLabel):
             self.clicked.emit(self.event)
 
 
+class TimeIndicatorOverlay(QWidget):
+    """Transparent overlay that paints the current-time red line on top of event blocks."""
+
+    def __init__(self, date: datetime.date, parent: "QWidget"):
+        super().__init__(parent)
+        self._date = date
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
+        self.setAutoFillBackground(False)
+        self.resize(parent.size())
+
+    def paintEvent(self, event):
+        if self._date != datetime.date.today():
+            return
+        now = datetime.datetime.now()
+        y = int((now.hour * 60 + now.minute) / 60 * HOUR_HEIGHT)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(QPen(QColor("#d13438"), 2))
+        painter.setBrush(QColor("#d13438"))
+        painter.drawEllipse(0, y - 5, 10, 10)
+        painter.drawLine(10, y, self.width(), y)
+
+
 class DayTimeline(QWidget):
     """
-    Full-width single-day timeline. Draws hour lines, places event blocks,
-    and paints a red current-time indicator when the date is today.
+    Full-width single-day timeline. Draws hour lines and places event blocks.
+    A transparent TimeIndicatorOverlay child renders the red current-time line
+    on top of all event blocks.
     """
 
     slot_double_clicked = pyqtSignal(datetime.datetime)
@@ -178,44 +214,128 @@ class DayTimeline(QWidget):
         self._ui_config = None
         self.setAcceptDrops(True)
         self._apply_bg()
+        self._overlay = TimeIndicatorOverlay(self.date, self)
+        self._overlay.raise_()
 
     def _apply_bg(self) -> None:
         dark = _styles._dark
         bg = _styles.D_WHITE if dark else WHITE
         self.setStyleSheet(f"background-color: {bg};")
 
+    # ------------------------------------------------------------------
+    # Layout helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _to_min(t: str) -> int:
+        try:
+            h, m = map(int, t.split(":"))
+            return h * 60 + m
+        except Exception:
+            return 0
+
+    def _compute_layout(self, events: List[dict], avail_w: int):
+        """
+        Returns [(event, x, w, top, height), ...].
+        Overlapping events are placed in side-by-side columns (Google Calendar style).
+        """
+        if not events:
+            return []
+
+        def ev_s(ev): return self._to_min(ev.get("start_time", "0:00"))
+        def ev_e(ev):
+            s = ev_s(ev)
+            e = self._to_min(ev.get("end_time", "0:00"))
+            return max(e, s + 15)
+
+        sorted_evs = sorted(events, key=lambda ev: (ev_s(ev), -ev_e(ev)))
+
+        # Split into non-overlapping clusters
+        clusters: List[List[dict]] = []
+        cluster: List[dict] = []
+        cluster_end = -1
+        for ev in sorted_evs:
+            s = ev_s(ev)
+            if cluster and s >= cluster_end:
+                clusters.append(cluster)
+                cluster = []
+                cluster_end = -1
+            cluster.append(ev)
+            cluster_end = max(cluster_end, ev_e(ev))
+        if cluster:
+            clusters.append(cluster)
+
+        result = []
+        for grp in clusters:
+            # Greedy column assignment within this cluster
+            col_ends: List[int] = []   # latest end_min placed in each column
+            ev_col: List[int] = []
+            for ev in grp:
+                s = ev_s(ev)
+                placed = False
+                for ci, ce in enumerate(col_ends):
+                    if s >= ce:
+                        col_ends[ci] = ev_e(ev)
+                        ev_col.append(ci)
+                        placed = True
+                        break
+                if not placed:
+                    ev_col.append(len(col_ends))
+                    col_ends.append(ev_e(ev))
+
+            n_cols = len(col_ends)
+            usable = avail_w - _LEFT_PAD - _RIGHT_PAD
+            col_w = (usable - _COL_GAP * (n_cols - 1)) / n_cols
+
+            for i, ev in enumerate(grp):
+                ci = ev_col[i]
+                s = ev_s(ev)
+                e = ev_e(ev)
+                top = int(s / 60 * HOUR_HEIGHT)
+                height = max(int((e - s) / 60 * HOUR_HEIGHT), 28)
+                x = _LEFT_PAD + int(ci * (col_w + _COL_GAP))
+                w = max(int(col_w), 40)
+                result.append((ev, x, w, top, height))
+
+        return result
+
+    # ------------------------------------------------------------------
+
     def load_events(self, events: List[dict]) -> None:
+        self._events = events  # store for re-layout on resize
         for w in self._event_widgets:
             w.deleteLater()
         self._event_widgets.clear()
 
-        for ev in events:
-            try:
-                sh, sm = map(int, ev["start_time"].split(":"))
-            except Exception:
-                continue
-            try:
-                eh, em = map(int, ev["end_time"].split(":"))
-            except Exception:
-                end_min = sh * 60 + sm + 60
-                eh, em = min(end_min // 60, 23), end_min % 60
+        fs = 12 if not self._ui_config else self._ui_config.font_day
+        layout = self._compute_layout(events, self.width())
 
-            top = (sh * 60 + sm) / 60 * HOUR_HEIGHT
-            h = max(((eh * 60 + em) - (sh * 60 + sm)) / 60 * HOUR_HEIGHT, 24)
-
-            fs = 12 if not self._ui_config else self._ui_config.font_day
+        for ev, x, w, top, h in layout:
             block = EventBlock(ev, self)
             block._font_size = fs
+            block._color = ev.get("color", BLUE)
+            block._apply_block_style()
+            block._col_x = x
+            block._col_w = w
             block.clicked.connect(self.event_clicked)
             block.resized.connect(self.event_rescheduled)
-            block.setGeometry(4, int(top), self.width() - 8, int(h))
+            block.setGeometry(x, top, w, h)
             block.show()
             self._event_widgets.append(block)
+        self._overlay.raise_()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        for block in self._event_widgets:
-            block.setGeometry(4, block.y(), self.width() - 8, block.height())
+        # Re-run full layout so column widths scale correctly
+        if self._event_widgets and hasattr(self, "_events"):
+            layout = self._compute_layout(self._events, self.width())
+            for block, item in zip(self._event_widgets, layout):
+                x, w = item[1], item[2]
+                block._col_x = x
+                block._col_w = w
+                block.setGeometry(x, block.y(), w, block.height())
+        self._overlay.resize(self.size())
+        self._overlay.raise_()
 
     def mouseDoubleClickEvent(self, event):
         y = event.pos().y()
@@ -266,15 +386,6 @@ class DayTimeline(QWidget):
 
         if self._drag_hover:
             painter.fillRect(self.rect(), QColor("#0078d4").lighter(190))
-
-        # Current-time indicator (red) when viewing today
-        if self.date == datetime.date.today():
-            now = datetime.datetime.now()
-            y = int((now.hour * 60 + now.minute) / 60 * HOUR_HEIGHT)
-            painter.setPen(QPen(QColor("#d13438"), 2))
-            painter.setBrush(QColor("#d13438"))
-            painter.drawEllipse(0, y - 5, 10, 10)
-            painter.drawLine(10, y, self.width(), y)
 
 
 class DayView(QWidget):
@@ -467,7 +578,7 @@ class DayView(QWidget):
 
     def _tick_time(self) -> None:
         if self._timeline and self._date == datetime.date.today():
-            self._timeline.update()
+            self._timeline._overlay.update()
 
     def _scroll_to_now(self) -> None:
         if self._date == datetime.date.today():

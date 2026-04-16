@@ -25,6 +25,15 @@ class CalendarIntent(BaseIntent):
             raise ValueError("Event title cannot be empty")
         return str(v).strip()
 
+    @field_validator("recur_until", "recurrence", "date", "start_time", "end_time",
+                     "location", "description", mode="before")
+    @classmethod
+    def coerce_null_strings(cls, v: Any) -> Any:
+        """Treat the literal string 'null' or 'none' as a missing value."""
+        if isinstance(v, str) and v.strip().lower() in ("null", "none", ""):
+            return None
+        return v
+
     @model_validator(mode="after")
     def fill_defaults(self) -> "CalendarIntent":
         """Fill in missing date and time fields with sensible defaults."""

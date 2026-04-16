@@ -130,8 +130,11 @@ def run_test_llm(parser, expected_count: int, test_name: str, transcript: str, s
 
 def run_direct_tests():
     from assistant.actions.todo.intent import (
+        AddSubtaskIntent,
         CompleteTodoIntent,
+        CompleteSubtaskIntent,
         CreateTodoIntent,
+        DeleteSubtaskIntent,
         DeleteTodoIntent,
         QueryTodoIntent,
         UpdateTodoIntent,
@@ -265,6 +268,104 @@ def run_direct_tests():
     print("🎬 Test: Completed Tasks Hidden from Pending")
     print(f"   ✅ 2 tasks, 1 completed → 1 pending")
     print("🟢 Passed Completed Tasks Hidden from Pending!")
+
+    # SCENARIO 9: Create with priority + due date
+    next_week = (datetime.date.today() + datetime.timedelta(days=7)).isoformat()
+    todos, results = run_test_direct(
+        [("create_todo", CreateTodoIntent(
+            titles=["submit report"],
+            priority="high",
+            due_date=next_week,
+            list_name="today",
+        ))],
+        expected_count=1,
+        test_name="Create Task with Priority + Due Date",
+    )
+    db = _get_db()
+    created = db.get_todos(include_completed=True)
+    assert created[0]["priority"] == "high", f"Expected high priority, got {created[0]['priority']}"
+    assert created[0]["due_date"] == next_week, f"Expected due {next_week}, got {created[0]['due_date']}"
+    assert "high priority" in results[0], f"Expected priority in response: {results[0]}"
+    print("   ✅ Priority and due_date stored and confirmed in response")
+
+    # SCENARIO 10: Update notes via voice
+    _, results = run_test_direct(
+        [
+            ("create_todo", CreateTodoIntent(titles=["review PR"])),
+            ("update_todo", UpdateTodoIntent(
+                match_title="review PR",
+                new_notes="Check tests and coverage before merging.",
+            )),
+        ],
+        expected_count=1,
+        test_name="Update Task Notes",
+    )
+    db = _get_db()
+    updated = db.get_todos(include_completed=True)
+    assert updated[0]["notes"] == "Check tests and coverage before merging.", (
+        f"Unexpected notes: {updated[0]['notes']}"
+    )
+    assert "notes updated" in results[1], f"Expected 'notes updated' in response: {results[1]}"
+    print("   ✅ Notes correctly stored and confirmed in response")
+
+    # SCENARIO 11: Add subtask → complete subtask → delete subtask
+    run_test_direct(
+        [("create_todo", CreateTodoIntent(titles=["Modern Vision HW"]))],
+        expected_count=1,
+        test_name="Setup parent task for subtask tests",
+    )
+    db = _get_db()
+    parent = db.get_todos(include_completed=True)[0]
+
+    # Add subtask
+    config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config.yaml"))
+    config = load_config(config_path)
+    add_cls = registry.get("add_subtask")
+    add_result = add_cls().execute(
+        AddSubtaskIntent(parent_title="Modern Vision HW", subtask_title="Read theory notes"),
+        config,
+    )
+    print(f"   ✅ add_subtask: {add_result}")
+    assert "Read theory notes" in add_result
+
+    subtasks = db.get_subtasks(parent["id"])
+    assert len(subtasks) == 1
+    assert subtasks[0]["title"] == "Read theory notes"
+    assert subtasks[0]["completed"] == 0
+
+    # Complete subtask
+    complete_cls = registry.get("complete_subtask")
+    complete_result = complete_cls().execute(
+        CompleteSubtaskIntent(parent_title="Modern Vision HW", subtask_title="Read theory"),
+        config,
+    )
+    print(f"   ✅ complete_subtask: {complete_result}")
+    assert "Completed" in complete_result
+    subtasks = db.get_subtasks(parent["id"])
+    assert subtasks[0]["completed"] == 1
+
+    # Delete subtask
+    delete_cls = registry.get("delete_subtask")
+    delete_result = delete_cls().execute(
+        DeleteSubtaskIntent(parent_title="Modern Vision HW", subtask_title="Read theory"),
+        config,
+    )
+    print(f"   ✅ delete_subtask: {delete_result}")
+    assert "Deleted" in delete_result
+    subtasks = db.get_subtasks(parent["id"])
+    assert len(subtasks) == 0
+    print("🟢 Passed Subtask Add / Complete / Delete!")
+
+    # SCENARIO 12: Query response includes priority for high-priority tasks
+    clear_todos()
+    db.create_todo("submit tax return", list_name="today", priority="high")
+    db.create_todo("buy groceries", list_name="today", priority="none")
+    query_cls = registry.get("query_todos")
+    result = query_cls().execute(QueryTodoIntent(list_name="today"), config)
+    assert "urgent" in result.lower(), f"Expected 'urgent' for high priority task in: {result}"
+    assert "buy groceries" in result
+    print(f"   ✅ Query includes priority hint: {result}")
+    print("🟢 Passed Priority in Query Response!")
 
     print("\n" + "=" * 60)
     print("🎉 ALL DIRECT TESTS PASSED!")
