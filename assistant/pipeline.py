@@ -435,6 +435,25 @@ class Pipeline:
         from assistant.db import get_db
 
         logger.debug("🖥️ Background verify starting for: %r", transcript)
+
+        # Short-circuit: if the rule parser picked create_event and the transcript
+        # contains a strong calendar signal word AND an explicit time, the rule
+        # parser is almost certainly right — skip the LLM verification entirely to
+        # avoid false-positive "meeting → create_todo" misclassifications.
+        _STRONG_CALENDAR_WORDS = frozenset({
+            "meeting", "appointment", "call", "session", "interview",
+            "sync", "standup", "stand-up", "lecture", "class",
+        })
+        _rule_actions = list(rule_result.raw_slots.keys())
+        if len(_rule_actions) == 1 and _rule_actions[0] == "create_event":
+            _slots = rule_result.raw_slots["create_event"]
+            _words = set(re.findall(r"\w+", transcript.lower()))
+            if (_words & _STRONG_CALENDAR_WORDS) and _slots.get("start_time"):
+                logger.debug(
+                    "🖥️ Background verify: skipping — calendar signal + time is unambiguous"
+                )
+                return
+
         correction = self._parser.verify_fast_path_async(transcript, rule_result)
         if correction is None:
             return  # tier 1 — confirmed correct, silent
@@ -516,6 +535,51 @@ class Pipeline:
         if not corrected_action:
             return
 
+        # Validate the corrected intent BEFORE undoing anything — if the LLM
+        # returned bad parameters (e.g. empty title) we must not destroy the
+        # original record that the user already has.
+        action_cls = self.registry.get(corrected_action)
+        if action_cls is None:
+            logger.warning("🖥️ Correction action %r not in registry", corrected_action)
+            return
+
+        # If the LLM returned an empty title for create_event, try to recover
+        # it before bailing: prefer the rule parser's title, then keyword fallback.
+        if corrected_action == "create_event" and not corrected_params.get("title"):
+            _rule_title = rule_result.raw_slots.get("create_event", {}).get("title") or ""
+            if _rule_title:
+                corrected_params["title"] = _rule_title
+                logger.info("🖥️ Filled empty correction title from rule parser: %r", _rule_title)
+            else:
+                # Keyword fallback: first calendar-type noun in transcript
+                _CAL_TITLE_WORDS = (
+                    "appointment", "meeting", "session", "call", "sync",
+                    "interview", "lecture", "class", "standup",
+                )
+                _transcript_lower = transcript.lower()
+                for _kw in _CAL_TITLE_WORDS:
+                    if _kw in _transcript_lower:
+                        corrected_params["title"] = _kw.capitalize()
+                        logger.info(
+                            "🖥️ Filled empty correction title from keyword fallback: %r",
+                            corrected_params["title"],
+                        )
+                        break
+
+        try:
+            intent = action_cls.intent_model.model_validate(corrected_params)
+        except Exception as exc:
+            logger.warning(
+                "🖥️ Major correction params invalid — skipping undo+redo: %s", exc
+            )
+            self._append_scenario_bug(
+                transcript,
+                issue_type="correction_failed",
+                details=f"LLM correction action={corrected_action!r} had invalid params: {exc}",
+                extra={"Corrected params": corrected_params},
+            )
+            return
+
         # Undo: only safe for creates (delete/update originals are already gone/changed)
         for action_name in action_names:
             if action_name == "create_event":
@@ -537,13 +601,8 @@ class Pipeline:
                         logger.warning("🖥️ Undo create_todo failed: %s", exc)
                         return
 
-        # Re-execute with corrected intent
-        action_cls = self.registry.get(corrected_action)
-        if action_cls is None:
-            logger.warning("🖥️ Correction action %r not in registry", corrected_action)
-            return
+        # Re-execute with validated corrected intent
         try:
-            intent = action_cls.intent_model.model_validate(corrected_params)
             result_text = action_cls().execute(intent, self.config)
             logger.info("🖥️ Background verify: major correction executed → %s", result_text)
             combined = f"{speech} {result_text}".strip() if speech else result_text
