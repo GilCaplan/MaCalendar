@@ -112,3 +112,10 @@ title
 
 ---
 
+## [2026-04-19 21:00:31] unknown_intent
+**Transcript:** `I didn't...`
+
+**Issue:** LLM returned no recognisable action.
+
+---
+

@@ -73,6 +73,31 @@ struct HealthResponse: Codable {
     let db: String
 }
 
+struct Course: Identifiable, Codable, Equatable {
+    let id: Int           // negative = local temp, positive = server ID
+    var number: String
+    var name: String
+    var color: String
+    var partners: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case id, number, name, color, partners
+    }
+}
+
+struct Assignment: Identifiable, Codable, Equatable {
+    let id: Int           // negative = local temp, positive = server ID
+    var courseId: Int
+    var title: String
+    var dueDate: String   // "YYYY-MM-DD" or ""
+    var completed: Bool
+    var calendarEventId: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case id, courseId = "course_id", title, dueDate = "due_date", completed, calendarEventId = "calendar_event_id"
+    }
+}
+
 // Lightweight type-erased Codable value for heterogeneous JSON dicts
 struct AnyCodable: Codable {
     let value: Any

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import calendar
 import datetime
+import json
 import os
 import sqlite3
 from contextlib import contextmanager
@@ -107,12 +108,37 @@ CREATE TABLE IF NOT EXISTS timer_sessions (
 )
 """
 
+_CREATE_COURSES_TABLE = """
+CREATE TABLE IF NOT EXISTS courses (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    number     TEXT    NOT NULL DEFAULT '',
+    name       TEXT    NOT NULL,
+    color      TEXT    NOT NULL DEFAULT '#1a6fc4',
+    partners   TEXT    NOT NULL DEFAULT '[]',
+    position   INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT    NOT NULL
+)
+"""
+
+_CREATE_ASSIGNMENTS_TABLE = """
+CREATE TABLE IF NOT EXISTS assignments (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    course_id         INTEGER NOT NULL,
+    title             TEXT    NOT NULL,
+    due_date          TEXT    NOT NULL DEFAULT '',
+    completed         INTEGER NOT NULL DEFAULT 0,
+    calendar_event_id INTEGER,
+    created_at        TEXT    NOT NULL
+)
+"""
+
 _CREATE_INDEXES = """
 CREATE INDEX IF NOT EXISTS idx_events_date      ON events(date);
 CREATE INDEX IF NOT EXISTS idx_events_series    ON events(series_id);
 CREATE INDEX IF NOT EXISTS idx_todos_list       ON todos(list, completed);
 CREATE INDEX IF NOT EXISTS idx_subtasks_todo    ON subtasks(todo_id, position);
 CREATE INDEX IF NOT EXISTS idx_timer_sessions   ON timer_sessions(timer_id);
+CREATE INDEX IF NOT EXISTS idx_assignments_course ON assignments(course_id);
 """
 
 
@@ -149,6 +175,8 @@ class CalendarDB:
             conn.execute(_CREATE_TIMERS_TABLE)
             self._migrate_timers(conn)
             conn.execute(_CREATE_TIMER_SESSIONS_TABLE)
+            conn.execute(_CREATE_COURSES_TABLE)
+            conn.execute(_CREATE_ASSIGNMENTS_TABLE)
             for stmt in _CREATE_INDEXES.strip().splitlines():
                 stmt = stmt.strip()
                 if stmt:
@@ -970,6 +998,114 @@ class CalendarDB:
         with self._conn() as conn:
             conn.execute("DELETE FROM todos")
             conn.execute("DELETE FROM sqlite_sequence WHERE name='todos'")  # reset IDs
+
+    # ------------------------------------------------------------------
+    # Courses
+    # ------------------------------------------------------------------
+
+    def get_courses(self) -> list[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT id, number, name, color, partners, position FROM courses ORDER BY position, id"
+            ).fetchall()
+        return [
+            {
+                "id": r[0], "number": r[1], "name": r[2], "color": r[3],
+                "partners": json.loads(r[4]) if r[4] else [],
+                "position": r[5],
+            }
+            for r in rows
+        ]
+
+    def create_course(self, number: str, name: str, color: str, partners: list) -> int:
+        now = datetime.datetime.now().isoformat()
+        with self._conn() as conn:
+            cur = conn.execute(
+                "INSERT INTO courses (number, name, color, partners, created_at) VALUES (?,?,?,?,?)",
+                (number, name, color, json.dumps(partners, ensure_ascii=False), now),
+            )
+            return cur.lastrowid
+
+    def update_course(self, course_id: int, **fields) -> None:
+        allowed = {"number", "name", "color", "partners", "position"}
+        updates = {}
+        for k, v in fields.items():
+            if k not in allowed:
+                continue
+            updates[k] = json.dumps(v, ensure_ascii=False) if k == "partners" else v
+        if not updates:
+            return
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        with self._conn() as conn:
+            conn.execute(
+                f"UPDATE courses SET {set_clause} WHERE id = ?",
+                (*updates.values(), course_id),
+            )
+
+    def delete_course(self, course_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute("DELETE FROM assignments WHERE course_id = ?", (course_id,))
+            conn.execute("DELETE FROM courses WHERE id = ?", (course_id,))
+
+    # ------------------------------------------------------------------
+    # Assignments
+    # ------------------------------------------------------------------
+
+    def get_assignments(self, course_id: int) -> list[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT id, course_id, title, due_date, completed, calendar_event_id "
+                "FROM assignments WHERE course_id = ? ORDER BY completed, due_date, id",
+                (course_id,),
+            ).fetchall()
+        return [
+            {"id": r[0], "course_id": r[1], "title": r[2],
+             "due_date": r[3], "completed": r[4], "calendar_event_id": r[5]}
+            for r in rows
+        ]
+
+    def create_assignment(self, course_id: int, title: str, due_date: str = "") -> int:
+        now = datetime.datetime.now().isoformat()
+        with self._conn() as conn:
+            cur = conn.execute(
+                "INSERT INTO assignments (course_id, title, due_date, created_at) VALUES (?,?,?,?)",
+                (course_id, title, due_date, now),
+            )
+            return cur.lastrowid
+
+    def toggle_assignment(self, assignment_id: int) -> bool:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT completed FROM assignments WHERE id = ?", (assignment_id,)
+            ).fetchone()
+            if row is None:
+                return False
+            new_val = 0 if row[0] else 1
+            conn.execute("UPDATE assignments SET completed = ? WHERE id = ?", (new_val, assignment_id))
+        return bool(new_val)
+
+    def update_assignment(self, assignment_id: int, **fields) -> None:
+        allowed = {"title", "due_date", "completed", "calendar_event_id"}
+        updates = {k: v for k, v in fields.items() if k in allowed}
+        if not updates:
+            return
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        with self._conn() as conn:
+            conn.execute(
+                f"UPDATE assignments SET {set_clause} WHERE id = ?",
+                (*updates.values(), assignment_id),
+            )
+
+    def delete_assignment(self, assignment_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute("DELETE FROM assignments WHERE id = ?", (assignment_id,))
+
+    def set_assignment_calendar_event(self, assignment_id: int, event_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE assignments SET calendar_event_id = ? WHERE id = ?",
+                (event_id, assignment_id),
+            )
 
 
 # ---------------------------------------------------------------------------

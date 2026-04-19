@@ -511,6 +511,87 @@ def create_app() -> Flask:
         return jsonify({"deleted": count})
 
     # ------------------------------------------------------------------
+    # Courses
+    # ------------------------------------------------------------------
+
+    @app.get("/courses")
+    def courses_list():
+        return jsonify(get_db().get_courses())
+
+    @app.post("/courses")
+    def course_create():
+        data = request.get_json(silent=True) or {}
+        name = data.get("name", "").strip()
+        if not name:
+            return jsonify({"error": "Missing 'name'"}), 400
+        course_id = get_db().create_course(
+            number=data.get("number", ""),
+            name=name,
+            color=data.get("color", "#1a6fc4"),
+            partners=data.get("partners", []),
+        )
+        return jsonify({"id": course_id}), 201
+
+    @app.patch("/courses/<int:course_id>")
+    def course_update(course_id: int):
+        data = request.get_json(silent=True) or {}
+        get_db().update_course(course_id, **data)
+        return jsonify({"id": course_id})
+
+    @app.delete("/courses/<int:course_id>")
+    def course_delete(course_id: int):
+        get_db().delete_course(course_id)
+        return jsonify({"deleted": course_id})
+
+    # ------------------------------------------------------------------
+    # Assignments
+    # ------------------------------------------------------------------
+
+    @app.get("/assignments")
+    def assignments_list_all():
+        """Return all assignments across every course."""
+        db = get_db()
+        courses = db.get_courses()
+        result = []
+        for c in courses:
+            result.extend(db.get_assignments(c["id"]))
+        return jsonify(result)
+
+    @app.get("/courses/<int:course_id>/assignments")
+    def assignments_list(course_id: int):
+        return jsonify(get_db().get_assignments(course_id))
+
+    @app.post("/assignments")
+    def assignment_create():
+        data = request.get_json(silent=True) or {}
+        course_id = data.get("course_id")
+        title     = data.get("title", "").strip()
+        if not course_id or not title:
+            return jsonify({"error": "Missing 'course_id' or 'title'"}), 400
+        asgn_id = get_db().create_assignment(
+            course_id=int(course_id),
+            title=title,
+            due_date=data.get("due_date", ""),
+        )
+        return jsonify({"id": asgn_id}), 201
+
+    @app.patch("/assignments/<int:asgn_id>")
+    def assignment_update(asgn_id: int):
+        data = request.get_json(silent=True) or {}
+        get_db().update_assignment(asgn_id, **data)
+        return jsonify({"id": asgn_id})
+
+    @app.patch("/assignments/<int:asgn_id>/toggle")
+    def assignment_toggle(asgn_id: int):
+        new_state = get_db().toggle_assignment(asgn_id)
+        return jsonify({"id": asgn_id, "completed": int(new_state)})
+
+    @app.delete("/assignments/<int:asgn_id>")
+    def assignment_delete(asgn_id: int):
+        get_db().delete_assignment(asgn_id)
+        return jsonify({"deleted": asgn_id})
+
+    # ------------------------------------------------------------------
     # Config
     # ------------------------------------------------------------------
 

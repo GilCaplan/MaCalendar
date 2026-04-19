@@ -47,10 +47,12 @@ struct EventDetailView: View {
             Form {
                 Section(header: Text("Event")) {
                     TextField("Title", text: $title)
+                        .onSubmit { if !saving && !title.isEmpty { save() } }
 
                     VStack(alignment: .leading, spacing: 2) {
                         TextField("Date (YYYY-MM-DD)", text: $date)
                             .keyboardType(.numbersAndPunctuation)
+                            .onSubmit { if !saving && !title.isEmpty { save() } }
                         if let label = parsedDayLabel {
                             Text(label)
                                 .font(.caption)
@@ -64,14 +66,18 @@ struct EventDetailView: View {
                             .onChange(of: startTime) { newVal in
                                 autoUpdateEndTime(from: newVal)
                             }
+                            .onSubmit { if !saving && !title.isEmpty { save() } }
                         Text("–")
                         TextField("End (HH:MM)", text: $endTime)
                             .keyboardType(.numbersAndPunctuation)
+                            .onSubmit { if !saving && !title.isEmpty { save() } }
                     }
                 }
                 Section(header: Text("Details")) {
                     TextField("Location", text: $location)
+                        .onSubmit { if !saving && !title.isEmpty { save() } }
                     TextField("Attendees", text: $attendees)
+                        .onSubmit { if !saving && !title.isEmpty { save() } }
                 }
                 if !isNew {
                     Section {

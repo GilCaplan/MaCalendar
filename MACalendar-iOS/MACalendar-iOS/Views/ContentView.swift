@@ -184,10 +184,15 @@ struct ContentView: View {
                     .tabItem { Label("Tasks", systemImage: "checklist") }
                     .tag(1)
 
+                // ── Coursework Tab ───────────────────────────────────────
+                CourseworkView()
+                    .tabItem { Label("Coursework", systemImage: "graduationcap") }
+                    .tag(2)
+
                 // ── Settings Tab ─────────────────────────────────────────
                 SettingsView()
                     .tabItem { Label("Settings", systemImage: "gear") }
-                    .tag(2)
+                    .tag(3)
             }
         }
         .sheet(isPresented: $showCreateSheet) {

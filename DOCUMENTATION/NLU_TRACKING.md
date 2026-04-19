@@ -276,3 +276,111 @@ to cover those patterns.
 
 ---
 
+## [2026-04-16 16:46:39] SUCCESS — 🖥️ Mac
+**Transcript:** `i had a meeting today at 8.30pm with ora to work on project`
+
+**Parse:** 🤖 llm | **Actions:** update_event
+
+- I couldn't find an event at 20:30 on 2026-04-16.
+
+---
+
+## [2026-04-16 21:04:58] SUCCESS — 🖥️ Mac
+**Transcript:** `set tomorrow a meeting with ora at 5pm`
+
+**Parse:** ✅ rule fast-path | **Actions:** create_event
+
+- Created event 'meeting' on Friday, Apr 17, 2026 from 5 PM to 6 PM.
+
+---
+
+## [2026-04-16 22:08:46] SUCCESS — 🖥️ Mac
+**Transcript:** `set for sunday at 10 a.m. to send out weekly challenge message`
+
+**Parse:** 🤖 hybrid | **Actions:** create_event
+
+- Created event 'Weekly Challenge Message' on Sunday, Apr 19, 2026 from 10 AM to 11 AM.
+
+---
+
+## [2026-04-16 22:31:33] SUCCESS — 🖥️ Mac
+**Transcript:** `set a meeting for me tomorrow at 4pm`
+
+**Parse:** ✅ rule fast-path | **Actions:** create_event
+
+- Created event 'meeting' on Friday, Apr 17, 2026 from 4 PM to 5 PM.
+
+---
+
+## [2026-04-18 23:34:52] SUCCESS — 🖥️ Mac
+**Transcript:** `on the 17th of may lecture for teachers assistant course at 4.30pm`
+
+**Parse:** 🤖 llm | **Actions:** create_event
+
+- Created event 'Lecture for Teachers Assistant Course' on Sunday, May 17, 2026 from 4:30 PM to 5:30 PM.
+
+---
+
+## [2026-04-19 10:09:32] SUCCESS — 🖥️ Mac
+**Transcript:** `meeting on tuesday at 6 p.m. with aura for project studies`
+
+**Parse:** 🤖 llm | **Actions:** create_event
+
+- Created event 'Meeting with Aura for Project Studies' on Tuesday, Apr 21, 2026 from 6 PM to 7 PM.
+
+---
+
+## [2026-04-19 10:49:37] SUCCESS — 🖥️ Mac
+**Transcript:** `please set a meeting for me tomorrow at 4pm with re for defense on homework`
+
+**Parse:** ✅ rule fast-path | **Actions:** create_event
+
+- Created event 'meeting' on Monday, Apr 20, 2026 from 4 PM to 5 PM.
+
+---
+
+## [2026-04-19 20:58:54] SUCCESS — 🖥️ Mac
+**Transcript:** `set a meeting tomorrow. sorry, not tomorrow. set a meeting on tuesday.`
+
+**Parse:** 🤖 hybrid | **Actions:** create_event
+
+- Created event 'meeting' on Monday, Apr 20, 2026 from 9 AM to 10 AM.
+
+---
+
+## [2026-04-19 21:00:31] FAILED — 🖥️ Mac
+**Transcript:** `I didn't...`
+
+**Parse:** ❌ failed (llm)
+
+**Reason:** unknown_intent
+
+---
+
+## [2026-04-19 23:03:20] SUCCESS — 🖥️ Mac
+**Transcript:** `set a meeting for me tomorrow at 5.30 p.m. with pelic sorry, i mean edo`
+
+**Parse:** ✅ rule fast-path | **Actions:** create_event
+
+- Created event 'meeting' on Monday, Apr 20, 2026 from 5:30 PM to 6:30 PM.
+
+---
+
+## [2026-04-19 23:21:24] SUCCESS — 🖥️ Mac
+**Transcript:** `set meeting on thursday for three o'clock. thank you. is this why you made it?`
+
+**Parse:** ✅ rule fast-path | **Actions:** create_event
+
+- Created event 'meeting' on Thursday, Apr 23, 2026 from 3 PM to 4 PM.
+
+---
+
+## [2026-04-19 23:23:12] SUCCESS — 🖥️ Mac
+**Transcript:** `set a meeting on thursday for 11 a.m. to`
+
+**Parse:** ✅ rule fast-path | **Actions:** create_event
+
+- Created event 'meeting' on Thursday, Apr 23, 2026 from 11 AM to 12 PM.
+
+---
+
