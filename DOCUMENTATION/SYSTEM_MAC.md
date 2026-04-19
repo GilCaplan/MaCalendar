@@ -71,11 +71,12 @@ Hotkey (Ctrl+J) or Mic Button
 | `assistant/actions/todo/action.py` | 5 todo actions (create/complete/delete/update/query). Multi-task create via `titles: List[str]`. |
 | `assistant/actions/__init__.py` | `ActionRegistry` Borg singleton. Builds system prompt for LLM. |
 | `assistant/db.py` | Thread-safe SQLite. `get_db()` singleton. Indexes on `events(date)`, `events(series_id)`, `todos(list, completed)`. |
-| `assistant/calendar_ui/window.py` | Main PyQt6 window. Four-view stack: Month/Week/Day/Tasks. |
+| `assistant/calendar_ui/window.py` | Main PyQt6 window. Six-view stack: Month/Week/Day/Tasks/Timer/Coursework. |
 | `assistant/calendar_ui/day_view.py` | Hourly timeline, resize handles (8px top/bottom), drag-to-move. |
 | `assistant/calendar_ui/week_view.py` | 7-column week grid, resize handles, drag-to-move. |
 | `assistant/calendar_ui/month_view.py` | Month grid, shades Sun/Tue/Thu/Sat columns. |
 | `assistant/calendar_ui/todo_view.py` | Tasks panel. All signals deferred via `QTimer.singleShot(0)` to prevent re-entrant crashes. `TodoItemWidget` (L700) has inline `▸` expand button → `TodoDetailPanel` (L160) with notes/subtasks/attachments/due-date/priority. |
+| `assistant/calendar_ui/coursework_view.py` | Coursework panel. Two-pane: course list (left) + assignment panel (right). Stores courses + assignments in SQLite. Calendar sync writes a `📚` event via `db.create_event_from_dict()`. |
 
 ---
 

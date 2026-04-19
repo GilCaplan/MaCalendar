@@ -293,6 +293,65 @@ class APIClient: ObservableObject {
             throw APIError.offline
         }
     }
+
+    // MARK: - Courses
+
+    func courses() async throws -> [Course] {
+        let data = try await request("/courses")
+        return try decode([Course].self, from: data)
+    }
+
+    @discardableResult
+    func createCourse(number: String, name: String, color: String, partners: [String]) async throws -> Int {
+        let body: [String: Any] = ["number": number, "name": name, "color": color, "partners": partners]
+        let data = try await request("/courses", method: "POST", body: body)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        return json?["id"] as? Int ?? -1
+    }
+
+    func updateCourse(id: Int, number: String, name: String, color: String, partners: [String]) async throws {
+        let body: [String: Any] = ["number": number, "name": name, "color": color, "partners": partners]
+        _ = try await request("/courses/\(id)", method: "PATCH", body: body)
+    }
+
+    func deleteCourse(id: Int) async throws {
+        _ = try await request("/courses/\(id)", method: "DELETE")
+    }
+
+    // MARK: - Assignments
+
+    func allAssignments() async throws -> [Assignment] {
+        let data = try await request("/assignments")
+        return try decode([Assignment].self, from: data)
+    }
+
+    @discardableResult
+    func createAssignment(courseId: Int, title: String, dueDate: String = "") async throws -> Int {
+        let body: [String: Any] = ["course_id": courseId, "title": title, "due_date": dueDate]
+        let data = try await request("/assignments", method: "POST", body: body)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        return json?["id"] as? Int ?? -1
+    }
+
+    func updateAssignment(id: Int, title: String? = nil, dueDate: String? = nil,
+                          calendarEventId: Int? = nil) async throws {
+        var body: [String: Any] = [:]
+        if let v = title           { body["title"]             = v }
+        if let v = dueDate         { body["due_date"]          = v }
+        if let v = calendarEventId { body["calendar_event_id"] = v }
+        _ = try await request("/assignments/\(id)", method: "PATCH", body: body)
+    }
+
+    @discardableResult
+    func toggleAssignment(id: Int) async throws -> Bool {
+        let data = try await request("/assignments/\(id)/toggle", method: "PATCH", body: [:])
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        return (json?["completed"] as? Int ?? 0) != 0
+    }
+
+    func deleteAssignment(id: Int) async throws {
+        _ = try await request("/assignments/\(id)", method: "DELETE")
+    }
 }
 
 // MARK: - Errors

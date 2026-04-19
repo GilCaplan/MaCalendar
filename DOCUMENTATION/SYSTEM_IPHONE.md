@@ -189,8 +189,9 @@ MACalendar-iOS/
   API/
     APIClient.swift         URLSession wrapper — offline-aware, falls back to LocalStore
     Models.swift            CalendarEvent, Todo, VoiceResponse, HealthResponse (Codable)
+  CourseStore.swift         Local-only JSON store for Course + Assignment (singleton, no Mac sync)
   Views/
-    ContentView.swift       TabView: Calendar | Tasks | Settings + offline banner
+    ContentView.swift       TabView: Calendar | Tasks | Coursework | Settings + offline banner
     CalendarView.swift      Month/Week/Day switcher
     MonthGridView.swift     7-col grid (Sun first), tap → day detail
     WeekView.swift          Horizontal week strip
@@ -198,6 +199,7 @@ MACalendar-iOS/
     EventDetailView.swift   View + edit single event
     TasksView.swift         Today + General sections
     TaskRowView.swift       Checkbox row + swipe-to-delete
+    CourseworkView.swift    Course list with assignments, due dates, calendar sync
     VoiceButton.swift       Mic button — records WAV, POSTs to /voice, speaks response
     SettingsView.swift      Server URL, API key, TTS voice (3 options), Test Connection
   Voice/
@@ -297,3 +299,66 @@ python -m assistant.api --tailscale
 
 iPhone: set Server URL in Settings to `http://<tailscale-ip>:8080`.
 iPhone can be disconnected from USB after first install — app runs standalone.
+
+---
+
+## Coursework Tab
+
+A local-only feature (no Mac API endpoints). All data lives in the app's Documents directory; nothing syncs to the Mac server except when the user explicitly pushes an assignment deadline to the main calendar.
+
+### Data models (`API/Models.swift`)
+
+```swift
+struct Course: Identifiable, Codable, Equatable {
+    let id: UUID           // auto-generated
+    var number: String     // e.g. "00960336"
+    var name: String       // course title (supports Hebrew RTL)
+    var color: String      // hex e.g. "#4BA8A0"
+    var partners: [String] // classmate names
+}
+
+struct Assignment: Identifiable, Codable, Equatable {
+    let id: UUID
+    var courseId: UUID
+    var title: String
+    var dueDate: String        // "YYYY-MM-DD" or "" if none
+    var completed: Bool
+    var calendarEventId: Int?  // set when synced to main calendar
+}
+```
+
+### Storage (`CourseStore.swift`)
+
+`@MainActor` singleton, pattern mirrors `LocalStore`. Persists to:
+- `mc_courses.json` — array of Course
+- `mc_assignments.json` — array of Assignment
+
+No offline queue needed (local-only). Calendar sync calls `api.createEvent()` via the existing events API.
+
+### CourseworkView.swift — key interactions
+
+| Action | How |
+|--------|-----|
+| Add course | `+` button (nav bar) → `CourseEditSheet` |
+| Edit course | Pencil icon in section header → `CourseEditSheet` |
+| Delete course | Edit button (nav bar) → swipe-to-delete on course row; **or** edit sheet → Delete button. Deleting a course also deletes all its assignments. |
+| Add assignment | "Add Assignment" row at bottom of each course section |
+| Delete assignment | Swipe left on assignment row |
+| Toggle complete | Tap circle checkbox |
+| Set due date | Tap calendar icon on assignment → `DueDatePickerSheet` (graphical date picker, clear option) |
+| Sync to calendar | Tap export icon (only shown when due date is set and not yet synced) → creates CalendarEvent via `api.createEvent()` with title "📚 [title]", all-day-style at 23:59 |
+
+### Due date color coding
+- > 3 days away: secondary gray
+- ≤ 3 days: orange
+- Today or overdue: red
+
+### Calendar sync
+Calls `api.createEvent(fields)` with:
+- `title`: `"📚 \(assignment.title)"`
+- `date`: `assignment.dueDate`
+- `start_time` / `end_time`: `"23:59"`
+- `color`: course hex color
+- `description`: `"\(course.number) — \(course.name)"`
+
+On success, stores the returned event ID in `assignment.calendarEventId` (disables re-sync). Changing the due date resets `calendarEventId = nil`.

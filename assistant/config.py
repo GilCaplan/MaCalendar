@@ -103,6 +103,7 @@ class UIConfig(BaseModel):
     font_week: int = 11
     font_day: int = 13
     font_tasks: int = 13
+    font_coursework: int = 13
     compact_ui: bool = False
 
 
