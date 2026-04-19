@@ -111,6 +111,14 @@ class ApiConfig(BaseModel):
     key: Optional[str] = None   # X-API-Key header value; null = no auth required
 
 
+class NLUConfig(BaseModel):
+    # Words that trigger instant fast-path create + background LLM title fix.
+    # When a voice command's extracted title matches one of these, the event is
+    # created immediately with the keyword as a placeholder title, then the LLM
+    # silently patches it with a proper title derived from the full transcript.
+    event_keywords: List[str] = ["meeting", "appointment", "activity"]
+
+
 class AppConfig(BaseModel):
     hotkey: HotkeyConfig
     stt_engine: Literal["whisper", "google"] = "whisper"
@@ -128,6 +136,7 @@ class AppConfig(BaseModel):
     tts: TTSConfig = TTSConfig()
     todo: TodoConfig = TodoConfig()
     api: ApiConfig = ApiConfig()
+    nlu: NLUConfig = NLUConfig()
     theme: Literal["light", "dark"] = "light"
     ui: UIConfig = UIConfig()
 

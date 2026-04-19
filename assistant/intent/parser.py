@@ -167,6 +167,45 @@ class IntentParser:
             logger.debug("Fast-path verification skipped: %s", e)
             return None
 
+    def fix_title_async(self, transcript: str, keyword: str) -> "str | None":
+        """Ask the LLM for a proper event title when fast-path used a keyword placeholder.
+
+        Returns an improved title string, or None if the LLM couldn't improve on the keyword.
+        Safe to call from a daemon thread — exceptions are caught and logged.
+        """
+        sys_prompt = (
+            "You are a calendar assistant. Given a voice command transcript, "
+            "produce a concise, properly-cased event title.\n"
+            "Rules: 2-6 words, title case, no punctuation at end, no explanation.\n"
+            "Respond with ONLY a JSON object: {\"title\": \"<event title>\"}"
+        )
+        user_prompt = (
+            f"Voice transcript: {transcript!r}\n"
+            f"Current placeholder title: {keyword!r}\n"
+            "What is the proper event title?"
+        )
+        try:
+            engine = self.config.llm_engine
+            if engine == "ollama":
+                raw = self._call_ollama_verify(sys_prompt, user_prompt)
+            elif engine == "openai":
+                raw = self._call_openai(sys_prompt, user_prompt)
+            elif engine == "gemini":
+                raw = self._call_gemini(sys_prompt, user_prompt)
+            elif engine == "claude":
+                raw = self._call_claude(sys_prompt, user_prompt)
+            else:
+                return None
+            json_str = self._extract_json(raw)
+            data = json.loads(json_str)
+            title = data.get("title", "").strip().strip("\"'")
+            if title and title.lower() != keyword.lower():
+                logger.debug("fix_title_async: %r → %r", keyword, title)
+                return title
+        except Exception as exc:
+            logger.debug("fix_title_async failed: %s", exc)
+        return None
+
     def _run_verification(
         self,
         transcript: str,

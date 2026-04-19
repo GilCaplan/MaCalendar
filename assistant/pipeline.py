@@ -294,6 +294,7 @@ class Pipeline:
                 action_list = all_actions if all_actions else None
 
         _parse_method = "separator" if action_list is not None else "llm"
+        _keyword_title: "str | None" = None  # set when fast-path title is a keyword placeholder
 
         if action_list is None and self._rule_parser is not None:
             try:
@@ -302,6 +303,12 @@ class Pipeline:
                     action_list = rule_result.intents
                     _fast_path_rule_result = rule_result
                     _parse_method = "rule"
+                    # Detect keyword placeholder titles (e.g. "meeting", "appointment")
+                    _event_kw_set = {k.lower() for k in self.config.nlu.event_keywords}
+                    if "create_event" in rule_result.raw_slots:
+                        _raw_title = (rule_result.raw_slots["create_event"].get("title") or "").lower()
+                        if _raw_title in _event_kw_set:
+                            _keyword_title = _raw_title
                     logger.info(
                         "🖥️ Rule fast-path: confidence=%.2f actions=%s (%.3fs)",
                         rule_result.confidence,
@@ -424,15 +431,25 @@ class Pipeline:
             self._tts.speak(summary)
             time.sleep(0.3)  # brief pause for UI toast to render before going idle
 
-            # Background LLM verification of fast-path results (does not block user)
-            if (
+            # Background processing of fast-path results (does not block user)
+            from assistant.intent.context import context_memory
+            if _keyword_title and not is_clarify:
+                # Keyword placeholder title: always ask LLM to fix just the title.
+                # This replaces the standard verify for these events — we already
+                # know the action/time are correct; only the title needs improvement.
+                _event_id_for_fix = context_memory.last_event_id
+                if _event_id_for_fix:
+                    threading.Thread(
+                        target=self._background_fix_title,
+                        args=(transcript, _event_id_for_fix, _keyword_title),
+                        daemon=True,
+                    ).start()
+            elif (
                 _fast_path_rule_result is not None
                 and self.config.verify_fast_path
                 and not is_clarify
             ):
-                # Snapshot what the fast-path just created/modified so we can detect
-                # user-changed-in-between and undo creates for major corrections.
-                from assistant.intent.context import context_memory
+                # Standard fast-path verify: full LLM severity judgment.
                 verify_snapshot = {
                     "actions": [(name, type(intent).__name__) for name, intent in valid],
                     "event_id": context_memory.last_event_id,
@@ -459,6 +476,30 @@ class Pipeline:
         logger.info("🖥️ ⏱ Total pipeline: %.2fs", time.perf_counter() - t_start)
         self._phase = STATUS_IDLE
         self._set_status(STATUS_IDLE, "")
+
+    def _background_fix_title(self, transcript: str, event_id: int, keyword: str) -> None:
+        """Daemon thread: ask the LLM for a proper title and patch the event if improved.
+
+        Called whenever the fast-path created an event whose title is a generic
+        keyword (e.g. 'meeting'). The LLM reads the full transcript context and
+        returns a better title; we patch silently if the record is still unchanged.
+        """
+        from assistant.db import get_db
+        try:
+            better_title = self._parser.fix_title_async(transcript, keyword)
+            if not better_title:
+                return
+            db = get_db()
+            current = db.get_event(event_id)
+            if current is None:
+                return  # already deleted
+            if current.get("title", "").lower() != keyword.lower():
+                return  # user already edited it — respect their change
+            db.update_event(event_id, title=better_title)
+            logger.info("🖥️ Keyword title fix: %r → %r (event_id=%d)", keyword, better_title, event_id)
+            self._set_status("refresh", "")
+        except Exception as exc:
+            logger.debug("🖥️ Background title fix failed: %s", exc)
 
     def _background_verify(self, transcript: str, rule_result, snapshot: dict) -> None:
         """Daemon thread: LLM judges the fast-path result in three tiers.

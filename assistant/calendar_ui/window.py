@@ -806,6 +806,20 @@ class CalendarWindow(QMainWindow):
         
         layout.addStretch(1)
 
+        # Event Keywords (NLU keyword fast-path)
+        keywords_layout = QVBoxLayout()
+        keywords_layout.setSpacing(3)
+        keywords_lbl = QLabel("Event Keywords (comma-separated — instant create + LLM title fix):")
+        keywords_lbl.setWordWrap(True)
+        keywords_layout.addWidget(keywords_lbl)
+        keywords_edit = QLineEdit()
+        keywords_edit.setPlaceholderText("e.g. meeting, appointment, activity")
+        keywords_edit.setText(", ".join(self._config.nlu.event_keywords))
+        keywords_layout.addWidget(keywords_edit)
+        layout.addLayout(keywords_layout)
+
+        layout.addStretch(1)
+
         # Stop Phrases
         stop_phrases_layout = QVBoxLayout()
         stop_phrases_layout.setSpacing(3)
@@ -856,7 +870,9 @@ class CalendarWindow(QMainWindow):
             self._pipeline._tts.mute = mute_cb.isChecked()
             self._pipeline._tts.rate = speed_spin.value()
             self._pipeline._tts.voice = voice_combo.currentText()
-            # Parse stop phrases from the text field
+            # Parse event keywords and stop phrases from text fields
+            raw_keywords = [k.strip() for k in keywords_edit.text().split(",") if k.strip()]
+            self._config.nlu.event_keywords = raw_keywords
             raw_phrases = [p.strip() for p in stop_phrases_edit.text().split(",") if p.strip()]
             self._config.audio.stop_phrases = raw_phrases
             self._config.audio.event_separator = sep_edit.text().strip()
@@ -879,6 +895,9 @@ class CalendarWindow(QMainWindow):
                     txt = re.sub(r"font_tasks:\s*\d+", f"font_tasks: {tasks_spin.value()}", txt, count=1)
                     txt = re.sub(r"font_coursework:\s*\d+", f"font_coursework: {coursework_spin.value()}", txt, count=1)
                     txt = re.sub(r"compact_ui:\s*(true|false)", f"compact_ui: {'true' if compact_cb.isChecked() else 'false'}", txt, count=1)
+                    # Event keywords — write as YAML flow list
+                    kw_yaml = _yaml.dump(raw_keywords, default_flow_style=True).strip()
+                    txt = re.sub(r"event_keywords:\s*\[.*?\]", f"event_keywords: {kw_yaml}", txt, count=1)
                     # Stop phrases — write as YAML list
                     phrases_yaml = _yaml.dump(raw_phrases, default_flow_style=True).strip()
                     txt = re.sub(r"stop_phrases:\s*\[.*?\]", f"stop_phrases: {phrases_yaml}", txt, count=1)
