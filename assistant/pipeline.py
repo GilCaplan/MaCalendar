@@ -43,6 +43,9 @@ STATUS_PROCESSING = "processing"
 STATUS_DONE = "done"
 STATUS_ERROR = "error"
 
+# Two button presses within this window while listening = cancel recording
+_DOUBLE_TAP_SEC = 0.4
+
 
 def _build_stt(config: AppConfig):
     if config.stt_engine == "whisper":
@@ -82,6 +85,8 @@ class Pipeline:
         # Pending session mode: None = no queue, "new" = fresh session, "combine" = append to last transcript
         self._queued: Optional[str] = None
         self._last_transcript: str = ""  # retained for combine mode
+        self._recording_cancelled = threading.Event()  # set to discard current recording
+        self._last_listen_press: float = 0.0  # monotonic time of last press during STATUS_LISTENING
 
         self.on_auth_expired: Optional[Callable[[], None]] = None
         # Set by the UI when the active view changes; used to inject parse context
@@ -101,7 +106,9 @@ class Pipeline:
         """Called by HotkeyListener or mic button.
 
         While idle → start a new session.
-        While listening → stop recording immediately.
+        While listening:
+          1st press → stop recording and auto-queue a new session.
+          2nd press within 400ms → cancel recording entirely (no processing).
         While processing, cycles through:
           1st press → queue a new independent session
           2nd press → switch to combine mode (new audio appended to previous transcript)
@@ -110,7 +117,20 @@ class Pipeline:
         with self._trigger_lock:
             if self._busy.is_set():
                 if self._phase == STATUS_LISTENING:
-                    self.stop_recording()
+                    now = time.monotonic()
+                    if now - self._last_listen_press < _DOUBLE_TAP_SEC:
+                        # Double-tap: cancel recording, discard audio, go idle
+                        self._recording_cancelled.set()
+                        self._audio.stop()
+                        self._queued = None
+                        self._set_status(STATUS_IDLE, "❌ Recording cancelled")
+                    else:
+                        # Single press: stop + auto-queue a fresh session
+                        self._last_listen_press = now
+                        self._audio.stop()
+                        if self._queued is None:
+                            self._queued = "new"
+                            self._set_status(STATUS_LISTENING, "⏸ Got it — recording again after processing")
                 elif self._queued is None:
                     self._queued = "new"
                     self._set_status(STATUS_PROCESSING, "🕐 Queued — tap again to combine instead")
@@ -142,7 +162,12 @@ class Pipeline:
         finally:
             self._busy.clear()
             # If a session was queued while we were busy, kick it off now
+            # (but not if the session was cancelled via double-tap)
             with self._trigger_lock:
+                if self._recording_cancelled.is_set():
+                    self._recording_cancelled.clear()
+                    self._queued = None
+                    return
                 next_mode = self._queued
                 if next_mode is not None:
                     self._queued = None
@@ -157,8 +182,9 @@ class Pipeline:
         t_start = time.perf_counter()
 
         # 1. Listen
+        self._recording_cancelled.clear()
         self._phase = STATUS_LISTENING
-        listen_hint = "🔗 Listening to add on… (say 'done' or press mic to stop)" if combine else "🎙 Listening… (say 'done' or press mic to stop)"
+        listen_hint = "🔗 Listening to add on… (say 'done' or tap twice to cancel)" if combine else "🎙 Listening… (tap to stop & re-record, tap twice to cancel)"
         self._set_status(STATUS_LISTENING, listen_hint)
 
         # Stream-checker: transcribe growing buffer every 2.5 s to detect stop words.
@@ -197,6 +223,12 @@ class Pipeline:
 
         t_recorded = time.perf_counter()
         logger.info("🖥️ ⏱ Recording: %.2fs", t_recorded - t_start)
+
+        # Double-tap cancel: discard audio and abort without processing
+        if self._recording_cancelled.is_set():
+            self._recording_cancelled.clear()
+            self._set_status(STATUS_IDLE, "")
+            return
 
         # 2. Transcribe — reuse stream-checker result if it's fresh (within 3 s)
         self._phase = STATUS_PROCESSING

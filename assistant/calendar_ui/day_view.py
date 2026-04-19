@@ -6,8 +6,9 @@ import datetime
 from typing import List
 
 from PyQt6.QtCore import Qt, QMimeData, QByteArray, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QDrag, QFont, QPainter, QPen, QPixmap
+from PyQt6.QtGui import QBrush, QColor, QDrag, QFont, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
+    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -82,6 +83,7 @@ class EventBlock(QLabel):
                 font-size: {fs}px;
                 padding: 5px 8px 4px 10px;
                 border-left: 5px solid rgba(0,0,0,0.25);
+                border-bottom: 1px solid rgba(0,0,0,0.20);
             }}
         """)
 
@@ -169,6 +171,39 @@ class EventBlock(QLabel):
             self.clicked.emit(self.event)
 
 
+_TEAL_TODO = "#0e9f8c"
+_TODO_PILL_H = 18
+
+
+class _TodoPill(QLabel):
+    """Small teal deadline pill shown in the all-day strip."""
+
+    def __init__(self, todo: dict, parent=None):
+        super().__init__(parent)
+        self._text = f"⊙ {todo.get('title', '')}"
+        self.setText(self._text)
+        self.setStyleSheet("background: transparent;")
+        self.setToolTip(f"Task due: {todo.get('title', '')}")
+        self.setFixedHeight(_TODO_PILL_H)
+
+    def paintEvent(self, _event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        color = QColor(_TEAL_TODO)
+        painter.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), 30)))
+        painter.setPen(QPen(color, 1))
+        painter.drawRoundedRect(self.rect().adjusted(0, 1, -1, -2), 4, 4)
+        painter.setPen(color)
+        font = self.font()
+        font.setPointSize(8)
+        font.setBold(True)
+        painter.setFont(font)
+        fm = painter.fontMetrics()
+        elided = fm.elidedText(self._text, Qt.TextElideMode.ElideRight, self.width() - 8)
+        painter.drawText(self.rect().adjusted(4, 0, -4, 0),
+                         Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, elided)
+
+
 class TimeIndicatorOverlay(QWidget):
     """Transparent overlay that paints the current-time red line on top of event blocks."""
 
@@ -212,6 +247,8 @@ class DayTimeline(QWidget):
         self._event_widgets: List[EventBlock] = []
         self._drag_hover = False
         self._ui_config = None
+        self._press_y: int = -1
+        self._pending_click_dt: datetime.datetime | None = None
         self.setAcceptDrops(True)
         self._apply_bg()
         self._overlay = TimeIndicatorOverlay(self.date, self)
@@ -292,10 +329,11 @@ class DayTimeline(QWidget):
                 s = ev_s(ev)
                 e = ev_e(ev)
                 top = int(s / 60 * HOUR_HEIGHT)
-                height = max(int((e - s) / 60 * HOUR_HEIGHT), 28)
+                height = max(int((e - s) / 60 * HOUR_HEIGHT), 30)
                 x = _LEFT_PAD + int(ci * (col_w + _COL_GAP))
                 w = max(int(col_w), 40)
-                result.append((ev, x, w, top, height))
+                # +1 top / -2 height creates a 2px gap between adjacent events
+                result.append((ev, x, w, top + 1, height - 2))
 
         return result
 
@@ -320,6 +358,11 @@ class DayTimeline(QWidget):
             block.clicked.connect(self.event_clicked)
             block.resized.connect(self.event_rescheduled)
             block.setGeometry(x, top, w, h)
+            shadow = QGraphicsDropShadowEffect()
+            shadow.setBlurRadius(8)
+            shadow.setOffset(0, 2)
+            shadow.setColor(QColor(0, 0, 0, 55))
+            block.setGraphicsEffect(shadow)
             block.show()
             self._event_widgets.append(block)
         self._overlay.raise_()
@@ -337,12 +380,27 @@ class DayTimeline(QWidget):
         self._overlay.resize(self.size())
         self._overlay.raise_()
 
+    def mousePressEvent(self, event):
+        self._press_y = event.pos().y()
+
+    def mouseReleaseEvent(self, event):
+        if self._press_y >= 0 and abs(event.pos().y() - self._press_y) < 10:
+            y = self._press_y
+            hour = min(y // HOUR_HEIGHT, 23)
+            minute = (y % HOUR_HEIGHT) // (HOUR_HEIGHT // 4) * 15
+            self._pending_click_dt = datetime.datetime.combine(
+                self.date, datetime.time(hour, minute)
+            )
+            QTimer.singleShot(220, self._fire_slot_click)
+        self._press_y = -1
+
     def mouseDoubleClickEvent(self, event):
-        y = event.pos().y()
-        hour = y // HOUR_HEIGHT
-        minute = (y % HOUR_HEIGHT) // (HOUR_HEIGHT // 2) * 30
-        dt = datetime.datetime.combine(self.date, datetime.time(min(hour, 23), minute))
-        self.slot_double_clicked.emit(dt)
+        self._pending_click_dt = None  # cancel single-click on double-click
+
+    def _fire_slot_click(self):
+        if self._pending_click_dt is not None:
+            self.slot_double_clicked.emit(self._pending_click_dt)
+            self._pending_click_dt = None
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasFormat("application/x-event-id"):
@@ -443,6 +501,14 @@ class DayView(QWidget):
 
         layout.addWidget(self._header)
 
+        # ── All-day strip (task deadlines) ───────────────────────────────
+        self._allday_strip = QWidget()
+        self._allday_strip.setVisible(False)
+        self._allday_strip_layout = QHBoxLayout(self._allday_strip)
+        self._allday_strip_layout.setContentsMargins(LABEL_WIDTH + 4, 3, 8, 3)
+        self._allday_strip_layout.setSpacing(4)
+        layout.addWidget(self._allday_strip)
+
         # ── Scrollable body: time labels + timeline ──────────────────────
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -520,6 +586,29 @@ class DayView(QWidget):
         if self._timeline:
             self._timeline.load_events(events)
         self._update_count(len(events))
+        self._refresh_allday()
+
+    def _refresh_allday(self) -> None:
+        layout = self._allday_strip_layout
+        while layout.count():
+            w = layout.takeAt(0).widget()
+            if w:
+                w.deleteLater()
+
+        date_str = self._date.isoformat()
+        todos = [
+            t for t in self._db.get_todos(include_completed=False)
+            if t.get("due_date", "")[:10] == date_str
+        ]
+        if todos:
+            for todo in todos:
+                pill = _TodoPill(todo)
+                layout.addWidget(pill)
+            layout.addStretch()
+            self._allday_strip.setFixedHeight(_TODO_PILL_H + 8)
+            self._allday_strip.setVisible(True)
+        else:
+            self._allday_strip.setVisible(False)
 
     def apply_theme(self, dark: bool) -> None:
         _styles._dark = dark
@@ -596,6 +685,9 @@ class DayView(QWidget):
         text_main = _styles.D_GRAY_DARK if dark else GRAY_DARK
 
         self._header.setStyleSheet(
+            f"background-color: {bg}; border-bottom: 1px solid {border};"
+        )
+        self._allday_strip.setStyleSheet(
             f"background-color: {bg}; border-bottom: 1px solid {border};"
         )
         self._time_col.setStyleSheet(f"background-color: {bg};")

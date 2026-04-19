@@ -60,10 +60,12 @@ class EventDialog(QDialog):
         parent=None,
         event: Optional[dict] = None,
         default_date: Optional[datetime.date] = None,
+        default_time: Optional[datetime.time] = None,
     ):
         super().__init__(parent)
         self._event = event  # None = create mode
         self._selected_color = (event or {}).get("color", BLUE)
+        self._default_time = default_time
         self.event_data: Optional[dict] = None
         self.delete_requested: bool = False
         self.delete_series_requested: bool = False
@@ -110,9 +112,15 @@ class EventDialog(QDialog):
             self._start.setTime(QTime.fromString(self._event["start_time"], "HH:mm"))
             self._end.setTime(QTime.fromString(self._event["end_time"], "HH:mm"))
         else:
-            now = datetime.datetime.now().replace(minute=0, second=0)
-            self._start.setTime(QTime(now.hour, 0))
-            self._end.setTime(QTime(now.hour + 1, 0))
+            if self._default_time:
+                sh, sm = self._default_time.hour, self._default_time.minute
+            else:
+                now = datetime.datetime.now()
+                sh, sm = now.hour, 0
+            self._start.setTime(QTime(sh, sm))
+            end_dt = (datetime.datetime.combine(datetime.date.today(), datetime.time(sh, sm))
+                      + datetime.timedelta(hours=1))
+            self._end.setTime(QTime(end_dt.hour, end_dt.minute))
         time_row.addWidget(self._start)
         time_row.addWidget(QLabel("–"))
         time_row.addWidget(self._end)

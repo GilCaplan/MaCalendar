@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import datetime
+import html as _html
 from typing import List
 
 from PyQt6.QtCore import Qt, QMimeData, QByteArray, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QDrag, QPainter, QPen, QPixmap
+from PyQt6.QtGui import QBrush, QColor, QDrag, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
+    QGraphicsDropShadowEffect,
     QGridLayout,
     QLabel,
     QScrollArea,
@@ -34,6 +36,11 @@ HOUR_HEIGHT = 48   # px per hour
 LABEL_WIDTH = 52   # px for time labels on left
 RESIZE_HANDLE = 7  # px at top/bottom edge that activate resize mode
 _SNAP_PX = HOUR_HEIGHT // 4  # 15-minute snap grid (12px)
+_COL_GAP = 2       # px between side-by-side overlapping event columns
+_LEFT_PAD = 2
+_RIGHT_PAD = 2
+_TEAL_TODO = "#0e9f8c"   # deadline pill colour (matches month view)
+_TODO_PILL_H = 18        # px height of each todo pill
 
 
 class TimeIndicatorOverlay(QWidget):
@@ -74,7 +81,13 @@ class EventBlock(QLabel):
         self.event = event
         self._font_size = font_size
         self._drag_start = None
-        self.setText(f"  {event['title']}\n  {start}–{end}")
+        title = _html.escape(event.get("title", ""))
+        self.setText(
+            f"<b style='font-size:{font_size}px'>{title}</b>"
+            f"<br><span style='font-size:{max(font_size-2,8)}px;"
+            f"opacity:0.82'>{start}–{end}</span>"
+        )
+        self.setTextFormat(Qt.TextFormat.RichText)
         self.setWordWrap(True)
         self.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         self.setStyleSheet(
@@ -82,10 +95,10 @@ class EventBlock(QLabel):
             QLabel {{
                 background-color: {color};
                 color: white;
-                border-radius: 3px;
-                font-size: {self._font_size}px;
-                padding: 2px 4px;
-                border-left: 3px solid rgba(0,0,0,0.2);
+                border-radius: 4px;
+                padding: 3px 5px 3px 8px;
+                border-left: 4px solid rgba(0,0,0,0.30);
+                border-bottom: 1px solid rgba(0,0,0,0.20);
             }}
             """
         )
@@ -181,6 +194,35 @@ class EventBlock(QLabel):
             self.clicked.emit(self.event)
 
 
+class _TodoPill(QLabel):
+    """Small teal deadline pill shown at the top of a week-view day column."""
+
+    def __init__(self, todo: dict, parent=None):
+        super().__init__(parent)
+        self._text = f"⊙ {todo.get('title', '')}"
+        self.setText(self._text)
+        self.setStyleSheet("background: transparent;")
+        self.setToolTip(f"Task due: {todo.get('title', '')}")
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+
+    def paintEvent(self, _event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        color = QColor(_TEAL_TODO)
+        painter.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), 30)))
+        painter.setPen(QPen(color, 1))
+        painter.drawRoundedRect(self.rect().adjusted(0, 1, -1, -2), 4, 4)
+        painter.setPen(color)
+        font = self.font()
+        font.setPointSize(7)
+        font.setBold(True)
+        painter.setFont(font)
+        fm = painter.fontMetrics()
+        elided = fm.elidedText(self._text, Qt.TextElideMode.ElideRight, self.width() - 8)
+        painter.drawText(self.rect().adjusted(4, 0, -4, 0),
+                         Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, elided)
+
+
 class DayColumn(QWidget):
     """One vertical day column in the week view."""
 
@@ -198,8 +240,11 @@ class DayColumn(QWidget):
         self.is_today = date == datetime.date.today()
         self.is_weekend = date.weekday() >= 5
         self._event_widgets: List[EventBlock] = []
+        self._events: List[dict] = []
         self._drag_hover = False
         self._ui_config = None
+        self._press_y: int = -1
+        self._pending_click_dt: datetime.datetime | None = None
         self.setAcceptDrops(True)
         self._apply_bg()
         self._overlay: TimeIndicatorOverlay | None = None
@@ -217,30 +262,92 @@ class DayColumn(QWidget):
             bg = _styles.D_WHITE if dark else WHITE
         self.setStyleSheet(f"background-color: {bg};")
 
+    @staticmethod
+    def _to_min(t: str) -> int:
+        try:
+            h, m = map(int, t.split(":"))
+            return h * 60 + m
+        except Exception:
+            return 0
+
+    def _compute_layout(self, events: List[dict], avail_w: int):
+        """Returns [(event, x, w, top, height), ...] with overlap columns."""
+        if not events:
+            return []
+
+        def ev_s(ev): return self._to_min(ev.get("start_time", "0:00"))
+        def ev_e(ev):
+            s = ev_s(ev)
+            e = self._to_min(ev.get("end_time", "0:00"))
+            return max(e, s + 15)
+
+        sorted_evs = sorted(events, key=lambda ev: (ev_s(ev), -ev_e(ev)))
+
+        clusters: List[List[dict]] = []
+        cluster: List[dict] = []
+        cluster_end = -1
+        for ev in sorted_evs:
+            s = ev_s(ev)
+            if cluster and s >= cluster_end:
+                clusters.append(cluster)
+                cluster = []
+                cluster_end = -1
+            cluster.append(ev)
+            cluster_end = max(cluster_end, ev_e(ev))
+        if cluster:
+            clusters.append(cluster)
+
+        result = []
+        for grp in clusters:
+            col_ends: List[int] = []
+            ev_col: List[int] = []
+            for ev in grp:
+                s = ev_s(ev)
+                placed = False
+                for ci, ce in enumerate(col_ends):
+                    if s >= ce:
+                        col_ends[ci] = ev_e(ev)
+                        ev_col.append(ci)
+                        placed = True
+                        break
+                if not placed:
+                    ev_col.append(len(col_ends))
+                    col_ends.append(ev_e(ev))
+
+            n_cols = len(col_ends)
+            usable = avail_w - _LEFT_PAD - _RIGHT_PAD
+            col_w = (usable - _COL_GAP * (n_cols - 1)) / n_cols
+
+            for i, ev in enumerate(grp):
+                ci = ev_col[i]
+                s = ev_s(ev)
+                e = ev_e(ev)
+                top = int(s / 60 * HOUR_HEIGHT)
+                height = max(int((e - s) / 60 * HOUR_HEIGHT), 20)
+                x = _LEFT_PAD + int(ci * (col_w + _COL_GAP))
+                w = max(int(col_w), 30)
+                # +1 top / -2 height creates a 2px gap between adjacent events
+                result.append((ev, x, w, top + 1, height - 2))
+
+        return result
+
     def load_events(self, events: List[dict]) -> None:
+        self._events = events
         for w in self._event_widgets:
             w.deleteLater()
         self._event_widgets.clear()
 
-        for ev in events:
-            try:
-                sh, sm = map(int, ev["start_time"].split(":"))
-            except Exception:
-                continue
-            try:
-                eh, em = map(int, ev["end_time"].split(":"))
-            except Exception:
-                end_min = sh * 60 + sm + 60
-                eh, em = min(end_min // 60, 23), end_min % 60
-
-            top = (sh * 60 + sm) / 60 * HOUR_HEIGHT
-            h = max(((eh * 60 + em) - (sh * 60 + sm)) / 60 * HOUR_HEIGHT, 18)
-
-            fs = 11 if not self._ui_config else self._ui_config.font_week
+        fs = 11 if not self._ui_config else self._ui_config.font_week
+        for ev, x, w, top, h in self._compute_layout(events, self.width()):
             block = EventBlock(ev, font_size=fs, parent=self)
             block.clicked.connect(self.event_clicked)
             block.resized.connect(self.event_rescheduled)
-            block.setGeometry(2, int(top), self.width() - 4, int(h))
+            block.setGeometry(x, top, w, h)
+            shadow = QGraphicsDropShadowEffect()
+            shadow.setBlurRadius(6)
+            shadow.setOffset(0, 2)
+            shadow.setColor(QColor(0, 0, 0, 55))
+            block.setGraphicsEffect(shadow)
             block.show()
             self._event_widgets.append(block)
         if self._overlay:
@@ -248,19 +355,35 @@ class DayColumn(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        # Re-layout event blocks on resize
-        for block in self._event_widgets:
-            block.setGeometry(2, block.y(), self.width() - 4, block.height())
+        if self._events:
+            layout = self._compute_layout(self._events, self.width())
+            for block, item in zip(self._event_widgets, layout):
+                block.setGeometry(item[1], block.y(), item[2], block.height())
         if self._overlay:
             self._overlay.resize(self.size())
             self._overlay.raise_()
 
+    def mousePressEvent(self, event):
+        self._press_y = event.pos().y()
+
+    def mouseReleaseEvent(self, event):
+        if self._press_y >= 0 and abs(event.pos().y() - self._press_y) < 10:
+            y = self._press_y
+            hour = min(y // HOUR_HEIGHT, 23)
+            minute = (y % HOUR_HEIGHT) // (HOUR_HEIGHT // 4) * 15
+            self._pending_click_dt = datetime.datetime.combine(
+                self.date, datetime.time(hour, minute)
+            )
+            QTimer.singleShot(220, self._fire_slot_click)
+        self._press_y = -1
+
     def mouseDoubleClickEvent(self, event):
-        y = event.pos().y()
-        hour = y // HOUR_HEIGHT
-        minute = (y % HOUR_HEIGHT) // (HOUR_HEIGHT // 2) * 30
-        dt = datetime.datetime.combine(self.date, datetime.time(min(hour, 23), minute))
-        self.slot_double_clicked.emit(dt)
+        self._pending_click_dt = None  # cancel single-click timer on double-click
+
+    def _fire_slot_click(self):
+        if self._pending_click_dt is not None:
+            self.slot_double_clicked.emit(self._pending_click_dt)
+            self._pending_click_dt = None
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasFormat("application/x-event-id"):
@@ -337,6 +460,15 @@ class WeekView(QWidget):
         self._header_layout.setContentsMargins(LABEL_WIDTH, 0, 0, 0)
         self._header_layout.setSpacing(0)
         layout.addWidget(self._header)
+
+        # All-day strip (task deadlines) — hidden until there are due tasks
+        self._allday_row = QWidget()
+        self._allday_row.setVisible(False)
+        self._allday_layout = QGridLayout(self._allday_row)
+        self._allday_layout.setContentsMargins(LABEL_WIDTH, 2, 0, 2)
+        self._allday_layout.setSpacing(0)
+        layout.addWidget(self._allday_row)
+        self._allday_cells: List[QWidget] = []
 
         # Scrollable body
         scroll = QScrollArea()
@@ -417,6 +549,9 @@ class WeekView(QWidget):
         self._header.setStyleSheet(
             f"background-color: {bg}; border-bottom: 1px solid {border};"
         )
+        self._allday_row.setStyleSheet(
+            f"background-color: {bg}; border-bottom: 1px solid {border};"
+        )
         self._time_col.setStyleSheet(f"background-color: {bg};")
         fs = 11 if not self._ui_config else self._ui_config.font_week
         for lbl in self._time_labels:
@@ -431,8 +566,42 @@ class WeekView(QWidget):
         by_date: dict[str, list] = {}
         for ev in events:
             by_date.setdefault(ev["date"], []).append(ev)
-        for col in self._day_columns:
-            col.load_events(by_date.get(col.date.isoformat(), []))
+
+        week_end = self._week_start + datetime.timedelta(days=6)
+        todos_by_date: dict[str, list] = {}
+        for t in self._db.get_todos(include_completed=False):
+            due = t.get("due_date", "")
+            if due:
+                try:
+                    due_d = datetime.date.fromisoformat(due)
+                except ValueError:
+                    continue
+                if self._week_start <= due_d <= week_end:
+                    todos_by_date.setdefault(due, []).append(t)
+
+        max_todos = 0
+        for i, col in enumerate(self._day_columns):
+            date_str = col.date.isoformat()
+            col.load_events(by_date.get(date_str, []))
+
+            todos = todos_by_date.get(date_str, [])
+            max_todos = max(max_todos, len(todos))
+            cell = self._allday_cells[i]
+            cell_layout = cell.layout()
+            while cell_layout.count():
+                w = cell_layout.takeAt(0).widget()
+                if w:
+                    w.deleteLater()
+            for todo in todos:
+                pill = _TodoPill(todo)
+                pill.setFixedHeight(_TODO_PILL_H)
+                cell_layout.addWidget(pill)
+
+        if max_todos > 0:
+            self._allday_row.setFixedHeight(max_todos * (_TODO_PILL_H + 1) + 6)
+            self._allday_row.setVisible(True)
+        else:
+            self._allday_row.setVisible(False)
 
     def _rebuild_columns(self) -> None:
         # Clear header
@@ -440,6 +609,13 @@ class WeekView(QWidget):
             item = self._header_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
+
+        # Clear allday strip
+        while self._allday_layout.count():
+            item = self._allday_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self._allday_cells.clear()
 
         # Clear columns
         while self._col_layout.count():
@@ -490,6 +666,15 @@ class WeekView(QWidget):
             self._col_layout.addWidget(col, 0, i)
             self._col_layout.setColumnStretch(i, 1)
             self._day_columns.append(col)
+
+            # Allday cell for this column
+            allday_cell = QWidget()
+            allday_cell_layout = QVBoxLayout(allday_cell)
+            allday_cell_layout.setContentsMargins(2, 0, 2, 0)
+            allday_cell_layout.setSpacing(1)
+            self._allday_layout.addWidget(allday_cell, 0, i)
+            self._allday_layout.setColumnStretch(i, 1)
+            self._allday_cells.append(allday_cell)
 
         self.refresh()
         self._apply_theme_styles()
