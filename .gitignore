@@ -43,6 +43,7 @@ config.yaml
 *.db
 *.sqlite
 *.sql
+MACalendar.app/
 
 # Allow the config example to be pushed
 !config.example.yaml
