@@ -3,6 +3,7 @@ import SwiftUI
 struct WeekView: View {
     @Binding var selectedDate: Date
     var events: [CalendarEvent]
+    var holidays: [Holiday] = []
     var onDateSelected: ((Date) -> Void)? = nil
     @EnvironmentObject var settings: AppSettings
 
@@ -29,7 +30,8 @@ struct WeekView: View {
                     WeekDayHeader(
                         day: day,
                         isSelected: Calendar.current.isDate(day, inSameDayAs: selectedDate),
-                        isToday: Calendar.current.isDateInToday(day)
+                        isToday: Calendar.current.isDateInToday(day),
+                        holidays: holidaysForDay(day)
                     )
                     .frame(maxWidth: .infinity)
                     .contentShape(Rectangle())
@@ -85,6 +87,11 @@ struct WeekView: View {
         return events.filter { $0.date == d }
     }
 
+    private func holidaysForDay(_ date: Date) -> [Holiday] {
+        let d = ISO8601DateFormatter.yyyyMMdd.string(from: date)
+        return holidays.filter { $0.spans(d) }
+    }
+
     private func hourLabel(_ h: Int) -> String {
         h == 0 ? "12 AM" : h < 12 ? "\(h) AM" : h == 12 ? "12 PM" : "\(h - 12) PM"
     }
@@ -97,6 +104,7 @@ private struct WeekDayHeader: View {
     var day: Date
     var isSelected: Bool
     var isToday: Bool
+    var holidays: [Holiday] = []
 
     private var label: String {
         let f = DateFormatter()
@@ -112,15 +120,29 @@ private struct WeekDayHeader: View {
                 .foregroundColor(.secondary)
             ZStack {
                 if isToday {
-                    Circle().fill(Color.blue)
+                    Circle().fill(settings.accentColor)
                         .frame(width: settings.fontWeek * 2, height: settings.fontWeek * 2)
                 } else if isSelected {
-                    Circle().stroke(Color.blue, lineWidth: 1.5)
+                    Circle().stroke(settings.accentColor, lineWidth: 1.5)
                         .frame(width: settings.fontWeek * 2, height: settings.fontWeek * 2)
                 }
                 Text(dayNum)
                     .font(.system(size: settings.fontWeek + 2, weight: isToday ? .bold : .regular))
-                    .foregroundColor(isToday ? .white : .primary)
+                    .foregroundColor(isToday ? Color.onColor(hex: settings.accentColorHex) : .primary)
+            }
+            if settings.hebrewDisplayMode != "english" {
+                Text(HebrewDateFormatting.string(for: day))
+                    .font(.system(size: 8))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+            }
+            if let first = holidays.first {
+                Text(first.nameEn)
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundColor(first.color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
             }
         }
     }
@@ -129,6 +151,7 @@ private struct WeekDayHeader: View {
 // MARK: - Single day column with events
 
 private struct WeekDayColumn: View {
+    @EnvironmentObject var settings: AppSettings
     var day: Date
     var events: [CalendarEvent]
     var now: Date
@@ -141,7 +164,7 @@ private struct WeekDayColumn: View {
         ZStack(alignment: .topLeading) {
             // Today background tint
             if isToday {
-                Color.blue.opacity(0.04)
+                settings.accentColor.opacity(0.06)
             }
 
             // Horizontal hour grid lines
@@ -167,17 +190,18 @@ private struct WeekDayColumn: View {
                             }
                         }
 
-                        // Current time redline (today only)
+                        // Current time line (today only) — follows the accent
+                        // color, same convention as the Mac app.
                         if isToday {
                             let ny = nowY
                             // Circle marker
                             Circle()
-                                .fill(Color.red)
+                                .fill(settings.accentColor)
                                 .frame(width: 8, height: 8)
                                 .offset(x: -4, y: ny - 4)
                             // Horizontal line
                             Rectangle()
-                                .fill(Color.red)
+                                .fill(settings.accentColor)
                                 .frame(width: geo.size.width + 4, height: 2)
                                 .offset(x: -4, y: ny - 1)
                         }
@@ -220,12 +244,13 @@ private struct WeekEventBlock: View {
     var height: CGFloat
 
     var body: some View {
+        let fillColor = Color(hex: event.color) ?? settings.accentColor
         RoundedRectangle(cornerRadius: 3)
-            .fill(Color(hex: event.color) ?? .blue)
+            .fill(fillColor)
             .overlay(alignment: .topLeading) {
                 Text(event.title)
                     .font(.system(size: max(settings.fontWeek - 2, 9), weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.onColor(hex: event.color.isEmpty ? settings.accentColorHex : event.color))
                     .padding(2)
                     .lineLimit(height > 36 ? 2 : 1)
             }

@@ -401,7 +401,8 @@ class _AssignmentPanel(QWidget):
 
         if not assignments:
             ph = QLabel("No assignments yet — add one below.")
-            ph.setStyleSheet(f"color: {GRAY_TEXT}; font-size: 13px; padding: 20px;")
+            color = D_GRAY_TEXT if self._dark else GRAY_TEXT
+            ph.setStyleSheet(f"color: {color}; font-size: 13px; padding: 20px;")
             ph.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._rows.append(ph)
             self._body_layout.insertWidget(self._body_layout.count() - 1, ph)

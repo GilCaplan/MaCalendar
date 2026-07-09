@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI
 
 class AppSettings: ObservableObject {
     @Published var serverURL: String {
@@ -14,7 +15,11 @@ class AppSettings: ObservableObject {
     @Published var theme: String {
         didSet { UserDefaults.standard.set(theme, forKey: "userTheme") }
     }
-    
+    @Published var accentColorHex: String {
+        didSet { UserDefaults.standard.set(accentColorHex, forKey: "accentColorHex") }
+    }
+    var accentColor: Color { Color(hex: accentColorHex) ?? Theme.defaultAccent }
+
     @Published var fontMonth: Double {
         didSet { UserDefaults.standard.set(fontMonth, forKey: "fontMonth") }
     }
@@ -28,12 +33,25 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(fontTasks, forKey: "fontTasks") }
     }
 
+    // Hebrew calendar — local-only, mirrors the Mac's config.yaml options but
+    // isn't synced from it (same precedent as the font settings above).
+    @Published var hebrewDisplayMode: String {
+        didSet { UserDefaults.standard.set(hebrewDisplayMode, forKey: "hebrewDisplayMode") }
+    }
+    @Published var showHolidays: Bool {
+        didSet { UserDefaults.standard.set(showHolidays, forKey: "showHolidays") }
+    }
+    @Published var israelHolidays: Bool {
+        didSet { UserDefaults.standard.set(israelHolidays, forKey: "israelHolidays") }
+    }
+
     init() {
         self.serverURL = UserDefaults.standard.string(forKey: "serverURL") ?? ""
         self.apiKey    = UserDefaults.standard.string(forKey: "apiKey") ?? ""
         self.ttsVoice  = UserDefaults.standard.string(forKey: "ttsVoice") ?? "en-US"
         self.theme     = UserDefaults.standard.string(forKey: "userTheme") ?? "dark"
-        
+        self.accentColorHex = UserDefaults.standard.string(forKey: "accentColorHex") ?? Theme.defaultAccentHex
+
         let fm = UserDefaults.standard.double(forKey: "fontMonth")
         self.fontMonth = fm == 0 ? 13 : fm
         
@@ -45,5 +63,11 @@ class AppSettings: ObservableObject {
         
         let ft = UserDefaults.standard.double(forKey: "fontTasks")
         self.fontTasks = ft == 0 ? 16 : ft
+
+        self.hebrewDisplayMode = UserDefaults.standard.string(forKey: "hebrewDisplayMode") ?? "both"
+        self.showHolidays = UserDefaults.standard.object(forKey: "showHolidays") == nil
+            ? true : UserDefaults.standard.bool(forKey: "showHolidays")
+        self.israelHolidays = UserDefaults.standard.object(forKey: "israelHolidays") == nil
+            ? true : UserDefaults.standard.bool(forKey: "israelHolidays")
     }
 }

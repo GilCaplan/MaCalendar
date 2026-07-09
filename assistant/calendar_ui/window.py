@@ -8,7 +8,7 @@ import threading
 from typing import Optional
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QFont, QCloseEvent
+from PyQt6.QtGui import QFont, QCloseEvent, QColor
 from PyQt6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QDialog,
     QCheckBox,
+    QColorDialog,
     QComboBox,
     QSpinBox,
     QGridLayout,
@@ -35,7 +36,7 @@ from assistant.calendar_ui.event_dialog import EventDialog
 from assistant.calendar_ui.month_view import MonthView
 from assistant.calendar_ui.sidebar import Sidebar
 import assistant.calendar_ui.styles as _styles
-from assistant.calendar_ui.styles import get_app_style, BLUE, GRAY_BORDER, GRAY_DARK, GRAY_TEXT, WHITE
+from assistant.calendar_ui.styles import get_app_style, BLUE, GRAY_BORDER, GRAY_DARK, GRAY_TEXT, GRAY_BG
 from assistant.calendar_ui.week_view import WeekView
 from assistant.calendar_ui.importer import parse_ics, scan_macos_calendar, import_events
 from assistant.db import CalendarDB
@@ -83,6 +84,35 @@ _MIC_OBJ_NAMES = {
     STATUS_SWITCH_TODAY: "mic_idle",
     STATUS_SWITCH_TODO: "mic_idle",
 }
+
+
+class ElidingLabel(QLabel):
+    """QLabel that elides its text with '…' when the toolbar doesn't have
+    room for it, instead of silently clipping mid-character — the plain
+    QLabel used for the title bar hard-cut the Hebrew month/year suffix
+    with no visual indication text was missing. The full text is always
+    available via tooltip."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._full_text = ""
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+
+    def setText(self, text: str) -> None:  # noqa: N802 — overriding QLabel's API
+        self._full_text = text
+        self.setToolTip(text)
+        self._update_elided()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._update_elided()
+
+    def _update_elided(self) -> None:
+        if not self._full_text:
+            return
+        fm = self.fontMetrics()
+        elided = fm.elidedText(self._full_text, Qt.TextElideMode.ElideRight, self.width())
+        super().setText(elided)
 
 
 class ToastLabel(QLabel):
@@ -150,6 +180,23 @@ class CalendarWindow(QMainWindow):
             self._poll_timer.setInterval(100)
             self._poll_timer.timeout.connect(self._poll_status)
             self._poll_timer.start()
+
+        # Periodic background sync for connected calendars (ICS subscriptions +
+        # two-way Outlook). Independent of the pipeline status timer above.
+        self._sync_results_queue: queue.Queue = queue.Queue()
+        self._sync_running = False
+        self._sync_result_timer = QTimer(self)
+        self._sync_result_timer.setInterval(500)
+        self._sync_result_timer.timeout.connect(self._drain_sync_results)
+        self._sync_result_timer.start()
+
+        self._sync_timer = QTimer(self)
+        self._sync_timer.setInterval(15 * 60 * 1000)  # 15 minutes
+        self._sync_timer.timeout.connect(self._start_background_sync)
+        self._sync_timer.start()
+        # Kick off one sync shortly after launch so connected calendars show
+        # up without waiting a full 15 minutes.
+        QTimer.singleShot(5000, self._start_background_sync)
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Standard window close event — keeps persistence."""
@@ -222,10 +269,15 @@ class CalendarWindow(QMainWindow):
         bar = QWidget()
         self._toolbar_bar = bar
         bar.setFixedHeight(54)
-        bar.setStyleSheet(f"background-color: {WHITE}; border-bottom: 1px solid {GRAY_BORDER};")
+        bar.setStyleSheet(f"background-color: {GRAY_BG}; border-bottom: 1px solid {GRAY_BORDER};")
         layout = QHBoxLayout(bar)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(2)
+        # Every widget below is added with AlignVCenter explicitly — mixed
+        # fixed-height buttons, an auto-height label, and spacer items in
+        # one row previously let some drift toward the top of the bar
+        # instead of sitting centered in the available 30px content height.
+        v_center = Qt.AlignmentFlag.AlignVCenter
 
         # ── Group 1: nav arrows ──────────────────────────────────────
         prev_btn = QPushButton("‹")
@@ -233,14 +285,14 @@ class CalendarWindow(QMainWindow):
         prev_btn.setFixedSize(28, 28)
         prev_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         prev_btn.clicked.connect(self._on_prev)
-        layout.addWidget(prev_btn)
+        layout.addWidget(prev_btn, alignment=v_center)
 
         next_btn = QPushButton("›")
         next_btn.setObjectName("nav")
         next_btn.setFixedSize(28, 28)
         next_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         next_btn.clicked.connect(self._on_next)
-        layout.addWidget(next_btn)
+        layout.addWidget(next_btn, alignment=v_center)
 
         layout.addSpacing(4)
 
@@ -249,17 +301,17 @@ class CalendarWindow(QMainWindow):
         today_btn.setFixedHeight(30)
         today_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         today_btn.clicked.connect(self._on_today)
-        layout.addWidget(today_btn)
+        layout.addWidget(today_btn, alignment=v_center)
 
         # ── Title ────────────────────────────────────────────────────
         layout.addSpacing(6)
-        self._title_label = QLabel()
+        self._title_label = ElidingLabel()
         self._title_label.setObjectName("month_title")
         font = QFont()
         font.setPointSize(15)
         font.setWeight(QFont.Weight.DemiBold)
         self._title_label.setFont(font)
-        layout.addWidget(self._title_label)
+        layout.addWidget(self._title_label, alignment=v_center)
 
         layout.addStretch()
 
@@ -267,20 +319,22 @@ class CalendarWindow(QMainWindow):
         for label, mode in [("Month", "month"), ("Week", "week"), ("Day", "day"), ("Tasks", "todo"), ("Timer", "timer"), ("Coursework", "coursework")]:
             btn = QPushButton(label)
             btn.setObjectName("seg_btn")
-            btn.setProperty("active", mode == self._view_mode)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setFixedHeight(30)
             btn.clicked.connect(lambda _, m=mode: self._set_view(m))
-            layout.addWidget(btn)
+            layout.addWidget(btn, alignment=v_center)
             setattr(self, f"_view_btn_{mode}", btn)
+            # Styled by _apply_theme(), always called right after _build_ui()
+            # in __init__ — no need to style twice here.
 
         # ── Separator ────────────────────────────────────────────────
         layout.addSpacing(8)
         sep = QFrame()
+        self._toolbar_sep = sep
         sep.setFrameShape(QFrame.Shape.VLine)
         sep.setFixedHeight(22)
         sep.setStyleSheet(f"color: {GRAY_BORDER};")
-        layout.addWidget(sep)
+        layout.addWidget(sep, alignment=v_center)
         layout.addSpacing(6)
 
         # ── Group 3: tools ───────────────────────────────────────────
@@ -290,7 +344,15 @@ class CalendarWindow(QMainWindow):
         import_btn.setToolTip("Import events from an .ics file or macOS Calendar")
         import_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         import_btn.clicked.connect(self._on_import)
-        layout.addWidget(import_btn)
+        layout.addWidget(import_btn, alignment=v_center)
+
+        connected_btn = QPushButton("🔗")
+        connected_btn.setObjectName("icon_btn")
+        connected_btn.setFixedSize(30, 30)
+        connected_btn.setToolTip("Connected Calendars — Gmail/Outlook/iCloud subscribe by link or connect Outlook")
+        connected_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        connected_btn.clicked.connect(self._on_connected_calendars)
+        layout.addWidget(connected_btn, alignment=v_center)
 
         self._settings_btn = QPushButton("⚙")
         self._settings_btn.setObjectName("icon_btn")
@@ -298,7 +360,7 @@ class CalendarWindow(QMainWindow):
         self._settings_btn.setToolTip("Assistant Settings")
         self._settings_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._settings_btn.clicked.connect(self._on_settings_popup)
-        layout.addWidget(self._settings_btn)
+        layout.addWidget(self._settings_btn, alignment=v_center)
 
         self._theme_btn = QPushButton("○")
         self._theme_btn.setObjectName("icon_btn")
@@ -306,7 +368,7 @@ class CalendarWindow(QMainWindow):
         self._theme_btn.setToolTip("Toggle dark / light mode")
         self._theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._theme_btn.clicked.connect(self._on_toggle_theme)
-        layout.addWidget(self._theme_btn)
+        layout.addWidget(self._theme_btn, alignment=v_center)
         self._update_theme_btn()
 
         layout.addSpacing(2)
@@ -318,9 +380,36 @@ class CalendarWindow(QMainWindow):
         self._mic_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         if self._pipeline is not None:
             self._mic_btn.clicked.connect(self._pipeline.trigger)
-        layout.addWidget(self._mic_btn)
+        layout.addWidget(self._mic_btn, alignment=v_center)
 
         return bar
+
+    def _style_seg_btn(self, btn: QPushButton, active: bool) -> None:
+        # Always set a complete inline stylesheet for both states rather than
+        # toggling the `[active="true"]` dynamic-property selector or ever
+        # clearing back to "": PyQt6's QSS engine was observed to only apply
+        # part of a rule (e.g. `color` but not `background-color`) after
+        # unpolish()/polish(), AND separately to only partially revert a
+        # previous inline override when cleared with setStyleSheet("":) —
+        # in both cases leaving stale, mismatched paint state on whichever
+        # button last changed. Explicitly stating every property for both
+        # states every time avoids relying on any cache invalidation.
+        dark = self._dark
+        text2 = _styles.D_GRAY_TEXT if dark else GRAY_TEXT
+        text = _styles.D_GRAY_DARK if dark else GRAY_DARK
+        hover = _styles.D_GRAY_LIGHT if dark else _styles.GRAY_LIGHT
+        if active:
+            btn.setStyleSheet(
+                f"QPushButton#seg_btn {{ background-color: {_styles.BLUE}; "
+                f"color: {_styles.ON_ACCENT}; font-weight: 700; border: none; }}"
+            )
+        else:
+            btn.setStyleSheet(
+                f"QPushButton#seg_btn {{ background-color: transparent; color: {text2}; "
+                f"font-weight: 500; border: none; }}"
+                f"QPushButton#seg_btn:hover {{ background-color: {hover}; color: {text}; }}"
+            )
+        btn.setProperty("active", active)
 
     def _update_theme_btn(self) -> None:
         # Show the icon for what the mode will switch TO
@@ -394,9 +483,7 @@ class CalendarWindow(QMainWindow):
         for m in ("month", "week", "day", "todo", "timer", "coursework"):
             btn = getattr(self, f"_view_btn_{m}", None)
             if btn:
-                btn.setProperty("active", m == mode)
-                btn.style().unpolish(btn)
-                btn.style().polish(btn)
+                self._style_seg_btn(btn, m == mode)
         # Keep pipeline context-aware of current view for voice routing
         if self._pipeline is not None:
             self._pipeline.current_view = mode
@@ -411,6 +498,18 @@ class CalendarWindow(QMainWindow):
                 )
         self._navigate()
 
+    def _title_with_hebrew(self, base: str, representative_date: datetime.date) -> str:
+        """Append/replace *base* with the Hebrew month+year per the configured
+        display mode. Uses a single representative date (not every visible
+        day) since the Hebrew month+year would otherwise repeat redundantly
+        across a whole month/week grid."""
+        mode = self._config.hebrew_calendar.display_mode if self._config else "english"
+        if mode == "english":
+            return base
+        from assistant.hebrew_calendar import hebrew_month_year_string
+        heb = hebrew_month_year_string(representative_date)
+        return heb if mode == "hebrew" else f"{base}   ·   {heb}"
+
     def _update_title(self) -> None:
         if self._view_mode == "timer":
             self._title_label.setText("Timer")
@@ -421,27 +520,30 @@ class CalendarWindow(QMainWindow):
         if self._view_mode == "todo":
             self._title_label.setText("Tasks")
         elif self._view_mode == "month":
-            self._title_label.setText(self._current_date.strftime("%B %Y"))
+            base = self._current_date.strftime("%B %Y")
+            # Mid-month as the representative date — the 1st can fall right
+            # at a Hebrew month boundary and misrepresent most of the grid.
+            mid = self._current_date.replace(day=15)
+            self._title_label.setText(self._title_with_hebrew(base, mid))
         elif self._view_mode == "week":
             week_start = self._current_date - datetime.timedelta(days=(self._current_date.weekday() + 1) % 7)
             week_end = week_start + datetime.timedelta(days=6)
             if week_start.month == week_end.month:
-                self._title_label.setText(
-                    f"{week_start.strftime('%B %-d')} – {week_end.day}, {week_end.year}"
-                )
+                base = f"{week_start.strftime('%B %-d')} – {week_end.day}, {week_end.year}"
             else:
-                self._title_label.setText(
-                    f"{week_start.strftime('%b %-d')} – {week_end.strftime('%b %-d, %Y')}"
-                )
+                base = f"{week_start.strftime('%b %-d')} – {week_end.strftime('%b %-d, %Y')}"
+            mid = week_start + datetime.timedelta(days=3)
+            self._title_label.setText(self._title_with_hebrew(base, mid))
         else:  # day
-            self._title_label.setText(self._current_date.strftime("%A, %B %-d, %Y"))
+            base = self._current_date.strftime("%A, %B %-d, %Y")
+            self._title_label.setText(self._title_with_hebrew(base, self._current_date))
 
     # ------------------------------------------------------------------
     # Event actions
     # ------------------------------------------------------------------
 
     def _on_new_event(self, default_date: Optional[datetime.date] = None) -> None:
-        dialog = EventDialog(self, default_date=default_date or self._current_date)
+        dialog = EventDialog(self, default_date=default_date or self._current_date, db=self._db)
         if dialog.exec() and dialog.event_data:
             self._db.create_event_from_dict(dialog.event_data)
             self.refresh_calendar()
@@ -450,13 +552,13 @@ class CalendarWindow(QMainWindow):
         self._on_new_event(default_date=date)
 
     def _on_datetime_double_clicked(self, dt: datetime.datetime) -> None:
-        dialog = EventDialog(self, default_date=dt.date(), default_time=dt.time())
+        dialog = EventDialog(self, default_date=dt.date(), default_time=dt.time(), db=self._db)
         if dialog.exec() and dialog.event_data:
             self._db.create_event_from_dict(dialog.event_data)
             self.refresh_calendar()
 
     def _on_event_clicked(self, event: dict) -> None:
-        dialog = EventDialog(self, event=event)
+        dialog = EventDialog(self, event=event, db=self._db)
         if dialog.exec():
             ev_id = event.get("id")
             series_id = event.get("series_id")
@@ -502,8 +604,12 @@ class CalendarWindow(QMainWindow):
                         self.show_toast(f"Updated \"{dialog.event_data['title']}\"")
 
     def _on_event_rescheduled(self, event_id: int, updates: dict) -> None:
+        event = self._db.get_event(event_id)
+        if event and self._db.is_event_locked(event):
+            self.refresh_calendar()  # snap the drag back to its DB position
+            self.show_toast("This event is read-only and can't be moved")
+            return
         if "start_time" in updates and "end_time" not in updates:
-            event = self._db.get_event(event_id)
             if event:
                 try:
                     orig_sh, orig_sm = map(int, event["start_time"].split(":"))
@@ -602,7 +708,8 @@ class CalendarWindow(QMainWindow):
         self._apply_theme(self._dark, show_toast=True)
 
     def _apply_theme(self, dark: bool, show_toast: bool = False) -> None:
-        self.setStyleSheet(get_app_style(dark))
+        accent = self._config.ui.accent_color if self._config else None
+        self.setStyleSheet(get_app_style(dark, accent))
         self._month_view.apply_theme(dark)
         self._week_view.apply_theme(dark)
         self._day_view.apply_theme(dark)
@@ -615,18 +722,19 @@ class CalendarWindow(QMainWindow):
             self._coursework_view.apply_theme(dark)
 
         # Re-style toolbar
-        bg = _styles.D_WHITE if dark else WHITE
+        bg = _styles.D_GRAY_BG if dark else _styles.GRAY_BG
         border = _styles.D_GRAY_BORDER if dark else GRAY_BORDER
         if hasattr(self, "_toolbar_bar"):
             self._toolbar_bar.setStyleSheet(
                 f"background-color: {bg}; border-bottom: 1px solid {border};"
             )
-        # Force segmented buttons to repaint with new theme
+        if hasattr(self, "_toolbar_sep"):
+            self._toolbar_sep.setStyleSheet(f"color: {border};")
+        # Re-apply segmented button styling (colors depend on theme + accent)
         for m in ("month", "week", "day", "todo", "timer", "coursework"):
             btn = getattr(self, f"_view_btn_{m}", None)
             if btn:
-                btn.style().unpolish(btn)
-                btn.style().polish(btn)
+                self._style_seg_btn(btn, m == self._view_mode)
         self._update_theme_btn()
         if show_toast:
             self.show_toast("Dark mode on" if dark else "Light mode on")
@@ -643,6 +751,11 @@ class CalendarWindow(QMainWindow):
             self._timer_view.apply_ui_config(ui)
         if hasattr(self, "_coursework_view"):
             self._coursework_view.apply_ui_config(ui)
+        hebrew = self._config.hebrew_calendar
+        self._month_view.apply_hebrew_config(hebrew)
+        self._week_view.apply_hebrew_config(hebrew)
+        self._day_view.apply_hebrew_config(hebrew)
+        self._update_title()
         self.refresh_calendar()
 
     def _on_briefing_requested(self) -> None:
@@ -715,6 +828,83 @@ class CalendarWindow(QMainWindow):
         theme_combo.setCurrentText("Dark" if (self._config.theme == "dark") else "Light")
         theme_layout.addWidget(theme_combo)
         layout.addLayout(theme_layout)
+
+        layout.addStretch(1)
+
+        # Accent Color
+        layout.addWidget(QLabel("Accent Color:"))
+        accent_state = {"hex": self._config.ui.accent_color}
+        swatch_row = QHBoxLayout()
+        swatch_row.setSpacing(8)
+        swatch_buttons: list[QPushButton] = []
+
+        def make_swatch(hex_color: str) -> QPushButton:
+            btn = QPushButton()
+            btn.setFixedSize(24, 24)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+
+            def refresh():
+                selected = accent_state["hex"].lower() == hex_color.lower()
+                ring = "#ffffff" if selected else "transparent"
+                btn.setStyleSheet(
+                    f"QPushButton {{ background-color: {hex_color}; border-radius: 12px; "
+                    f"padding: 0; border: 2px solid {ring}; }}"
+                )
+            btn._refresh = refresh
+            refresh()
+
+            def on_click():
+                accent_state["hex"] = hex_color
+                custom_btn.setStyleSheet("")
+                for b in swatch_buttons:
+                    b._refresh()
+            btn.clicked.connect(on_click)
+            return btn
+
+        for _name, hex_color in _styles.ACCENT_PRESETS:
+            b = make_swatch(hex_color)
+            b.setToolTip(_name)
+            swatch_buttons.append(b)
+            swatch_row.addWidget(b)
+
+        custom_btn = QPushButton("Custom…")
+        custom_btn.setObjectName("flat")
+
+        def pick_custom():
+            initial = QColor(accent_state["hex"])
+            color = QColorDialog.getColor(initial, dialog, "Choose Accent Color")
+            if color.isValid():
+                accent_state["hex"] = color.name()
+                for b in swatch_buttons:
+                    b._refresh()
+                custom_btn.setStyleSheet(f"QPushButton#flat {{ border: 2px solid {color.name()}; }}")
+        custom_btn.clicked.connect(pick_custom)
+        swatch_row.addWidget(custom_btn)
+        swatch_row.addStretch(1)
+        layout.addLayout(swatch_row)
+
+        layout.addStretch(1)
+
+        # Hebrew Calendar
+        layout.addWidget(QLabel("Hebrew Calendar:"))
+        hebrew_layout = QHBoxLayout()
+        hebrew_layout.addWidget(QLabel("Show dates as:"))
+        hebrew_mode_combo = QComboBox()
+        hebrew_mode_combo.addItem("English only", "english")
+        hebrew_mode_combo.addItem("Hebrew only", "hebrew")
+        hebrew_mode_combo.addItem("Both", "both")
+        idx = hebrew_mode_combo.findData(self._config.hebrew_calendar.display_mode)
+        hebrew_mode_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        hebrew_layout.addWidget(hebrew_mode_combo)
+        layout.addLayout(hebrew_layout)
+
+        hebrew_holidays_cb = QCheckBox("Show Jewish / Israeli holidays")
+        hebrew_holidays_cb.setChecked(self._config.hebrew_calendar.show_holidays)
+        layout.addWidget(hebrew_holidays_cb)
+
+        hebrew_israel_cb = QCheckBox("Israel holiday schedule (uncheck for Diaspora)")
+        hebrew_israel_cb.setChecked(self._config.hebrew_calendar.israel_holidays)
+        layout.addWidget(hebrew_israel_cb)
 
         layout.addStretch(1)
 
@@ -876,6 +1066,9 @@ class CalendarWindow(QMainWindow):
             raw_phrases = [p.strip() for p in stop_phrases_edit.text().split(",") if p.strip()]
             self._config.audio.stop_phrases = raw_phrases
             self._config.audio.event_separator = sep_edit.text().strip()
+            self._config.hebrew_calendar.display_mode = hebrew_mode_combo.currentData()
+            self._config.hebrew_calendar.show_holidays = hebrew_holidays_cb.isChecked()
+            self._config.hebrew_calendar.israel_holidays = hebrew_israel_cb.isChecked()
             # Try to write to config.yaml safely
             try:
                 import os, re, yaml as _yaml
@@ -895,6 +1088,10 @@ class CalendarWindow(QMainWindow):
                     txt = re.sub(r"font_tasks:\s*\d+", f"font_tasks: {tasks_spin.value()}", txt, count=1)
                     txt = re.sub(r"font_coursework:\s*\d+", f"font_coursework: {coursework_spin.value()}", txt, count=1)
                     txt = re.sub(r"compact_ui:\s*(true|false)", f"compact_ui: {'true' if compact_cb.isChecked() else 'false'}", txt, count=1)
+                    if re.search(r'accent_color:\s*"[^"]*"', txt):
+                        txt = re.sub(r'accent_color:\s*"[^"]*"', f'accent_color: "{accent_state["hex"]}"', txt, count=1)
+                    else:
+                        txt = re.sub(r"(compact_ui:\s*(?:true|false))", rf'\1\n  accent_color: "{accent_state["hex"]}"', txt, count=1)
                     # Event keywords — write as YAML flow list
                     kw_yaml = _yaml.dump(raw_keywords, default_flow_style=True).strip()
                     txt = re.sub(r"event_keywords:\s*\[.*?\]", f"event_keywords: {kw_yaml}", txt, count=1)
@@ -904,9 +1101,32 @@ class CalendarWindow(QMainWindow):
                     # Event separator
                     sep_val = sep_edit.text().strip()
                     txt = re.sub(r'event_separator:\s*"[^"]*"', f'event_separator: "{sep_val}"', txt, count=1)
+                    # Hebrew calendar — append the block if config.yaml predates this feature
+                    if "hebrew_calendar:" in txt:
+                        txt = re.sub(
+                            r'display_mode:\s*"[^"]*"',
+                            f'display_mode: "{hebrew_mode_combo.currentData()}"', txt, count=1,
+                        )
+                        txt = re.sub(
+                            r"show_holidays:\s*(true|false)",
+                            f"show_holidays: {'true' if hebrew_holidays_cb.isChecked() else 'false'}",
+                            txt, count=1,
+                        )
+                        txt = re.sub(
+                            r"israel_holidays:\s*(true|false)",
+                            f"israel_holidays: {'true' if hebrew_israel_cb.isChecked() else 'false'}",
+                            txt, count=1,
+                        )
+                    else:
+                        txt += (
+                            "\nhebrew_calendar:\n"
+                            f'  display_mode: "{hebrew_mode_combo.currentData()}"\n'
+                            f"  show_holidays: {'true' if hebrew_holidays_cb.isChecked() else 'false'}\n"
+                            f"  israel_holidays: {'true' if hebrew_israel_cb.isChecked() else 'false'}\n"
+                        )
                     with open(c_path, "w") as f:
                         f.write(txt)
-                    
+
                     # Apply changes immediately
                     self._config.ui.font_month = month_spin.value()
                     self._config.ui.font_week = week_spin.value()
@@ -914,12 +1134,16 @@ class CalendarWindow(QMainWindow):
                     self._config.ui.font_tasks = tasks_spin.value()
                     self._config.ui.font_coursework = coursework_spin.value()
                     self._config.ui.compact_ui = compact_cb.isChecked()
+                    self._config.ui.accent_color = accent_state["hex"]
+                    _styles.set_accent(accent_state["hex"])
                     self._apply_ui_config()
-                
+                    self._apply_theme(self._dark)
+
             except Exception as e:
                 QMessageBox.critical(self, "Error Saving", f"Could not save config.yaml: {e}")
-                
+
             self.show_toast("Settings applied!")
+            self.refresh_calendar()
             dialog.accept()
             
         save_btn.clicked.connect(save_config)
@@ -981,3 +1205,243 @@ class CalendarWindow(QMainWindow):
             self.show_toast(f"Imported {inserted} event(s) from macOS Calendar, {skipped} skipped")
         except Exception as e:
             QMessageBox.critical(self, "Import Error", str(e))
+
+    # ------------------------------------------------------------------
+    # Connected calendars — ICS/webcal subscriptions + two-way Outlook sync
+    # ------------------------------------------------------------------
+
+    def _start_background_sync(self) -> None:
+        """Refresh all connected calendars on a worker thread. Safe to call
+        from the periodic QTimer, the manual 'Sync Now' button, or right
+        after adding/connecting a new source."""
+        if self._sync_running or self._config is None:
+            return
+        self._sync_running = True
+
+        def worker() -> None:
+            from assistant.calendar_sync.outlook_sync import run_full_sync
+            try:
+                results = run_full_sync(self._db, self._config)
+            except Exception as e:  # noqa: BLE001 — surface any failure as a toast, don't crash the thread
+                results = {"errors": [str(e)]}
+            self._sync_results_queue.put(results)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _drain_sync_results(self) -> None:
+        """Runs on the main-thread QTimer; picks up finished sync results."""
+        try:
+            while True:
+                results = self._sync_results_queue.get_nowait()
+                self._sync_running = False
+                self.refresh_calendar()
+                refresh_dialog = getattr(self, "_connected_dialog_refresh", None)
+                if refresh_dialog:
+                    refresh_dialog()
+                pulled = results.get("ics_synced", 0) + results.get("outlook_pulled", 0)
+                pushed = results.get("outlook_pushed", 0)
+                if results.get("errors"):
+                    self.show_toast("Calendar sync had errors — see Connected Calendars")
+                elif pulled or pushed:
+                    self.show_toast(f"Calendars synced ({pulled} pulled, {pushed} pushed)")
+        except queue.Empty:
+            pass
+
+    def _on_connected_calendars(self) -> None:
+        from PyQt6.QtWidgets import QListWidget, QListWidgetItem
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Connected Calendars")
+        dialog.setMinimumSize(500, 460)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(10)
+
+        intro = QLabel(
+            "Subscribe to any calendar's private ICS/webcal link (Gmail, Outlook.com, "
+            "iCloud, Yahoo…) for a read-only feed that auto-refreshes. Connect Outlook "
+            "directly below for two-way sync instead."
+        )
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+
+        list_widget = QListWidget()
+        list_widget.setAlternatingRowColors(True)
+        layout.addWidget(list_widget, 1)
+
+        def refresh_list() -> None:
+            list_widget.clear()
+            for source in self._db.get_calendar_sources():
+                if source["kind"] == "outlook":
+                    kind_label = "Outlook (two-way)" if source["two_way"] else "Outlook (read-only pull)"
+                else:
+                    kind_label = "ICS link"
+                label = source["label"] or source["url"] or "Outlook"
+                status = f"last synced {source['last_synced'][:16].replace('T', ' ')}" if source["last_synced"] else "not yet synced"
+                state = "" if source["enabled"] else "  (disabled)"
+                item = QListWidgetItem(f"{label}  —  {kind_label}  —  {status}{state}")
+                item.setData(Qt.ItemDataRole.UserRole, source["id"])
+                list_widget.addItem(item)
+
+        self._connected_dialog_refresh = refresh_list
+        refresh_list()
+
+        remove_btn = QPushButton("Remove Selected")
+
+        def remove_selected() -> None:
+            item = list_widget.currentItem()
+            if not item:
+                return
+            self._db.delete_calendar_source(item.data(Qt.ItemDataRole.UserRole))
+            refresh_list()
+            self.refresh_calendar()
+
+        remove_btn.clicked.connect(remove_selected)
+        layout.addWidget(remove_btn)
+
+        layout.addWidget(QLabel("Add a calendar link (ICS / webcal URL):"))
+        add_row = QHBoxLayout()
+        label_edit = QLineEdit()
+        label_edit.setPlaceholderText("Label (e.g. \"My Gmail\")")
+        url_edit = QLineEdit()
+        url_edit.setPlaceholderText("https://calendar.google.com/.../basic.ics")
+        add_row.addWidget(label_edit, 1)
+        add_row.addWidget(url_edit, 2)
+        add_btn = QPushButton("Add")
+
+        def add_ics() -> None:
+            url = url_edit.text().strip()
+            if not url:
+                return
+            self._db.create_calendar_source(kind="ics_url", label=label_edit.text().strip(), url=url)
+            label_edit.clear()
+            url_edit.clear()
+            refresh_list()
+            self._start_background_sync()
+
+        add_btn.clicked.connect(add_ics)
+        add_row.addWidget(add_btn)
+        layout.addLayout(add_row)
+
+        layout.addSpacing(6)
+
+        outlook_row = QHBoxLayout()
+        connect_outlook_btn = QPushButton("Connect Outlook…")
+
+        def connect_outlook() -> None:
+            if self._config.microsoft is None:
+                QMessageBox.warning(
+                    dialog, "Outlook Not Configured",
+                    "Add a \"microsoft:\" section (client_id) to config.yaml first — "
+                    "see README for registering a free Azure AD app.",
+                )
+                return
+            self._start_outlook_connect(dialog, refresh_list)
+
+        connect_outlook_btn.clicked.connect(connect_outlook)
+        outlook_row.addWidget(connect_outlook_btn)
+
+        two_way_cb = QCheckBox("Two-way sync (push my edits/deletes back to Outlook)")
+        existing_outlook = self._db.get_calendar_source_by_kind("outlook")
+        two_way_cb.setChecked(bool(existing_outlook and existing_outlook["two_way"]))
+
+        def toggle_two_way(checked: bool) -> None:
+            src = self._db.get_calendar_source_by_kind("outlook")
+            if src:
+                self._db.update_calendar_source(src["id"], two_way=int(checked))
+            else:
+                QMessageBox.information(dialog, "Not Connected", "Connect Outlook first.")
+                two_way_cb.setChecked(False)
+
+        two_way_cb.toggled.connect(toggle_two_way)
+        outlook_row.addWidget(two_way_cb)
+        layout.addLayout(outlook_row)
+
+        sync_now_btn = QPushButton("Sync Now")
+        sync_now_btn.clicked.connect(self._start_background_sync)
+        layout.addWidget(sync_now_btn)
+
+        close_btn = QPushButton("Close")
+        close_btn.setDefault(True)
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn)
+
+        dialog.exec()
+        self._connected_dialog_refresh = None
+
+    def _start_outlook_connect(self, parent_dialog: QDialog, on_done) -> None:
+        """Runs MSAL's device-code flow with a small modal instead of the
+        console-only UX the menu-bar 'Re-authenticate' item uses."""
+        from assistant.actions.calendar.auth import MSALAuth
+
+        try:
+            auth = MSALAuth(self._config.microsoft)
+            flow = auth.start_device_flow()
+        except Exception as e:
+            QMessageBox.critical(parent_dialog, "Outlook Connect Failed", str(e))
+            return
+
+        code_dialog = QDialog(parent_dialog)
+        code_dialog.setWindowTitle("Connect Outlook")
+        code_dialog.setMinimumWidth(380)
+        v = QVBoxLayout(code_dialog)
+
+        msg = QLabel(flow.get("message", ""))
+        msg.setWordWrap(True)
+        v.addWidget(msg)
+        status_lbl = QLabel("Waiting for you to complete sign-in in your browser…")
+        status_lbl.setWordWrap(True)
+        v.addWidget(status_lbl)
+
+        open_btn = QPushButton("Open Browser")
+
+        def open_browser() -> None:
+            from PyQt6.QtCore import QUrl
+            from PyQt6.QtGui import QDesktopServices
+            url = flow.get("verification_uri") or flow.get("verification_uri_complete", "")
+            if url:
+                QDesktopServices.openUrl(QUrl(url))
+
+        open_btn.clicked.connect(open_browser)
+        v.addWidget(open_btn)
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(code_dialog.reject)
+        v.addWidget(cancel_btn)
+
+        result_queue: queue.Queue = queue.Queue()
+
+        def worker() -> None:
+            try:
+                auth.complete_device_flow(flow)
+                result_queue.put(("ok", None))
+            except Exception as e:  # noqa: BLE001
+                result_queue.put(("error", str(e)))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+        poll_timer = QTimer(code_dialog)
+        poll_timer.setInterval(500)
+
+        def poll() -> None:
+            try:
+                status, err = result_queue.get_nowait()
+            except queue.Empty:
+                return
+            poll_timer.stop()
+            if status == "ok":
+                existing = self._db.get_calendar_source_by_kind("outlook")
+                if not existing:
+                    self._db.create_calendar_source(kind="outlook", label="Outlook")
+                code_dialog.accept()
+                self.show_toast("Outlook connected")
+                on_done()
+                self._start_background_sync()
+            else:
+                status_lbl.setText(f"Failed: {err}")
+
+        poll_timer.timeout.connect(poll)
+        poll_timer.start()
+        code_dialog.finished.connect(poll_timer.stop)
+
+        code_dialog.exec()

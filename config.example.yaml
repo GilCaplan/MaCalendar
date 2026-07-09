@@ -64,3 +64,20 @@ api:
   key: null            # optional secret — set a string to require X-API-Key header on all requests
                        # recommended when using --tailscale or --lan
 
+# Hebrew calendar + Jewish/Israeli holidays (all computed offline via pyluach)
+hebrew_calendar:
+  display_mode: "both"      # "english" | "hebrew" | "both" — Hebrew dates use gematria letters, never numerals
+  show_holidays: true        # overlay Jewish/Israeli holidays on Month/Week/Day views
+  israel_holidays: true      # true = Israel schedule (1-day Yom Tov), false = Diaspora (2-day)
+
+theme: "dark"  # "light" | "dark" - default theme on startup
+
+ui:
+  font_month: 11
+  font_week: 11
+  font_day: 13
+  font_tasks: 13
+  font_coursework: 13
+  compact_ui: false
+  accent_color: "#f5a524"   # hex; brand accent used app-wide (also editable from Settings → Accent Color)
+

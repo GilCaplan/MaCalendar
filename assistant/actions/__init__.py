@@ -57,31 +57,37 @@ class ActionRegistry:
         today_dt = datetime.date.fromisoformat(today)
         day_name = today_dt.strftime("%A")  # e.g. "Tuesday"
 
-        # Build 14-day reference so the LLM can resolve relative dates accurately.
-        # Days 0-6 are labelled "this [Day]" (or today/tomorrow), days 7-13 "next [Day]".
+        # Build date reference using actual calendar weeks (Mon–Sun) so that
+        # "next Wednesday" always refers to the Wednesday of next calendar week,
+        # not just 7 days from today (which breaks when today is Thu/Fri/Sat).
+        days_since_monday = today_dt.weekday()  # 0=Monday … 6=Sunday
+        this_monday = today_dt - datetime.timedelta(days=days_since_monday)
+        next_monday = this_monday + datetime.timedelta(days=7)
+        next_sunday = next_monday + datetime.timedelta(days=6)
+
         this_week = []
         next_week = []
-        for i in range(14):
-            d = today_dt + datetime.timedelta(days=i)
-            if i == 0:
+        # Today through end of this calendar week
+        d = today_dt
+        while d <= (this_monday + datetime.timedelta(days=6)):
+            delta = (d - today_dt).days
+            if delta == 0:
                 label = f"today ({day_name})"
-            elif i == 1:
+            elif delta == 1:
                 label = f"tomorrow ({d.strftime('%A')})"
-            elif i <= 6:
+            else:
                 label = f"this {d.strftime('%A')}"
-            else:
-                label = f"next {d.strftime('%A')}"
-            entry = f"  {label} = {d.isoformat()}"
-            if i <= 6:
-                this_week.append(entry)
-            else:
-                next_week.append(entry)
+            this_week.append(f"  {label} = {d.isoformat()}")
+            d += datetime.timedelta(days=1)
+        # All days of next calendar week
+        d = next_monday
+        while d <= next_sunday:
+            next_week.append(f"  next {d.strftime('%A')} = {d.isoformat()}")
+            d += datetime.timedelta(days=1)
 
-        next_week_start = today_dt + datetime.timedelta(days=7)
-        next_week_end = today_dt + datetime.timedelta(days=13)
         upcoming_str = (
             "This week:\n" + "\n".join(this_week) +
-            f"\n\nNext week ({next_week_start.strftime('%b %d')}–{next_week_end.strftime('%b %d')}):\n" +
+            f"\n\nNext week ({next_monday.strftime('%b %d')}–{next_sunday.strftime('%b %d')}):\n" +
             "\n".join(next_week)
         )
 
@@ -104,6 +110,7 @@ class ActionRegistry:
             "",
             "CRITICAL: Always use the 'actions' array, even if there is only 1 action.",
             "If the user's transcript contains multiple distinct events, times, or tasks (e.g. 'Set a meeting at 10am and another at 2pm'), extract each as a separate object in the 'actions' array.",
+            "When the user says 'another one', 'another [type]', 'one more', etc., inherit the title from the preceding event in the batch — never leave title empty.",
             "",
             'Use action="unknown" with parameters={} if no action matches.',
             "",

@@ -39,7 +39,7 @@ struct TaskRowView: View {
                 Button(action: onToggle) {
                     Image(systemName: todo.isDone ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: settings.fontTasks + 4))
-                        .foregroundColor(todo.isDone ? .blue : .secondary)
+                        .foregroundColor(todo.isDone ? settings.accentColor : .secondary)
                 }
                 .buttonStyle(.plain)
 
@@ -110,7 +110,7 @@ struct TaskRowView: View {
                             Button("Set") { editDueDate = Date() }
                                 .font(.system(size: settings.fontTasks - 2))
                                 .buttonStyle(.plain)
-                                .foregroundColor(.blue)
+                                .foregroundColor(settings.accentColor)
                         } else {
                             Button(action: { editDueDate = nil }) {
                                 Image(systemName: "xmark.circle.fill")

@@ -35,7 +35,7 @@ struct TasksView: View {
                         .labelsHidden()
                         Button(action: addTask) {
                             Image(systemName: "plus.circle.fill")
-                                .foregroundColor(.blue)
+                                .foregroundColor(settings.accentColor)
                         }
                         .disabled(newTaskTitle.isEmpty)
                     }

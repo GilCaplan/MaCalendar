@@ -7,7 +7,7 @@ import json
 import os
 from typing import Optional
 
-from PyQt6.QtCore import Qt, QDate, QEvent, QTimer, QUrl, pyqtSignal
+from PyQt6.QtCore import Qt, QDate, QEvent, QMimeData, QTimer, QUrl, pyqtSignal
 from PyQt6.QtGui import QFont, QPixmap
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -38,12 +38,17 @@ from PyQt6.QtGui import QDesktopServices
 
 from assistant.calendar_ui.styles import (
     BLUE,
+    BLUE_HOVER,
+    BLUE_DARK,
     D_GRAY_BG,
     D_GRAY_BORDER,
     D_GRAY_DARK,
     D_GRAY_MID,
     D_GRAY_TEXT,
     D_WHITE,
+    DESTRUCTIVE,
+    DESTRUCTIVE_DARK,
+    ON_ACCENT,
     GRAY_BG,
     GRAY_BORDER,
     GRAY_DARK,
@@ -62,6 +67,16 @@ _PRIORITY_COLORS = {
 _PRIORITY_LABELS = ["none", "low", "medium", "high"]
 
 IMG_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tiff", ".heic"}
+
+
+class _ClickableLabel(QLabel):
+    """QLabel that emits a clicked signal on left mouse press (works with PyQt6 SIP dispatch)."""
+    clicked = pyqtSignal()
+
+    def mousePressEvent(self, event) -> None:  # type: ignore[override]
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
 
 
 class _TodayDefaultDateEdit(QDateEdit):
@@ -83,6 +98,21 @@ class _TodayDefaultDateEdit(QDateEdit):
                 today = QDate.currentDate()
                 obj.setCurrentPage(today.year(), today.month())
         return super().eventFilter(obj, event)
+
+
+# ---------------------------------------------------------------------------
+# _PlainPasteTextEdit — QTextEdit that strips formatting on paste
+# ---------------------------------------------------------------------------
+
+class _PlainPasteTextEdit(QTextEdit):
+    """QTextEdit that pastes as plain text so copied content can't bleed its
+    source color (e.g. black text) into a dark-themed editor."""
+
+    def insertFromMimeData(self, source: QMimeData) -> None:
+        if source.hasText():
+            self.insertPlainText(source.text())
+        else:
+            super().insertFromMimeData(source)
 
 
 # ---------------------------------------------------------------------------
@@ -180,7 +210,7 @@ class SubtaskRow(QWidget):
         self._dark = dark
         text_color = D_GRAY_DARK if dark else GRAY_DARK
         check_border = D_GRAY_MID if dark else GRAY_MID
-        del_color = "#ff6666" if dark else "#cc0000"
+        del_color = DESTRUCTIVE_DARK if dark else DESTRUCTIVE
 
         self._check.setStyleSheet(f"""
             QCheckBox::indicator {{
@@ -329,7 +359,7 @@ class TodoDetailPanel(QWidget):
         _notes_font.setPointSize(13)
         self._notes_browser.setFont(_notes_font)
 
-        self._notes_editor = QTextEdit()
+        self._notes_editor = _PlainPasteTextEdit()
         self._notes_editor.setObjectName("detail_notes_editor")
         self._notes_editor.setFrameShape(QFrame.Shape.NoFrame)
         self._notes_editor.setFixedHeight(90)
@@ -365,19 +395,13 @@ class TodoDetailPanel(QWidget):
 
         # ── Attachments ────────────────────────────────────────────────
         att_header_row = QHBoxLayout()
-        att_lbl = QLabel("Attachments")
-        att_lbl.setStyleSheet("font-size: 11px; font-weight: 600; color: #888;")
-        att_header_row.addWidget(att_lbl)
+        self._att_lbl = QLabel("Attachments")
+        att_header_row.addWidget(self._att_lbl)
         att_header_row.addStretch()
-        add_att_btn = QPushButton("📎 Add")
-        add_att_btn.setFixedHeight(22)
-        add_att_btn.setStyleSheet(
-            "QPushButton { background: transparent; border: 1px solid #aaa; "
-            "border-radius: 4px; font-size: 11px; padding: 0 6px; }"
-            "QPushButton:hover { background: #e8e8e8; }"
-        )
-        add_att_btn.clicked.connect(self._on_add_attachment)
-        att_header_row.addWidget(add_att_btn)
+        self._add_att_btn = QPushButton("📎 Add")
+        self._add_att_btn.setFixedHeight(22)
+        self._add_att_btn.clicked.connect(self._on_add_attachment)
+        att_header_row.addWidget(self._add_att_btn)
         outer.addLayout(att_header_row)
 
         self._att_row = QHBoxLayout()
@@ -389,9 +413,8 @@ class TodoDetailPanel(QWidget):
         meta_row = QHBoxLayout()
         meta_row.setSpacing(12)
 
-        due_lbl = QLabel("Due:")
-        due_lbl.setStyleSheet("font-size: 11px; color: #888;")
-        meta_row.addWidget(due_lbl)
+        self._due_lbl = QLabel("Due:")
+        meta_row.addWidget(self._due_lbl)
 
         self._due_edit = _TodayDefaultDateEdit()
         self._due_edit.setCalendarPopup(True)
@@ -403,11 +426,16 @@ class TodoDetailPanel(QWidget):
         self._due_edit.dateChanged.connect(self._on_due_date_changed)
         meta_row.addWidget(self._due_edit)
 
+        self._due_clear_btn = QPushButton("×")
+        self._due_clear_btn.setFixedSize(18, 18)
+        self._due_clear_btn.setToolTip("Clear due date")
+        self._due_clear_btn.clicked.connect(self._clear_due_date)
+        meta_row.addWidget(self._due_clear_btn)
+
         meta_row.addSpacing(8)
 
-        pri_lbl = QLabel("Priority:")
-        pri_lbl.setStyleSheet("font-size: 11px; color: #888;")
-        meta_row.addWidget(pri_lbl)
+        self._pri_lbl = QLabel("Priority:")
+        meta_row.addWidget(self._pri_lbl)
 
         self._priority_combo = QComboBox()
         self._priority_combo.setFixedWidth(100)
@@ -470,6 +498,7 @@ class TodoDetailPanel(QWidget):
         else:
             self._due_edit.setDate(self._due_edit.minimumDate().addDays(-1))
         self._due_edit.blockSignals(False)
+        self._due_clear_btn.setVisible(bool(due))
 
         # Priority
         self._priority_combo.blockSignals(True)
@@ -599,6 +628,10 @@ class TodoDetailPanel(QWidget):
         btn.setToolTip(os.path.basename(path))
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
 
+        bdr = D_GRAY_BORDER if self._dark else GRAY_BORDER
+        chip_bg = D_GRAY_BG if self._dark else GRAY_BG
+        text = D_GRAY_DARK if self._dark else GRAY_DARK
+
         ext = os.path.splitext(path)[1].lower()
         if ext in IMG_EXTS and os.path.exists(path):
             pix = QPixmap(path).scaled(
@@ -610,16 +643,15 @@ class TodoDetailPanel(QWidget):
             from PyQt6.QtCore import QSize
             btn.setIconSize(QSize(58, 58))
             btn.setText("")
+            btn.setStyleSheet(
+                f"QPushButton {{ border: 1px solid {bdr}; border-radius: 4px; }}"
+            )
         else:
             btn.setText(os.path.basename(path)[:8])
             btn.setStyleSheet(
-                "QPushButton { font-size: 9px; border: 1px solid #aaa; border-radius: 4px; }"
+                f"QPushButton {{ font-size: 9px; color: {text}; border: 1px solid {bdr}; "
+                f"border-radius: 4px; background: {chip_bg}; }}"
             )
-
-        btn.setStyleSheet(
-            btn.styleSheet()
-            + " QPushButton { border: 1px solid #ccc; border-radius: 4px; background: #f0f0f0; }"
-        )
         btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(path)))
         btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         btn.customContextMenuRequested.connect(lambda pos, p=path: self._att_context_menu(p, btn))
@@ -673,8 +705,18 @@ class TodoDetailPanel(QWidget):
             value = ""
         else:
             value = f"{qdate.year():04d}-{qdate.month():02d}-{qdate.day():02d}"
+        self._due_clear_btn.setVisible(bool(value))
         self._db.update_todo(self._todo["id"], due_date=value)
         self._todo["due_date"] = value
+        self.changed.emit()
+
+    def _clear_due_date(self) -> None:
+        self._due_edit.blockSignals(True)
+        self._due_edit.setDate(self._due_edit.minimumDate().addDays(-1))
+        self._due_edit.blockSignals(False)
+        self._due_clear_btn.setVisible(False)
+        self._db.update_todo(self._todo["id"], due_date="")
+        self._todo["due_date"] = ""
         self.changed.emit()
 
     def _on_priority_changed(self, _index: int) -> None:
@@ -719,6 +761,20 @@ class TodoDetailPanel(QWidget):
             f"border-radius: 4px; padding: 2px 4px; font-size: 12px; }}"
         )
         self._due_edit.setStyleSheet(date_style)
+
+        text2 = D_GRAY_TEXT if dark else GRAY_TEXT
+        hover_bg = D_GRAY_BG if dark else GRAY_BG
+        for lbl in (self._att_lbl, self._due_lbl, self._pri_lbl):
+            lbl.setStyleSheet(f"font-size: 11px; font-weight: 600; color: {text2};")
+        self._add_att_btn.setStyleSheet(
+            f"QPushButton {{ background: transparent; border: 1px solid {bdr}; color: {text}; "
+            f"border-radius: 4px; font-size: 11px; padding: 0 6px; }}"
+            f"QPushButton:hover {{ background: {hover_bg}; }}"
+        )
+        self._due_clear_btn.setStyleSheet(
+            f"QPushButton {{ border: none; color: {text2}; font-size: 14px; padding: 0; background: transparent; }}"
+            f"QPushButton:hover {{ color: {DESTRUCTIVE_DARK if dark else DESTRUCTIVE}; }}"
+        )
 
         for row in self._subtask_rows:
             row.apply_theme(dark)
@@ -846,6 +902,8 @@ class TodoItemWidget(QWidget):
         self._meta_due = QLabel()
         self._meta_due.setObjectName("meta_chip")
         self._meta_due.setFixedWidth(90)  # always reserves space so priority stays aligned
+        self._meta_due.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._meta_due.customContextMenuRequested.connect(self._on_meta_due_context_menu)
         meta_layout.addWidget(self._meta_due)
 
         self._meta_priority = QLabel()
@@ -921,6 +979,18 @@ class TodoItemWidget(QWidget):
             self._meta_row.show()
         else:
             self._meta_row.hide()
+
+    def _on_meta_due_context_menu(self, pos) -> None:
+        if not self._todo.get("due_date"):
+            return
+        menu = QMenu(self)
+        clear_action = menu.addAction("Clear due date")
+        action = menu.exec(self._meta_due.mapToGlobal(pos))
+        if action == clear_action:
+            self._todo["due_date"] = ""
+            self._db.update_todo(self._todo["id"], due_date="")
+            self._refresh_meta()
+            self.detail_saved.emit()
 
     def _toggle_expand(self) -> None:
         self._expanded = not self._expanded
@@ -1099,6 +1169,7 @@ class TodoListWidget(QWidget):
 
         # Draggable list
         self._list_widget = QListWidget()
+        self._list_widget.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._list_widget.setDragEnabled(True)
         self._list_widget.setAcceptDrops(True)
         self._list_widget.setDropIndicatorShown(True)
@@ -1195,7 +1266,7 @@ class TodoListWidget(QWidget):
         hl.setContentsMargins(14, 6, 10, 6)
         hl.setSpacing(10)
 
-        self._plus_label = QLabel("+ New Task")
+        self._plus_label = _ClickableLabel("+ New Task")
         self._plus_label.setCursor(Qt.CursorShape.PointingHandCursor)
         add_color = D_GRAY_TEXT if self._dark else GRAY_TEXT
         self._plus_label.setStyleSheet(f"color: {add_color}; font-style: italic; font-size: {self._font_size}px;")
@@ -1205,12 +1276,20 @@ class TodoListWidget(QWidget):
         self._new_task_editor.setPlaceholderText("Task title…")
         self._new_task_editor.hide()
 
-        def _start(_event):
+        _active = [False]  # tracks whether the editor is open
+
+        def _start():
+            _active[0] = True
             self._plus_label.hide()
             self._new_task_editor.show()
-            self._new_task_editor.setFocus()
+            # Defer focus so the click event that triggered _start() finishes
+            # propagating first — otherwise the parent widget steals focus back.
+            QTimer.singleShot(0, self._new_task_editor.setFocus)
 
         def _commit():
+            if not _active[0]:
+                return
+            _active[0] = False
             title = self._new_task_editor.text().strip()
             self._new_task_editor.blockSignals(True)
             self._new_task_editor.clear()
@@ -1222,13 +1301,20 @@ class TodoListWidget(QWidget):
                 QTimer.singleShot(0, self.todo_changed.emit)
 
         def _cancel():
+            if not _active[0]:
+                return
+            _active[0] = False
+            self._new_task_editor.blockSignals(True)
             self._new_task_editor.clear()
             self._new_task_editor.hide()
+            self._new_task_editor.blockSignals(False)
             self._plus_label.show()
 
         self._new_task_editor.returnPressed.connect(_commit)
-        self._new_task_editor.editingFinished.connect(lambda: _cancel() if not self._new_task_editor.text().strip() else _commit())
-        self._plus_label.mousePressEvent = _start  # type: ignore[assignment]
+        self._new_task_editor.editingFinished.connect(
+            lambda: _commit() if self._new_task_editor.text().strip() else _cancel()
+        )
+        self._plus_label.clicked.connect(_start)
 
         hl.addWidget(self._plus_label)
         hl.addWidget(self._new_task_editor)
@@ -1390,19 +1476,11 @@ class SectionHeader(QWidget):
 
         # Count badge
         self._count_lbl = QLabel()
-        self._count_lbl.setStyleSheet(
-            "color: #ffffff; background-color: #1a6fc4; border-radius: 8px;"
-            " font-size: 10px; font-weight: 600; padding: 1px 6px;"
-        )
         self._count_lbl.hide()
         hl.addWidget(self._count_lbl)
 
         # Sync badge (hidden by default)
         self._sync_badge = QLabel("synced")
-        self._sync_badge.setStyleSheet(
-            "color: #1a6fc4; font-size: 10px; padding: 1px 6px;"
-            " border: 1px solid #1a6fc4; border-radius: 8px;"
-        )
         self._sync_badge.hide()
         hl.addWidget(self._sync_badge)
 
@@ -1414,45 +1492,26 @@ class SectionHeader(QWidget):
         self._clear_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._clear_btn.setFixedHeight(22)
         self._clear_btn.hide()
-        self._clear_btn.setStyleSheet("""
-            QPushButton {
-                color: #cc0000; background: transparent;
-                border: 1px solid #cc0000; border-radius: 4px;
-                padding: 0 8px; font-size: 10px;
-            }
-            QPushButton:hover { background-color: #ffeaea; }
-        """)
         self._clear_btn.clicked.connect(self.clear_completed_clicked.emit)
         hl.addWidget(self._clear_btn)
 
+        self._sync_btn = None
         if show_sync_button:
             self._sync_btn = QPushButton("🔄 Sync Today")
             self._sync_btn.setToolTip("Pull today's calendar events into this list")
             self._sync_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             self._sync_btn.setFixedHeight(26)
-            self._sync_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #0078d4;
-                    color: white;
-                    border: none;
-                    border-radius: 5px;
-                    padding: 0 10px;
-                    font-size: 11px;
-                }
-                QPushButton:hover { background-color: #106ebe; }
-                QPushButton:pressed { background-color: #005a9e; }
-            """)
             self._sync_btn.clicked.connect(self.sync_now_clicked.emit)
             hl.addWidget(self._sync_btn)
 
+        self._gear_btn = None
         if show_sync_gear:
-            gear = QPushButton("⚙")
-            gear.setFixedSize(24, 24)
-            gear.setToolTip("Sync settings")
-            gear.setStyleSheet("QPushButton { background: transparent; border: none; font-size: 13px; }")
-            gear.setCursor(Qt.CursorShape.PointingHandCursor)
-            gear.clicked.connect(self._show_sync_menu)
-            hl.addWidget(gear)
+            self._gear_btn = QPushButton("⚙")
+            self._gear_btn.setFixedSize(24, 24)
+            self._gear_btn.setToolTip("Sync settings")
+            self._gear_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self._gear_btn.clicked.connect(self._show_sync_menu)
+            hl.addWidget(self._gear_btn)
 
         self._apply_theme(dark)
 
@@ -1488,6 +1547,44 @@ class SectionHeader(QWidget):
         font = self._title_lbl.font()
         font.setPointSize(self._font_size)
         self._title_lbl.setFont(font)
+
+        destructive = DESTRUCTIVE_DARK if dark else DESTRUCTIVE
+        hover_bg = D_GRAY_BG if dark else GRAY_BG
+
+        self._count_lbl.setStyleSheet(
+            f"color: {ON_ACCENT}; background-color: {BLUE}; border-radius: 8px;"
+            f" font-size: 10px; font-weight: 600; padding: 1px 6px;"
+        )
+        self._sync_badge.setStyleSheet(
+            f"color: {BLUE}; font-size: 10px; padding: 1px 6px;"
+            f" border: 1px solid {BLUE}; border-radius: 8px;"
+        )
+        self._clear_btn.setStyleSheet(f"""
+            QPushButton {{
+                color: {destructive}; background: transparent;
+                border: 1px solid {destructive}; border-radius: 4px;
+                padding: 0 8px; font-size: 10px;
+            }}
+            QPushButton:hover {{ background-color: {destructive}; color: {ON_ACCENT}; }}
+        """)
+        if self._sync_btn is not None:
+            self._sync_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {BLUE};
+                    color: {ON_ACCENT};
+                    border: none;
+                    border-radius: 5px;
+                    padding: 0 10px;
+                    font-size: 11px;
+                }}
+                QPushButton:hover {{ background-color: {BLUE_HOVER}; }}
+                QPushButton:pressed {{ background-color: {BLUE_DARK}; }}
+            """)
+        if self._gear_btn is not None:
+            self._gear_btn.setStyleSheet(
+                f"QPushButton {{ background: transparent; border: none; font-size: 13px; color: {text}; }}"
+                f"QPushButton:hover {{ background-color: {hover_bg}; border-radius: 4px; }}"
+            )
 
     def apply_theme(self, dark: bool) -> None:
         self._apply_theme(dark)

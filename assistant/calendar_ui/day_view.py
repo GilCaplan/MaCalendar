@@ -26,6 +26,8 @@ from assistant.calendar_ui.styles import (
     GRAY_TEXT,
     WHITE,
 )
+from assistant.calendar_ui.month_view import HolidayBanner
+from assistant.hebrew_calendar import enumerate_holidays
 
 HOUR_HEIGHT = 60   # px per hour
 LABEL_WIDTH = 60
@@ -78,7 +80,7 @@ class EventBlock(QLabel):
         self.setStyleSheet(f"""
             QLabel {{
                 background-color: {self._color};
-                color: white;
+                color: {_styles.on_color(self._color)};
                 border-radius: 6px;
                 font-size: {fs}px;
                 padding: 5px 8px 4px 10px;
@@ -172,19 +174,20 @@ class EventBlock(QLabel):
 
 
 _TEAL_TODO = "#0e9f8c"
-_TODO_PILL_H = 18
+_TODO_PILL_H_DEFAULT = 20
 
 
 class _TodoPill(QLabel):
     """Small teal deadline pill shown in the all-day strip."""
 
-    def __init__(self, todo: dict, parent=None):
+    def __init__(self, todo: dict, font_size: int = 9, pill_height: int = _TODO_PILL_H_DEFAULT, parent=None):
         super().__init__(parent)
         self._text = f"⊙ {todo.get('title', '')}"
+        self._font_size = font_size
         self.setText(self._text)
         self.setStyleSheet("background: transparent;")
         self.setToolTip(f"Task due: {todo.get('title', '')}")
-        self.setFixedHeight(_TODO_PILL_H)
+        self.setFixedHeight(pill_height)
 
     def paintEvent(self, _event):
         painter = QPainter(self)
@@ -195,7 +198,7 @@ class _TodoPill(QLabel):
         painter.drawRoundedRect(self.rect().adjusted(0, 1, -1, -2), 4, 4)
         painter.setPen(color)
         font = self.font()
-        font.setPointSize(8)
+        font.setPointSize(self._font_size)
         font.setBold(True)
         painter.setFont(font)
         fm = painter.fontMetrics()
@@ -222,8 +225,8 @@ class TimeIndicatorOverlay(QWidget):
         y = int((now.hour * 60 + now.minute) / 60 * HOUR_HEIGHT)
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setPen(QPen(QColor("#d13438"), 2))
-        painter.setBrush(QColor("#d13438"))
+        painter.setPen(QPen(QColor(BLUE), 2))
+        painter.setBrush(QColor(BLUE))
         painter.drawEllipse(0, y - 5, 10, 10)
         painter.drawLine(10, y, self.width(), y)
 
@@ -443,7 +446,9 @@ class DayTimeline(QWidget):
             painter.drawLine(0, y, self.width(), y)
 
         if self._drag_hover:
-            painter.fillRect(self.rect(), QColor("#0078d4").lighter(190))
+            tint = QColor(BLUE)
+            tint.setAlpha(70)
+            painter.fillRect(self.rect(), tint)
 
 
 class DayView(QWidget):
@@ -467,6 +472,7 @@ class DayView(QWidget):
         self._date = datetime.date.today()
         self._timeline: DayTimeline | None = None
         self._ui_config = None
+        self._hebrew_config = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -600,12 +606,27 @@ class DayView(QWidget):
             t for t in self._db.get_todos(include_completed=False)
             if t.get("due_date", "")[:10] == date_str
         ]
-        if todos:
+        holidays = []
+        if self._hebrew_config and self._hebrew_config.show_holidays:
+            for h in enumerate_holidays(self._date, self._date, israel=self._hebrew_config.israel_holidays):
+                holidays.append(h)
+
+        if todos or holidays:
+            # Scale with the user's configured Day font size like every
+            # other element in this view already does, instead of a
+            # hardcoded small size that ignores it.
+            pill_fs = 10 if not self._ui_config else max(9, self._ui_config.font_day - 3)
+            pill_h = 22 if not self._ui_config else max(22, self._ui_config.font_day + 8)
+            for h in holidays:
+                is_erev = self._date == h.gregorian_erev_start
+                banner = HolidayBanner(h.name_en, h.category, is_erev, font_size=pill_fs)
+                banner.setFixedHeight(pill_h)
+                layout.addWidget(banner)
             for todo in todos:
-                pill = _TodoPill(todo)
+                pill = _TodoPill(todo, font_size=pill_fs, pill_height=pill_h)
                 layout.addWidget(pill)
             layout.addStretch()
-            self._allday_strip.setFixedHeight(_TODO_PILL_H + 8)
+            self._allday_strip.setFixedHeight(pill_h + 8)
             self._allday_strip.setVisible(True)
         else:
             self._allday_strip.setVisible(False)
@@ -615,6 +636,11 @@ class DayView(QWidget):
         self._apply_theme_styles()
         if self._timeline:
             self._timeline._apply_bg()
+        self.refresh()
+
+    def apply_hebrew_config(self, hebrew_config) -> None:
+        self._hebrew_config = hebrew_config
+        self._update_header()
         self.refresh()
 
     def apply_ui_config(self, ui_config) -> None:
@@ -656,6 +682,9 @@ class DayView(QWidget):
         self._date_label.setText(f"{prefix} \u2014 {date_str}" if prefix else date_str)
         # Brief Me button only makes sense for today
         self._brief_btn.setVisible(self._date == today)
+        # Hebrew date is shown once, in the main window's toolbar title
+        # (CalendarWindow._title_with_hebrew) \u2014 showing it here too was
+        # redundant duplicate content unique to Day view.
 
     def _update_count(self, n: int) -> None:
         if n == 0:

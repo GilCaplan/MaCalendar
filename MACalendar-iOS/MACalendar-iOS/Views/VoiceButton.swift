@@ -21,11 +21,11 @@ struct VoiceButton: View {
                     .shadow(radius: status == .idle ? 4 : 8)
 
                 if status == .thinking {
-                    ProgressView().tint(.white).scaleEffect(1.2)
+                    ProgressView().tint(iconColor).scaleEffect(1.2)
                 } else {
                     Image(systemName: iconName)
                         .font(.system(size: 24, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(iconColor)
                 }
 
                 // Pulsing ring when recording
@@ -43,11 +43,15 @@ struct VoiceButton: View {
 
     private var buttonColor: Color {
         switch status {
-        case .idle:      return .blue
+        case .idle:      return settings.accentColor
         case .recording: return .red
         case .thinking:  return .orange
         case .speaking:  return .green
         }
+    }
+
+    private var iconColor: Color {
+        status == .idle ? Color.onColor(hex: settings.accentColorHex) : .white
     }
 
     private var iconName: String {

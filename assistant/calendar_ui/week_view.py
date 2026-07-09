@@ -31,6 +31,8 @@ from assistant.calendar_ui.styles import (
     WEEKEND_BG,
     WHITE,
 )
+from assistant.calendar_ui.month_view import HolidayBanner
+from assistant.hebrew_calendar import enumerate_holidays, hebrew_day_label
 
 HOUR_HEIGHT = 48   # px per hour
 LABEL_WIDTH = 52   # px for time labels on left
@@ -40,7 +42,6 @@ _COL_GAP = 2       # px between side-by-side overlapping event columns
 _LEFT_PAD = 2
 _RIGHT_PAD = 2
 _TEAL_TODO = "#0e9f8c"   # deadline pill colour (matches month view)
-_TODO_PILL_H = 18        # px height of each todo pill
 
 
 class TimeIndicatorOverlay(QWidget):
@@ -61,8 +62,8 @@ class TimeIndicatorOverlay(QWidget):
         y = int((now.hour * 60 + now.minute) / 60 * HOUR_HEIGHT)
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setPen(QPen(QColor("#d13438"), 2))
-        painter.setBrush(QColor("#d13438"))
+        painter.setPen(QPen(QColor(BLUE), 2))
+        painter.setBrush(QColor(BLUE))
         painter.drawEllipse(0, y - 5, 10, 10)
         painter.drawLine(10, y, self.width(), y)
 
@@ -94,7 +95,7 @@ class EventBlock(QLabel):
             f"""
             QLabel {{
                 background-color: {color};
-                color: white;
+                color: {_styles.on_color(color)};
                 border-radius: 4px;
                 padding: 3px 5px 3px 8px;
                 border-left: 4px solid rgba(0,0,0,0.30);
@@ -197,9 +198,10 @@ class EventBlock(QLabel):
 class _TodoPill(QLabel):
     """Small teal deadline pill shown at the top of a week-view day column."""
 
-    def __init__(self, todo: dict, parent=None):
+    def __init__(self, todo: dict, font_size: int = 9, parent=None):
         super().__init__(parent)
         self._text = f"⊙ {todo.get('title', '')}"
+        self._font_size = font_size
         self.setText(self._text)
         self.setStyleSheet("background: transparent;")
         self.setToolTip(f"Task due: {todo.get('title', '')}")
@@ -214,7 +216,7 @@ class _TodoPill(QLabel):
         painter.drawRoundedRect(self.rect().adjusted(0, 1, -1, -2), 4, 4)
         painter.setPen(color)
         font = self.font()
-        font.setPointSize(7)
+        font.setPointSize(self._font_size)
         font.setBold(True)
         painter.setFont(font)
         fm = painter.fontMetrics()
@@ -255,7 +257,7 @@ class DayColumn(QWidget):
     def _apply_bg(self) -> None:
         dark = _styles._dark
         if self.is_today:
-            bg = _styles.D_GRAY_BG if dark else "#f0f7ff"
+            bg = _styles.D_BLUE_LIGHT if dark else BLUE_LIGHT
         elif self.is_weekend:
             bg = _styles.D_WEEKEND_BG if dark else WEEKEND_BG
         else:
@@ -426,7 +428,9 @@ class DayColumn(QWidget):
         # Right border
         painter.drawLine(self.width() - 1, 0, self.width() - 1, self.height())
         if self._drag_hover:
-            painter.fillRect(self.rect(), QColor("#0078d4").lighter(190))
+            tint = QColor(BLUE)
+            tint.setAlpha(70)
+            painter.fillRect(self.rect(), tint)
 
 
 class WeekView(QWidget):
@@ -448,6 +452,7 @@ class WeekView(QWidget):
         self._week_start = today - datetime.timedelta(days=(today.weekday() + 1) % 7)
         self._day_columns: List[DayColumn] = []
         self._ui_config = None
+        self._hebrew_config = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -540,6 +545,11 @@ class WeekView(QWidget):
         self._apply_theme_styles()
         self._rebuild_columns()
 
+    def apply_hebrew_config(self, hebrew_config) -> None:
+        self._hebrew_config = hebrew_config
+        self._rebuild_columns()
+        self.refresh()
+
     def _apply_theme_styles(self) -> None:
         """Reapply stylesheet constants that depend on the current theme."""
         dark = _styles._dark
@@ -579,26 +589,46 @@ class WeekView(QWidget):
                 if self._week_start <= due_d <= week_end:
                     todos_by_date.setdefault(due, []).append(t)
 
-        max_todos = 0
+        holidays_by_date: dict[str, list] = {}
+        if self._hebrew_config and self._hebrew_config.show_holidays:
+            for h in enumerate_holidays(self._week_start, week_end, israel=self._hebrew_config.israel_holidays):
+                d = h.gregorian_erev_start
+                while d <= h.gregorian_end:
+                    holidays_by_date.setdefault(d.isoformat(), []).append(h)
+                    d += datetime.timedelta(days=1)
+
+        # Deadline/holiday pills default larger than the old hardcoded 7pt —
+        # and now scale with the user's configured Week font size like every
+        # other element in this view already does, instead of ignoring it.
+        pill_fs = 9 if not self._ui_config else max(8, self._ui_config.font_week - 2)
+        pill_h = 20 if not self._ui_config else max(20, self._ui_config.font_week + 8)
+
+        max_items = 0
         for i, col in enumerate(self._day_columns):
             date_str = col.date.isoformat()
             col.load_events(by_date.get(date_str, []))
 
             todos = todos_by_date.get(date_str, [])
-            max_todos = max(max_todos, len(todos))
+            holidays = holidays_by_date.get(date_str, [])
+            max_items = max(max_items, len(todos) + len(holidays))
             cell = self._allday_cells[i]
             cell_layout = cell.layout()
             while cell_layout.count():
                 w = cell_layout.takeAt(0).widget()
                 if w:
                     w.deleteLater()
+            for h in holidays:
+                is_erev = col.date == h.gregorian_erev_start
+                banner = HolidayBanner(h.name_en, h.category, is_erev, font_size=pill_fs)
+                banner.setFixedHeight(pill_h)
+                cell_layout.addWidget(banner)
             for todo in todos:
-                pill = _TodoPill(todo)
-                pill.setFixedHeight(_TODO_PILL_H)
+                pill = _TodoPill(todo, font_size=pill_fs)
+                pill.setFixedHeight(pill_h)
                 cell_layout.addWidget(pill)
 
-        if max_todos > 0:
-            self._allday_row.setFixedHeight(max_todos * (_TODO_PILL_H + 1) + 6)
+        if max_items > 0:
+            self._allday_row.setFixedHeight(max_items * (pill_h + 1) + 6)
             self._allday_row.setVisible(True)
         else:
             self._allday_row.setVisible(False)
@@ -654,6 +684,13 @@ class WeekView(QWidget):
 
             header_layout.addWidget(day_name)
             header_layout.addWidget(day_num)
+
+            if self._hebrew_config and self._hebrew_config.display_mode != "english":
+                hebrew_lbl = QLabel(hebrew_day_label(date))
+                hebrew_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                hebrew_lbl.setStyleSheet(f"font-size: 10px; color: {text2};")
+                header_layout.addWidget(hebrew_lbl)
+
             self._header_layout.addWidget(header_cell, 0, i)
             self._header_layout.setColumnStretch(i, 1)
 

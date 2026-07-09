@@ -429,6 +429,18 @@ class IntentParser:
         else:
             raw_items = [data]
 
+        # Propagate title across create_event batch items — handles "another one" anaphora
+        # where the LLM returns an empty title for the second/third event.
+        last_create_title: str | None = None
+        for item in raw_items:
+            if item.get("action") == "create_event":
+                params = item.setdefault("parameters", {})
+                t = params.get("title", "")
+                if t and str(t).strip():
+                    last_create_title = str(t).strip()
+                elif last_create_title:
+                    params["title"] = last_create_title
+
         results: list[tuple[str, BaseIntent]] = []
         for item in raw_items:
             action_name = item.get("action", "unknown")

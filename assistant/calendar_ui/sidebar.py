@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from assistant.calendar_ui.styles import BLUE, GRAY_BG, GRAY_BORDER
+from assistant.calendar_ui.styles import BLUE, ON_ACCENT, GRAY_BG, GRAY_BORDER
 import assistant.calendar_ui.styles as _styles
 
 
@@ -49,7 +49,7 @@ class MiniCalendar(QCalendarWidget):
                 background-color: {bg};
                 color: {text};
                 selection-background-color: {BLUE};
-                selection-color: white;
+                selection-color: {ON_ACCENT};
             }}
             QCalendarWidget QWidget#qt_calendar_navigationbar {{
                 background-color: {bg};

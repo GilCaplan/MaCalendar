@@ -44,6 +44,7 @@ from PyQt6.QtWidgets import (
 )
 
 from assistant.db import CalendarDB
+import assistant.calendar_ui.styles as _styles
 
 # ---------------------------------------------------------------------------
 # Currency data  (code → (display name, symbol))
@@ -107,10 +108,11 @@ def _currency_symbol(code: str) -> str:
     return _CURRENCIES.get(code, ("", code))[1]
 
 
-# Palette of colours for new timers (cycles through)
+# Palette of colours for new timers (cycles through) — first entry follows
+# the configured accent, same convention as styles.EVENT_COLORS.
 _TIMER_COLORS = [
-    "#1a6fc4",  # blue
-    "#108010",  # green
+    _styles.BLUE,  # accent
+    "#2fae5c",  # green
     "#c83b01",  # red-orange
     "#7c58b0",  # purple
     "#028385",  # teal
@@ -244,7 +246,7 @@ class TimerDialog(QDialog):
         timer_type: str = "work",
         hourly_rate: float = 0.0,
         currency: str = _DEFAULT_CURRENCY,
-        color: str = "#1a6fc4",
+        color: str = _styles.BLUE,
     ):
         super().__init__(parent)
         self.setWindowTitle("Timer Settings")
@@ -326,6 +328,8 @@ class TimerDialog(QDialog):
         line.setFrameShape(QFrame.Shape.HLine)
         root.addWidget(line)
 
+        self._title_edit.returnPressed.connect(self.accept)
+
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
@@ -342,12 +346,12 @@ class TimerDialog(QDialog):
         self._work_btn.setChecked(is_work)
         self._personal_btn.setChecked(not is_work)
         self._work_btn.setStyleSheet(
-            "background:#1a6fc4; color:white; border-radius:4px 0 0 4px; font-weight:bold;"
+            f"background:{_styles.BLUE}; color:{_styles.ON_ACCENT}; border-radius:4px 0 0 4px; font-weight:bold;"
             if is_work else
             "background:transparent; border:1px solid #aaa; border-radius:4px 0 0 4px;"
         )
         self._personal_btn.setStyleSheet(
-            "background:#1a6fc4; color:white; border-radius:0 4px 4px 0; font-weight:bold;"
+            f"background:{_styles.BLUE}; color:{_styles.ON_ACCENT}; border-radius:0 4px 4px 0; font-weight:bold;"
             if not is_work else
             "background:transparent; border:1px solid #aaa; border-radius:0 4px 4px 0;"
         )
@@ -477,6 +481,8 @@ class LogTimeDialog(QDialog):
         line.setFrameShape(QFrame.Shape.HLine)
         root.addWidget(line)
 
+        self._title_edit.returnPressed.connect(self._on_accept)
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
@@ -596,6 +602,8 @@ class SessionEditDialog(QDialog):
 
         layout.addLayout(form)
 
+        self._title_edit.returnPressed.connect(self.accept)
+
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
@@ -703,7 +711,8 @@ class SessionRow(QWidget):
         start_str = _fmt_datetime_short(session["start_time"])
         if is_running:
             self._range_lbl.setText(f"{start_str} → now")
-            self._dot.setStyleSheet("color: #c83b01;")
+            live = _styles.DESTRUCTIVE_DARK if _styles._dark else _styles.DESTRUCTIVE
+            self._dot.setStyleSheet(f"color: {live};")
         else:
             end_str = _fmt_datetime_short(session["end_time"])
             self._range_lbl.setText(f"{start_str} → {end_str}")
@@ -994,8 +1003,9 @@ class TimerCard(QWidget):
         total = _sessions_total_secs(sessions)
         is_running = any(s.get("end_time") is None for s in sessions)
 
+        live = _styles.DESTRUCTIVE_DARK if _styles._dark else _styles.DESTRUCTIVE
         self._dot.setStyleSheet(
-            f"color: {'#c83b01' if is_running else self._timer['color']};"
+            f"color: {live if is_running else self._timer['color']};"
         )
         self._title_lbl.setText(self._timer["title"])
         self._elapsed_lbl.setText(_fmt_duration(total))
@@ -1079,7 +1089,7 @@ class TimerCard(QWidget):
             timer_type=self._timer.get("timer_type", "work"),
             hourly_rate=self._timer.get("hourly_rate", 0),
             currency=self._timer.get("currency", _DEFAULT_CURRENCY),
-            color=self._timer.get("color", "#1a6fc4"),
+            color=self._timer.get("color", _styles.BLUE),
         )
         if dlg.exec():
             self._db.update_timer(
@@ -1364,11 +1374,11 @@ class TimerView(QWidget):
         self._apply_card_styles()
 
     def _apply_card_styles(self) -> None:
-        from assistant.calendar_ui import styles as _styles
         bg = _styles.D_WHITE if self._dark else _styles.WHITE
         card_bg = _styles.D_GRAY_LIGHT if self._dark else _styles.GRAY_LIGHT
         border = _styles.D_GRAY_BORDER if self._dark else _styles.GRAY_BORDER
         text2 = _styles.D_GRAY_TEXT if self._dark else _styles.GRAY_TEXT
+        destructive = _styles.DESTRUCTIVE_DARK if self._dark else _styles.DESTRUCTIVE
 
         self.setStyleSheet(f"""
             QWidget#timer_topbar {{
@@ -1385,18 +1395,18 @@ class TimerView(QWidget):
                 font-size: 12px;
             }}
             QLabel#earn_label {{
-                color: #108010;
+                color: #2fae5c;
                 font-weight: bold;
                 font-size: 13px;
             }}
             QPushButton#start_btn {{
-                background: #1a6fc4;
-                color: white;
+                background: {_styles.BLUE};
+                color: {_styles.ON_ACCENT};
                 border-radius: 5px;
                 font-weight: bold;
             }}
             QPushButton#start_btn:hover {{
-                background: #1862ad;
+                background: {_styles.BLUE_HOVER};
             }}
             QPushButton#pause_btn {{
                 background: #b84e0e;
@@ -1409,8 +1419,8 @@ class TimerView(QWidget):
             }}
             QPushButton#stop_btn {{
                 background: transparent;
-                color: #c83b01;
-                border: 1px solid #c83b01;
+                color: {destructive};
+                border: 1px solid {destructive};
                 border-radius: 5px;
             }}
             QPushButton#stop_btn:disabled {{

@@ -105,10 +105,19 @@ class UIConfig(BaseModel):
     font_tasks: int = 13
     font_coursework: int = 13
     compact_ui: bool = False
+    accent_color: str = "#f5a524"  # hex; brand accent used app-wide (Settings → Accent Color)
 
 
 class ApiConfig(BaseModel):
     key: Optional[str] = None   # X-API-Key header value; null = no auth required
+
+
+class HebrewCalendarConfig(BaseModel):
+    # "english" = Gregorian only, "hebrew" = Hebrew (gematria) only, "both" = show both
+    display_mode: Literal["english", "hebrew", "both"] = "both"
+    show_holidays: bool = True
+    # True = Israel holiday schedule (1-day Yom Tov); False = Diaspora (2-day)
+    israel_holidays: bool = True
 
 
 class NLUConfig(BaseModel):
@@ -137,8 +146,9 @@ class AppConfig(BaseModel):
     todo: TodoConfig = TodoConfig()
     api: ApiConfig = ApiConfig()
     nlu: NLUConfig = NLUConfig()
-    theme: Literal["light", "dark"] = "light"
+    theme: Literal["light", "dark"] = "dark"
     ui: UIConfig = UIConfig()
+    hebrew_calendar: HebrewCalendarConfig = HebrewCalendarConfig()
 
     @field_validator("confirmation_level")
     @classmethod

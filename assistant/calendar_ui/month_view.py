@@ -10,6 +10,7 @@ from PyQt6.QtCore import Qt, QMimeData, QByteArray, QPoint, pyqtSignal
 from PyQt6.QtGui import QColor, QDrag, QPainter, QPen, QPixmap, QBrush
 from PyQt6.QtWidgets import (
     QGridLayout,
+    QHBoxLayout,
     QLabel,
     QSizePolicy,
     QVBoxLayout,
@@ -28,8 +29,66 @@ from assistant.calendar_ui.styles import (
     WEEKEND_BG,
     WHITE,
 )
+from assistant.hebrew_calendar import enumerate_holidays, hebrew_day_label
 
 DAY_HEADERS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+_HOLIDAY_COLORS = {
+    "major": "#c9a227",
+    "minor": "#0e9f8c",
+    "fast": "#6b7280",
+    "modern": "#2563a8",
+}
+
+
+class HolidayBanner(QLabel):
+    """All-day banner for a Jewish/Israeli holiday.
+
+    Erev (evening-before) cells render lighter with a dashed outline, since
+    the holiday has only just begun at sundown that day rather than being
+    in full swing.
+    """
+
+    def __init__(self, name: str, category: str, is_erev: bool, font_size: int = 8, parent=None):
+        super().__init__(parent)
+        self._color = _HOLIDAY_COLORS.get(category, "#c9a227")
+        self._is_erev = is_erev
+        self._font_size = font_size
+        self._text = f"🌙 Erev {name}" if is_erev else f"✡ {name}"
+        self.setText(self._text)
+        self.setFixedHeight(20)
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.setStyleSheet("background: transparent;")
+        self.setToolTip(
+            f"{name} — begins at sundown this evening" if is_erev else name
+        )
+
+    def paintEvent(self, _event):  # noqa: ARG002
+        # Solid-fill + white text, same recipe as EventPill — proven legible
+        # in both themes. The alpha-outlined style used earlier was nearly
+        # invisible in dark mode (category color text on a near-black bg).
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        color = QColor(self._color)
+        if self._is_erev:
+            # Mostly-opaque tint + dashed border marks "begins tonight" while
+            # staying readable — not the near-transparent wash used before.
+            painter.setBrush(QBrush(QColor(color.red(), color.green(), color.blue(), 190)))
+            painter.setPen(QPen(color.darker(130), 1, Qt.PenStyle.DashLine))
+        else:
+            painter.setBrush(QBrush(color))
+            painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(self.rect().adjusted(0, 1, -1, -2), 4, 4)
+        painter.setPen(QColor("white"))
+        font = self.font()
+        font.setPointSize(self._font_size)
+        font.setWeight(font.Weight.DemiBold)
+        painter.setFont(font)
+        fm = painter.fontMetrics()
+        elided = fm.elidedText(self._text, Qt.TextElideMode.ElideRight, self.width() - 8)
+        painter.drawText(self.rect().adjusted(4, 0, -4, 0),
+                         Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, elided)
 
 
 class EventPill(QLabel):
@@ -61,7 +120,7 @@ class EventPill(QLabel):
         painter.setBrush(QColor(self._color))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(self.rect(), 4, 4)
-        painter.setPen(QColor("white"))
+        painter.setPen(QColor(_styles.on_color(self._color)))
         font = self.font()
         font.setPointSize(self._font_size)
         font.setWeight(font.Weight.Medium)
@@ -153,6 +212,7 @@ class DayCell(QWidget):
         self._drag_hover      = False
         self._events: List[dict] = []
         self._todos: List[dict]  = []
+        self._holidays: List[dict] = []
         self._ui_config       = None
 
         self.setMinimumHeight(88)
@@ -167,7 +227,17 @@ class DayCell(QWidget):
 
         is_weekend = date.weekday() in (5, 6)
         self._num_label = DayNumberLabel(date.day, self.is_today, self.is_current_month, is_weekend=is_weekend)
-        layout.addWidget(self._num_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        header_row = QHBoxLayout()
+        header_row.setSpacing(4)
+        header_row.setContentsMargins(0, 0, 0, 0)
+        header_row.addWidget(self._num_label)
+        self._hebrew_label = QLabel()
+        self._hebrew_font_size = 12
+        self._apply_hebrew_label_style()
+        self._hebrew_label.hide()
+        header_row.addWidget(self._hebrew_label)
+        header_row.addStretch()
+        layout.addLayout(header_row)
 
         self._event_layout = QVBoxLayout()
         self._event_layout.setSpacing(2)
@@ -181,12 +251,34 @@ class DayCell(QWidget):
             self._num_label.set_selected(selected)
             self.update()
 
+    def set_hebrew_date(self, text: str) -> None:
+        if text:
+            self._hebrew_label.setText(text)
+            self._hebrew_label.show()
+        else:
+            self._hebrew_label.hide()
+
+    def set_hebrew_font_size(self, size: int) -> None:
+        self._hebrew_font_size = size
+        self._apply_hebrew_label_style()
+
+    def _apply_hebrew_label_style(self) -> None:
+        dark = _styles._dark
+        color = _styles.D_GRAY_TEXT if dark else GRAY_TEXT
+        self._hebrew_label.setStyleSheet(
+            f"font-size: {self._hebrew_font_size}px; color: {color}; background: transparent;"
+        )
+
     def load_events(self, events: List[dict]) -> None:
         self._events = events
         self._render_pills()
 
     def load_todos(self, todos: List[dict]) -> None:
         self._todos = todos
+        self._render_pills()
+
+    def load_holidays(self, holidays: List[dict]) -> None:
+        self._holidays = holidays
         self._render_pills()
 
     def _render_pills(self) -> None:
@@ -196,6 +288,10 @@ class DayCell(QWidget):
                 item.widget().deleteLater()
 
         pill_fs = 8 if not self._ui_config else max(6, self._ui_config.font_month - 3)
+        for h in self._holidays:
+            banner = HolidayBanner(h["name"], h["category"], h["is_erev"], font_size=pill_fs)
+            self._event_layout.addWidget(banner)
+
         all_items = [("event", e) for e in self._events] + [("todo", t) for t in self._todos]
         for tag, item in all_items[:3]:
             if tag == "todo":
@@ -254,7 +350,9 @@ class DayCell(QWidget):
         painter = QPainter(self)
         painter.fillRect(self.rect(), QColor(bg))
         if self._drag_hover:
-            painter.fillRect(self.rect(), QColor("#0078d4").lighter(190))
+            tint = QColor(BLUE)
+            tint.setAlpha(70)
+            painter.fillRect(self.rect(), tint)
         painter.setPen(QPen(QColor(border_color)))
         painter.drawLine(self.width() - 1, 0, self.width() - 1, self.height())
         painter.drawLine(0, self.height() - 1, self.width(), self.height() - 1)
@@ -308,7 +406,7 @@ class DayNumberLabel(QLabel):
         else:
             if self.is_current_month:
                 if self.is_weekend:
-                    text = "#e61919"  # Red for weekends
+                    text = _styles.DESTRUCTIVE_DARK if dark else _styles.DESTRUCTIVE
                 else:
                     text = _styles.D_GRAY_DARK if dark else GRAY_DARK
             else:
@@ -347,6 +445,7 @@ class MonthView(QWidget):
         self._cells: List[DayCell]       = []
         self._selected_date: Optional[datetime.date] = datetime.date.today()
         self._ui_config = None
+        self._hebrew_config = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -390,7 +489,7 @@ class MonthView(QWidget):
         fs = 11 if not self._ui_config else self._ui_config.font_month
         for i, lbl in enumerate(self._header_labels):
             # Sunday (0) and Saturday (6) in red
-            lbl_color = "#e61919" if i in (0, 6) else color
+            lbl_color = (_styles.DESTRUCTIVE_DARK if dark else _styles.DESTRUCTIVE) if i in (0, 6) else color
             lbl.setStyleSheet(
                 f"font-size: {fs}px; font-weight: 600; color: {lbl_color};"
             )
@@ -404,6 +503,10 @@ class MonthView(QWidget):
         self._ui_config = ui_config
         self._apply_header_style()
         self._rebuild_grid()
+
+    def apply_hebrew_config(self, hebrew_config) -> None:
+        self._hebrew_config = hebrew_config
+        self.refresh()
 
     def navigate(self, year: int, month: int) -> None:
         self._year  = year
@@ -423,10 +526,31 @@ class MonthView(QWidget):
             if due and due.startswith(month_prefix):
                 todos_by_date.setdefault(due, []).append(t)
 
+        holidays_by_date: dict[str, list] = {}
+        if self._cells and self._hebrew_config and self._hebrew_config.show_holidays:
+            grid_start = self._cells[0].date
+            grid_end = self._cells[-1].date
+            for h in enumerate_holidays(grid_start, grid_end, israel=self._hebrew_config.israel_holidays):
+                d = h.gregorian_erev_start
+                while d <= h.gregorian_end:
+                    holidays_by_date.setdefault(d.isoformat(), []).append({
+                        "name": h.name_en,
+                        "category": h.category,
+                        "is_erev": d == h.gregorian_erev_start,
+                    })
+                    d += datetime.timedelta(days=1)
+
+        display_mode = self._hebrew_config.display_mode if self._hebrew_config else "english"
+
         for cell in self._cells:
             date_str = cell.date.isoformat()
             cell.load_events(events_by_date.get(date_str, []))
             cell.load_todos(todos_by_date.get(date_str, []))
+            cell.load_holidays(holidays_by_date.get(date_str, []))
+            if display_mode == "english":
+                cell.set_hebrew_date("")
+            else:
+                cell.set_hebrew_date(hebrew_day_label(cell.date))
 
     def _rebuild_grid(self) -> None:
         while self._grid.count():
@@ -449,6 +573,7 @@ class MonthView(QWidget):
                 if self._ui_config:
                     cell._num_label._font_size = self._ui_config.font_month + 1
                     cell._num_label._refresh_style()
+                    cell.set_hebrew_font_size(max(10, self._ui_config.font_month - 1))
                 cell.set_selected(date == self._selected_date)
                 cell.day_clicked.connect(self._on_cell_clicked)
                 cell.event_clicked.connect(self.event_clicked)

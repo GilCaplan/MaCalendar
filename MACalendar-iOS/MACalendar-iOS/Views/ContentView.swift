@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var viewedDate = Date()
     @State private var calendarView: CalendarMode = .month
     @State private var monthEvents: [CalendarEvent] = []
+    @State private var monthHolidays: [Holiday] = []
     @State private var loadingMonth = false
     @State private var showCreateSheet = false
 
@@ -75,6 +76,7 @@ struct ContentView: View {
                                     month: Calendar.current.component(.month, from: viewedDate),
                                     selectedDate: $selectedDate,
                                     events: monthEvents,
+                                    holidays: monthHolidays,
                                     onDateSelected: { date in viewedDate = date }
                                 )
                                 Spacer()
@@ -103,6 +105,7 @@ struct ContentView: View {
                                 WeekView(
                                     selectedDate: $selectedDate,
                                     events: monthEvents,
+                                    holidays: monthHolidays,
                                     onDateSelected: { date in
                                         selectedDate = date
                                         viewedDate = date
@@ -166,9 +169,9 @@ struct ContentView: View {
                             } label: {
                                 Image(systemName: "plus")
                                     .font(.system(size: 24, weight: .bold))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(Color.onColor(hex: settings.accentColorHex))
                                     .frame(width: 60, height: 60)
-                                    .background(Color.blue)
+                                    .background(settings.accentColor)
                                     .clipShape(Circle())
                                     .shadow(radius: 4)
                             }
@@ -206,7 +209,7 @@ struct ContentView: View {
                     id: 0, title: "", date: dateStr,
                     startTime: "10:00", endTime: "11:00",
                     attendees: "", location: "",
-                    description: "", color: "#007AFF",
+                    description: "", color: settings.accentColorHex,
                     recurrence: "", recurrenceEnd: ""
                 ),
                 isNew: true,
@@ -281,7 +284,25 @@ struct ContentView: View {
         let year  = Calendar.current.component(.year,  from: viewedDate)
         let month = Calendar.current.component(.month, from: viewedDate)
         loadingMonth = true
-        monthEvents = (try? await api.eventsForMonth(year: year, month: month)) ?? []
+
+        let cal = Calendar.current
+        let start = cal.date(from: DateComponents(year: year, month: month, day: 1)) ?? viewedDate
+        let end = cal.date(byAdding: DateComponents(month: 1, day: -1), to: start) ?? start
+        let showHolidays = settings.showHolidays
+        let israel = settings.israelHolidays
+
+        // Independent requests — run concurrently instead of paying the sum
+        // of both latencies on every month navigation.
+        async let eventsResult: [CalendarEvent] = (try? await api.eventsForMonth(year: year, month: month)) ?? []
+        async let holidaysResult: [Holiday] = fetchHolidays(showHolidays: showHolidays, start: start, end: end, israel: israel)
+
+        monthEvents = await eventsResult
         loadingMonth = false
+        monthHolidays = await holidaysResult
+    }
+
+    private func fetchHolidays(showHolidays: Bool, start: Date, end: Date, israel: Bool) async -> [Holiday] {
+        guard showHolidays else { return [] }
+        return (try? await api.holidays(start: start, end: end, israel: israel)) ?? []
     }
 }

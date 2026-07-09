@@ -3,7 +3,9 @@ import SwiftUI
 struct DayView: View {
     var date: Date
     @EnvironmentObject var api: APIClient
+    @EnvironmentObject var settings: AppSettings
     @State private var events: [CalendarEvent] = []
+    @State private var holidays: [Holiday] = []
     @State private var selected: CalendarEvent?
     @State private var now: Date = Date()
     private let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
@@ -11,7 +13,32 @@ struct DayView: View {
     private let hourHeight: CGFloat = 56
     private let startHour = 7
 
+    private var dateStr: String { ISO8601DateFormatter.yyyyMMdd.string(from: date) }
+
     var body: some View {
+        VStack(spacing: 0) {
+            if settings.hebrewDisplayMode != "english" || !holidays.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    if settings.hebrewDisplayMode != "english" {
+                        Text(HebrewDateFormatting.string(for: date))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    ForEach(holidays) { h in
+                        Text(h.isErev(on: dateStr) ? "🌙 Erev \(h.nameEn)" : "✡ \(h.nameEn)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(h.color)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal)
+                .padding(.top, 6)
+            }
+            dayTimeline
+        }
+    }
+
+    private var dayTimeline: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 ZStack(alignment: .topLeading) {
@@ -43,13 +70,14 @@ struct DayView: View {
                         }
                     }
 
-                    // Current time redline (today only)
+                    // Current time line (today only) — follows the accent
+                    // color, same convention as the Mac app.
                     if Calendar.current.isDate(date, inSameDayAs: now) {
                         Circle()
-                            .fill(Color.red)
+                            .fill(settings.accentColor)
                             .frame(width: 10, height: 10)
                             .offset(x: 39, y: nowY - 5)
-                        Color.red
+                        settings.accentColor
                             .frame(height: 2)
                             .padding(.trailing, 8)
                             .offset(x: 49, y: nowY - 1)
@@ -93,6 +121,13 @@ struct DayView: View {
                 events = fresh
             }
         }
+        guard settings.showHolidays else { holidays = []; return }
+        Task {
+            let fresh = (try? await api.holidays(start: targetDate, end: targetDate, israel: settings.israelHolidays)) ?? []
+            if date == targetDate {
+                holidays = fresh
+            }
+        }
     }
 
     private func position(_ ev: CalendarEvent) -> (CGFloat, CGFloat)? {
@@ -120,12 +155,13 @@ private struct EventBlock: View {
     var height: CGFloat
 
     var body: some View {
+        let textColor = Color.onColor(hex: event.color.isEmpty ? settings.accentColorHex : event.color)
         RoundedRectangle(cornerRadius: 6)
-            .fill(Color(hex: event.color) ?? .blue)
+            .fill(Color(hex: event.color) ?? settings.accentColor)
             .overlay(alignment: .topLeading) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(event.title).font(.system(size: settings.fontDay, weight: .semibold)).foregroundColor(.white)
-                    Text(event.displayTime).font(.system(size: settings.fontDay - 2)).foregroundColor(.white.opacity(0.85))
+                    Text(event.title).font(.system(size: settings.fontDay, weight: .semibold)).foregroundColor(textColor)
+                    Text(event.displayTime).font(.system(size: settings.fontDay - 2)).foregroundColor(textColor.opacity(0.85))
                 }
                 .padding(4)
             }

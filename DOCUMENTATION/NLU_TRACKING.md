@@ -384,3 +384,43 @@ to cover those patterns.
 
 ---
 
+## [2026-04-22 17:50:46] FAILED — 🖥️ Mac
+**Transcript:** `set a meeting for me tomorrow at 1 p.m. set another one at 4 p.m. and then pizza at 6.30 p.m. tomorrow`
+
+**Parse:** ❌ failed (llm)
+
+**Reason:** parse_error: Validation failed for 'create_event': 1 validation error for CalendarIntent
+title
+  Value error, Event title cannot be empty [type=value_error, input_value='', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.12/v/value_error
+
+---
+
+## [2026-04-22 17:59:12] SUCCESS — 🖥️ Mac
+**Transcript:** `a meeting for me tomorrow at two one sorry one pm and four pm and then another one a pizza party at 6.30 pm at edo's`
+
+**Parse:** 🤖 llm | **Actions:** create_event, create_event
+
+- Created event 'Meeting' on Thursday, Apr 23, 2026 from 1 PM to 4 PM.
+- Created event 'Pizza Party' on Thursday, Apr 23, 2026 from 6:30 PM to 7:30 PM.
+
+---
+
+## [2026-04-23 11:16:16] SUCCESS — 🖥️ Mac
+**Transcript:** `set a meeting for me next week on wednesday at 2pm for with technion talk regarding project funds for ta costs. summarize that nicely`
+
+**Parse:** 🤖 llm | **Actions:** create_event
+
+- Created event 'Technion Talk - Project Funds for TA Costs' on Wednesday, May 6, 2026 from 2 PM to 3 PM.
+
+---
+
+## [2026-05-13 14:17:01] SUCCESS — 🖥️ Mac
+**Transcript:** `add on the 19 at 9 a.m. exam for eurovision course online`
+
+**Parse:** ✅ rule fast-path | **Actions:** create_event
+
+- Created event 'eurovision course' on Tuesday, May 19, 2026 from 9 AM to 10 AM.
+
+---
+

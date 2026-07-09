@@ -128,6 +128,18 @@ class APIClient: ObservableObject {
         }
     }
 
+    // MARK: - Holidays
+
+    /// Jewish/Israeli holidays for [start, end]. Computed server-side (Mac)
+    /// so the holiday list stays identical across devices. Not cached for
+    /// offline use — returns [] if unreachable, same as any other refresh.
+    func holidays(start: Date, end: Date, israel: Bool = true) async throws -> [Holiday] {
+        let s = ISO8601DateFormatter.yyyyMMdd.string(from: start)
+        let e = ISO8601DateFormatter.yyyyMMdd.string(from: end)
+        let data = try await request("/holidays?start=\(s)&end=\(e)&israel=\(israel ? 1 : 0)")
+        return try decode([Holiday].self, from: data)
+    }
+
     func createEvent(_ fields: [String: Any]) async throws -> Int {
         do {
             let data = try await request("/events", method: "POST", body: fields)

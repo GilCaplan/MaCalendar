@@ -4,6 +4,7 @@ import SwiftUI
 
 struct CourseworkView: View {
     @EnvironmentObject var api: APIClient
+    @EnvironmentObject var settings: AppSettings
     @ObservedObject private var store = CourseStore.shared
     @State private var showAddCourse = false
     @State private var editingCourse: Course? = nil
@@ -83,6 +84,7 @@ struct CourseworkView: View {
 
 private struct CourseSection: View {
     @EnvironmentObject var api: APIClient
+    @EnvironmentObject var settings: AppSettings
     @ObservedObject private var store = CourseStore.shared
 
     let course: Course
@@ -127,7 +129,7 @@ private struct CourseSection: View {
                         .submitLabel(.done)
                         .onSubmit(submitAssignment)
                     Button(action: submitAssignment) {
-                        Image(systemName: "plus.circle.fill").foregroundColor(.blue)
+                        Image(systemName: "plus.circle.fill").foregroundColor(settings.accentColor)
                     }
                     .disabled(newAssignmentTitle.isEmpty)
                     Button {
@@ -142,7 +144,7 @@ private struct CourseSection: View {
                 Button { addingAssignment = true } label: {
                     Label("Add Assignment", systemImage: "plus")
                         .font(.subheadline)
-                        .foregroundColor(.blue)
+                        .foregroundColor(settings.accentColor)
                 }
                 .buttonStyle(.plain)
             }
@@ -207,6 +209,7 @@ private struct CourseSection: View {
 // MARK: - Course Header
 
 private struct CourseHeaderView: View {
+    @EnvironmentObject var settings: AppSettings
     let course: Course
     let onEdit: () -> Void
     let onDelete: () -> Void
@@ -214,7 +217,7 @@ private struct CourseHeaderView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             Circle()
-                .fill(Color(hex: course.color) ?? .blue)
+                .fill(Color(hex: course.color) ?? settings.accentColor)
                 .frame(width: 10, height: 10)
                 .padding(.top, 4)
 
@@ -265,6 +268,7 @@ private struct CourseHeaderView: View {
 // MARK: - Assignment Row
 
 private struct AssignmentRowView: View {
+    @EnvironmentObject var settings: AppSettings
     let assignment: Assignment
     let course: Course
     let onToggle: () -> Void
@@ -279,7 +283,7 @@ private struct AssignmentRowView: View {
             Button(action: onToggle) {
                 Image(systemName: assignment.completed ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundColor(assignment.completed ? (Color(hex: course.color) ?? .blue) : .secondary)
+                    .foregroundColor(assignment.completed ? (Color(hex: course.color) ?? settings.accentColor) : .secondary)
             }
             .buttonStyle(.plain)
 
@@ -304,7 +308,7 @@ private struct AssignmentRowView: View {
                     .foregroundColor(
                         assignment.dueDate.isEmpty
                             ? .secondary
-                            : (Color(hex: course.color) ?? .blue)
+                            : (Color(hex: course.color) ?? settings.accentColor)
                     )
             }
             .buttonStyle(.plain)
@@ -409,6 +413,7 @@ private let courseColorPalette = [
 
 struct CourseEditSheet: View {
     @EnvironmentObject var api: APIClient
+    @EnvironmentObject var settings: AppSettings
     @ObservedObject private var store = CourseStore.shared
     @Environment(\.dismiss) private var dismiss
 
@@ -465,7 +470,7 @@ struct CourseEditSheet: View {
                             .submitLabel(.done)
                             .onSubmit(addPartner)
                         Button(action: addPartner) {
-                            Image(systemName: "plus.circle.fill").foregroundColor(.blue)
+                            Image(systemName: "plus.circle.fill").foregroundColor(settings.accentColor)
                         }
                         .disabled(newPartner.trimmingCharacters(in: .whitespaces).isEmpty)
                     }

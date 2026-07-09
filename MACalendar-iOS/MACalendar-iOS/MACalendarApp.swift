@@ -17,6 +17,7 @@ struct MACalendarApp: App {
                 .environmentObject(settings)
                 .environmentObject(api)
                 .preferredColorScheme(settings.theme == "dark" ? .dark : .light)
+                .tint(settings.accentColor)
         }
     }
 }

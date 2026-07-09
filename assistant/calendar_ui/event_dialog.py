@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QDate, QTime
 
+import assistant.calendar_ui.styles as _styles
 from assistant.calendar_ui.styles import BLUE, EVENT_COLORS, GRAY_BORDER, GRAY_TEXT
 
 
@@ -61,6 +62,7 @@ class EventDialog(QDialog):
         event: Optional[dict] = None,
         default_date: Optional[datetime.date] = None,
         default_time: Optional[datetime.time] = None,
+        db=None,
     ):
         super().__init__(parent)
         self._event = event  # None = create mode
@@ -69,6 +71,26 @@ class EventDialog(QDialog):
         self.event_data: Optional[dict] = None
         self.delete_requested: bool = False
         self.delete_series_requested: bool = False
+
+        # ICS-subscribed events are always read-only (no write endpoint
+        # behind a webcal/ICS link). Outlook-synced events are read-only
+        # too unless two-way sync is currently on — editing one while it's
+        # off would silently and permanently diverge from the real Outlook
+        # event. CalendarDB.is_event_locked() is the single source of truth
+        # for this policy (also enforced at the DB layer for drag/API paths).
+        # *db* should be the same CalendarDB instance the caller already has
+        # (e.g. CalendarWindow._db) rather than reaching for the global
+        # get_db() singleton here — those happen to be the same underlying
+        # file in the running app, but coupling to the global would be a
+        # silent footgun for any caller that legitimately uses a different
+        # CalendarDB instance (tests, an alternate window, etc).
+        if event:
+            if db is None:
+                from assistant.db import get_db
+                db = get_db()
+            self._read_only = db.is_event_locked(event)
+        else:
+            self._read_only = False
 
         self.setWindowTitle("New Event" if event is None else "Edit Event")
         self.setMinimumWidth(520)
@@ -80,6 +102,26 @@ class EventDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 16)
         layout.setSpacing(12)
+
+        source = (self._event or {}).get("source", "local")
+        if source == "ics":
+            banner = QLabel("🔗 Synced from a subscribed calendar — read-only. "
+                             "Unsubscribe in Connected Calendars to remove it.")
+            banner.setWordWrap(True)
+            banner_text = _styles.D_GRAY_TEXT if _styles._dark else GRAY_TEXT
+            banner.setStyleSheet(f"color: {banner_text}; font-size: 12px; padding-bottom: 4px;")
+            layout.addWidget(banner)
+        elif source == "outlook":
+            if self._read_only:
+                text = ("🔗 Synced from Outlook — read-only. Turn on two-way sync in "
+                        "Connected Calendars to edit this event.")
+            else:
+                text = "🔗 Synced with Outlook — edits are pushed back automatically."
+            banner = QLabel(text)
+            banner.setWordWrap(True)
+            banner_text = _styles.D_GRAY_TEXT if _styles._dark else GRAY_TEXT
+            banner.setStyleSheet(f"color: {banner_text}; font-size: 12px; padding-bottom: 4px;")
+            layout.addWidget(banner)
 
         # Title
         self._title = QLineEdit()
@@ -198,18 +240,23 @@ class EventDialog(QDialog):
         # Button row
         btn_row = QHBoxLayout()
 
+        if self._read_only:
+            btn_row.addStretch()
+            close_btn = QPushButton("Close")
+            close_btn.setDefault(True)
+            close_btn.clicked.connect(self.reject)
+            btn_row.addWidget(close_btn)
+            layout.addLayout(btn_row)
+            self._set_read_only_widgets()
+            return
+
         # Delete button (edit mode only)
         if self._event:
             del_btn = QPushButton("🗑 Delete")
-            del_btn.setObjectName("delete_btn")
+            del_btn.setObjectName("destructive")
             del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             del_btn.setAutoDefault(False)
             del_btn.setDefault(False)
-            del_btn.setStyleSheet(
-                "QPushButton { background-color: #d83b01; color: white; "
-                "border: none; border-radius: 4px; padding: 5px 14px; font-weight: 600; }"
-                "QPushButton:hover { background-color: #b83000; }"
-            )
             del_btn.clicked.connect(self._on_delete)
             btn_row.addWidget(del_btn)
 
@@ -228,6 +275,15 @@ class EventDialog(QDialog):
         layout.addLayout(btn_row)
 
         self._title.setFocus()
+
+    def _set_read_only_widgets(self) -> None:
+        for w in (
+            self._title, self._date, self._start, self._end, self._attendees,
+            self._location, self._description, self._repeat, self._until,
+        ):
+            w.setEnabled(False)
+        for dot in self._color_dots:
+            dot.setEnabled(False)
 
     def _on_color_selected(self, color: str) -> None:
         self._selected_color = color

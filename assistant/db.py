@@ -75,7 +75,36 @@ _MIGRATIONS = [
     "ALTER TABLE events ADD COLUMN series_id INTEGER",
     "ALTER TABLE events ADD COLUMN recurrence TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE events ADD COLUMN recurrence_end TEXT NOT NULL DEFAULT ''",
+    # External calendar sync bookkeeping (ICS subscriptions + two-way Outlook sync)
+    "ALTER TABLE events ADD COLUMN source TEXT NOT NULL DEFAULT 'local'",
+    "ALTER TABLE events ADD COLUMN external_id TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE events ADD COLUMN external_source TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE events ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE events ADD COLUMN sync_dirty INTEGER NOT NULL DEFAULT 0",
 ]
+
+_CREATE_CALENDAR_SOURCES_TABLE = """
+CREATE TABLE IF NOT EXISTS calendar_sources (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind        TEXT    NOT NULL,             -- 'ics_url' | 'outlook'
+    label       TEXT    NOT NULL DEFAULT '',
+    url         TEXT    NOT NULL DEFAULT '',  -- ics_url only
+    color       TEXT    NOT NULL DEFAULT '#0078d4',
+    two_way     INTEGER NOT NULL DEFAULT 0,   -- outlook only — push local changes back
+    last_synced TEXT    NOT NULL DEFAULT '',
+    enabled     INTEGER NOT NULL DEFAULT 1,
+    created_at  TEXT    NOT NULL
+)
+"""
+
+_CREATE_SYNC_DELETES_TABLE = """
+CREATE TABLE IF NOT EXISTS calendar_sync_deletes (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    external_source TEXT    NOT NULL,
+    external_id     TEXT    NOT NULL,
+    created_at      TEXT    NOT NULL
+)
+"""
 
 
 _CREATE_TIMERS_TABLE = """
@@ -139,7 +168,13 @@ CREATE INDEX IF NOT EXISTS idx_todos_list       ON todos(list, completed);
 CREATE INDEX IF NOT EXISTS idx_subtasks_todo    ON subtasks(todo_id, position);
 CREATE INDEX IF NOT EXISTS idx_timer_sessions   ON timer_sessions(timer_id);
 CREATE INDEX IF NOT EXISTS idx_assignments_course ON assignments(course_id);
+CREATE INDEX IF NOT EXISTS idx_events_external    ON events(external_source, external_id);
 """
+
+
+def _utcnow_iso() -> str:
+    """UTC timestamp for sync bookkeeping — comparable against Graph API timestamps."""
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
 
 def _next_date(d: datetime.date, recurrence: str) -> datetime.date:
@@ -177,6 +212,8 @@ class CalendarDB:
             conn.execute(_CREATE_TIMER_SESSIONS_TABLE)
             conn.execute(_CREATE_COURSES_TABLE)
             conn.execute(_CREATE_ASSIGNMENTS_TABLE)
+            conn.execute(_CREATE_CALENDAR_SOURCES_TABLE)
+            conn.execute(_CREATE_SYNC_DELETES_TABLE)
             for stmt in _CREATE_INDEXES.strip().splitlines():
                 stmt = stmt.strip()
                 if stmt:
@@ -416,6 +453,43 @@ class CalendarDB:
     # Update
     # ------------------------------------------------------------------
 
+    def _is_externally_locked(self, conn: sqlite3.Connection, event_id: int) -> bool:
+        """True if *event_id* must not be edited/deleted locally right now.
+
+        ICS-subscribed events are always locked — there is no write path
+        behind a webcal/ICS link. Outlook-sourced events are locked unless
+        two-way sync is currently on: editing one while it's off would mark
+        the row dirty with no push ever happening, silently and permanently
+        diverging it from the real Outlook event (see `pull()`'s dirty-row
+        preservation logic in calendar_sync/outlook_sync.py).
+        """
+        row = conn.execute("SELECT source FROM events WHERE id = ?", (event_id,)).fetchone()
+        if not row:
+            return False
+        source = row["source"]
+        if source == "ics":
+            return True
+        if source == "outlook":
+            two_way = conn.execute(
+                "SELECT two_way FROM calendar_sources WHERE kind = 'outlook' LIMIT 1"
+            ).fetchone()
+            return not (two_way and two_way["two_way"])
+        return False
+
+    def is_event_locked(self, event: dict) -> bool:
+        """UI-facing check: can *event* (a dict, e.g. from get_event()) be
+        edited/deleted right now? See `_is_externally_locked` for policy."""
+        source = event.get("source")
+        if source == "ics":
+            return True
+        if source == "outlook":
+            with self._conn() as conn:
+                row = conn.execute(
+                    "SELECT two_way FROM calendar_sources WHERE kind = 'outlook' LIMIT 1"
+                ).fetchone()
+            return not (row and row["two_way"])
+        return False
+
     def update_event(self, event_id: int, **fields) -> None:
         allowed = {"title", "date", "start_time", "end_time", "attendees",
                    "location", "description", "color", "recurrence", "recurrence_end"}
@@ -423,9 +497,22 @@ class CalendarDB:
         if not updates:
             return
         set_clause = ", ".join(f"{k} = ?" for k in updates)
-        values = list(updates.values()) + [event_id]
+        values = list(updates.values()) + [_utcnow_iso(), event_id]
         with self._conn() as conn:
-            conn.execute(f"UPDATE events SET {set_clause} WHERE id = ?", values)
+            if self._is_externally_locked(conn, event_id):
+                return
+            # updated_at is stamped in UTC (comparable against Graph's
+            # lastModifiedDateTime for last-write-wins conflict resolution).
+            # sync_dirty is only ever set here for outlook-sourced rows — the
+            # periodic sync worker clears it once the push succeeds. Reaching
+            # here at all already implies two-way is on (see the lock check
+            # above), so this is never dirtied for a row nothing will push.
+            conn.execute(
+                f"UPDATE events SET {set_clause}, updated_at = ?, "
+                f"sync_dirty = CASE WHEN source = 'outlook' THEN 1 ELSE sync_dirty END "
+                f"WHERE id = ?",
+                values,
+            )
 
     def promote_to_series(self, event_id: int) -> None:
         """Promote a standalone event that already has recurrence set into a full series.
@@ -533,6 +620,26 @@ class CalendarDB:
         valid series_id reference and can still be edited/extended as a group.
         """
         with self._conn() as conn:
+            if self._is_externally_locked(conn, event_id):
+                return
+
+            # Reaching here means this isn't an ICS event and, if it's an
+            # Outlook event, two-way sync is on — queue a tombstone so the
+            # periodic sync worker deletes it on the Outlook side too. The
+            # row (and its external_id) won't exist to retry from once the
+            # DELETE below runs.
+            synced = conn.execute(
+                "SELECT external_source, external_id FROM events "
+                "WHERE id = ? AND external_source = 'outlook' AND external_id != ''",
+                (event_id,),
+            ).fetchone()
+            if synced:
+                conn.execute(
+                    "INSERT INTO calendar_sync_deletes (external_source, external_id, created_at) "
+                    "VALUES (?, ?, ?)",
+                    (synced["external_source"], synced["external_id"], _utcnow_iso()),
+                )
+
             # Check whether this event is the series root
             row = conn.execute(
                 "SELECT id FROM events WHERE id = ? AND series_id = id",
@@ -1105,6 +1212,190 @@ class CalendarDB:
             conn.execute(
                 "UPDATE assignments SET calendar_event_id = ? WHERE id = ?",
                 (event_id, assignment_id),
+            )
+
+    # ------------------------------------------------------------------
+    # Connected calendars (ICS subscriptions + Outlook two-way sync)
+    # ------------------------------------------------------------------
+
+    def get_calendar_sources(self) -> List[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM calendar_sources ORDER BY created_at"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_calendar_source(self, source_id: int) -> Optional[dict]:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM calendar_sources WHERE id = ?", (source_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def get_calendar_source_by_kind(self, kind: str) -> Optional[dict]:
+        """There's only ever one 'outlook' source (a single account) —
+        this avoids callers fetching the whole table just to find it."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM calendar_sources WHERE kind = ? LIMIT 1", (kind,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def create_calendar_source(
+        self, kind: str, label: str = "", url: str = "",
+        color: str = "#0078d4", two_way: bool = False,
+    ) -> int:
+        with self._conn() as conn:
+            cur = conn.execute(
+                "INSERT INTO calendar_sources "
+                "(kind, label, url, color, two_way, last_synced, enabled, created_at) "
+                "VALUES (?, ?, ?, ?, ?, '', 1, ?)",
+                (kind, label, url, color, int(two_way), _utcnow_iso()),
+            )
+            return cur.lastrowid
+
+    def update_calendar_source(self, source_id: int, **fields) -> None:
+        allowed = {"label", "url", "color", "two_way", "last_synced", "enabled"}
+        updates = {k: v for k, v in fields.items() if k in allowed}
+        if not updates:
+            return
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        with self._conn() as conn:
+            conn.execute(
+                f"UPDATE calendar_sources SET {set_clause} WHERE id = ?",
+                (*updates.values(), source_id),
+            )
+
+    def delete_calendar_source(self, source_id: int) -> None:
+        """Remove a connected source and any local events it produced.
+
+        Outlook events (external_source='outlook') are left in place — that
+        connection is a single shared account, not a deletable per-source
+        feed, and disconnecting Outlook is handled separately (it just stops
+        the sync worker from touching those rows again).
+        """
+        with self._conn() as conn:
+            source = conn.execute(
+                "SELECT kind, id FROM calendar_sources WHERE id = ?", (source_id,)
+            ).fetchone()
+            if source and source["kind"] == "ics_url":
+                conn.execute(
+                    "DELETE FROM events WHERE external_source = ?",
+                    (f"ics:{source_id}",),
+                )
+            conn.execute("DELETE FROM calendar_sources WHERE id = ?", (source_id,))
+
+    def get_events_by_external_source(self, external_source: str) -> List[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM events WHERE external_source = ?", (external_source,)
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def upsert_external_event(self, external_source: str, external_id: str, data: dict) -> int:
+        """Insert or update a read-only/synced event keyed by (external_source, external_id).
+
+        Used by both ICS subscription refresh and Outlook pull. Returns the
+        local row id. UPDATE and INSERT share the same field dict so a
+        column added to one path can't silently be forgotten on the other
+        (this previously happened to `attendees`, which was only ever set on
+        first insert and never refreshed on subsequent syncs).
+        """
+        fields = {
+            "title": data["title"],
+            "date": data["date"],
+            "start_time": data["start_time"],
+            "end_time": data["end_time"],
+            "attendees": data.get("attendees", ""),
+            "location": data.get("location", ""),
+            "description": data.get("description", ""),
+            "color": data.get("color", "#0078d4"),
+        }
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT id FROM events WHERE external_source = ? AND external_id = ?",
+                (external_source, external_id),
+            ).fetchone()
+            if row:
+                event_id = row["id"]
+                set_clause = ", ".join(f"{k} = ?" for k in fields)
+                conn.execute(
+                    f"UPDATE events SET {set_clause}, updated_at = ? WHERE id = ?",
+                    (*fields.values(), _utcnow_iso(), event_id),
+                )
+                return event_id
+
+            columns = list(fields) + [
+                "created_at", "updated_at", "source", "external_id", "external_source"
+            ]
+            placeholders = ", ".join("?" for _ in columns)
+            cur = conn.execute(
+                f"INSERT INTO events ({', '.join(columns)}) VALUES ({placeholders})",
+                (
+                    *fields.values(),
+                    _utcnow_iso(), _utcnow_iso(),
+                    "outlook" if external_source == "outlook" else "ics",
+                    external_id, external_source,
+                ),
+            )
+            return cur.lastrowid
+
+    def delete_events_not_in(self, external_source: str, keep_external_ids: List[str]) -> int:
+        """Remove previously-synced events whose external_id no longer appears upstream.
+
+        Only ever touches rows already tagged with *external_source* — never
+        local/manual events. Returns the number removed.
+        """
+        with self._conn() as conn:
+            if keep_external_ids:
+                placeholders = ", ".join("?" for _ in keep_external_ids)
+                cur = conn.execute(
+                    f"DELETE FROM events WHERE external_source = ? "
+                    f"AND external_id NOT IN ({placeholders})",
+                    (external_source, *keep_external_ids),
+                )
+            else:
+                cur = conn.execute(
+                    "DELETE FROM events WHERE external_source = ?", (external_source,)
+                )
+            return cur.rowcount
+
+    def get_dirty_outlook_events(self) -> List[dict]:
+        """Non-recurring local events pending push to Outlook (created or edited)."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM events WHERE source = 'outlook' "
+                "AND sync_dirty = 1 AND series_id IS NULL"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def clear_sync_dirty(self, event_id: int) -> None:
+        with self._conn() as conn:
+            conn.execute("UPDATE events SET sync_dirty = 0 WHERE id = ?", (event_id,))
+
+    def set_event_external_id(self, event_id: int, external_source: str, external_id: str) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE events SET source = ?, external_source = ?, external_id = ?, "
+                "sync_dirty = 0 WHERE id = ?",
+                ("outlook" if external_source == "outlook" else "ics",
+                 external_source, external_id, event_id),
+            )
+
+    def pop_sync_deletes(self) -> List[dict]:
+        """Return and clear all queued tombstones for the sync worker to push."""
+        with self._conn() as conn:
+            rows = conn.execute("SELECT * FROM calendar_sync_deletes").fetchall()
+            conn.execute("DELETE FROM calendar_sync_deletes")
+        return [dict(r) for r in rows]
+
+    def requeue_sync_delete(self, external_source: str, external_id: str) -> None:
+        """Re-enqueue a tombstone whose push attempt failed, for the next sync cycle."""
+        with self._conn() as conn:
+            conn.execute(
+                "INSERT INTO calendar_sync_deletes (external_source, external_id, created_at) "
+                "VALUES (?, ?, ?)",
+                (external_source, external_id, _utcnow_iso()),
             )
 
 

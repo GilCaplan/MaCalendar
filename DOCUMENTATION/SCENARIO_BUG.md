@@ -119,3 +119,13 @@ title
 
 ---
 
+## [2026-04-22 17:50:46] parse_error
+**Transcript:** `set a meeting for me tomorrow at 1 p.m. set another one at 4 p.m. and then pizza at 6.30 p.m. tomorrow`
+
+**Issue:** Validation failed for 'create_event': 1 validation error for CalendarIntent
+title
+  Value error, Event title cannot be empty [type=value_error, input_value='', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.12/v/value_error
+
+---
+

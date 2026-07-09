@@ -1,6 +1,6 @@
 """High-level calendar handler — orchestrates auth, building, and API call."""
 
-import datetime
+import os
 
 from assistant.actions.calendar.auth import MSALAuth
 from assistant.actions.calendar.event_builder import build_event_payload
@@ -10,12 +10,21 @@ from assistant.config import AppConfig
 
 
 def get_local_timezone() -> str:
-    """Return the local IANA timezone string."""
+    """Return the local IANA timezone string (e.g. "America/New_York").
+
+    `str(datetime.now().astimezone().tzinfo)` only yields a bare abbreviation
+    like "IDT"/"PDT" on macOS, not a zone name — Microsoft Graph rejects that
+    as an event's `timeZone` value. Resolving the actual symlink target of
+    `/etc/localtime` (which macOS always keeps pointed at the current zone)
+    gives the real IANA name Graph expects.
+    """
     try:
-        import zoneinfo
-        return str(datetime.datetime.now().astimezone().tzinfo)
+        path = os.path.realpath("/etc/localtime")
+        if "/zoneinfo/" in path:
+            return path.split("/zoneinfo/")[-1]
     except Exception:
-        return "UTC"
+        pass
+    return "UTC"
 
 
 class CalendarHandler:

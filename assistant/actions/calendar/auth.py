@@ -51,22 +51,25 @@ class MSALAuth:
             "Run `python scripts/setup_auth.py` or use the Re-authenticate menu item."
         )
 
-    def device_code_flow(self) -> str:
+    def start_device_flow(self) -> dict:
         """
-        Full interactive device-code flow. Prints a URL + code for the user to enter
-        at https://microsoft.com/devicelogin. Blocks until authentication completes.
-
-        Returns the access token on success.
+        Begin the device-code flow. Returns the flow dict, which includes
+        'message' (human-readable instructions), 'user_code', and
+        'verification_uri' — display these to the user before calling
+        complete_device_flow(), which blocks until they finish in a browser.
         """
         flow = self._app.initiate_device_flow(scopes=SCOPES)
         if "user_code" not in flow:
             raise AuthError(
                 f"Failed to start device-code flow: {flow.get('error_description', 'unknown error')}"
             )
+        return flow
 
-        # This message contains the URL and one-time code.
-        print(flow["message"])
+    def complete_device_flow(self, flow: dict) -> str:
+        """Blocks until the user finishes authenticating at the flow's URL.
 
+        Returns the access token on success.
+        """
         result = self._app.acquire_token_by_device_flow(flow)
         if "access_token" not in result:
             raise AuthError(
@@ -75,6 +78,18 @@ class MSALAuth:
 
         self._save_cache()
         return result["access_token"]
+
+    def device_code_flow(self) -> str:
+        """
+        Full interactive device-code flow. Prints a URL + code for the user to enter
+        at https://microsoft.com/devicelogin. Blocks until authentication completes.
+
+        Returns the access token on success.
+        """
+        flow = self.start_device_flow()
+        # This message contains the URL and one-time code.
+        print(flow["message"])
+        return self.complete_device_flow(flow)
 
     def force_reauth(self) -> str:
         """Wipe the token cache and run a fresh device-code flow."""

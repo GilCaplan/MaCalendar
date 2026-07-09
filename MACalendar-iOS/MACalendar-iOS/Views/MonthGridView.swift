@@ -6,6 +6,7 @@ struct MonthGridView: View {
     var month: Int
     @Binding var selectedDate: Date
     var events: [CalendarEvent]
+    var holidays: [Holiday] = []
     var onDateSelected: ((Date) -> Void)? = nil
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
@@ -31,7 +32,8 @@ struct MonthGridView: View {
                 ForEach(gridDays, id: \.self) { date in
                     DayCell(date: date, isCurrentMonth: isCurrentMonth(date),
                             isSelected: Calendar.current.isDate(date, inSameDayAs: selectedDate),
-                            events: events(for: date))
+                            events: events(for: date),
+                            holidays: holidaysForDay(date))
                         .onTapGesture {
                             selectedDate = date
                             onDateSelected?(date)
@@ -60,6 +62,11 @@ struct MonthGridView: View {
         let d = ISO8601DateFormatter.yyyyMMdd.string(from: date)
         return events.filter { $0.date == d }
     }
+
+    private func holidaysForDay(_ date: Date) -> [Holiday] {
+        let d = ISO8601DateFormatter.yyyyMMdd.string(from: date)
+        return holidays.filter { $0.spans(d) }
+    }
 }
 
 private struct DayCell: View {
@@ -68,26 +75,43 @@ private struct DayCell: View {
     var isCurrentMonth: Bool
     var isSelected: Bool
     var events: [CalendarEvent]
+    var holidays: [Holiday] = []
 
     private var dayNum: String { "\(Calendar.current.component(.day, from: date))" }
     private var isToday: Bool  { Calendar.current.isDateInToday(date) }
+    private var dateStr: String { ISO8601DateFormatter.yyyyMMdd.string(from: date) }
 
     var body: some View {
         VStack(spacing: 2) {
             ZStack {
                 if isToday {
-                    Circle().fill(Color.blue).frame(width: settings.fontMonth * 2, height: settings.fontMonth * 2)
+                    Circle().fill(settings.accentColor).frame(width: settings.fontMonth * 2, height: settings.fontMonth * 2)
                 } else if isSelected {
-                    Circle().stroke(Color.blue, lineWidth: 1.5).frame(width: settings.fontMonth * 2, height: settings.fontMonth * 2)
+                    Circle().stroke(settings.accentColor, lineWidth: 1.5).frame(width: settings.fontMonth * 2, height: settings.fontMonth * 2)
                 }
                 Text(dayNum)
                     .font(.system(size: settings.fontMonth, weight: isToday ? .bold : .regular))
-                    .foregroundColor(isToday ? .white : isCurrentMonth ? .primary : .secondary)
+                    .foregroundColor(isToday ? Color.onColor(hex: settings.accentColorHex) : isCurrentMonth ? .primary : .secondary)
+            }
+
+            if settings.hebrewDisplayMode != "english" {
+                Text(HebrewDateFormatting.string(for: date))
+                    .font(.system(size: max(7, settings.fontMonth - 5)))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            }
+
+            ForEach(holidays) { h in
+                Capsule()
+                    .fill(h.color.opacity(h.isErev(on: dateStr) ? 0.4 : 1.0))
+                    .frame(height: 4)
+                    .padding(.horizontal, 3)
             }
 
             ForEach(events.prefix(2)) { ev in
                 Capsule()
-                    .fill(Color(hex: ev.color) ?? .blue)
+                    .fill(Color(hex: ev.color) ?? settings.accentColor)
                     .frame(height: 4)
                     .padding(.horizontal, 3)
             }

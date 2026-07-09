@@ -41,7 +41,7 @@ struct SettingsView: View {
                             .padding(10)
                             .background(Color(.systemBackground))
                             .cornerRadius(8)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(urlFocused ? Color.accentColor : Color(.separator), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(urlFocused ? settings.accentColor : Color(.separator), lineWidth: 1))
                             .onTapGesture { urlFocused = true }
 
                             HStack {
@@ -59,7 +59,7 @@ struct SettingsView: View {
                             .padding(10)
                             .background(Color(.systemBackground))
                             .cornerRadius(8)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(keyFocused ? Color.accentColor : Color(.separator), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(keyFocused ? settings.accentColor : Color(.separator), lineWidth: 1))
                             .onTapGesture { keyFocused = true }
 
                             Button(action: checkHealth) {
@@ -91,9 +91,32 @@ struct SettingsView: View {
                                 Text("Dark").tag("dark")
                             }
                             .pickerStyle(.segmented)
-                            
+
                             Divider().padding(.vertical, 4)
-                            
+
+                            Label("Accent Color", systemImage: "paintpalette")
+                            HStack(spacing: 10) {
+                                ForEach(Theme.accentPresets, id: \.hex) { preset in
+                                    Circle()
+                                        .fill(Color(hex: preset.hex) ?? Theme.defaultAccent)
+                                        .frame(width: 28, height: 28)
+                                        .overlay(
+                                            Circle()
+                                                .stroke(Color.primary.opacity(settings.accentColorHex.caseInsensitiveCompare(preset.hex) == .orderedSame ? 1 : 0), lineWidth: 2)
+                                                .padding(2)
+                                        )
+                                        .onTapGesture { settings.accentColorHex = preset.hex }
+                                }
+                                ColorPicker("", selection: Binding(
+                                    get: { settings.accentColor },
+                                    set: { newColor in settings.accentColorHex = newColor.hexString ?? settings.accentColorHex }
+                                ))
+                                .labelsHidden()
+                                .frame(width: 28, height: 28)
+                            }
+
+                            Divider().padding(.vertical, 4)
+
                             HStack {
                                 Label("Month Font", systemImage: "calendar")
                                 Spacer()
@@ -116,6 +139,27 @@ struct SettingsView: View {
                             }
                         }
                         .padding(.vertical, 4)
+                    }
+
+                    // MARK: Hebrew Calendar
+                    GroupBox(label: Label("Hebrew Calendar", systemImage: "star.of.david")) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Picker("Show dates as", selection: $settings.hebrewDisplayMode) {
+                                Text("English").tag("english")
+                                Text("Hebrew").tag("hebrew")
+                                Text("Both").tag("both")
+                            }
+                            .pickerStyle(.segmented)
+
+                            Toggle("Show Jewish / Israeli holidays", isOn: $settings.showHolidays)
+                            Toggle("Israel holiday schedule", isOn: $settings.israelHolidays)
+                                .disabled(!settings.showHolidays)
+
+                            Text("Hebrew dates use gematria letters (e.g. כ״ט תשרי). Holidays begin at sundown the evening before their main day.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.top, 4)
                     }
 
                     // MARK: Voice

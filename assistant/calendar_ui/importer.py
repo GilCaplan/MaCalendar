@@ -24,6 +24,8 @@ import re
 import sqlite3
 from typing import Generator, List, Optional, Tuple
 
+from assistant.calendar_ui.styles import BLUE
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -83,7 +85,11 @@ def parse_ics(path: str) -> List[dict]:
     """
     with open(path, "rb") as fh:
         raw = fh.read()
+    return parse_ics_bytes(raw)
 
+
+def parse_ics_bytes(raw: bytes) -> List[dict]:
+    """Parse raw ICS/iCal bytes (e.g. fetched from a subscription URL)."""
     # Unfold RFC 5545 folded lines (CRLF / CR / LF + SPACE|TAB)
     text = raw.decode("utf-8", errors="replace")
     text = re.sub(r"\r\n[ \t]|\r[ \t]|\n[ \t]", "", text)
@@ -146,6 +152,8 @@ def _build_event_dict(raw: dict) -> Optional[dict]:
     if not end_time:
         end_time = "23:59"
 
+    uid = get("UID")[0]
+
     return {
         "title": title,
         "date": date_str,
@@ -154,7 +162,8 @@ def _build_event_dict(raw: dict) -> Optional[dict]:
         "location": location,
         "description": description,
         "attendees": "",
-        "color": "#0078d4",
+        "color": BLUE,
+        "external_id": uid,
     }
 
 
@@ -250,7 +259,7 @@ def _read_calendar_cache_db(path: str) -> Optional[List[dict]]:
                     "location": str(row["location"] or ""),
                     "description": str(row["description"] or ""),
                     "attendees": "",
-                    "color": "#0078d4",
+                    "color": BLUE,
                 })
             except Exception:
                 continue

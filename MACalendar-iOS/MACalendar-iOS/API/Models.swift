@@ -12,18 +12,28 @@ struct CalendarEvent: Identifiable, Codable, Equatable {
     var color: String
     var recurrence: String
     var recurrenceEnd: String
+    // Sync bookkeeping — 'local' | 'ics' | 'outlook'. ICS-sourced events are
+    // read-only (no write endpoint behind a subscription link); Outlook
+    // events stay editable when two-way sync is on.
+    var source: String? = nil
+    var externalSource: String? = nil
+    var externalId: String? = nil
 
     enum CodingKeys: String, CodingKey {
-        case id, title, date, color, recurrence, attendees, location, description
-        case startTime    = "start_time"
-        case endTime      = "end_time"
-        case recurrenceEnd = "recurrence_end"
+        case id, title, date, color, recurrence, attendees, location, description, source
+        case startTime      = "start_time"
+        case endTime        = "end_time"
+        case recurrenceEnd  = "recurrence_end"
+        case externalSource = "external_source"
+        case externalId     = "external_id"
     }
 
     var displayTime: String {
         guard !startTime.isEmpty else { return "" }
         return endTime.isEmpty ? startTime : "\(startTime) – \(endTime)"
     }
+
+    var isReadOnly: Bool { source == "ics" }
 }
 
 struct Todo: Identifiable, Codable, Equatable {
@@ -65,6 +75,30 @@ struct VerifyResult: Codable {
     let parameters: [String: AnyCodable]? // major: corrected params
     let speech: String?         // TTS string for user
     let refresh: String?        // "events" | "todos" | ""
+}
+
+struct Holiday: Codable, Equatable, Identifiable {
+    var nameEn: String
+    var nameHe: String
+    var category: String   // "major" | "minor" | "fast" | "modern"
+    var gregorianErevStart: String   // ISO date — evening-before civil date
+    var gregorianEnd: String         // ISO date — last full civil day
+
+    enum CodingKeys: String, CodingKey {
+        case nameEn = "name_en"
+        case nameHe = "name_he"
+        case category
+        case gregorianErevStart = "gregorian_erev_start"
+        case gregorianEnd = "gregorian_end"
+    }
+
+    var id: String { "\(nameEn)-\(gregorianErevStart)" }
+
+    /// True if *date* (yyyy-MM-dd) is the erev (evening-before) day of this holiday.
+    func isErev(on date: String) -> Bool { date == gregorianErevStart }
+
+    /// True if *date* (yyyy-MM-dd) falls anywhere within this holiday's span.
+    func spans(_ date: String) -> Bool { date >= gregorianErevStart && date <= gregorianEnd }
 }
 
 struct HealthResponse: Codable {

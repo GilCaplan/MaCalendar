@@ -412,8 +412,11 @@ def create_app() -> Flask:
     def event_update(event_id: int):
         data = request.get_json(silent=True) or {}
         db = get_db()
-        if db.get_event(event_id) is None:
+        event = db.get_event(event_id)
+        if event is None:
             return jsonify({"error": "Event not found", "code": 404}), 404
+        if db.is_event_locked(event):
+            return jsonify({"error": "Event is read-only (synced source)", "code": 403}), 403
         db.update_event(event_id, **data)
         if data.get("recurrence"):
             db.promote_to_series(event_id)
@@ -422,8 +425,11 @@ def create_app() -> Flask:
     @app.delete("/events/<int:event_id>")
     def event_delete(event_id: int):
         db = get_db()
-        if db.get_event(event_id) is None:
+        event = db.get_event(event_id)
+        if event is None:
             return jsonify({"error": "Event not found", "code": 404}), 404
+        if db.is_event_locked(event):
+            return jsonify({"error": "Event is read-only (synced source)", "code": 403}), 403
         db.delete_event(event_id)
         return jsonify({"deleted": event_id})
 
@@ -626,5 +632,79 @@ def create_app() -> Flask:
             yaml.dump(current, f, default_flow_style=False, allow_unicode=True)
 
         return jsonify({"status": "ok"})
+
+    # ------------------------------------------------------------------
+    # Hebrew calendar / holidays
+    # ------------------------------------------------------------------
+
+    @app.get("/holidays")
+    def holidays_list():
+        from assistant.hebrew_calendar import enumerate_holidays
+
+        start_str = request.args.get("start")
+        end_str = request.args.get("end")
+        israel = request.args.get("israel", "1") not in ("0", "false", "False")
+
+        try:
+            if start_str and end_str:
+                start = datetime.date.fromisoformat(start_str)
+                end = datetime.date.fromisoformat(end_str)
+            else:
+                today = datetime.date.today()
+                start = today.replace(day=1)
+                end = today + datetime.timedelta(days=60)
+        except ValueError as e:
+            return jsonify({"error": str(e), "code": 400}), 400
+
+        holidays = enumerate_holidays(start, end, israel=israel)
+        return jsonify([
+            {
+                "name_en": h.name_en,
+                "name_he": h.name_he,
+                "category": h.category,
+                "gregorian_erev_start": h.gregorian_erev_start.isoformat(),
+                "gregorian_end": h.gregorian_end.isoformat(),
+            }
+            for h in holidays
+        ])
+
+    # ------------------------------------------------------------------
+    # Connected calendars (ICS subscriptions + Outlook two-way sync)
+    # ------------------------------------------------------------------
+    # Note: this is a view/manage surface for sources — the Outlook OAuth
+    # device-code flow itself is a Mac-only UI (Connected Calendars dialog),
+    # since it requires an interactive browser sign-in.
+
+    @app.get("/calendar_sources")
+    def calendar_sources_list():
+        return jsonify(get_db().get_calendar_sources())
+
+    @app.post("/calendar_sources")
+    def calendar_source_create():
+        data = request.get_json(silent=True) or {}
+        kind = data.get("kind", "")
+        if kind not in ("ics_url", "outlook"):
+            return jsonify({"error": "kind must be 'ics_url' or 'outlook'", "code": 400}), 400
+        if kind == "ics_url" and not data.get("url", "").strip():
+            return jsonify({"error": "Missing 'url'", "code": 400}), 400
+        source_id = get_db().create_calendar_source(
+            kind=kind,
+            label=data.get("label", ""),
+            url=data.get("url", ""),
+            color=data.get("color", "#0078d4"),
+            two_way=bool(data.get("two_way", False)),
+        )
+        return jsonify({"id": source_id}), 201
+
+    @app.patch("/calendar_sources/<int:source_id>")
+    def calendar_source_update(source_id: int):
+        data = request.get_json(silent=True) or {}
+        get_db().update_calendar_source(source_id, **data)
+        return jsonify({"id": source_id})
+
+    @app.delete("/calendar_sources/<int:source_id>")
+    def calendar_source_delete(source_id: int):
+        get_db().delete_calendar_source(source_id)
+        return jsonify({"deleted": source_id})
 
     return app
