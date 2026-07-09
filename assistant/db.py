@@ -177,8 +177,15 @@ def _utcnow_iso() -> str:
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
 
-def _next_date(d: datetime.date, recurrence: str) -> datetime.date:
-    """Advance d by one recurrence period."""
+def _next_date(d: datetime.date, recurrence: str, anchor_day: int | None = None) -> datetime.date:
+    """Advance d by one recurrence period.
+
+    For monthly recurrence, `anchor_day` (the original series day-of-month, e.g.
+    31 for a "31st of every month" series) is used instead of `d.day` so a
+    short-month clamp doesn't permanently stick — Jan 31 -> Feb 28 -> Mar 31,
+    not Mar 28. Without an anchor, falls back to `d.day` (chains from the
+    previous instance), which is what causes the drift.
+    """
     if recurrence == "daily":
         return d + datetime.timedelta(days=1)
     if recurrence == "weekly":
@@ -189,9 +196,10 @@ def _next_date(d: datetime.date, recurrence: str) -> datetime.date:
         if month > 12:
             month = 1
             year += 1
+        day = anchor_day if anchor_day is not None else d.day
         # Clamp day to the last valid day of the target month
         max_day = calendar.monthrange(year, month)[1]
-        return datetime.date(year, month, min(d.day, max_day))
+        return datetime.date(year, month, min(day, max_day))
     raise ValueError(f"Unknown recurrence: {recurrence!r}")
 
 
@@ -324,11 +332,12 @@ class CalendarDB:
         conn.execute("UPDATE events SET series_id = ? WHERE id = ?", (first_id, first_id))
 
         current = datetime.date.fromisoformat(intent.date)
+        anchor_day = current.day  # original day-of-month; see _next_date docstring
         count = 0
         max_instances = 500  # hard safety cap
 
         while count < max_instances:
-            current = _next_date(current, recurrence)
+            current = _next_date(current, recurrence, anchor_day=anchor_day)
             if current > end_date:
                 break
             conn.execute(

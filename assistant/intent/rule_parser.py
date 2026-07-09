@@ -392,6 +392,44 @@ def _preprocess(transcript: str) -> tuple[str, bool]:
 # ---------------------------------------------------------------------------
 
 
+_IMPERATIVE_VERB_LEMMAS: frozenset = frozenset(lemma for (lemma, _domain) in INTENT_MAP.keys())
+
+# Common Whisper mishearings of sentence-initial imperative verbs. Only consulted
+# at ROOT position in _route_intent (see Pass 5) — never as a general text
+# substitution — so "meeting by 3pm" (where "by" is a legitimate preposition,
+# not the ROOT) is unaffected.
+_STT_HOMOPHONE_VERBS: dict = {
+    "by": "buy",
+    "bye": "buy",
+}
+
+
+def _lexicon_split_points(doc) -> list:
+    """Fallback split-point detector for when spaCy's VERB-conjunct detection fails.
+
+    spaCy's statistical POS tagger frequently mistags a bare imperative verb
+    immediately followed by a bare-noun object as a NOUN compound instead of a
+    VERB — e.g. "schedule meeting tomorrow" gets ROOT="meeting" (NOUN), hiding
+    "schedule" from the VERB-conjunct search entirely. "book", "plan", and
+    "block" show the same failure mode with their own bare-noun objects.
+
+    Rather than fight the tagger, use vocabulary we already control: INTENT_MAP's
+    verb lemmas. A token qualifies as a split point only if it's sentence-initial
+    or immediately follows a coordinating "and"/"or" — both low-risk positions
+    (a command verb mid-clause, e.g. "the schedule needs an update", won't match
+    either condition), so this can't fire on ordinary single-action sentences.
+    """
+    points = []
+    for i, tok in enumerate(doc):
+        if tok.lemma_.lower() not in _IMPERATIVE_VERB_LEMMAS:
+            continue
+        sentence_initial = i == 0
+        follows_cc = i > 0 and doc[i - 1].dep_ == "cc" and doc[i - 1].lower_ in ("and", "or")
+        if sentence_initial or follows_cc:
+            points.append(tok)
+    return points
+
+
 def _split_intents(doc) -> list:
     """Split a spaCy Doc into per-intent Span objects.
 
@@ -407,17 +445,44 @@ def _split_intents(doc) -> list:
         if tok.dep_ == "conj" and tok.head == root and tok.pos_ == "VERB"
     ]
 
-    if len(split_verbs) == 1:
+    if len(split_verbs) < 2:
+        # spaCy's dependency parse found only one verb — try the lexicon fallback
+        # before giving up and treating this as a single-intent sentence.
+        lexicon_points = _lexicon_split_points(doc)
+        if len(lexicon_points) >= 2:
+            # These tokens aren't reliable syntactic heads (mistagged as NOUN, so
+            # their .subtree is unusable — it may not cover the clause's temporal
+            #/object tokens at all). Partition the doc by raw token position
+            # between consecutive split points instead of by subtree.
+            points_sorted = sorted(lexicon_points, key=lambda t: t.i)
+            spans = []
+            for idx, tok in enumerate(points_sorted):
+                start = tok.i
+                end = points_sorted[idx + 1].i if idx + 1 < len(points_sorted) else len(doc)
+                if start < end:
+                    spans.append(doc[start:end])
+            return spans if spans else [doc[:]]
         return [doc[:]]
 
-    # Sort by position and build non-overlapping subtree spans
+    # Sort by position and build non-overlapping spans.
+    # A conj verb's own .subtree always includes everything nested under it, and
+    # since conj verbs hang off the ROOT, the ROOT's subtree also covers the whole
+    # sentence — using raw subtree bounds would make span[0] duplicate the full
+    # transcript alongside the later per-verb spans. Clip each span so it stops at
+    # the start of the next split verb and starts no earlier than the previous
+    # span's end, giving contiguous, non-overlapping chunks instead.
     split_verbs_sorted = sorted(split_verbs, key=lambda t: t.i)
     spans = []
-    for verb in split_verbs_sorted:
+    prev_end = 0
+    for idx, verb in enumerate(split_verbs_sorted):
         subtree_tokens = sorted(verb.subtree, key=lambda t: t.i)
-        start = subtree_tokens[0].i
+        start = max(subtree_tokens[0].i, prev_end)
         end = subtree_tokens[-1].i + 1
-        spans.append(doc[start:end])
+        if idx < len(split_verbs_sorted) - 1:
+            end = min(end, split_verbs_sorted[idx + 1].i)
+        if start < end:
+            spans.append(doc[start:end])
+            prev_end = end
 
     return spans if spans else [doc[:]]
 
@@ -647,10 +712,16 @@ def _extract_temporal(span_text: str, today: datetime.date) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _route_intent(span, current_view: str) -> tuple[str | None, str, bool]:
-    """Route a span to an (action_name, domain, domain_inferred) tuple.
+def _route_intent(span, current_view: str) -> tuple[str | None, str, bool, bool]:
+    """Route a span to an (action_name, domain, domain_inferred, domain_material) tuple.
 
     domain_inferred=True means we fell back to view context (lower confidence).
+    domain_material=True means the *guessed* domain was actually load-bearing in
+    picking the action (INTENT_MAP had a domain-specific entry for this verb, e.g.
+    ("delete", "todo") vs ("delete", "calendar") give different actions). Verbs
+    that map via the domain-agnostic (lemma, None) entry — "buy", "call", "email",
+    etc. always mean create_todo regardless of domain — have domain_material=False,
+    since the domain guess played no role in resolving them.
     """
     span_text = span.text.lower()
     span_words = set(re.findall(r"\w+", span_text))
@@ -685,26 +756,35 @@ def _route_intent(span, current_view: str) -> tuple[str | None, str, bool]:
     #   3. Any VERB/AUX in span that maps to INTENT_MAP
     #   4. Any token (any POS) whose lemma maps to INTENT_MAP
 
-    def _maps_to_action(lemma: str) -> str | None:
-        return INTENT_MAP.get((lemma, domain)) or INTENT_MAP.get((lemma, None))
+    def _maps_to_action(lemma: str) -> tuple[str | None, bool]:
+        """Returns (action_name, domain_was_material) — see docstring above."""
+        domain_specific = INTENT_MAP.get((lemma, domain))
+        if domain_specific:
+            return domain_specific, True
+        generic = INTENT_MAP.get((lemma, None))
+        if generic:
+            return generic, False
+        return None, False
 
     # WH-word check first — "what/when/how many" sentences are queries regardless
     # of what other INTENT_MAP verbs appear in the span (e.g. "what's on my schedule")
     _WH_RE = re.compile(r"^(what|when|how\s+many|which|show|list|read)\b", re.IGNORECASE)
     if _WH_RE.search(span_text.strip()):
         wh_action = "query_schedule" if domain == "calendar" else "query_todos"
-        return wh_action, domain, False  # WH-word is explicit, not inferred
+        return wh_action, domain, False, True  # WH-word is explicit, not inferred
 
     root_verb = None
     action = None
+    domain_material = False
 
     # Pass 1: ROOT verb that directly maps
     for tok in span:
         if tok.dep_ == "ROOT" and tok.pos_ in ("VERB", "AUX"):
-            mapped = _maps_to_action(tok.lemma_)
+            mapped, material = _maps_to_action(tok.lemma_)
             if mapped:
                 root_verb = tok
                 action = mapped
+                domain_material = material
                 break
 
     # Pass 2: ROOT verb even without map (for WH-fallback path)
@@ -718,29 +798,50 @@ def _route_intent(span, current_view: str) -> tuple[str | None, str, bool]:
     if action is None:
         for tok in span:
             if tok.pos_ in ("VERB", "AUX"):
-                mapped = _maps_to_action(tok.lemma_)
+                mapped, material = _maps_to_action(tok.lemma_)
                 if mapped:
                     root_verb = tok
                     action = mapped
+                    domain_material = material
                     break
 
     # Pass 4: any token with known action lemma (noun-verb ambiguity, ADJ mis-tags, etc.)
     if action is None:
         for tok in span:
-            mapped = _maps_to_action(tok.lemma_)
+            mapped, material = _maps_to_action(tok.lemma_)
             if mapped:
                 root_verb = tok
                 action = mapped
+                domain_material = material
                 break
+
+    # Pass 5: STT homophone fallback, ROOT position only. A preposition/adverb
+    # can't legitimately be a well-formed sentence's syntactic ROOT — when spaCy
+    # lands there, it's a signal the transcript is a fragment, usually because
+    # Whisper misheard an imperative verb as its homophone (e.g. "buy" -> "by").
+    # Restricted to ROOT to avoid false positives on legitimate uses elsewhere in
+    # the sentence (e.g. "meeting by 3pm", where "by" is a prep, not the ROOT).
+    if action is None:
+        for tok in span:
+            if tok.dep_ != "ROOT":
+                continue
+            alias = _STT_HOMOPHONE_VERBS.get(tok.lower_)
+            if alias:
+                mapped, material = _maps_to_action(alias)
+                if mapped:
+                    root_verb = tok
+                    action = mapped
+                    domain_material = material
+            break  # only one ROOT per span
 
     if action is None:
         # No-verb fallbacks: WH-word query
         if re.match(r"\b(what|when|how many|which|show|list|read)\b", span_text):
             action_fallback = "query_schedule" if domain == "calendar" else "query_todos"
-            return action_fallback, domain, domain_inferred
-        return None, domain, domain_inferred
+            return action_fallback, domain, domain_inferred, True
+        return None, domain, domain_inferred, True
 
-    return action, domain, domain_inferred
+    return action, domain, domain_inferred, domain_material
 
 
 # ---------------------------------------------------------------------------
@@ -1152,7 +1253,7 @@ class RuleBasedParser:
             temporal = _extract_temporal(span.text, today)
 
             # Phase 3: Intent/domain routing
-            action_name, _, domain_inferred = _route_intent(span, current_view)
+            action_name, _, domain_inferred, domain_material = _route_intent(span, current_view)
             if action_name is None:
                 if len(spans) == 1:
                     raise RuleParserSkip(f"No action matched for: {span.text!r}")
@@ -1169,8 +1270,12 @@ class RuleBasedParser:
 
             # Phase 6: Confidence + validation
             missing = _compute_missing_slots(action_name, slots)
+            # Only penalize the guessed domain when it was actually load-bearing in
+            # picking the action (domain_material) — a domain-agnostic verb like
+            # "buy"/"call"/"email" maps to create_todo regardless of domain, so an
+            # unresolved domain guess shouldn't dock confidence on those.
             confidence = _compute_confidence(
-                action_name, slots, temporal, domain_inferred, used_anaphora
+                action_name, slots, temporal, domain_inferred and domain_material, used_anaphora
             )
 
             all_missing.extend(missing)

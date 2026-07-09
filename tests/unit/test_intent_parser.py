@@ -52,14 +52,28 @@ def test_malformed_json_raises_parse_error(monkeypatch, isolated_registry, sampl
 
 
 def test_missing_required_param_raises_parse_error(monkeypatch, isolated_registry, sample_config):
-    # DummyIntent has 'message' with a default, so let's use CalendarIntent instead
+    # CalendarIntent only requires 'title' — date/start_time/end_time have sensible
+    # defaults (fill_defaults validator), so omitting the title is what must fail.
     from assistant.actions.calendar.action import CreateEventAction
     isolated_registry.register(CreateEventAction)
     parser = IntentParser(sample_config, isolated_registry)
-    # Missing required fields: date, start_time, end_time
-    _mock_post(monkeypatch, json.dumps({"action": "create_event", "parameters": {"title": "X"}}))
+    _mock_post(monkeypatch, json.dumps({"action": "create_event", "parameters": {"date": "2026-04-01"}}))
     with pytest.raises(ParseError):
         parser.parse("schedule something")
+
+
+def test_calendar_intent_fills_defaults_when_time_omitted(monkeypatch, isolated_registry, sample_config):
+    """Title alone is enough — date/start_time/end_time are auto-filled, not required."""
+    from assistant.actions.calendar.action import CreateEventAction
+    isolated_registry.register(CreateEventAction)
+    parser = IntentParser(sample_config, isolated_registry)
+    _mock_post(monkeypatch, json.dumps({"action": "create_event", "parameters": {"title": "X"}}))
+    results = parser.parse("schedule something")
+    action_name, intent = results[0]
+    assert action_name == "create_event"
+    assert intent.date is not None
+    assert intent.start_time is not None
+    assert intent.end_time is not None
 
 
 def test_connection_error_raises_ollama_unavailable(monkeypatch, isolated_registry, sample_config):

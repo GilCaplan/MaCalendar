@@ -25,12 +25,18 @@ dependencies = [
     "python-dateutil==2.9.0",
     "pytz==2024.1",
     "pyluach>=2.3.0",
+    "Flask>=3.0",
 ]
 
 [project.optional-dependencies]
 nlp = [
     "spacy>=3.7,<4.0",
     "recognizers-text-date-time>=1.0.2a0",
+    # recognizers-text-date-time imports emoji.UNICODE_EMOJI, removed in emoji 2.0
+    # (Aug 2021). Without this pin, a fresh resolve silently breaks date parsing:
+    # the DateTime recognizer catches the ImportError, logs a warning, and disables
+    # itself — every "on friday"/"next wednesday" style command loses its date.
+    "emoji<2.0",
 ]
 dev = [
     "pytest>=8.0",
@@ -38,6 +44,8 @@ dev = [
     "pytest-cov",
     "spacy>=3.7,<4.0",
     "recognizers-text-date-time>=1.0.2a0",
+    "emoji<2.0",
+    "soundfile>=0.12",  # tests/audio/ — macOS-only STT round-trip tests
 ]
 
 [project.scripts]

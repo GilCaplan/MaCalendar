@@ -57,20 +57,25 @@ def test_build_system_prompt_contains_parameters_schema(isolated_registry, dummy
     assert "message" in prompt
 
 
+def _action_enum(schema: dict) -> list:
+    """Schema wraps actions in a top-level 'actions' array (multi-action support)."""
+    return schema["properties"]["actions"]["items"]["properties"]["action"]["enum"]
+
+
 def test_build_ollama_schema_includes_unknown(isolated_registry):
     schema = isolated_registry.build_ollama_schema()
-    assert "unknown" in schema["properties"]["action"]["enum"]
+    assert "unknown" in _action_enum(schema)
 
 
 def test_build_ollama_schema_includes_registered(isolated_registry, dummy_action_cls):
     isolated_registry.register(dummy_action_cls)
     schema = isolated_registry.build_ollama_schema()
-    assert "dummy_action" in schema["properties"]["action"]["enum"]
+    assert "dummy_action" in _action_enum(schema)
 
 
 def test_build_ollama_schema_empty_registry(isolated_registry):
     schema = isolated_registry.build_ollama_schema()
-    assert schema["properties"]["action"]["enum"] == ["unknown"]
+    assert _action_enum(schema) == ["unknown"]
 
 
 def test_reset_clears_actions(isolated_registry, dummy_action_cls):

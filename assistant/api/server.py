@@ -10,7 +10,6 @@ from __future__ import annotations
 import datetime
 import logging
 import os
-from functools import wraps
 from typing import Any
 
 import yaml
@@ -135,20 +134,23 @@ def create_app() -> Flask:
     app = Flask(__name__)
 
     # ------------------------------------------------------------------
-    # Optional API-key auth
+    # Optional API-key auth — enforced via before_request so every route is
+    # covered automatically (a per-route @decorator is easy to forget on a
+    # new endpoint; this can't be skipped by accident). /health stays open
+    # so external monitoring doesn't need the key.
     # ------------------------------------------------------------------
 
-    def _api_key_required(f):
-        @wraps(f)
-        def decorated(*args, **kwargs):
-            cfg = load_config()
-            expected = cfg.api.key
-            if expected:
-                provided = request.headers.get("X-API-Key", "")
-                if provided != expected:
-                    return jsonify({"error": "Unauthorized", "code": 401}), 401
-            return f(*args, **kwargs)
-        return decorated
+    @app.before_request
+    def _enforce_api_key():
+        if request.path == "/health":
+            return None
+        cfg = load_config()
+        expected = cfg.api.key
+        if expected:
+            provided = request.headers.get("X-API-Key", "")
+            if provided != expected:
+                return jsonify({"error": "Unauthorized", "code": 401}), 401
+        return None
 
     # ------------------------------------------------------------------
     # Health
