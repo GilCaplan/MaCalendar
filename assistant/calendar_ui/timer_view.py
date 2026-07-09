@@ -45,6 +45,7 @@ from PyQt6.QtWidgets import (
 
 from assistant.db import CalendarDB
 import assistant.calendar_ui.styles as _styles
+from assistant.calendar_ui.dialog_utils import install_enter_confirms
 
 # ---------------------------------------------------------------------------
 # Currency data  (code → (display name, symbol))
@@ -328,11 +329,12 @@ class TimerDialog(QDialog):
         line.setFrameShape(QFrame.Shape.HLine)
         root.addWidget(line)
 
-        self._title_edit.returnPressed.connect(self.accept)
-
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
+        ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        ok_btn.setDefault(True)
+        install_enter_confirms(self, ok_btn)
         root.addWidget(buttons)
 
         # Apply initial state
@@ -481,13 +483,14 @@ class LogTimeDialog(QDialog):
         line.setFrameShape(QFrame.Shape.HLine)
         root.addWidget(line)
 
-        self._title_edit.returnPressed.connect(self._on_accept)
-
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
+        ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        ok_btn.setDefault(True)
+        install_enter_confirms(self, ok_btn)
         root.addWidget(buttons)
 
     def _on_unknown_toggled(self, checked: bool) -> None:
@@ -602,11 +605,12 @@ class SessionEditDialog(QDialog):
 
         layout.addLayout(form)
 
-        self._title_edit.returnPressed.connect(self.accept)
-
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
+        ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        ok_btn.setDefault(True)
+        install_enter_confirms(self, ok_btn)
         layout.addWidget(buttons)
 
     @property
@@ -797,6 +801,7 @@ class SessionsPanel(QWidget):
             self, "Delete Session",
             "Remove this session? This cannot be undone.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Yes,  # Enter confirms; Escape still cancels
         )
         if confirm != QMessageBox.StandardButton.Yes:
             return
@@ -1142,6 +1147,7 @@ class TimerCard(QWidget):
                 self, "Delete Timer",
                 f"Delete \"{self._timer['title']}\" and all its sessions? This cannot be undone.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Yes,  # Enter confirms; Escape still cancels
             )
             if confirm == QMessageBox.StandardButton.Yes:
                 self._db.delete_timer(self._timer["id"])

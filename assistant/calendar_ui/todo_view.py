@@ -36,6 +36,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QDesktopServices
 
+from assistant.calendar_ui.dialog_utils import install_enter_confirms
 from assistant.calendar_ui.styles import (
     BLUE,
     BLUE_HOVER,
@@ -145,9 +146,10 @@ class InsertLinkDialog(QDialog):
         )
         btns.accepted.connect(self.accept)
         btns.rejected.connect(self.reject)
+        ok_btn = btns.button(QDialogButtonBox.StandardButton.Ok)
+        ok_btn.setDefault(True)
+        install_enter_confirms(self, ok_btn)
         form.addRow(btns)
-
-        self._url_edit.returnPressed.connect(self.accept)
 
     def result_link(self) -> tuple[str, str]:
         """Returns (display_text, url)."""

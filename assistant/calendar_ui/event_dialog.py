@@ -25,6 +25,7 @@ from PyQt6.QtCore import QDate, QTime
 
 import assistant.calendar_ui.styles as _styles
 from assistant.calendar_ui.styles import BLUE, EVENT_COLORS, GRAY_BORDER, GRAY_TEXT
+from assistant.calendar_ui.dialog_utils import install_enter_confirms
 
 
 class ColorDot(QWidget):
@@ -266,10 +267,12 @@ class EventDialog(QDialog):
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Cancel | QDialogButtonBox.StandardButton.Save
         )
-        buttons.button(QDialogButtonBox.StandardButton.Save).setObjectName("primary")
-        buttons.button(QDialogButtonBox.StandardButton.Save).setDefault(True)
+        save_btn = buttons.button(QDialogButtonBox.StandardButton.Save)
+        save_btn.setObjectName("primary")
+        save_btn.setDefault(True)
         buttons.accepted.connect(self._on_save)
         buttons.rejected.connect(self.reject)
+        install_enter_confirms(self, save_btn)
         btn_row.addWidget(buttons)
 
         layout.addLayout(btn_row)
@@ -303,6 +306,7 @@ class EventDialog(QDialog):
             btn_only_this = msg.addButton("Only this instance", QMessageBox.ButtonRole.ActionRole)
             btn_series = msg.addButton("Entire series", QMessageBox.ButtonRole.DestructiveRole)
             msg.addButton(QMessageBox.StandardButton.Cancel)
+            msg.setDefaultButton(btn_only_this)  # Enter confirms; Escape/Cancel button still cancels
             msg.exec()
             if msg.clickedButton() == btn_only_this:
                 self.delete_requested = True
@@ -315,9 +319,9 @@ class EventDialog(QDialog):
             reply = QMessageBox.question(
                 self,
                 "Delete Event",
-                f"Delete \"{title}\"?\nThis cannot be undone.",
+                f"Delete \"{title}\"?\n(⌘Z undoes this if you change your mind.)",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Yes,  # Enter confirms; Escape/Cancel button still cancels
             )
             if reply == QMessageBox.StandardButton.Yes:
                 self.delete_requested = True

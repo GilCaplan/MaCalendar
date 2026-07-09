@@ -1,7 +1,30 @@
 #!/bin/bash
 # Double-click this file in Finder to launch the Calendar Assistant.
+# The Terminal window Finder opens for this gets minimized to the Dock
+# immediately rather than staying visible — everything below then keeps
+# running normally in that same (now-hidden) window/process.
+#
+# Deliberately NOT detaching this into a separate background process
+# (e.g. via `nohup ... &` or `launchctl submit`): this project lives under
+# ~/Desktop, and macOS's TCC privacy controls block freshly-spawned/
+# re-parented processes from touching anything there ("Operation not
+# permitted") unless the user has separately granted that process Desktop
+# access. Staying in the same process that Terminal already launched (and
+# already has permission for) sidesteps that entirely.
 
 cd "$(dirname "$0")"
+
+if [ -z "$MACALENDAR_DETACHED" ]; then
+    export MACALENDAR_DETACHED=1
+    MY_TTY="$(tty)"
+    osascript -e "
+        tell application \"Terminal\"
+            repeat with w in windows
+                if (tty of w) is \"$MY_TTY\" then set miniaturized of w to true
+            end repeat
+        end tell
+    " 2>/dev/null
+fi
 
 # Activate virtual environment
 VENV_PYTHON=""

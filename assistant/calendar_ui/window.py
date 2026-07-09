@@ -8,7 +8,7 @@ import threading
 from typing import Optional
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QFont, QCloseEvent, QColor
+from PyQt6.QtGui import QFont, QCloseEvent, QColor, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -35,6 +35,7 @@ from assistant.calendar_ui.day_view import DayView
 from assistant.calendar_ui.event_dialog import EventDialog
 from assistant.calendar_ui.month_view import MonthView
 from assistant.calendar_ui.sidebar import Sidebar
+from assistant.calendar_ui.undo import UndoManager
 import assistant.calendar_ui.styles as _styles
 from assistant.calendar_ui.styles import get_app_style, BLUE, GRAY_BORDER, GRAY_DARK, GRAY_TEXT, GRAY_BG
 from assistant.calendar_ui.week_view import WeekView
@@ -159,16 +160,24 @@ class CalendarWindow(QMainWindow):
         self._db = CalendarDB()
         self._current_date = datetime.date.today()
         self._view_mode = "month"  # "month" | "week" | "day" | "todo" | "timer"
+        self._undo_manager = UndoManager()
 
         self._dark = (config.theme == "dark") if config else False
-        
+
         self.setWindowTitle("Calendar")
         self.setMinimumSize(900, 640)
         self.resize(1100, 720)
-        
+
         self._build_ui()
         self._apply_theme(self._dark, show_toast=False)
         self._apply_ui_config()
+
+        # Cmd+Z on macOS (Ctrl+Z elsewhere) — undoes the last direct UI edit
+        # (create/update/delete/drag-reschedule/resize of an event). Separate
+        # from the voice pipeline's own background-verification undo+redo.
+        QShortcut(QKeySequence.StandardKey.Undo, self, activated=self._on_undo)
+        # Shift+Cmd+Z (Ctrl+Shift+Z elsewhere) — redoes an undone action.
+        QShortcut(QKeySequence.StandardKey.Redo, self, activated=self._on_redo)
 
         # Auto-sync todos from calendar on open if configured
         if config and config.todo.sync.auto_sync_on_open and config.todo.sync.mode != "off":
@@ -542,11 +551,65 @@ class CalendarWindow(QMainWindow):
     # Event actions
     # ------------------------------------------------------------------
 
+    def _on_undo(self) -> None:
+        desc = self._undo_manager.undo()
+        if desc:
+            self.refresh_calendar()
+            self.show_toast(f"Undid: {desc}")
+        else:
+            self.show_toast("Nothing to undo")
+
+    def _on_redo(self) -> None:
+        desc = self._undo_manager.redo()
+        if desc:
+            self.refresh_calendar()
+            self.show_toast(f"Redid: {desc}")
+        else:
+            self.show_toast("Nothing to redo")
+
+    @staticmethod
+    def _event_content_fields(event: dict) -> dict:
+        """Strip an event dict down to the fields create/update accept —
+        excludes id/series_id/source/timestamps so a recreate never
+        accidentally regenerates a whole series or collides on id.
+        Includes recurrence/recurrence_end so an undo that reverts a
+        recurring-vs-not change restores the field, not just the visible
+        title/date/time — see the promotion guard in _on_event_clicked for
+        why promoting to a series is excluded from the undo stack entirely
+        rather than relying on this alone."""
+        keys = ("title", "date", "start_time", "end_time", "attendees",
+                "location", "description", "color", "recurrence", "recurrence_end")
+        return {k: event.get(k, "") for k in keys}
+
+    def _create_event_and_refresh(self, dialog: EventDialog) -> None:
+        data = dict(dialog.event_data)
+        title = data.get("title", "event")
+        is_recurring = bool(data.get("recurrence"))
+        # Mutable holder: redo re-creates the row under a NEW id each time,
+        # so undo (which deletes "the current copy") must always read the
+        # latest id rather than one frozen at push() time.
+        id_holder = {"id": self._db.create_event_from_dict(data)}
+
+        def undo():
+            # A recurring create generates a whole series (create_event_from_dict
+            # -> _create_series_instances) — delete_event alone would only remove
+            # the root and re-root the series to the next instance, leaving the
+            # rest behind. delete_series removes every generated instance.
+            if is_recurring:
+                self._db.delete_series(id_holder["id"])
+            else:
+                self._db.delete_event(id_holder["id"])
+
+        def redo():
+            id_holder["id"] = self._db.create_event_from_dict(data)
+
+        self._undo_manager.push(f'Create "{title}"', undo, redo)
+        self.refresh_calendar()
+
     def _on_new_event(self, default_date: Optional[datetime.date] = None) -> None:
         dialog = EventDialog(self, default_date=default_date or self._current_date, db=self._db)
         if dialog.exec() and dialog.event_data:
-            self._db.create_event_from_dict(dialog.event_data)
-            self.refresh_calendar()
+            self._create_event_and_refresh(dialog)
 
     def _on_day_double_clicked(self, date: datetime.date) -> None:
         self._on_new_event(default_date=date)
@@ -554,8 +617,7 @@ class CalendarWindow(QMainWindow):
     def _on_datetime_double_clicked(self, dt: datetime.datetime) -> None:
         dialog = EventDialog(self, default_date=dt.date(), default_time=dt.time(), db=self._db)
         if dialog.exec() and dialog.event_data:
-            self._db.create_event_from_dict(dialog.event_data)
-            self.refresh_calendar()
+            self._create_event_and_refresh(dialog)
 
     def _on_event_clicked(self, event: dict) -> None:
         dialog = EventDialog(self, event=event, db=self._db)
@@ -564,17 +626,43 @@ class CalendarWindow(QMainWindow):
             series_id = event.get("series_id")
 
             if dialog.delete_series_requested and series_id:
+                # Series-wide delete isn't captured for undo (would require
+                # snapshotting every instance) — Cmd+Z after this reaches
+                # further back to the last undoable action instead.
                 count = self._db.delete_series(series_id)
                 self.refresh_calendar()
                 self.show_toast(f"Deleted {count} events in series")
             elif dialog.delete_requested and ev_id:
-                self._db.delete_event(ev_id)
+                restore_data = self._event_content_fields(event)
+                # If this instance belonged to a series, it inherited that
+                # series' recurrence/recurrence_end fields too — but restoring
+                # it via create_event_from_dict() treats a non-empty
+                # recurrence as "generate a brand new series", which would
+                # spawn a second, parallel series of future instances rather
+                # than just bringing back this one deleted occurrence. Clear
+                # it so undo restores the row's content without side effects;
+                # the restored instance just won't carry its old series
+                # membership/badge — same "series identity isn't fully
+                # undoable" boundary already accepted for the other cases above.
+                if event.get("series_id"):
+                    restore_data["recurrence"] = ""
+                    restore_data["recurrence_end"] = ""
+                id_holder = {"id": ev_id}
+                self._db.delete_event(id_holder["id"])
+
+                def undo():
+                    id_holder["id"] = self._db.create_event_from_dict(restore_data)
+
+                def redo():
+                    self._db.delete_event(id_holder["id"])
+
+                self._undo_manager.push(f'Delete "{event["title"]}"', undo, redo)
                 self.refresh_calendar()
                 self.show_toast(f"Deleted \"{event['title']}\"")
             elif dialog.event_data:
                 ev_id = dialog.event_data.pop("id", None)
                 series_id = dialog.event_data.pop("series_id", None)
-                
+
                 if ev_id:
                     if series_id:
                         msg = QMessageBox(self)
@@ -584,22 +672,46 @@ class CalendarWindow(QMainWindow):
                         btn_only_this = msg.addButton("Only this instance", QMessageBox.ButtonRole.ActionRole)
                         btn_series = msg.addButton("Entire series", QMessageBox.ButtonRole.AcceptRole)
                         msg.addButton(QMessageBox.StandardButton.Cancel)
+                        msg.setDefaultButton(btn_only_this)
                         msg.exec()
-                        
+
                         if msg.clickedButton() == btn_only_this:
-                            self._db.update_event(ev_id, **dialog.event_data)
+                            before = self._event_content_fields(event)
+                            after = dict(dialog.event_data)
+                            self._db.update_event(ev_id, **after)
+                            self._undo_manager.push(
+                                f'Update "{after["title"]}"',
+                                lambda: self._db.update_event(ev_id, **before),
+                                lambda: self._db.update_event(ev_id, **after),
+                            )
                             self.refresh_calendar()
                             self.show_toast(f"Updated this instance of \"{dialog.event_data['title']}\"")
                         elif msg.clickedButton() == btn_series:
+                            # Series-wide update isn't captured for undo either.
                             self._db.update_series(series_id, ev_id, **dialog.event_data)
                             self.refresh_calendar()
                             self.show_toast(f"Updated series \"{dialog.event_data['title']}\"")
                     else:
-                        self._db.update_event(ev_id, **dialog.event_data)
+                        before = self._event_content_fields(event)
+                        after = dict(dialog.event_data)
+                        promotes_to_series = bool(after.get("recurrence")) and not before.get("recurrence")
+                        self._db.update_event(ev_id, **after)
                         # If recurrence was added to a previously non-recurring event,
                         # promote it to a series root and generate future instances.
-                        if dialog.event_data.get("recurrence"):
+                        if after.get("recurrence"):
                             self._db.promote_to_series(ev_id)
+                        if promotes_to_series:
+                            # Reverting update_event alone wouldn't clean up the
+                            # series instances promote_to_series just generated —
+                            # same undo boundary as the series-wide branches above:
+                            # don't push a record that would silently under-undo.
+                            pass
+                        else:
+                            self._undo_manager.push(
+                                f'Update "{after["title"]}"',
+                                lambda: self._db.update_event(ev_id, **before),
+                                lambda: self._db.update_event(ev_id, **after),
+                            )
                         self.refresh_calendar()
                         self.show_toast(f"Updated \"{dialog.event_data['title']}\"")
 
@@ -621,6 +733,14 @@ class CalendarWindow(QMainWindow):
                         updates["end_time"] = f"{end_min // 60:02d}:{end_min % 60:02d}"
                 except Exception:
                     pass
+        if event:
+            before = {k: event.get(k, "") for k in ("date", "start_time", "end_time")}
+            after = dict(updates)
+            self._undo_manager.push(
+                f'Move "{event["title"]}"',
+                lambda: self._db.update_event(event_id, **before),
+                lambda: self._db.update_event(event_id, **after),
+            )
         self._db.update_event(event_id, **updates)
         self.refresh_calendar()
         action = "Event resized" if ("start_time" in updates and "end_time" in updates) else "Event moved"
@@ -1322,6 +1442,11 @@ class CalendarWindow(QMainWindow):
         add_btn.clicked.connect(add_ics)
         add_row.addWidget(add_btn)
         layout.addLayout(add_row)
+        # Enter while typing a label/URL adds the calendar (the contextually
+        # obvious action) rather than falling through to the dialog's Close
+        # default below.
+        label_edit.returnPressed.connect(add_ics)
+        url_edit.returnPressed.connect(add_ics)
 
         layout.addSpacing(6)
 
@@ -1403,6 +1528,7 @@ class CalendarWindow(QMainWindow):
                 QDesktopServices.openUrl(QUrl(url))
 
         open_btn.clicked.connect(open_browser)
+        open_btn.setDefault(True)
         v.addWidget(open_btn)
 
         cancel_btn = QPushButton("Cancel")

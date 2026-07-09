@@ -47,6 +47,7 @@ from assistant.calendar_ui.styles import (
     D_GRAY_BORDER,
     D_GRAY_TEXT,
 )
+from assistant.calendar_ui.dialog_utils import install_enter_confirms
 from assistant.db import CalendarDB
 
 # ---------------------------------------------------------------------------
@@ -650,6 +651,7 @@ class CourseworkView(QWidget):
             "Delete Course",
             f"Delete \"{course['name']}\" and all its assignments?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,  # Enter confirms; Escape still cancels
         )
         if reply == QMessageBox.StandardButton.Yes:
             if self._selected_id == course["id"]:
@@ -747,6 +749,9 @@ class _CourseDialog(QDialog):
         )
         btns.accepted.connect(self.accept)
         btns.rejected.connect(self.reject)
+        ok_btn = btns.button(QDialogButtonBox.StandardButton.Ok)
+        ok_btn.setDefault(True)
+        install_enter_confirms(self, ok_btn)
         layout.addWidget(btns)
 
     def _select_color(self, hex_color: str) -> None:
@@ -838,6 +843,9 @@ class _AssignmentDialog(QDialog):
         )
         btns.accepted.connect(self.accept)
         btns.rejected.connect(self.reject)
+        ok_btn = btns.button(QDialogButtonBox.StandardButton.Ok)
+        ok_btn.setDefault(True)
+        install_enter_confirms(self, ok_btn)
         layout.addWidget(btns)
 
     def result_data(self) -> dict:
