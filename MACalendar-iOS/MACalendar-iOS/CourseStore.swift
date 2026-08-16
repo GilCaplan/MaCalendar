@@ -81,7 +81,7 @@ class CourseStore: ObservableObject {
 
     func insertAssignment(courseId: Int, title: String, dueDate: String = "") -> Assignment {
         let a = Assignment(id: nextTemp, courseId: courseId, title: title,
-                           dueDate: dueDate, completed: false)
+                           dueDate: dueDate, completed: 0)
         nextTemp -= 1
         assignments.append(a)
         persist()
@@ -89,7 +89,7 @@ class CourseStore: ObservableObject {
     }
 
     func patchAssignment(_ id: Int, title: String? = nil, dueDate: String? = nil,
-                         completed: Bool? = nil, calendarEventId: Int? = nil) {
+                         completed: Int? = nil, calendarEventId: Int? = nil) {
         guard let i = assignments.firstIndex(where: { $0.id == id }) else { return }
         if let v = title           { assignments[i].title           = v }
         if let v = dueDate         { assignments[i].dueDate         = v }
@@ -106,7 +106,7 @@ class CourseStore: ObservableObject {
 
     func toggleAssignment(_ id: Int) {
         guard let i = assignments.firstIndex(where: { $0.id == id }) else { return }
-        assignments[i].completed.toggle()
+        assignments[i].completed = assignments[i].completed == 0 ? 1 : 0
         persist()
     }
 

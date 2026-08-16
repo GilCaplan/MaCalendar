@@ -124,12 +124,19 @@ struct Assignment: Identifiable, Codable, Equatable {
     var courseId: Int
     var title: String
     var dueDate: String   // "YYYY-MM-DD" or ""
-    var completed: Bool
+    // The server serializes this straight from a SQLite INTEGER column (0/1),
+    // never a JSON true/false, so JSONDecoder's strict Bool decoding threw on
+    // every GET /assignments — which silently broke loading (and, via the
+    // try? refresh after a save, made new assignments vanish right after
+    // being added). Int + isDone mirrors Todo.completed's already-correct pattern.
+    var completed: Int
     var calendarEventId: Int?
 
     enum CodingKeys: String, CodingKey {
         case id, courseId = "course_id", title, dueDate = "due_date", completed, calendarEventId = "calendar_event_id"
     }
+
+    var isDone: Bool { completed != 0 }
 }
 
 // Lightweight type-erased Codable value for heterogeneous JSON dicts

@@ -331,6 +331,8 @@ class CalendarWindow(QMainWindow):
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setFixedHeight(30)
             btn.clicked.connect(lambda _, m=mode: self._set_view(m))
+            if mode == "coursework":
+                btn.setVisible(self._config.ui.show_coursework if self._config else True)
             layout.addWidget(btn, alignment=v_center)
             setattr(self, f"_view_btn_{mode}", btn)
             # Styled by _apply_theme(), always called right after _build_ui()
@@ -933,6 +935,11 @@ class CalendarWindow(QMainWindow):
         
         compact_cb.toggled.connect(update_style)
 
+        # Coursework tab visibility
+        coursework_tab_cb = QCheckBox("Show Coursework Tab")
+        coursework_tab_cb.setChecked(self._config.ui.show_coursework)
+        layout.addWidget(coursework_tab_cb)
+
         # Auto-Approve check
         auto_cb = QCheckBox("Auto-Approve Actions (No Confirmations)")
         auto_cb.setChecked(self._pipeline._confirmer.level == 0)
@@ -1212,6 +1219,11 @@ class CalendarWindow(QMainWindow):
                         txt = re.sub(r'accent_color:\s*"[^"]*"', f'accent_color: "{accent_state["hex"]}"', txt, count=1)
                     else:
                         txt = re.sub(r"(compact_ui:\s*(?:true|false))", rf'\1\n  accent_color: "{accent_state["hex"]}"', txt, count=1)
+                    show_coursework_val = "true" if coursework_tab_cb.isChecked() else "false"
+                    if re.search(r"show_coursework:\s*(true|false)", txt):
+                        txt = re.sub(r"show_coursework:\s*(true|false)", f"show_coursework: {show_coursework_val}", txt, count=1)
+                    else:
+                        txt = re.sub(r'(accent_color:\s*"[^"]*")', rf'\1\n  show_coursework: {show_coursework_val}', txt, count=1)
                     # Event keywords — write as YAML flow list
                     kw_yaml = _yaml.dump(raw_keywords, default_flow_style=True).strip()
                     txt = re.sub(r"event_keywords:\s*\[.*?\]", f"event_keywords: {kw_yaml}", txt, count=1)
@@ -1255,6 +1267,10 @@ class CalendarWindow(QMainWindow):
                     self._config.ui.font_coursework = coursework_spin.value()
                     self._config.ui.compact_ui = compact_cb.isChecked()
                     self._config.ui.accent_color = accent_state["hex"]
+                    self._config.ui.show_coursework = coursework_tab_cb.isChecked()
+                    self._view_btn_coursework.setVisible(self._config.ui.show_coursework)
+                    if not self._config.ui.show_coursework and self._view_mode == "coursework":
+                        self._set_view("month")
                     _styles.set_accent(accent_state["hex"])
                     self._apply_ui_config()
                     self._apply_theme(self._dark)

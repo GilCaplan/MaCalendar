@@ -162,6 +162,12 @@ struct SettingsView: View {
                         .padding(.top, 4)
                     }
 
+                    // MARK: Tabs
+                    GroupBox(label: Label("Tabs", systemImage: "square.grid.2x2")) {
+                        Toggle("Show Coursework Tab", isOn: $settings.showCourseworkTab)
+                    }
+                    .padding(.top, 4)
+
                     // MARK: Voice
                     GroupBox(label: Label("Voice", systemImage: "speaker.wave.2")) {
                         Picker("TTS Voice", selection: $settings.ttsVoice) {

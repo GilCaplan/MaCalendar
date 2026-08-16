@@ -45,6 +45,21 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(israelHolidays, forKey: "israelHolidays") }
     }
 
+    // Local-only, mirrors the Mac's config.yaml `todo.show_completed` (default
+    // off) but isn't synced from it — same precedent as the Hebrew settings
+    // above. Unlike Mac, which only exposes this via config.yaml, iOS gets an
+    // in-app toggle (TasksView toolbar) since editing a config file on a
+    // phone isn't practical.
+    @Published var hideCompletedTasks: Bool {
+        didSet { UserDefaults.standard.set(hideCompletedTasks, forKey: "hideCompletedTasks") }
+    }
+
+    // Local-only, mirrors the Mac's config.yaml `ui.show_coursework` (default
+    // on) but isn't synced from it — same precedent as the settings above.
+    @Published var showCourseworkTab: Bool {
+        didSet { UserDefaults.standard.set(showCourseworkTab, forKey: "showCourseworkTab") }
+    }
+
     init() {
         self.serverURL = UserDefaults.standard.string(forKey: "serverURL") ?? ""
         self.apiKey    = UserDefaults.standard.string(forKey: "apiKey") ?? ""
@@ -69,5 +84,11 @@ class AppSettings: ObservableObject {
             ? true : UserDefaults.standard.bool(forKey: "showHolidays")
         self.israelHolidays = UserDefaults.standard.object(forKey: "israelHolidays") == nil
             ? true : UserDefaults.standard.bool(forKey: "israelHolidays")
+
+        self.hideCompletedTasks = UserDefaults.standard.object(forKey: "hideCompletedTasks") == nil
+            ? true : UserDefaults.standard.bool(forKey: "hideCompletedTasks")
+
+        self.showCourseworkTab = UserDefaults.standard.object(forKey: "showCourseworkTab") == nil
+            ? true : UserDefaults.standard.bool(forKey: "showCourseworkTab")
     }
 }

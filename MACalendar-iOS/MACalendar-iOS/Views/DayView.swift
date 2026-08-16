@@ -20,7 +20,7 @@ struct DayView: View {
             if settings.hebrewDisplayMode != "english" || !holidays.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
                     if settings.hebrewDisplayMode != "english" {
-                        Text(HebrewDateFormatting.string(for: date))
+                        Text(HebrewDateFormatting.fullString(for: date))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }

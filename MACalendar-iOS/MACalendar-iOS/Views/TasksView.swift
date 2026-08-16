@@ -11,8 +11,11 @@ struct TasksView: View {
     @State private var errorMsg: String?
     @State private var editMode: EditMode = .inactive
 
-    private var todayTasks: [Todo]   { todos.filter { $0.list == "today" } }
-    private var generalTasks: [Todo] { todos.filter { $0.list == "general" } }
+    private var visibleTodos: [Todo] {
+        settings.hideCompletedTasks ? todos.filter { !$0.isDone } : todos
+    }
+    private var todayTasks: [Todo]   { visibleTodos.filter { $0.list == "today" } }
+    private var generalTasks: [Todo] { visibleTodos.filter { $0.list == "general" } }
 
     private var hasCompleted: Bool {
         todos.contains { $0.isDone }
@@ -86,8 +89,13 @@ struct TasksView: View {
             .environment(\.editMode, $editMode)
             .navigationTitle("Tasks")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItemGroup(placement: .navigationBarLeading) {
                     if hasCompleted {
+                        Button(action: { settings.hideCompletedTasks.toggle() }) {
+                            Image(systemName: settings.hideCompletedTasks ? "eye" : "eye.slash")
+                        }
+                        .help(settings.hideCompletedTasks ? "Show completed" : "Hide completed")
+
                         Button(action: clearCompleted) {
                             Label("Clear Done", systemImage: "trash.slash")
                                 .foregroundColor(.red)

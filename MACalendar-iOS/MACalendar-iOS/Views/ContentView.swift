@@ -85,6 +85,19 @@ struct ContentView: View {
                             .task { await loadMonth() }
                             .onChange(of: viewedDate) { _ in Task { await loadMonth() } }
                             .onAppear { viewedDate = selectedDate }
+                            // Vertical swipe to move a month, in addition to the
+                            // chevron buttons. `simultaneousGesture` (rather than
+                            // `gesture`) so it doesn't steal the horizontal swipe
+                            // the outer page TabView uses to switch Month/Week/Day.
+                            .simultaneousGesture(
+                                DragGesture(minimumDistance: 24)
+                                    .onEnded { value in
+                                        let h = value.translation.height
+                                        let w = value.translation.width
+                                        guard abs(h) > abs(w) * 1.5, abs(h) > 40 else { return }
+                                        withAnimation { shiftMonth(h < 0 ? 1 : -1) }
+                                    }
+                            )
 
                             // ── Week ──
                             VStack(spacing: 0) {
@@ -188,9 +201,11 @@ struct ContentView: View {
                     .tag(1)
 
                 // ── Coursework Tab ───────────────────────────────────────
-                CourseworkView()
-                    .tabItem { Label("Coursework", systemImage: "graduationcap") }
-                    .tag(2)
+                if settings.showCourseworkTab {
+                    CourseworkView()
+                        .tabItem { Label("Coursework", systemImage: "graduationcap") }
+                        .tag(2)
+                }
 
                 // ── Settings Tab ─────────────────────────────────────────
                 SettingsView()
@@ -215,6 +230,11 @@ struct ContentView: View {
                 isNew: true,
                 onDismiss: { Task { await loadMonth() } }
             )
+        }
+        .onChange(of: settings.showCourseworkTab) { visible in
+            // Bounce off the now-hidden tab so the user doesn't land on a
+            // blank TabView page.
+            if !visible && selectedTab == 2 { selectedTab = 0 }
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active {

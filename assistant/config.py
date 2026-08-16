@@ -106,6 +106,7 @@ class UIConfig(BaseModel):
     font_coursework: int = 13
     compact_ui: bool = False
     accent_color: str = "#f5a524"  # hex; brand accent used app-wide (Settings → Accent Color)
+    show_coursework: bool = True  # toggled off from Settings to hide the Coursework tab entirely
 
 
 class ApiConfig(BaseModel):

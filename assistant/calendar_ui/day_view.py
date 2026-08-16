@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 from typing import List
 
-from PyQt6.QtCore import Qt, QMimeData, QByteArray, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QEvent, QMimeData, QByteArray, QTimer, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QDrag, QFont, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QGraphicsDropShadowEffect,
@@ -29,10 +29,10 @@ from assistant.calendar_ui.styles import (
 from assistant.calendar_ui.month_view import HolidayBanner
 from assistant.hebrew_calendar import enumerate_holidays
 
-HOUR_HEIGHT = 60   # px per hour
+HOUR_HEIGHT = 60       # px per hour at full size (also the ceiling when compressing)
+MIN_HOUR_HEIGHT = 24   # px per hour floor before the view falls back to scrolling
 LABEL_WIDTH = 60
 RESIZE_HANDLE = 8  # px at top/bottom edge that activate resize mode
-_SNAP_PX = HOUR_HEIGHT // 4  # 15-minute snap grid
 _COL_GAP = 3       # px gap between side-by-side event columns
 _LEFT_PAD = 4      # px left of first column
 _RIGHT_PAD = 6     # px right of last column
@@ -52,6 +52,7 @@ class EventBlock(QLabel):
         location = event.get("location") or ""
         self.event = event
         self._font_size = 12
+        self._hour_height = HOUR_HEIGHT
 
         title_line = f"<b>{event['title']}</b>"
         time_line = f"<span style='opacity:0.85;font-size:{self._font_size - 1}px'>{start}–{end}</span>"
@@ -89,6 +90,10 @@ class EventBlock(QLabel):
             }}
         """)
 
+    @property
+    def _snap_px(self) -> int:
+        return max(self._hour_height // 4, 3)  # 15-minute snap grid
+
     def _edge_at(self, y: int) -> str | None:
         if y <= RESIZE_HANDLE:
             return "top"
@@ -109,19 +114,20 @@ class EventBlock(QLabel):
 
     def mouseMoveEvent(self, event):
         if self._resize_edge:
+            snap_px = self._snap_px
             parent_y = self.mapToParent(event.pos()).y()
             delta = parent_y - self._resize_press_y
-            min_h = max(_SNAP_PX, 18)
+            min_h = max(snap_px, 18)
             orig_bottom = self._resize_orig_top + self._resize_orig_height
 
             if self._resize_edge == "bottom":
                 raw_bottom = orig_bottom + delta
-                snapped_bottom = round(raw_bottom / _SNAP_PX) * _SNAP_PX
+                snapped_bottom = round(raw_bottom / snap_px) * snap_px
                 new_h = max(snapped_bottom - self._resize_orig_top, min_h)
                 self.setGeometry(self.x(), self._resize_orig_top, self.width(), new_h)
             else:  # top
                 raw_top = self._resize_orig_top + delta
-                snapped_top = round(raw_top / _SNAP_PX) * _SNAP_PX
+                snapped_top = round(raw_top / snap_px) * snap_px
                 new_h = max(orig_bottom - snapped_top, min_h)
                 actual_top = orig_bottom - new_h
                 self.setGeometry(self.x(), actual_top, self.width(), new_h)
@@ -155,8 +161,8 @@ class EventBlock(QLabel):
         if self._resize_edge:
             top = self.y()
             bottom = top + self.height()
-            start_min = round(top / HOUR_HEIGHT * 60)
-            end_min = round(bottom / HOUR_HEIGHT * 60)
+            start_min = round(top / self._hour_height * 60)
+            end_min = round(bottom / self._hour_height * 60)
             start_min = max(0, min(start_min, 23 * 60))
             end_min = max(start_min + 15, min(end_min, 24 * 60 - 1))
             payload = {
@@ -210,19 +216,24 @@ class _TodoPill(QLabel):
 class TimeIndicatorOverlay(QWidget):
     """Transparent overlay that paints the current-time red line on top of event blocks."""
 
-    def __init__(self, date: datetime.date, parent: "QWidget"):
+    def __init__(self, date: datetime.date, parent: "QWidget", hour_height: int = HOUR_HEIGHT):
         super().__init__(parent)
         self._date = date
+        self._hour_height = hour_height
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
         self.setAutoFillBackground(False)
         self.resize(parent.size())
 
+    def set_hour_height(self, hour_height: int) -> None:
+        self._hour_height = hour_height
+        self.update()
+
     def paintEvent(self, event):
         if self._date != datetime.date.today():
             return
         now = datetime.datetime.now()
-        y = int((now.hour * 60 + now.minute) / 60 * HOUR_HEIGHT)
+        y = int((now.hour * 60 + now.minute) / 60 * self._hour_height)
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(QPen(QColor(BLUE), 2))
@@ -245,16 +256,18 @@ class DayTimeline(QWidget):
     def __init__(self, date: datetime.date, parent=None):
         super().__init__(parent)
         self.date = date
+        self.hour_height = HOUR_HEIGHT
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.setFixedHeight(HOUR_HEIGHT * 24)
+        self.setFixedHeight(self.hour_height * 24)
         self._event_widgets: List[EventBlock] = []
+        self._events: List[dict] = []
         self._drag_hover = False
         self._ui_config = None
         self._press_y: int = -1
         self._pending_click_dt: datetime.datetime | None = None
         self.setAcceptDrops(True)
         self._apply_bg()
-        self._overlay = TimeIndicatorOverlay(self.date, self)
+        self._overlay = TimeIndicatorOverlay(self.date, self, hour_height=self.hour_height)
         self._overlay.raise_()
 
     def _apply_bg(self) -> None:
@@ -331,8 +344,8 @@ class DayTimeline(QWidget):
                 ci = ev_col[i]
                 s = ev_s(ev)
                 e = ev_e(ev)
-                top = int(s / 60 * HOUR_HEIGHT)
-                height = max(int((e - s) / 60 * HOUR_HEIGHT), 30)
+                top = int(s / 60 * self.hour_height)
+                height = max(int((e - s) / 60 * self.hour_height), 30)
                 x = _LEFT_PAD + int(ci * (col_w + _COL_GAP))
                 w = max(int(col_w), 40)
                 # +1 top / -2 height creates a 2px gap between adjacent events
@@ -354,6 +367,7 @@ class DayTimeline(QWidget):
         for ev, x, w, top, h in layout:
             block = EventBlock(ev, self)
             block._font_size = fs
+            block._hour_height = self.hour_height
             block._color = ev.get("color", BLUE)
             block._apply_block_style()
             block._col_x = x
@@ -369,6 +383,17 @@ class DayTimeline(QWidget):
             block.show()
             self._event_widgets.append(block)
         self._overlay.raise_()
+
+    def set_hour_height(self, hour_height: int) -> None:
+        """Rescale this timeline (called by DayView when the window is resized)."""
+        if hour_height == self.hour_height:
+            return
+        self.hour_height = hour_height
+        self.setFixedHeight(hour_height * 24)
+        self._overlay.set_hour_height(hour_height)
+        if self._events:
+            self.load_events(self._events)
+        self.update()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -389,8 +414,8 @@ class DayTimeline(QWidget):
     def mouseReleaseEvent(self, event):
         if self._press_y >= 0 and abs(event.pos().y() - self._press_y) < 10:
             y = self._press_y
-            hour = min(y // HOUR_HEIGHT, 23)
-            minute = (y % HOUR_HEIGHT) // (HOUR_HEIGHT // 4) * 15
+            hour = min(y // self.hour_height, 23)
+            minute = (y % self.hour_height) // (self.hour_height // 4) * 15
             self._pending_click_dt = datetime.datetime.combine(
                 self.date, datetime.time(hour, minute)
             )
@@ -425,7 +450,7 @@ class DayTimeline(QWidget):
         if event.mimeData().hasFormat("application/x-event-id"):
             event_id = int(bytes(event.mimeData().data("application/x-event-id")).decode())
             y = event.position().y()
-            total_min = int(y / HOUR_HEIGHT * 60)
+            total_min = int(y / self.hour_height * 60)
             total_min = (total_min // 30) * 30
             new_h = min(total_min // 60, 23)
             new_m = total_min % 60
@@ -442,7 +467,7 @@ class DayTimeline(QWidget):
         # Hour grid lines
         painter.setPen(QPen(QColor(border_color)))
         for h in range(25):
-            y = h * HOUR_HEIGHT
+            y = h * self.hour_height
             painter.drawLine(0, y, self.width(), y)
 
         if self._drag_hover:
@@ -473,6 +498,7 @@ class DayView(QWidget):
         self._timeline: DayTimeline | None = None
         self._ui_config = None
         self._hebrew_config = None
+        self._hour_height = HOUR_HEIGHT
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -529,7 +555,7 @@ class DayView(QWidget):
         # Time labels column
         self._time_col = QWidget()
         self._time_col.setFixedWidth(LABEL_WIDTH)
-        self._time_col.setFixedHeight(HOUR_HEIGHT * 24)
+        self._time_col.setFixedHeight(self._hour_height * 24)
         self._time_labels: List[QLabel] = []
         time_layout = QVBoxLayout(self._time_col)
         time_layout.setContentsMargins(0, 0, 4, 0)
@@ -544,7 +570,7 @@ class DayView(QWidget):
             else:
                 label_text = f"{h - 12} PM"
             lbl = QLabel(label_text)
-            lbl.setFixedHeight(HOUR_HEIGHT)
+            lbl.setFixedHeight(self._hour_height)
             lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
             self._time_labels.append(lbl)
             time_layout.addWidget(lbl)
@@ -555,7 +581,7 @@ class DayView(QWidget):
         self._timeline_container.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
-        self._timeline_container.setFixedHeight(HOUR_HEIGHT * 24)
+        self._timeline_container.setFixedHeight(self._hour_height * 24)
         self._tc_layout = QVBoxLayout(self._timeline_container)
         self._tc_layout.setContentsMargins(0, 0, 0, 0)
         self._tc_layout.setSpacing(0)
@@ -564,6 +590,11 @@ class DayView(QWidget):
         scroll.setWidget(body)
         layout.addWidget(scroll, stretch=1)
         self._scroll = scroll
+
+        # Compress hour rows to fit the available height instead of always
+        # scrolling — recalculated whenever the scroll viewport is resized.
+        scroll.viewport().installEventFilter(self)
+        QTimer.singleShot(0, lambda: self._recalc_hour_height(scroll.viewport().height()))
 
         # Refresh current-time indicator every minute
         self._tick_timer = QTimer(self)
@@ -576,6 +607,27 @@ class DayView(QWidget):
         self._update_header()
 
         QTimer.singleShot(120, self._scroll_to_now)
+
+    def eventFilter(self, obj, event):
+        if obj is self._scroll.viewport() and event.type() == QEvent.Type.Resize:
+            self._recalc_hour_height(event.size().height())
+        return super().eventFilter(obj, event)
+
+    def _recalc_hour_height(self, viewport_h: int) -> None:
+        """Shrink/grow the hour-row height so the full day fits the window when
+        possible, only falling back to scrolling below MIN_HOUR_HEIGHT."""
+        if viewport_h <= 0:
+            return
+        new_h = max(MIN_HOUR_HEIGHT, min(HOUR_HEIGHT, viewport_h // 24))
+        if new_h == self._hour_height:
+            return
+        self._hour_height = new_h
+        self._time_col.setFixedHeight(new_h * 24)
+        for lbl in self._time_labels:
+            lbl.setFixedHeight(new_h)
+        self._timeline_container.setFixedHeight(new_h * 24)
+        if self._timeline:
+            self._timeline.set_hour_height(new_h)
 
     # ------------------------------------------------------------------
     # Public API
@@ -661,6 +713,9 @@ class DayView(QWidget):
                 item.widget().deleteLater()
 
         self._timeline = DayTimeline(self._date)
+        if self._hour_height != self._timeline.hour_height:
+            self._timeline.hour_height = self._hour_height
+            self._timeline.setFixedHeight(self._hour_height * 24)
         self._timeline.slot_double_clicked.connect(self.datetime_double_clicked)
         self._timeline.event_clicked.connect(self.event_clicked)
         self._timeline.event_rescheduled.connect(self.event_rescheduled)
@@ -701,10 +756,10 @@ class DayView(QWidget):
     def _scroll_to_now(self) -> None:
         if self._date == datetime.date.today():
             now = datetime.datetime.now()
-            y = int((now.hour * 60 + now.minute) / 60 * HOUR_HEIGHT)
+            y = int((now.hour * 60 + now.minute) / 60 * self._hour_height)
             self._scroll.verticalScrollBar().setValue(max(0, y - 120))
         else:
-            self._scroll.verticalScrollBar().setValue(HOUR_HEIGHT * 8)
+            self._scroll.verticalScrollBar().setValue(self._hour_height * 8)
 
     def _apply_theme_styles(self) -> None:
         dark = _styles._dark

@@ -401,29 +401,11 @@ QWidget#sidebar {{
 }}
 
 /* ── Mini calendar ── */
+/* The native navigation bar (month/year QMenu dropdown) is hidden in
+   favor of Sidebar's own header — see MiniCalendar in sidebar.py — since
+   that QMenu popup isn't reliably themeable via QSS on macOS. */
 QCalendarWidget {{
     background-color: {bg2};
-}}
-QCalendarWidget QToolButton {{
-    background-color: transparent;
-    color: {text};
-    font-size: 12px;
-    border: none;
-    padding: 2px;
-}}
-QCalendarWidget QToolButton:hover {{
-    background-color: {border};
-    border-radius: {RADIUS_SM}px;
-}}
-QCalendarWidget QMenu {{
-    background-color: {bg};
-    color: {text};
-}}
-QCalendarWidget QSpinBox {{
-    background-color: {bg};
-    border: 1px solid {mid};
-    border-radius: {RADIUS_SM}px;
-    color: {text};
 }}
 QCalendarWidget QAbstractItemView {{
     background-color: {bg2};

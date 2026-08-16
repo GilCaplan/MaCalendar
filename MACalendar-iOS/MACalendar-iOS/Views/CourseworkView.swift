@@ -96,7 +96,7 @@ private struct CourseSection: View {
 
     private var sortedAssignments: [Assignment] {
         store.assignments(for: course.id).sorted { a, b in
-            if a.completed != b.completed { return !a.completed }
+            if a.isDone != b.isDone { return !a.isDone }
             if a.dueDate.isEmpty && b.dueDate.isEmpty { return false }
             if a.dueDate.isEmpty { return false }
             if b.dueDate.isEmpty { return true }
@@ -281,17 +281,17 @@ private struct AssignmentRowView: View {
     var body: some View {
         HStack(spacing: 10) {
             Button(action: onToggle) {
-                Image(systemName: assignment.completed ? "checkmark.circle.fill" : "circle")
+                Image(systemName: assignment.isDone ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundColor(assignment.completed ? (Color(hex: course.color) ?? settings.accentColor) : .secondary)
+                    .foregroundColor(assignment.isDone ? (Color(hex: course.color) ?? settings.accentColor) : .secondary)
             }
             .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(assignment.title)
                     .font(.body)
-                    .strikethrough(assignment.completed)
-                    .foregroundColor(assignment.completed ? .secondary : .primary)
+                    .strikethrough(assignment.isDone)
+                    .foregroundColor(assignment.isDone ? .secondary : .primary)
 
                 if !assignment.dueDate.isEmpty {
                     Text(dueDateLabel)
