@@ -10,6 +10,10 @@ struct CourseworkView: View {
     @State private var editingCourse: Course? = nil
     @State private var editMode: EditMode = .inactive
 
+    private var hasCompleted: Bool {
+        store.assignments.contains { $0.isDone }
+    }
+
     var body: some View {
         NavigationView {
             Group {
@@ -46,10 +50,19 @@ struct CourseworkView: View {
             }
             .navigationTitle("Coursework")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItemGroup(placement: .navigationBarLeading) {
                     if !store.courses.isEmpty {
                         Button(editMode == .active ? "Done" : "Edit") {
                             withAnimation { editMode = editMode == .active ? .inactive : .active }
+                        }
+                    }
+                    if hasCompleted {
+                        Button(action: { settings.hideCompletedAssignments.toggle() }) {
+                            Image(systemName: settings.hideCompletedAssignments ? "eye" : "eye.slash")
+                        }
+                        Button(action: clearCompleted) {
+                            Label("Clear Done", systemImage: "trash.slash")
+                                .foregroundColor(.red)
                         }
                     }
                 }
@@ -78,6 +91,14 @@ struct CourseworkView: View {
         store.removeCourse(course.id)
         Task { try? await api.deleteCourse(id: course.id) }
     }
+
+    private func clearCompleted() {
+        store.removeCompletedAssignments()
+        Task {
+            try? await api.clearCompletedAssignments()
+            await load()
+        }
+    }
 }
 
 // MARK: - Course Section
@@ -95,7 +116,9 @@ private struct CourseSection: View {
     @State private var addingAssignment = false
 
     private var sortedAssignments: [Assignment] {
-        store.assignments(for: course.id).sorted { a, b in
+        let all = store.assignments(for: course.id)
+        let visible = settings.hideCompletedAssignments ? all.filter { !$0.isDone } : all
+        return visible.sorted { a, b in
             if a.isDone != b.isDone { return !a.isDone }
             if a.dueDate.isEmpty && b.dueDate.isEmpty { return false }
             if a.dueDate.isEmpty { return false }

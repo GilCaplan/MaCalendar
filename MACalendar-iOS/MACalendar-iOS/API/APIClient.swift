@@ -364,6 +364,11 @@ class APIClient: ObservableObject {
     func deleteAssignment(id: Int) async throws {
         _ = try await request("/assignments/\(id)", method: "DELETE")
     }
+
+    func clearCompletedAssignments(courseId: Int? = nil) async throws {
+        let path = courseId != nil ? "/assignments/completed?course_id=\(courseId!)" : "/assignments/completed"
+        _ = try await request(path, method: "DELETE")
+    }
 }
 
 // MARK: - Errors

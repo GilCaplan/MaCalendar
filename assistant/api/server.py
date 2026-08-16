@@ -599,6 +599,12 @@ def create_app() -> Flask:
         get_db().delete_assignment(asgn_id)
         return jsonify({"deleted": asgn_id})
 
+    @app.delete("/assignments/completed")
+    def assignments_clear_completed():
+        course_id = request.args.get("course_id", type=int)  # optional filter
+        count = get_db().delete_completed_assignments(course_id=course_id)
+        return jsonify({"deleted": count})
+
     # ------------------------------------------------------------------
     # Config
     # ------------------------------------------------------------------

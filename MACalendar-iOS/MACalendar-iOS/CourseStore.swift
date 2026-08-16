@@ -114,4 +114,9 @@ class CourseStore: ObservableObject {
         assignments.removeAll { $0.id == id }
         persist()
     }
+
+    func removeCompletedAssignments() {
+        assignments.removeAll { $0.isDone }
+        persist()
+    }
 }

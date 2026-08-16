@@ -274,6 +274,7 @@ class _AssignmentPanel(QWidget):
         self._font_size = font_size
         self._course: Optional[dict] = None
         self._rows: list[QWidget] = []
+        self._hide_completed = False
         self._build()
 
     def _build(self) -> None:
@@ -315,6 +316,25 @@ class _AssignmentPanel(QWidget):
         self._partners_lbl.setStyleSheet(f"color: {GRAY_TEXT}; font-size: 12px;")
         self._partners_lbl.setWordWrap(True)
         hlayout.addWidget(self._partners_lbl)
+
+        # ── Completed-assignment controls (hide filter + destructive clear) ──
+        completed_row = QHBoxLayout()
+        completed_row.setSpacing(10)
+        self._hide_completed_cb = QCheckBox("Hide completed")
+        self._hide_completed_cb.setVisible(False)
+        self._hide_completed_cb.toggled.connect(self._on_hide_completed_toggled)
+        completed_row.addWidget(self._hide_completed_cb)
+
+        self._clear_completed_btn = QPushButton("Clear Done")
+        self._clear_completed_btn.setObjectName("flat")
+        self._clear_completed_btn.setFixedHeight(24)
+        self._clear_completed_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._clear_completed_btn.setVisible(False)
+        self._clear_completed_btn.clicked.connect(self._on_clear_completed)
+        completed_row.addWidget(self._clear_completed_btn)
+
+        completed_row.addStretch(1)
+        hlayout.addLayout(completed_row)
 
         hlayout.addWidget(_HDivider())
         outer.addWidget(header)
@@ -360,6 +380,8 @@ class _AssignmentPanel(QWidget):
             self._partners_lbl.setText("")
             self._edit_course_btn.setVisible(False)
             self._add_bar.setVisible(False)
+            self._hide_completed_cb.setVisible(False)
+            self._clear_completed_btn.setVisible(False)
             self._clear_rows()
             return
 
@@ -377,6 +399,7 @@ class _AssignmentPanel(QWidget):
         self._partners_lbl.setVisible(bool(partners))
 
         self._add_bar.setVisible(True)
+        self._hide_completed_cb.setVisible(True)
         self._reload_assignments()
 
     def _on_edit_course_btn(self) -> None:
@@ -400,8 +423,15 @@ class _AssignmentPanel(QWidget):
         assignments = self._db.get_assignments(self._course["id"])
         assignments.sort(key=lambda a: (a["completed"], a["due_date"] or "9999-99-99"))
 
+        has_completed = any(a["completed"] for a in assignments)
+        self._clear_completed_btn.setVisible(has_completed)
+        hiding_some = self._hide_completed and has_completed
+        if self._hide_completed:
+            assignments = [a for a in assignments if not a["completed"]]
+
         if not assignments:
-            ph = QLabel("No assignments yet — add one below.")
+            ph = QLabel("All done — completed assignments are hidden." if hiding_some
+                        else "No assignments yet — add one below.")
             color = D_GRAY_TEXT if self._dark else GRAY_TEXT
             ph.setStyleSheet(f"color: {color}; font-size: 13px; padding: 20px;")
             ph.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -431,6 +461,16 @@ class _AssignmentPanel(QWidget):
 
     def _on_delete(self, asgn_id: int) -> None:
         self._db.delete_assignment(asgn_id)
+        self._reload_assignments()
+
+    def _on_hide_completed_toggled(self, checked: bool) -> None:
+        self._hide_completed = checked
+        self._reload_assignments()
+
+    def _on_clear_completed(self) -> None:
+        if self._course is None:
+            return
+        self._db.delete_completed_assignments(course_id=self._course["id"])
         self._reload_assignments()
 
     def _on_sync(self, asgn_id: int) -> None:

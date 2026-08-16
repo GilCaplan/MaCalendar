@@ -1216,6 +1216,17 @@ class CalendarDB:
         with self._conn() as conn:
             conn.execute("DELETE FROM assignments WHERE id = ?", (assignment_id,))
 
+    def delete_completed_assignments(self, course_id: Optional[int] = None) -> int:
+        """Delete all completed assignments, optionally filtered by course. Returns count deleted."""
+        with self._conn() as conn:
+            if course_id is not None:
+                cur = conn.execute(
+                    "DELETE FROM assignments WHERE completed = 1 AND course_id = ?", (course_id,)
+                )
+            else:
+                cur = conn.execute("DELETE FROM assignments WHERE completed = 1")
+            return cur.rowcount
+
     def set_assignment_calendar_event(self, assignment_id: int, event_id: int) -> None:
         with self._conn() as conn:
             conn.execute(

@@ -54,6 +54,11 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(hideCompletedTasks, forKey: "hideCompletedTasks") }
     }
 
+    // Same pattern as hideCompletedTasks above, applied to Coursework assignments.
+    @Published var hideCompletedAssignments: Bool {
+        didSet { UserDefaults.standard.set(hideCompletedAssignments, forKey: "hideCompletedAssignments") }
+    }
+
     // Local-only, mirrors the Mac's config.yaml `ui.show_coursework` (default
     // on) but isn't synced from it — same precedent as the settings above.
     @Published var showCourseworkTab: Bool {
@@ -87,6 +92,9 @@ class AppSettings: ObservableObject {
 
         self.hideCompletedTasks = UserDefaults.standard.object(forKey: "hideCompletedTasks") == nil
             ? true : UserDefaults.standard.bool(forKey: "hideCompletedTasks")
+
+        self.hideCompletedAssignments = UserDefaults.standard.object(forKey: "hideCompletedAssignments") == nil
+            ? true : UserDefaults.standard.bool(forKey: "hideCompletedAssignments")
 
         self.showCourseworkTab = UserDefaults.standard.object(forKey: "showCourseworkTab") == nil
             ? true : UserDefaults.standard.bool(forKey: "showCourseworkTab")
