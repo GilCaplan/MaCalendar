@@ -1021,7 +1021,7 @@ class CalendarDB:
 
     def create_timer_session(self, timer_id: int, title: str = "", start_time: Optional[str] = None) -> int:
         """Start a new session for a timer. Returns new row id."""
-        now = datetime.datetime.now().isoformat()
+        now = datetime.datetime.now().astimezone().isoformat()
         with self._conn() as conn:
             cur = conn.execute(
                 "INSERT INTO timer_sessions (timer_id, title, start_time, end_time, notes, created_at) VALUES (?, ?, ?, NULL, '', ?)",
@@ -1065,7 +1065,7 @@ class CalendarDB:
         with self._conn() as conn:
             conn.execute(
                 "UPDATE timer_sessions SET end_time = ? WHERE id = ?",
-                (end_time or datetime.datetime.now().isoformat(), session_id),
+                (end_time or datetime.datetime.now().astimezone().isoformat(), session_id),
             )
 
     def delete_timer_session(self, session_id: int) -> None:
@@ -1088,8 +1088,12 @@ class CalendarDB:
             session = dict(row)
 
         start = datetime.datetime.fromisoformat(session["start_time"])
+        if start.tzinfo is None:
+            start = start.astimezone()
         end_raw = session.get("end_time")
         end = datetime.datetime.fromisoformat(end_raw) if end_raw else datetime.datetime.now()
+        if end.tzinfo is None:
+            end = end.astimezone()
 
         if split_at:
             mid = datetime.datetime.fromisoformat(split_at)

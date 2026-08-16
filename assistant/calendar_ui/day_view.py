@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import time as _time
 from typing import List
 
 from PyQt6.QtCore import Qt, QEvent, QMimeData, QByteArray, QTimer, pyqtSignal
@@ -236,10 +237,37 @@ class TimeIndicatorOverlay(QWidget):
         y = int((now.hour * 60 + now.minute) / 60 * self._hour_height)
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setPen(QPen(QColor(BLUE), 2))
-        painter.setBrush(QColor(BLUE))
-        painter.drawEllipse(0, y - 5, 10, 10)
+
+        accent = QColor(BLUE)
+
+        # Soft glow halo behind the dot, for a less jarring, more
+        # integrated feel against the event blocks it sits on top of.
+        glow = QColor(accent)
+        glow.setAlpha(50)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(glow)
+        painter.drawEllipse(-4, y - 9, 18, 18)
+
+        # A faint dark halo under the line keeps it legible when it
+        # crosses an event block in the same accent color family.
+        halo = QColor(0, 0, 0, 70)
+        halo_pen = QPen(halo, 3)
+        halo_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(halo_pen)
         painter.drawLine(10, y, self.width(), y)
+
+        # Thin, slightly translucent line with round caps.
+        line_color = QColor(accent)
+        line_color.setAlpha(210)
+        pen = QPen(line_color, 1.5)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        painter.drawLine(10, y, self.width(), y)
+
+        # Solid dot marking "now" at the left edge.
+        painter.setPen(QPen(accent, 1))
+        painter.setBrush(accent)
+        painter.drawEllipse(0, y - 5, 10, 10)
 
 
 class DayTimeline(QWidget):
@@ -714,8 +742,7 @@ class DayView(QWidget):
 
         self._timeline = DayTimeline(self._date)
         if self._hour_height != self._timeline.hour_height:
-            self._timeline.hour_height = self._hour_height
-            self._timeline.setFixedHeight(self._hour_height * 24)
+            self._timeline.set_hour_height(self._hour_height)
         self._timeline.slot_double_clicked.connect(self.datetime_double_clicked)
         self._timeline.event_clicked.connect(self.event_clicked)
         self._timeline.event_rescheduled.connect(self.event_rescheduled)
@@ -750,6 +777,10 @@ class DayView(QWidget):
             self._count_label.setText(f"\u00b7 {n} events")
 
     def _tick_time(self) -> None:
+        # Re-sync to the OS timezone in case it changed while the app was
+        # running (e.g. laptop travel) — datetime.now() can otherwise keep
+        # using the zone that was active when the process started.
+        _time.tzset()
         if self._timeline and self._date == datetime.date.today():
             self._timeline._overlay.update()
 

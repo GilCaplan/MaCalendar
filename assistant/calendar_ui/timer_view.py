@@ -19,6 +19,7 @@ A single 1-second QTimer in TimerView drives all live displays.
 from __future__ import annotations
 
 import datetime
+import time as _time
 from typing import Optional
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
@@ -127,10 +128,20 @@ _TIMER_COLORS = [
 # ---------------------------------------------------------------------------
 
 def _duration_secs(start_iso: str, end_iso: Optional[str]) -> float:
-    """Seconds between start and end (or now if end is None)."""
+    """Seconds between start and end (or now if end is None).
+
+    Timestamps may be naive (legacy rows) or timezone-aware (current
+    format). Normalize both to aware datetimes anchored to the system's
+    current local offset so the diff reflects real elapsed time even if
+    the laptop's timezone changed between start and now (e.g. travel).
+    """
     try:
         s = datetime.datetime.fromisoformat(start_iso)
+        if s.tzinfo is None:
+            s = s.astimezone()
         e = datetime.datetime.fromisoformat(end_iso) if end_iso else datetime.datetime.now()
+        if e.tzinfo is None:
+            e = e.astimezone()
         return max(0.0, (e - s).total_seconds())
     except Exception:
         return 0.0
@@ -1340,6 +1351,10 @@ class TimerView(QWidget):
     # ------------------------------------------------------------------
 
     def _tick(self) -> None:
+        # Re-sync to the OS timezone in case it changed while the app was
+        # running (e.g. laptop travel) — datetime.now() can otherwise keep
+        # using the zone that was active when the process started.
+        _time.tzset()
         for card in self._cards.values():
             card.tick()
         self._update_summary()
