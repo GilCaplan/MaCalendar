@@ -8,7 +8,7 @@ import time as _time
 from typing import List
 
 from PyQt6.QtCore import Qt, QEvent, QMimeData, QByteArray, QTimer, pyqtSignal
-from PyQt6.QtGui import QBrush, QColor, QDrag, QPainter, QPen, QPixmap
+from PyQt6.QtGui import QBrush, QColor, QDrag, QFont, QFontMetrics, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QGraphicsDropShadowEffect,
     QGridLayout,
@@ -107,36 +107,24 @@ class EventBlock(QLabel):
     clicked = pyqtSignal(dict)
     resized = pyqtSignal(int, dict)  # (event_id, {start_time, end_time})
 
+    # Roomy padding is used when there's space for the full two-line
+    # title+time label; tight padding kicks in for compact, short-event
+    # blocks so every spare pixel goes to the text instead of whitespace.
+    # Each tuple is (top, right, bottom, left) to match CSS padding order.
+    _PAD_ROOMY = (3, 5, 3, 8)
+    _PAD_TIGHT = (1, 4, 1, 6)
+
     def __init__(self, event: dict, font_size: int = 11, hour_height: int = HOUR_HEIGHT, parent=None):
         super().__init__(parent)
-        color = event.get("color", BLUE)
-        start = event.get("start_time", "")
-        end = event.get("end_time", "")
         self.event = event
+        self._color = event.get("color", BLUE)
+        self._title_raw = event.get("title", "")
+        self._title_html = _html.escape(self._title_raw)
+        self._start = event.get("start_time", "")
+        self._end = event.get("end_time", "")
         self._font_size = font_size
         self._hour_height = hour_height
         self._drag_start = None
-        title = _html.escape(event.get("title", ""))
-        self.setText(
-            f"<b style='font-size:{font_size}px'>{title}</b>"
-            f"<br><span style='font-size:{max(font_size-2,8)}px;"
-            f"opacity:0.82'>{start}–{end}</span>"
-        )
-        self.setTextFormat(Qt.TextFormat.RichText)
-        self.setWordWrap(True)
-        self.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        self.setStyleSheet(
-            f"""
-            QLabel {{
-                background-color: {color};
-                color: {_styles.on_color(color)};
-                border-radius: 4px;
-                padding: 3px 5px 3px 8px;
-                border-left: 4px solid rgba(0,0,0,0.30);
-                border-bottom: 1px solid rgba(0,0,0,0.20);
-            }}
-            """
-        )
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setMouseTracking(True)
         # Resize state
@@ -144,6 +132,76 @@ class EventBlock(QLabel):
         self._resize_orig_top = 0
         self._resize_orig_height = 0
         self._resize_press_y = 0  # parent-relative y at press
+        self._update_display()
+
+    def _apply_style(self, pad: tuple[int, int, int, int]) -> None:
+        top, right, bottom, left = pad
+        self.setStyleSheet(
+            f"""
+            QLabel {{
+                background-color: {self._color};
+                color: {_styles.on_color(self._color)};
+                border-radius: 4px;
+                padding: {top}px {right}px {bottom}px {left}px;
+                border-left: 4px solid rgba(0,0,0,0.30);
+                border-bottom: 1px solid rgba(0,0,0,0.20);
+            }}
+            """
+        )
+
+    def _update_display(self) -> None:
+        """Pick a one-line or two-line label depending on the block's actual
+        height, so events stay readable no matter how short their duration or
+        how far the user has dragged a resize handle. Runs from resizeEvent,
+        so it re-evaluates live during interactive resize, window resize, and
+        the initial layout pass alike."""
+        w, h = self.width(), self.height()
+        if w <= 0 or h <= 0:
+            return
+
+        title_font = QFont(self.font())
+        title_font.setPixelSize(self._font_size)
+        title_font.setBold(True)
+        title_fm = QFontMetrics(title_font)
+
+        sub_size = max(self._font_size - 2, 8)
+        sub_font = QFont(self.font())
+        sub_font.setPixelSize(sub_size)
+        sub_fm = QFontMetrics(sub_font)
+
+        def content_h(pad):
+            return h - pad[0] - pad[2] - 1  # -1 for the border-bottom
+
+        two_line_h = title_fm.height() + 2 + sub_fm.height()
+
+        if content_h(self._PAD_ROOMY) >= two_line_h:
+            self._apply_style(self._PAD_ROOMY)
+            self.setFont(QFont())  # let the rich-text spans own size/weight
+            self.setWordWrap(True)
+            self.setTextFormat(Qt.TextFormat.RichText)
+            self.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+            self.setText(
+                f"<b style='font-size:{self._font_size}px'>{self._title_html}</b>"
+                f"<br><span style='font-size:{sub_size}px;"
+                f"opacity:0.82'>{self._start}–{self._end}</span>"
+            )
+        else:
+            # Not enough vertical room for both lines: drop the time-range
+            # subtitle and show a single, vertically-centered, elided title
+            # instead of letting the two-line rich text get clipped.
+            pad = self._PAD_TIGHT
+            self._apply_style(pad)
+            self.setFont(title_font)
+            self.setWordWrap(False)
+            self.setTextFormat(Qt.TextFormat.PlainText)
+            self.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+            avail_w = max(w - pad[1] - pad[3] - 4, 10)  # -4 for the border-left strip
+            elided = title_fm.elidedText(self._title_raw, Qt.TextElideMode.ElideRight, avail_w)
+            self.setText(elided)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._update_display()
 
     @property
     def _snap_px(self) -> int:
@@ -312,10 +370,16 @@ class DayColumn(QWidget):
         except Exception:
             return 0
 
-    def _compute_layout(self, events: List[dict], avail_w: int):
+    def _compute_layout(self, events: List[dict], avail_w: int, font_size: int = 11):
         """Returns [(event, x, w, top, height), ...] with overlap columns."""
         if not events:
             return []
+
+        # Floor scales with the configured font so a larger Week font size
+        # still leaves room for at least one readable line; EventBlock itself
+        # adapts its label (drops the time subtitle) whenever a block ends up
+        # too short for two lines, so this only needs to guarantee that much.
+        min_block_h = max(20, font_size + 9)
 
         def ev_s(ev): return self._to_min(ev.get("start_time", "0:00"))
         def ev_e(ev):
@@ -365,7 +429,7 @@ class DayColumn(QWidget):
                 s = ev_s(ev)
                 e = ev_e(ev)
                 top = int(s / 60 * self.hour_height)
-                height = max(int((e - s) / 60 * self.hour_height), 20)
+                height = max(int((e - s) / 60 * self.hour_height), min_block_h)
                 x = _LEFT_PAD + int(ci * (col_w + _COL_GAP))
                 w = max(int(col_w), 30)
                 # +1 top / -2 height creates a 2px gap between adjacent events
@@ -380,11 +444,16 @@ class DayColumn(QWidget):
         self._event_widgets.clear()
 
         fs = 11 if not self._ui_config else self._ui_config.font_week
-        for ev, x, w, top, h in self._compute_layout(events, self.width()):
+        self._fs = fs
+        for ev, x, w, top, h in self._compute_layout(events, self.width(), fs):
             block = EventBlock(ev, font_size=fs, hour_height=self.hour_height, parent=self)
             block.clicked.connect(self.event_clicked)
             block.resized.connect(self.event_rescheduled)
             block.setGeometry(x, top, w, h)
+            # setGeometry() on a still-hidden widget doesn't reliably deliver
+            # a resizeEvent, so refresh the label content explicitly instead
+            # of trusting resizeEvent alone for this first layout pass.
+            block._update_display()
             shadow = QGraphicsDropShadowEffect()
             shadow.setBlurRadius(6)
             shadow.setOffset(0, 2)
@@ -410,9 +479,10 @@ class DayColumn(QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if self._events:
-            layout = self._compute_layout(self._events, self.width())
+            layout = self._compute_layout(self._events, self.width(), getattr(self, "_fs", 11))
             for block, item in zip(self._event_widgets, layout):
                 block.setGeometry(item[1], block.y(), item[2], block.height())
+                block._update_display()
         if self._overlay:
             self._overlay.resize(self.size())
             self._overlay.raise_()
