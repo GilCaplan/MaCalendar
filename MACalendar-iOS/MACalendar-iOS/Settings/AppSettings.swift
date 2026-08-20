@@ -65,6 +65,11 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(showCourseworkTab, forKey: "showCourseworkTab") }
     }
 
+    // Same pattern as showCourseworkTab above, for the local-only Workout tab.
+    @Published var showWorkoutTab: Bool {
+        didSet { UserDefaults.standard.set(showWorkoutTab, forKey: "showWorkoutTab") }
+    }
+
     init() {
         self.serverURL = UserDefaults.standard.string(forKey: "serverURL") ?? ""
         self.apiKey    = UserDefaults.standard.string(forKey: "apiKey") ?? ""
@@ -98,5 +103,8 @@ class AppSettings: ObservableObject {
 
         self.showCourseworkTab = UserDefaults.standard.object(forKey: "showCourseworkTab") == nil
             ? true : UserDefaults.standard.bool(forKey: "showCourseworkTab")
+
+        self.showWorkoutTab = UserDefaults.standard.object(forKey: "showWorkoutTab") == nil
+            ? true : UserDefaults.standard.bool(forKey: "showWorkoutTab")
     }
 }

@@ -9,6 +9,11 @@ struct VoiceButton: View {
 
     @State private var status: Status = .idle
     var onRefresh: ((String) -> Void)?
+    /// Full response, for callers that need more than the refresh string —
+    /// e.g. the Workout tab keys off `actions.contains("generate_workout_routine")`
+    /// since the backend's `refresh` field has no workout-specific value (it's
+    /// a hardcoded "event"/"todo" substring match — see server.py).
+    var onResponse: ((VoiceResponse) -> Void)?
 
     enum Status { case idle, recording, thinking, speaking }
 
@@ -101,6 +106,7 @@ struct VoiceButton: View {
 
     private func handleResponse(_ response: VoiceResponse) async {
         onRefresh?(response.refresh)
+        onResponse?(response)
         if !response.message.isEmpty {
             status = .speaking
             player.speak(response.message, voiceIdentifier: settings.ttsVoice)

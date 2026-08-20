@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime
 import logging
 import os
+import sqlite3
 from typing import Any
 
 import yaml
@@ -44,9 +45,10 @@ _verify_lock = _threading.Lock()
 def _get_registry() -> ActionRegistry:
     global _registry
     if _registry is None:
-        import assistant.actions.calendar  # noqa: F401  triggers @register
-        import assistant.actions.todo      # noqa: F401
-        import assistant.actions.clarify   # noqa: F401
+        import assistant.actions.calendar         # noqa: F401  triggers @register
+        import assistant.actions.todo             # noqa: F401
+        import assistant.actions.clarify          # noqa: F401
+        import assistant.actions.workout_routine  # noqa: F401
         _registry = ActionRegistry()
     return _registry
 
@@ -604,6 +606,121 @@ def create_app() -> Flask:
         course_id = request.args.get("course_id", type=int)  # optional filter
         count = get_db().delete_completed_assignments(course_id=course_id)
         return jsonify({"deleted": count})
+
+    # ------------------------------------------------------------------
+    # Workout
+    #
+    # Client-generated UUID primary keys end-to-end (unlike events/todos'
+    # autoincrement-Int + temp-id-remap scheme) — the client always sends
+    # its own `id`, the server just stores it. JSON keys are snake_case,
+    # matching the SQL columns 1:1 (same convention as /events and /todos;
+    # the iOS API layer translates snake_case -> camelCase via CodingKeys,
+    # see API/Models.swift).
+    # ------------------------------------------------------------------
+
+    @app.get("/workout/exercises")
+    def workout_exercises_list():
+        return jsonify(get_db().get_workout_exercises())
+
+    @app.post("/workout/exercises")
+    def workout_exercise_create():
+        data = request.get_json(silent=True) or {}
+        exercise_id = data.get("id")
+        name = (data.get("name") or "").strip()
+        if not exercise_id or not name:
+            return jsonify({"error": "Missing 'id' or 'name'", "code": 400}), 400
+        get_db().create_workout_exercise(id=exercise_id, name=name, created_at=data.get("created_at"))
+        return jsonify({"id": exercise_id}), 201
+
+    @app.get("/workout/templates")
+    def workout_templates_list():
+        include_drafts = request.args.get("include_drafts", "false").lower() == "true"
+        return jsonify(get_db().get_workout_templates(include_drafts=include_drafts))
+
+    @app.post("/workout/templates")
+    def workout_template_create():
+        data = request.get_json(silent=True) or {}
+        template_id = data.get("id")
+        name = (data.get("name") or "").strip()
+        if not template_id or not name:
+            return jsonify({"error": "Missing 'id' or 'name'", "code": 400}), 400
+        db = get_db()
+        if db.get_workout_template(template_id) is not None:
+            return jsonify({"error": "Template already exists", "code": 409}), 409
+        try:
+            db.create_workout_template(data)
+        except (sqlite3.IntegrityError, KeyError) as e:
+            return jsonify({"error": f"Invalid template: {e}", "code": 400}), 400
+        return jsonify({"id": template_id}), 201
+
+    @app.patch("/workout/templates/<template_id>")
+    def workout_template_update(template_id: str):
+        data = request.get_json(silent=True) or {}
+        db = get_db()
+        if db.get_workout_template(template_id) is None:
+            return jsonify({"error": "Template not found", "code": 404}), 404
+        try:
+            db.replace_workout_template(template_id, data)
+        except (sqlite3.IntegrityError, KeyError) as e:
+            return jsonify({"error": f"Invalid template: {e}", "code": 400}), 400
+        return jsonify({"id": template_id})
+
+    @app.delete("/workout/templates/<template_id>")
+    def workout_template_delete(template_id: str):
+        db = get_db()
+        if db.get_workout_template(template_id) is None:
+            return jsonify({"error": "Template not found", "code": 404}), 404
+        db.delete_workout_template(template_id)
+        return jsonify({"deleted": template_id})
+
+    @app.patch("/workout/templates/<template_id>/approve")
+    def workout_template_approve(template_id: str):
+        db = get_db()
+        if db.get_workout_template(template_id) is None:
+            return jsonify({"error": "Template not found", "code": 404}), 404
+        db.approve_workout_template(template_id)
+        return jsonify({"id": template_id, "status": "saved"})
+
+    @app.get("/workout/sessions")
+    def workout_sessions_list():
+        limit = request.args.get("limit", type=int)
+        start_date = request.args.get("start_date")
+        end_date = request.args.get("end_date")
+        rows = get_db().get_workout_sessions(limit=limit, start_date=start_date, end_date=end_date)
+        return jsonify(rows)
+
+    @app.post("/workout/sessions")
+    def workout_session_create():
+        data = request.get_json(silent=True) or {}
+        session_id = data.get("id")
+        started_at = data.get("started_at")
+        if not session_id or not started_at:
+            return jsonify({"error": "Missing 'id' or 'started_at'", "code": 400}), 400
+        db = get_db()
+        if db.get_workout_session(session_id) is not None:
+            return jsonify({"error": "Session already exists", "code": 409}), 409
+        try:
+            db.create_workout_session(data)
+        except (sqlite3.IntegrityError, KeyError) as e:
+            return jsonify({"error": f"Invalid session: {e}", "code": 400}), 400
+        return jsonify({"id": session_id}), 201
+
+    @app.patch("/workout/sessions/<session_id>")
+    def workout_session_update(session_id: str):
+        data = request.get_json(silent=True) or {}
+        db = get_db()
+        if db.get_workout_session(session_id) is None:
+            return jsonify({"error": "Session not found", "code": 404}), 404
+        db.update_workout_session(session_id, **data)
+        return jsonify({"id": session_id})
+
+    @app.delete("/workout/sessions/<session_id>")
+    def workout_session_delete(session_id: str):
+        db = get_db()
+        if db.get_workout_session(session_id) is None:
+            return jsonify({"error": "Session not found", "code": 404}), 404
+        db.delete_workout_session(session_id)
+        return jsonify({"deleted": session_id})
 
     # ------------------------------------------------------------------
     # Config

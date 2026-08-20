@@ -10,9 +10,10 @@ import sys
 # Register action plugins — add new `import assistant.actions.<name>` lines
 # here to activate additional plugins.
 # ---------------------------------------------------------------------------
-import assistant.actions.calendar  # noqa: F401, PLC0415  registers CreateEventAction
-import assistant.actions.todo      # noqa: F401, PLC0415  registers todo actions
-import assistant.actions.clarify   # noqa: F401, PLC0415  registers ClarifyAction
+import assistant.actions.calendar         # noqa: F401, PLC0415  registers CreateEventAction
+import assistant.actions.todo             # noqa: F401, PLC0415  registers todo actions
+import assistant.actions.clarify          # noqa: F401, PLC0415  registers ClarifyAction
+import assistant.actions.workout_routine  # noqa: F401, PLC0415  registers GenerateWorkoutRoutineAction
 
 from assistant.actions import registry
 from assistant.calendar_ui.window import CalendarWindow

@@ -206,6 +206,38 @@ class IntentParser:
             logger.debug("fix_title_async failed: %s", exc)
         return None
 
+    def call_llm_json(self, sys_prompt: str, user_prompt: str) -> dict:
+        """Generic one-shot structured-output call to whichever LLM engine is configured.
+
+        For actions that need free-form structured JSON from the LLM outside the
+        normal intent-routing envelope (e.g. workout routine generation) — reuses
+        the same per-provider HTTP call paths as parse()/fix_title_async(), no new
+        request path. Raises ParseError on an unsupported engine, requests errors,
+        or invalid JSON; caller decides how to handle validation of the parsed dict.
+        """
+        engine = self.config.llm_engine
+        try:
+            if engine == "ollama":
+                raw = self._call_ollama_verify(sys_prompt, user_prompt)
+            elif engine == "openai":
+                raw = self._call_openai(sys_prompt, user_prompt)
+            elif engine == "gemini":
+                raw = self._call_gemini(sys_prompt, user_prompt)
+            elif engine == "claude":
+                raw = self._call_claude(sys_prompt, user_prompt)
+            else:
+                raise ParseError(f"Unsupported LLM engine: {engine}")
+        except AssistantError:
+            raise
+        except Exception as e:
+            raise ParseError(f"Error calling {engine}: {e}") from e
+
+        json_str = self._extract_json(raw)
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError as e:
+            raise ParseError(f"LLM returned invalid JSON: {e}\nRaw: {raw}") from e
+
     def _run_verification(
         self,
         transcript: str,

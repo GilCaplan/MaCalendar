@@ -246,6 +246,173 @@ class APIClient: ObservableObject {
         _ = try await request(path, method: "DELETE")
     }
 
+    // MARK: - Workout
+    //
+    // Workout IDs are client-generated UUIDs end-to-end (both locally and on
+    // the server), so — unlike events/todos — there's no temp-ID/remap dance:
+    // create locally (optimistic, in WorkoutStore) -> attempt to push to the
+    // server immediately -> on failure/offline, fall back to LocalStore's
+    // generic pending-write queue (same one events/todos use), replayed
+    // generically by syncPending() above.
+
+    private func workoutBody<T: Encodable>(_ value: T) -> [String: Any]? {
+        guard let data = try? JSONEncoder.workout.encode(value),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        return obj
+    }
+
+    private func bodyId(_ p: PendingChange) -> UUID? {
+        guard let data = p.bodyJSON,
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let idStr = obj["id"] as? String else { return nil }
+        return UUID(uuidString: idStr)
+    }
+
+    /// True if a POST to `path` for `id` is still sitting in the offline
+    /// queue — i.e. the record doesn't exist server-side yet, so a PATCH/DELETE
+    /// against it right now would 404 even though we're online.
+    private func hasPendingCreate(path: String, id: UUID) -> Bool {
+        LocalStore.shared.allPending().contains { $0.method == "POST" && $0.path == path && bodyId($0) == id }
+    }
+
+    // MARK: Workout — exercises
+
+    @discardableResult
+    func workoutExercises() async throws -> [Exercise] {
+        do {
+            let data = try await request("/workout/exercises")
+            let items = try JSONDecoder.workout.decode([Exercise].self, from: data)
+            WorkoutStore.shared.cacheExercises(items)
+            return items
+        } catch APIError.offline, APIError.badURL {
+            return WorkoutStore.shared.exercises
+        }
+    }
+
+    /// Called after WorkoutStore has already created the exercise locally
+    /// (find-or-create is always local-first — exercises are never edited or
+    /// deleted, only created, so there's no update/delete race to guard here).
+    func syncNewExercise(_ exercise: Exercise) async {
+        guard let body = workoutBody(exercise) else { return }
+        do {
+            _ = try await request("/workout/exercises", method: "POST", body: body)
+        } catch APIError.offline, APIError.badURL {
+            LocalStore.shared.enqueue(method: "POST", path: "/workout/exercises", body: body)
+        } catch {
+            // Other server error (e.g. validation) — don't enqueue a write
+            // that would just fail identically on replay.
+        }
+    }
+
+    // MARK: Workout — templates
+
+    @discardableResult
+    func workoutTemplates(includeDrafts: Bool = false) async throws -> [WorkoutTemplate] {
+        do {
+            let path = "/workout/templates" + (includeDrafts ? "?include_drafts=true" : "")
+            let data = try await request(path)
+            let items = try JSONDecoder.workout.decode([WorkoutTemplate].self, from: data)
+            WorkoutStore.shared.cacheTemplates(items, includeDrafts: includeDrafts)
+            return items
+        } catch APIError.offline, APIError.badURL {
+            return WorkoutStore.shared.templates
+        }
+    }
+
+    func syncTemplate(_ template: WorkoutTemplate, isNew: Bool) async {
+        guard let body = workoutBody(template) else { return }
+        let path = isNew ? "/workout/templates" : "/workout/templates/\(template.id.uuidString)"
+        let method = isNew ? "POST" : "PATCH"
+        if !isNew && hasPendingCreate(path: "/workout/templates", id: template.id) {
+            // Create hasn't synced yet — queue behind it so replay order is POST-then-PATCH.
+            LocalStore.shared.enqueue(method: method, path: path, body: body)
+            return
+        }
+        do {
+            _ = try await request(path, method: method, body: body)
+        } catch APIError.offline, APIError.badURL {
+            LocalStore.shared.enqueue(method: method, path: path, body: body)
+        } catch { }
+    }
+
+    func deleteWorkoutTemplate(_ id: UUID) async {
+        let path = "/workout/templates/\(id.uuidString)"
+        // If it never made it to the server (create still queued), just drop
+        // the queued create — nothing to delete remotely.
+        if let pc = LocalStore.shared.allPending().first(where: {
+            $0.method == "POST" && $0.path == "/workout/templates" && bodyId($0) == id
+        }) {
+            LocalStore.shared.removePending(pc.id)
+            return
+        }
+        do {
+            _ = try await request(path, method: "DELETE")
+        } catch APIError.offline, APIError.badURL {
+            LocalStore.shared.enqueue(method: "DELETE", path: path)
+        } catch { }
+    }
+
+    /// Finalizes an AI-drafted template. The draft already exists server-side
+    /// (created by the generate_workout_routine voice action), so there's no
+    /// pending-create race to guard against here.
+    func approveWorkoutTemplate(_ id: UUID) async {
+        let path = "/workout/templates/\(id.uuidString)/approve"
+        do {
+            _ = try await request(path, method: "PATCH")
+        } catch APIError.offline, APIError.badURL {
+            LocalStore.shared.enqueue(method: "PATCH", path: path)
+        } catch { }
+    }
+
+    // MARK: Workout — sessions
+
+    @discardableResult
+    func workoutSessions(limit: Int? = nil, startDate: String? = nil, endDate: String? = nil) async throws -> [WorkoutSession] {
+        var q: [String] = []
+        if let limit { q.append("limit=\(limit)") }
+        if let startDate { q.append("start_date=\(startDate)") }
+        if let endDate { q.append("end_date=\(endDate)") }
+        let qs = q.isEmpty ? "" : "?" + q.joined(separator: "&")
+        do {
+            let data = try await request("/workout/sessions" + qs)
+            let items = try JSONDecoder.workout.decode([WorkoutSession].self, from: data)
+            WorkoutStore.shared.cacheSessions(items)
+            return items
+        } catch APIError.offline, APIError.badURL {
+            return WorkoutStore.shared.sessions
+        }
+    }
+
+    func syncSession(_ session: WorkoutSession, isNew: Bool) async {
+        guard let body = workoutBody(session) else { return }
+        let path = isNew ? "/workout/sessions" : "/workout/sessions/\(session.id.uuidString)"
+        let method = isNew ? "POST" : "PATCH"
+        if !isNew && hasPendingCreate(path: "/workout/sessions", id: session.id) {
+            LocalStore.shared.enqueue(method: method, path: path, body: body)
+            return
+        }
+        do {
+            _ = try await request(path, method: method, body: body)
+        } catch APIError.offline, APIError.badURL {
+            LocalStore.shared.enqueue(method: method, path: path, body: body)
+        } catch { }
+    }
+
+    func deleteWorkoutSession(_ id: UUID) async {
+        let path = "/workout/sessions/\(id.uuidString)"
+        if let pc = LocalStore.shared.allPending().first(where: {
+            $0.method == "POST" && $0.path == "/workout/sessions" && bodyId($0) == id
+        }) {
+            LocalStore.shared.removePending(pc.id)
+            return
+        }
+        do {
+            _ = try await request(path, method: "DELETE")
+        } catch APIError.offline, APIError.badURL {
+            LocalStore.shared.enqueue(method: "DELETE", path: path)
+        } catch { }
+    }
+
     // MARK: - Voice (requires server)
 
     /// After a rule-path voice response, poll for LLM background verification.

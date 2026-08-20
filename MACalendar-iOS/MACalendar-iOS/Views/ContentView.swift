@@ -207,6 +207,13 @@ struct ContentView: View {
                         .tag(2)
                 }
 
+                // ── Workout Tab ──────────────────────────────────────────
+                if settings.showWorkoutTab {
+                    WorkoutView()
+                        .tabItem { Label("Workout", systemImage: "figure.strengthtraining.traditional") }
+                        .tag(4)
+                }
+
                 // ── Settings Tab ─────────────────────────────────────────
                 SettingsView()
                     .tabItem { Label("Settings", systemImage: "gear") }
@@ -236,21 +243,35 @@ struct ContentView: View {
             // blank TabView page.
             if !visible && selectedTab == 2 { selectedTab = 0 }
         }
+        .onChange(of: settings.showWorkoutTab) { visible in
+            if !visible && selectedTab == 4 { selectedTab = 0 }
+        }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
                 Task {
                     let synced = await api.syncPending()
-                    if synced { await loadMonth() }
+                    if synced {
+                        await loadMonth()
+                        await refreshWorkoutIfNeeded()
+                    }
                 }
             }
         }
         .task {
+            // Wire the Workout store up to the network layer once, so its
+            // local mutations (saveTemplate, finishSession, etc.) can push
+            // themselves to the server immediately — see WorkoutStore.configure.
+            WorkoutStore.shared.configure(api: api)
+
             // While the app is open, retry sync every 30 s so pending
             // changes upload as soon as the Mac comes back online.
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 30_000_000_000)
                 let synced = await api.syncPending()
-                if synced { await loadMonth() }
+                if synced {
+                    await loadMonth()
+                    await refreshWorkoutIfNeeded()
+                }
             }
         }
     }
@@ -324,5 +345,18 @@ struct ContentView: View {
     private func fetchHolidays(showHolidays: Bool, start: Date, end: Date, israel: Bool) async -> [Holiday] {
         guard showHolidays else { return [] }
         return (try? await api.holidays(start: start, end: end, israel: israel)) ?? []
+    }
+
+    /// Mirrors `loadMonth()`'s role for events: pulls fresh exercises/templates/
+    /// sessions after pending offline writes just flushed. WorkoutView's own
+    /// `.task` handles the initial load when the tab is opened; this covers
+    /// the background-refresh case so server-side changes (e.g. a routine
+    /// generated on the Mac, or on another device) show up without requiring
+    /// the user to leave and re-enter the Workout tab.
+    private func refreshWorkoutIfNeeded() async {
+        guard settings.showWorkoutTab else { return }
+        _ = try? await api.workoutExercises()
+        _ = try? await api.workoutTemplates(includeDrafts: false)
+        _ = try? await api.workoutSessions(limit: 50)
     }
 }

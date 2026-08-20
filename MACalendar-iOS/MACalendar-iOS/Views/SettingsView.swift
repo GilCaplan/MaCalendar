@@ -164,7 +164,10 @@ struct SettingsView: View {
 
                     // MARK: Tabs
                     GroupBox(label: Label("Tabs", systemImage: "square.grid.2x2")) {
-                        Toggle("Show Coursework Tab", isOn: $settings.showCourseworkTab)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Toggle("Show Coursework Tab", isOn: $settings.showCourseworkTab)
+                            Toggle("Show Workout Tab", isOn: $settings.showWorkoutTab)
+                        }
                     }
                     .padding(.top, 4)
 

@@ -159,7 +159,7 @@ class CalendarWindow(QMainWindow):
         self._config = config
         self._db = CalendarDB()
         self._current_date = datetime.date.today()
-        self._view_mode = "month"  # "month" | "week" | "day" | "todo" | "timer"
+        self._view_mode = "month"  # "month" | "week" | "day" | "todo" | "timer" | "coursework" | "workout"
         self._undo_manager = UndoManager()
 
         self._dark = (config.theme == "dark") if config else False
@@ -237,6 +237,7 @@ class CalendarWindow(QMainWindow):
         from assistant.calendar_ui.todo_view import TodoView
         from assistant.calendar_ui.timer_view import TimerView as _TimerView
         from assistant.calendar_ui.coursework_view import CourseworkView as _CourseworkView
+        from assistant.calendar_ui.workout_view import WorkoutView as _WorkoutView
         self._stack = QStackedWidget()
         self._month_view = MonthView(self._db)
         self._week_view = WeekView(self._db)
@@ -244,12 +245,14 @@ class CalendarWindow(QMainWindow):
         self._todo_view = TodoView(self._db, config=self._config)
         self._timer_view = _TimerView(self._db)
         self._coursework_view = _CourseworkView(self._db, dark=self._dark)
+        self._workout_view = _WorkoutView(self._db)
         self._stack.addWidget(self._month_view)
         self._stack.addWidget(self._week_view)
         self._stack.addWidget(self._day_view)
         self._stack.addWidget(self._todo_view)
         self._stack.addWidget(self._timer_view)
         self._stack.addWidget(self._coursework_view)
+        self._stack.addWidget(self._workout_view)
         self._month_view.date_selected.connect(self._on_day_selected)
         self._month_view.date_double_clicked.connect(self._on_day_double_clicked)
         self._month_view.event_clicked.connect(self._on_event_clicked)
@@ -325,7 +328,7 @@ class CalendarWindow(QMainWindow):
         layout.addStretch()
 
         # ── Group 2: view toggle tabs ────────────────────────────────
-        for label, mode in [("Month", "month"), ("Week", "week"), ("Day", "day"), ("Tasks", "todo"), ("Timer", "timer"), ("Coursework", "coursework")]:
+        for label, mode in [("Month", "month"), ("Week", "week"), ("Day", "day"), ("Tasks", "todo"), ("Timer", "timer"), ("Coursework", "coursework"), ("Workout", "workout")]:
             btn = QPushButton(label)
             btn.setObjectName("seg_btn")
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -432,7 +435,7 @@ class CalendarWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def _on_prev(self) -> None:
-        if self._view_mode in ("todo", "timer", "coursework"):
+        if self._view_mode in ("todo", "timer", "coursework", "workout"):
             return
         if self._view_mode == "month":
             d = self._current_date.replace(day=1) - datetime.timedelta(days=1)
@@ -444,7 +447,7 @@ class CalendarWindow(QMainWindow):
         self._navigate()
 
     def _on_next(self) -> None:
-        if self._view_mode in ("todo", "timer", "coursework"):
+        if self._view_mode in ("todo", "timer", "coursework", "workout"):
             return
         if self._view_mode == "month":
             d = self._current_date.replace(day=28) + datetime.timedelta(days=4)
@@ -468,7 +471,7 @@ class CalendarWindow(QMainWindow):
         self._update_title()
 
     def _navigate(self) -> None:
-        if self._view_mode in ("todo", "timer", "coursework"):
+        if self._view_mode in ("todo", "timer", "coursework", "workout"):
             self._update_title()
             return
         if self._view_mode == "month":
@@ -489,9 +492,10 @@ class CalendarWindow(QMainWindow):
             "todo":       self._todo_view,
             "timer":      self._timer_view,
             "coursework": self._coursework_view,
+            "workout":    self._workout_view,
         }.get(mode, self._month_view)
         self._stack.setCurrentWidget(widget)
-        for m in ("month", "week", "day", "todo", "timer", "coursework"):
+        for m in ("month", "week", "day", "todo", "timer", "coursework", "workout"):
             btn = getattr(self, f"_view_btn_{m}", None)
             if btn:
                 self._style_seg_btn(btn, m == mode)
@@ -527,6 +531,9 @@ class CalendarWindow(QMainWindow):
             return
         if self._view_mode == "coursework":
             self._title_label.setText("Coursework")
+            return
+        if self._view_mode == "workout":
+            self._title_label.setText("Workout")
             return
         if self._view_mode == "todo":
             self._title_label.setText("Tasks")
@@ -842,6 +849,8 @@ class CalendarWindow(QMainWindow):
             self._timer_view.apply_theme(dark)
         if hasattr(self, "_coursework_view"):
             self._coursework_view.apply_theme(dark)
+        if hasattr(self, "_workout_view"):
+            self._workout_view.apply_theme(dark)
 
         # Re-style toolbar
         bg = _styles.D_GRAY_BG if dark else _styles.GRAY_BG
@@ -853,7 +862,7 @@ class CalendarWindow(QMainWindow):
         if hasattr(self, "_toolbar_sep"):
             self._toolbar_sep.setStyleSheet(f"color: {border};")
         # Re-apply segmented button styling (colors depend on theme + accent)
-        for m in ("month", "week", "day", "todo", "timer", "coursework"):
+        for m in ("month", "week", "day", "todo", "timer", "coursework", "workout"):
             btn = getattr(self, f"_view_btn_{m}", None)
             if btn:
                 self._style_seg_btn(btn, m == self._view_mode)
@@ -873,6 +882,8 @@ class CalendarWindow(QMainWindow):
             self._timer_view.apply_ui_config(ui)
         if hasattr(self, "_coursework_view"):
             self._coursework_view.apply_ui_config(ui)
+        if hasattr(self, "_workout_view"):
+            self._workout_view.apply_ui_config(ui)
         hebrew = self._config.hebrew_calendar
         self._month_view.apply_hebrew_config(hebrew)
         self._week_view.apply_hebrew_config(hebrew)
