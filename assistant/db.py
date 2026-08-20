@@ -137,6 +137,55 @@ CREATE TABLE IF NOT EXISTS timer_sessions (
 )
 """
 
+_CREATE_COUNTERS_TABLE = """
+CREATE TABLE IF NOT EXISTS counters (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    title           TEXT    NOT NULL DEFAULT 'Untitled Counter',
+    price_per_unit  REAL    NOT NULL DEFAULT 0.0,
+    currency        TEXT    NOT NULL DEFAULT 'ILS',
+    color           TEXT    NOT NULL DEFAULT '#1a6fc4',
+    created_at      TEXT    NOT NULL,
+    archived        INTEGER NOT NULL DEFAULT 0
+)
+"""
+
+# Each tap of +/- is logged as its own row (mirrors timer_sessions) so the
+# running count is always derivable — never stored redundantly — and every
+# tap keeps a timestamp (for the date / time-of-day bucket) plus an optional
+# label describing what that tap was for.
+_CREATE_COUNTER_PRESSES_TABLE = """
+CREATE TABLE IF NOT EXISTS counter_presses (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    counter_id  INTEGER NOT NULL,
+    delta       INTEGER NOT NULL DEFAULT 1,
+    label       TEXT    NOT NULL DEFAULT '',
+    pressed_at  TEXT    NOT NULL,
+    created_at  TEXT    NOT NULL
+)
+"""
+
+# A "cash out" closes the counter's current tally cycle: it snapshots the
+# net count for that cycle (so later press edits/deletes never retroactively
+# rewrite payout history — mirrors how timer session totals aren't
+# recomputed after the fact) and records when/how much was paid. Cycle
+# boundaries are pure time boundaries against counter_presses.pressed_at —
+# cycle_started_at is the previous payout's payout_at, or the counter's own
+# created_at for the first-ever payout — so no migration of counter_presses
+# is ever needed.
+_CREATE_COUNTER_PAYOUTS_TABLE = """
+CREATE TABLE IF NOT EXISTS counter_payouts (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    counter_id        INTEGER NOT NULL,
+    cycle_started_at  TEXT    NOT NULL,
+    payout_at         TEXT    NOT NULL,
+    count             INTEGER NOT NULL,
+    amount            REAL,
+    currency          TEXT    NOT NULL,
+    note              TEXT    NOT NULL DEFAULT '',
+    created_at        TEXT    NOT NULL
+)
+"""
+
 _CREATE_COURSES_TABLE = """
 CREATE TABLE IF NOT EXISTS courses (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -161,14 +210,112 @@ CREATE TABLE IF NOT EXISTS assignments (
 )
 """
 
+# ---------------------------------------------------------------------------
+# Workout (Phase 1: backend-only sync target for the existing local-only iOS
+# Workout feature — see MACalendar-iOS/.../Workout/WorkoutModels.swift).
+#
+# Unlike events/todos (server-assigned autoincrement Int id + temp-id remap
+# for offline creation), these tables use client-generated UUIDs (TEXT
+# PRIMARY KEY) end-to-end, matching how the iOS structs already mint their
+# own `id: UUID` at creation time. The server just stores whatever id the
+# client sends — no remap dance needed, conflict-free by construction.
+#
+# Normalized child tables (no JSON blob columns), matching this codebase's
+# existing convention (see todos/subtasks, timers/timer_sessions).
+# ---------------------------------------------------------------------------
+
+_CREATE_WORKOUT_EXERCISES_TABLE = """
+CREATE TABLE IF NOT EXISTS workout_exercises (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+)
+"""
+
+_CREATE_WORKOUT_TEMPLATES_TABLE = """
+CREATE TABLE IF NOT EXISTS workout_templates (
+    id                              TEXT PRIMARY KEY,
+    name                            TEXT    NOT NULL,
+    default_rest_between_sets       INTEGER NOT NULL DEFAULT 90,
+    default_rest_between_exercises  INTEGER NOT NULL DEFAULT 120,
+    created_at                      TEXT    NOT NULL,
+    status                          TEXT    NOT NULL DEFAULT 'saved'
+    -- status: 'saved' | 'draft' — 'draft' = pending review after
+    -- GenerateWorkoutRoutineAction auto-generation; excluded from normal
+    -- template list queries unless explicitly requested.
+)
+"""
+
+_CREATE_WORKOUT_TEMPLATE_BLOCKS_TABLE = """
+CREATE TABLE IF NOT EXISTS workout_template_blocks (
+    id                          TEXT PRIMARY KEY,
+    template_id                 TEXT    NOT NULL,
+    order_index                 INTEGER NOT NULL DEFAULT 0,
+    kind                        TEXT    NOT NULL,   -- 'single' | 'superset'
+    -- .single
+    exercise_id                 TEXT,
+    rest_between_sets_override  INTEGER,
+    -- .superset
+    exercise_id_a               TEXT,
+    exercise_id_b               TEXT,
+    rest_after_round            INTEGER
+)
+"""
+
+_CREATE_WORKOUT_TEMPLATE_SETS_TABLE = """
+CREATE TABLE IF NOT EXISTS workout_template_sets (
+    id             TEXT PRIMARY KEY,
+    block_id       TEXT    NOT NULL,
+    side           TEXT    NOT NULL DEFAULT 'single',  -- 'single' | 'a' | 'b'
+    set_index      INTEGER NOT NULL DEFAULT 0,
+    type           TEXT    NOT NULL,                   -- 'reps' | 'time'
+    target_reps    INTEGER,
+    weight_kg      REAL,
+    target_seconds INTEGER,
+    note           TEXT    NOT NULL DEFAULT ''
+)
+"""
+
+_CREATE_WORKOUT_SESSIONS_TABLE = """
+CREATE TABLE IF NOT EXISTS workout_sessions (
+    id          TEXT PRIMARY KEY,
+    template_id TEXT,             -- NULL = ad-hoc session
+    started_at  TEXT NOT NULL,
+    ended_at    TEXT,              -- NULL = in progress (should be finished before sync in practice)
+    notes       TEXT NOT NULL DEFAULT ''
+)
+"""
+
+_CREATE_WORKOUT_SET_LOGS_TABLE = """
+CREATE TABLE IF NOT EXISTS workout_set_logs (
+    id               TEXT PRIMARY KEY,
+    session_id       TEXT    NOT NULL,
+    exercise_id      TEXT    NOT NULL,
+    set_index        INTEGER NOT NULL DEFAULT 0,
+    type             TEXT    NOT NULL,     -- 'reps' | 'time'
+    actual_reps      INTEGER,
+    actual_seconds   INTEGER,
+    actual_weight_kg REAL,
+    completed_at     TEXT,
+    skipped          INTEGER NOT NULL DEFAULT 0
+)
+"""
+
 _CREATE_INDEXES = """
 CREATE INDEX IF NOT EXISTS idx_events_date      ON events(date);
 CREATE INDEX IF NOT EXISTS idx_events_series    ON events(series_id);
 CREATE INDEX IF NOT EXISTS idx_todos_list       ON todos(list, completed);
 CREATE INDEX IF NOT EXISTS idx_subtasks_todo    ON subtasks(todo_id, position);
 CREATE INDEX IF NOT EXISTS idx_timer_sessions   ON timer_sessions(timer_id);
+CREATE INDEX IF NOT EXISTS idx_counter_presses  ON counter_presses(counter_id);
+CREATE INDEX IF NOT EXISTS idx_counter_payouts  ON counter_payouts(counter_id);
 CREATE INDEX IF NOT EXISTS idx_assignments_course ON assignments(course_id);
 CREATE INDEX IF NOT EXISTS idx_events_external    ON events(external_source, external_id);
+CREATE INDEX IF NOT EXISTS idx_workout_templates_status  ON workout_templates(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_workout_blocks_template   ON workout_template_blocks(template_id, order_index);
+CREATE INDEX IF NOT EXISTS idx_workout_sets_block        ON workout_template_sets(block_id, set_index);
+CREATE INDEX IF NOT EXISTS idx_workout_sessions_started  ON workout_sessions(started_at);
+CREATE INDEX IF NOT EXISTS idx_workout_set_logs_session  ON workout_set_logs(session_id);
 """
 
 
@@ -218,10 +365,19 @@ class CalendarDB:
             conn.execute(_CREATE_TIMERS_TABLE)
             self._migrate_timers(conn)
             conn.execute(_CREATE_TIMER_SESSIONS_TABLE)
+            conn.execute(_CREATE_COUNTERS_TABLE)
+            conn.execute(_CREATE_COUNTER_PRESSES_TABLE)
+            conn.execute(_CREATE_COUNTER_PAYOUTS_TABLE)
             conn.execute(_CREATE_COURSES_TABLE)
             conn.execute(_CREATE_ASSIGNMENTS_TABLE)
             conn.execute(_CREATE_CALENDAR_SOURCES_TABLE)
             conn.execute(_CREATE_SYNC_DELETES_TABLE)
+            conn.execute(_CREATE_WORKOUT_EXERCISES_TABLE)
+            conn.execute(_CREATE_WORKOUT_TEMPLATES_TABLE)
+            conn.execute(_CREATE_WORKOUT_TEMPLATE_BLOCKS_TABLE)
+            conn.execute(_CREATE_WORKOUT_TEMPLATE_SETS_TABLE)
+            conn.execute(_CREATE_WORKOUT_SESSIONS_TABLE)
+            conn.execute(_CREATE_WORKOUT_SET_LOGS_TABLE)
             for stmt in _CREATE_INDEXES.strip().splitlines():
                 stmt = stmt.strip()
                 if stmt:
@@ -1107,6 +1263,179 @@ class CalendarDB:
             start_time=mid.isoformat(),
         )
 
+    # ------------------------------------------------------------------
+    # Counters
+    # ------------------------------------------------------------------
+
+    def create_counter(
+        self,
+        title: str = "Untitled Counter",
+        price_per_unit: float = 0.0,
+        currency: str = "ILS",
+        color: str = "#1a6fc4",
+    ) -> int:
+        """Create a new tally counter. Returns new row id."""
+        with self._conn() as conn:
+            cur = conn.execute(
+                "INSERT INTO counters (title, price_per_unit, currency, color, created_at) VALUES (?, ?, ?, ?, ?)",
+                (title, price_per_unit, currency, color, datetime.datetime.now().isoformat()),
+            )
+            return cur.lastrowid
+
+    def get_counters(self, include_archived: bool = False) -> List[dict]:
+        """Return all counters as dicts, newest first."""
+        with self._conn() as conn:
+            where = "" if include_archived else "WHERE archived = 0"
+            rows = conn.execute(
+                f"SELECT * FROM counters {where} ORDER BY created_at DESC"
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def update_counter(self, counter_id: int, **kwargs) -> None:
+        """Update allowed fields on a counter."""
+        allowed = {"title", "price_per_unit", "currency", "color", "archived"}
+        fields = {k: v for k, v in kwargs.items() if k in allowed}
+        if not fields:
+            return
+        sets = ", ".join(f"{k} = ?" for k in fields)
+        with self._conn() as conn:
+            conn.execute(
+                f"UPDATE counters SET {sets} WHERE id = ?",
+                (*fields.values(), counter_id),
+            )
+
+    def delete_counter(self, counter_id: int) -> None:
+        """Delete a counter and all its presses and payout history."""
+        with self._conn() as conn:
+            conn.execute("DELETE FROM counter_presses WHERE counter_id = ?", (counter_id,))
+            conn.execute("DELETE FROM counter_payouts WHERE counter_id = ?", (counter_id,))
+            conn.execute("DELETE FROM counters WHERE id = ?", (counter_id,))
+
+    # ------------------------------------------------------------------
+    # Counter Presses
+    # ------------------------------------------------------------------
+
+    def create_counter_press(
+        self,
+        counter_id: int,
+        delta: int = 1,
+        label: str = "",
+        pressed_at: Optional[str] = None,
+    ) -> int:
+        """Log a single +/- tap on a counter. Returns new row id."""
+        now = datetime.datetime.now().astimezone().isoformat()
+        with self._conn() as conn:
+            cur = conn.execute(
+                "INSERT INTO counter_presses (counter_id, delta, label, pressed_at, created_at) VALUES (?, ?, ?, ?, ?)",
+                (counter_id, delta, label, pressed_at or now, now),
+            )
+            return cur.lastrowid
+
+    def get_counter_presses(self, counter_id: int) -> List[dict]:
+        """Return all presses for a counter, oldest first."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM counter_presses WHERE counter_id = ? ORDER BY pressed_at ASC",
+                (counter_id,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def update_counter_press(self, press_id: int, **kwargs) -> None:
+        """Update allowed fields on a counter press."""
+        allowed = {"delta", "label", "pressed_at"}
+        fields = {k: v for k, v in kwargs.items() if k in allowed}
+        if not fields:
+            return
+        sets = ", ".join(f"{k} = ?" for k in fields)
+        with self._conn() as conn:
+            conn.execute(
+                f"UPDATE counter_presses SET {sets} WHERE id = ?",
+                (*fields.values(), press_id),
+            )
+
+    def delete_counter_press(self, press_id: int) -> None:
+        """Delete a single counter press."""
+        with self._conn() as conn:
+            conn.execute("DELETE FROM counter_presses WHERE id = ?", (press_id,))
+
+    # ------------------------------------------------------------------
+    # Counter Payouts ("cash out" a counter's current tally cycle)
+    # ------------------------------------------------------------------
+
+    def create_counter_payout(
+        self,
+        counter_id: int,
+        cycle_started_at: str,
+        payout_at: str,
+        count: int,
+        amount: Optional[float],
+        currency: str,
+        note: str = "",
+    ) -> int:
+        """Log a payout that closes out a counter's current tally cycle.
+
+        `count` is a snapshot of the net delta-sum for that cycle at the
+        moment of payout — it is never recomputed later, so subsequent edits
+        or deletions of presses don't retroactively rewrite payout history.
+        Returns the new row id.
+        """
+        now = datetime.datetime.now().astimezone().isoformat()
+        with self._conn() as conn:
+            cur = conn.execute(
+                "INSERT INTO counter_payouts "
+                "(counter_id, cycle_started_at, payout_at, count, amount, currency, note, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (counter_id, cycle_started_at, payout_at, count, amount, currency, note, now),
+            )
+            return cur.lastrowid
+
+    def get_counter_payouts(self, counter_id: int) -> List[dict]:
+        """Return all payouts for a counter, newest first."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM counter_payouts WHERE counter_id = ? ORDER BY payout_at DESC",
+                (counter_id,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def update_counter_payout(self, payout_id: int, **kwargs) -> None:
+        """Update allowed fields on a counter payout.
+
+        `count` and `cycle_started_at` are immutable snapshots and are not
+        in the allowed set — only the human-editable fields (when it was
+        paid, how much, and any note) can change after the fact.
+        """
+        allowed = {"payout_at", "amount", "note"}
+        fields = {k: v for k, v in kwargs.items() if k in allowed}
+        if not fields:
+            return
+        sets = ", ".join(f"{k} = ?" for k in fields)
+        with self._conn() as conn:
+            conn.execute(
+                f"UPDATE counter_payouts SET {sets} WHERE id = ?",
+                (*fields.values(), payout_id),
+            )
+
+    def delete_counter_payout(self, payout_id: int) -> None:
+        """Delete a single payout record. Does not touch the underlying press log."""
+        with self._conn() as conn:
+            conn.execute("DELETE FROM counter_payouts WHERE id = ?", (payout_id,))
+
+    def get_counter_cycle_start(self, counter_id: int) -> Optional[str]:
+        """Return the start of the counter's current (open) tally cycle.
+
+        This is the most recent payout's `payout_at` for that counter, or
+        None if it has never been cashed out — in which case the current
+        cycle spans the counter's entire press history.
+        """
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT payout_at FROM counter_payouts WHERE counter_id = ? "
+                "ORDER BY payout_at DESC LIMIT 1",
+                (counter_id,),
+            ).fetchone()
+            return row["payout_at"] if row else None
+
     def clear_all(self) -> None:
         """Wipe all events from the database."""
         with self._conn() as conn:
@@ -1237,6 +1566,318 @@ class CalendarDB:
                 "UPDATE assignments SET calendar_event_id = ? WHERE id = ?",
                 (event_id, assignment_id),
             )
+
+    # ------------------------------------------------------------------
+    # Workout: Exercises
+    # ------------------------------------------------------------------
+
+    def create_workout_exercise(self, id: str, name: str, created_at: Optional[str] = None) -> str:
+        """Insert a new exercise with a client-generated UUID. Idempotent on id
+        (INSERT OR IGNORE) so a retried offline-sync POST is safe to resend."""
+        now = created_at or datetime.datetime.now().isoformat()
+        with self._conn() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO workout_exercises (id, name, created_at) VALUES (?, ?, ?)",
+                (id, name, now),
+            )
+        return id
+
+    def get_workout_exercises(self) -> List[dict]:
+        """Return all exercises, alphabetical (used for search-or-create autocomplete)."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM workout_exercises ORDER BY name COLLATE NOCASE ASC"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_workout_exercise(self, exercise_id: str) -> Optional[dict]:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM workout_exercises WHERE id = ?", (exercise_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def find_workout_exercise_by_name(self, name: str) -> Optional[dict]:
+        """Case-insensitive exact name match — used to reuse an existing exercise
+        instead of creating a duplicate."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM workout_exercises WHERE name = ? COLLATE NOCASE LIMIT 1",
+                (name,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    # ------------------------------------------------------------------
+    # Workout: Templates (+ nested blocks/sets)
+    # ------------------------------------------------------------------
+
+    def _insert_workout_template_blocks(self, conn: sqlite3.Connection, template_id: str, blocks: list) -> None:
+        """Insert a template's blocks and their nested sets. Caller owns the transaction."""
+        for idx, block in enumerate(blocks):
+            conn.execute(
+                """
+                INSERT INTO workout_template_blocks
+                    (id, template_id, order_index, kind, exercise_id, rest_between_sets_override,
+                     exercise_id_a, exercise_id_b, rest_after_round)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    block["id"], template_id, idx, block["kind"],
+                    block.get("exercise_id"), block.get("rest_between_sets_override"),
+                    block.get("exercise_id_a"), block.get("exercise_id_b"),
+                    block.get("rest_after_round"),
+                ),
+            )
+            for side, sets_key in (("single", "sets"), ("a", "sets_a"), ("b", "sets_b")):
+                for set_idx, s in enumerate(block.get(sets_key) or []):
+                    conn.execute(
+                        """
+                        INSERT INTO workout_template_sets
+                            (id, block_id, side, set_index, type, target_reps, weight_kg,
+                             target_seconds, note)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            s["id"], block["id"], side, set_idx, s["type"],
+                            s.get("target_reps"), s.get("weight_kg"), s.get("target_seconds"),
+                            s.get("note") or "",
+                        ),
+                    )
+
+    def _delete_workout_template_children(self, conn: sqlite3.Connection, template_id: str) -> None:
+        block_ids = [
+            r[0] for r in conn.execute(
+                "SELECT id FROM workout_template_blocks WHERE template_id = ?", (template_id,)
+            ).fetchall()
+        ]
+        for block_id in block_ids:
+            conn.execute("DELETE FROM workout_template_sets WHERE block_id = ?", (block_id,))
+        conn.execute("DELETE FROM workout_template_blocks WHERE template_id = ?", (template_id,))
+
+    def _hydrate_workout_template(self, conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
+        template = dict(row)
+        block_rows = conn.execute(
+            "SELECT * FROM workout_template_blocks WHERE template_id = ? ORDER BY order_index ASC",
+            (template["id"],),
+        ).fetchall()
+        blocks = []
+        for b in block_rows:
+            b = dict(b)
+            set_rows = conn.execute(
+                "SELECT * FROM workout_template_sets WHERE block_id = ? ORDER BY set_index ASC",
+                (b["id"],),
+            ).fetchall()
+            sets, sets_a, sets_b = [], [], []
+            for s in set_rows:
+                s = dict(s)
+                side = s.pop("side")
+                s.pop("block_id", None)
+                s.pop("set_index", None)
+                (sets_a if side == "a" else sets_b if side == "b" else sets).append(s)
+            blocks.append({
+                "id": b["id"],
+                "kind": b["kind"],
+                "exercise_id": b["exercise_id"],
+                "sets": sets,
+                "rest_between_sets_override": b["rest_between_sets_override"],
+                "exercise_id_a": b["exercise_id_a"],
+                "exercise_id_b": b["exercise_id_b"],
+                "sets_a": sets_a,
+                "sets_b": sets_b,
+                "rest_after_round": b["rest_after_round"],
+            })
+        template["blocks"] = blocks
+        return template
+
+    def create_workout_template(self, template: dict) -> str:
+        """Insert a full nested template (id, name, blocks[+sets], ...) transactionally.
+        `template["id"]` is the client-generated UUID."""
+        template_id = template["id"]
+        now = template.get("created_at") or datetime.datetime.now().isoformat()
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO workout_templates
+                    (id, name, default_rest_between_sets, default_rest_between_exercises,
+                     created_at, status)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    template_id, template["name"],
+                    template.get("default_rest_between_sets", 90),
+                    template.get("default_rest_between_exercises", 120),
+                    now, template.get("status", "saved"),
+                ),
+            )
+            self._insert_workout_template_blocks(conn, template_id, template.get("blocks") or [])
+        return template_id
+
+    def get_workout_templates(self, include_drafts: bool = False) -> List[dict]:
+        """Return templates newest-first. Drafts (status='draft', pending review after
+        AI generation) are excluded unless include_drafts=True."""
+        where = "" if include_drafts else "WHERE status != 'draft'"
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM workout_templates {where} ORDER BY created_at DESC"
+            ).fetchall()
+            return [self._hydrate_workout_template(conn, r) for r in rows]
+
+    def get_workout_template(self, template_id: str) -> Optional[dict]:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM workout_templates WHERE id = ?", (template_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            return self._hydrate_workout_template(conn, row)
+
+    def replace_workout_template(self, template_id: str, template: dict) -> None:
+        """Replace-whole-template semantics: update scalar fields, delete+recreate
+        all blocks/sets. Simpler than diffing a nested structure and matches how
+        the client always has the full current template in memory anyway."""
+        with self._conn() as conn:
+            conn.execute(
+                """
+                UPDATE workout_templates
+                SET name = ?, default_rest_between_sets = ?, default_rest_between_exercises = ?,
+                    status = ?
+                WHERE id = ?
+                """,
+                (
+                    template.get("name"),
+                    template.get("default_rest_between_sets", 90),
+                    template.get("default_rest_between_exercises", 120),
+                    template.get("status", "saved"),
+                    template_id,
+                ),
+            )
+            self._delete_workout_template_children(conn, template_id)
+            self._insert_workout_template_blocks(conn, template_id, template.get("blocks") or [])
+
+    def delete_workout_template(self, template_id: str) -> None:
+        with self._conn() as conn:
+            self._delete_workout_template_children(conn, template_id)
+            conn.execute("DELETE FROM workout_templates WHERE id = ?", (template_id,))
+
+    def approve_workout_template(self, template_id: str) -> None:
+        """Flip a draft (from AI generation) to 'saved' — the client called /approve
+        after the user reviewed it. No-op if already saved or not found."""
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE workout_templates SET status = 'saved' WHERE id = ?", (template_id,)
+            )
+
+    # ------------------------------------------------------------------
+    # Workout: Sessions (+ nested set logs)
+    # ------------------------------------------------------------------
+
+    def _insert_workout_set_logs(self, conn: sqlite3.Connection, session_id: str, set_logs: list) -> None:
+        for log in set_logs:
+            conn.execute(
+                """
+                INSERT INTO workout_set_logs
+                    (id, session_id, exercise_id, set_index, type, actual_reps, actual_seconds,
+                     actual_weight_kg, completed_at, skipped)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    log["id"], session_id, log["exercise_id"], log.get("set_index", 0),
+                    log["type"], log.get("actual_reps"), log.get("actual_seconds"),
+                    log.get("actual_weight_kg"), log.get("completed_at"),
+                    int(bool(log.get("skipped", False))),
+                ),
+            )
+
+    def _hydrate_workout_session(self, conn: sqlite3.Connection, row: sqlite3.Row) -> dict:
+        session = dict(row)
+        log_rows = conn.execute(
+            "SELECT * FROM workout_set_logs WHERE session_id = ? ORDER BY rowid ASC",
+            (session["id"],),
+        ).fetchall()
+        set_logs = []
+        for r in log_rows:
+            log = dict(r)
+            log.pop("session_id", None)
+            log["skipped"] = bool(log["skipped"])
+            set_logs.append(log)
+        session["set_logs"] = set_logs
+        return session
+
+    def create_workout_session(self, session: dict) -> str:
+        """Insert a full nested session (id, startedAt, ..., setLogs[]) transactionally.
+        Sessions are normally posted once already-finished on the client."""
+        session_id = session["id"]
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO workout_sessions (id, template_id, started_at, ended_at, notes)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    session_id, session.get("template_id"), session["started_at"],
+                    session.get("ended_at"), session.get("notes") or "",
+                ),
+            )
+            self._insert_workout_set_logs(conn, session_id, session.get("set_logs") or [])
+        return session_id
+
+    def get_workout_sessions(
+        self,
+        limit: Optional[int] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> List[dict]:
+        """Return sessions most-recent-first, optionally filtered by started_at range
+        and/or capped with limit."""
+        query = "SELECT * FROM workout_sessions"
+        conditions: List[str] = []
+        params: List = []
+        if start_date:
+            conditions.append("started_at >= ?")
+            params.append(start_date)
+        if end_date:
+            conditions.append("started_at <= ?")
+            params.append(end_date)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY started_at DESC"
+        if limit:
+            query += " LIMIT ?"
+            params.append(int(limit))
+        with self._conn() as conn:
+            rows = conn.execute(query, params).fetchall()
+            return [self._hydrate_workout_session(conn, r) for r in rows]
+
+    def get_workout_session(self, session_id: str) -> Optional[dict]:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM workout_sessions WHERE id = ?", (session_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            return self._hydrate_workout_session(conn, row)
+
+    def update_workout_session(self, session_id: str, **fields) -> None:
+        """Patch allowed scalar fields; if 'set_logs' is present, delete+recreate
+        the child rows (post-hoc edits to logged sets)."""
+        allowed = {"template_id", "started_at", "ended_at", "notes"}
+        set_logs = fields.pop("set_logs", None)
+        updates = {k: v for k, v in fields.items() if k in allowed}
+        with self._conn() as conn:
+            if updates:
+                set_clause = ", ".join(f"{k} = ?" for k in updates)
+                conn.execute(
+                    f"UPDATE workout_sessions SET {set_clause} WHERE id = ?",
+                    (*updates.values(), session_id),
+                )
+            if set_logs is not None:
+                conn.execute("DELETE FROM workout_set_logs WHERE session_id = ?", (session_id,))
+                self._insert_workout_set_logs(conn, session_id, set_logs)
+
+    def delete_workout_session(self, session_id: str) -> None:
+        with self._conn() as conn:
+            conn.execute("DELETE FROM workout_set_logs WHERE session_id = ?", (session_id,))
+            conn.execute("DELETE FROM workout_sessions WHERE id = ?", (session_id,))
 
     # ------------------------------------------------------------------
     # Connected calendars (ICS subscriptions + Outlook two-way sync)
