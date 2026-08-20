@@ -39,6 +39,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QDoubleSpinBox,
+    QSpinBox,
     QStackedWidget,
     QTextEdit,
     QVBoxLayout,
@@ -334,6 +335,7 @@ class TimerDialog(QDialog):
         hourly_rate: float = 0.0,
         currency: str = _DEFAULT_CURRENCY,
         color: str = _styles.BLUE,
+        max_session_minutes: int = 0,
     ):
         super().__init__(parent)
         self.setWindowTitle("Timer Settings")
@@ -386,6 +388,18 @@ class TimerDialog(QDialog):
         color_row.addWidget(self._color_btn)
         color_row.addStretch()
         form.addRow("Colour:", color_row)
+
+        self._max_session_spin = QSpinBox()
+        self._max_session_spin.setRange(0, 1440)
+        self._max_session_spin.setSingleStep(15)
+        self._max_session_spin.setValue(max_session_minutes)
+        self._max_session_spin.setSuffix(" min")
+        self._max_session_spin.setSpecialValueText("No limit")
+        self._max_session_spin.setToolTip(
+            "Auto-stop this timer if a running session goes past this length "
+            "(e.g. you forgot to stop it)."
+        )
+        form.addRow("Max session:", self._max_session_spin)
 
         root.addLayout(form)
 
@@ -476,6 +490,10 @@ class TimerDialog(QDialog):
     @property
     def result_color(self) -> str:
         return self._color
+
+    @property
+    def result_max_session_minutes(self) -> int:
+        return self._max_session_spin.value()
 
 
 # ---------------------------------------------------------------------------
@@ -1391,8 +1409,23 @@ class TimerCard(QWidget):
             self._cached_sessions = self._db.get_timer_sessions(self._timer["id"])
 
         sessions = self._cached_sessions
+        running = next((s for s in sessions if s.get("end_time") is None), None)
+
+        limit_min = self._timer.get("max_session_minutes", 0) or 0
+        if running is not None and limit_min > 0:
+            elapsed = _duration_secs(running["start_time"], None)
+            if elapsed >= limit_min * 60:
+                start_dt = datetime.datetime.fromisoformat(running["start_time"])
+                cap_dt = start_dt + datetime.timedelta(minutes=limit_min)
+                self._db.stop_timer_session(running["id"], end_time=cap_dt.isoformat())
+                sessions = self._cached_sessions = self._db.get_timer_sessions(self._timer["id"])
+                running = None
+                if self._expanded:
+                    self._sessions_panel.reload()
+                self.changed.emit()
+
         total = _sessions_total_secs(sessions)
-        is_running = any(s.get("end_time") is None for s in sessions)
+        is_running = running is not None
 
         live = _styles.DESTRUCTIVE_DARK if _styles._dark else _styles.DESTRUCTIVE
         self._dot.setStyleSheet(
@@ -1481,6 +1514,7 @@ class TimerCard(QWidget):
             hourly_rate=self._timer.get("hourly_rate", 0),
             currency=self._timer.get("currency", _DEFAULT_CURRENCY),
             color=self._timer.get("color", _styles.BLUE),
+            max_session_minutes=self._timer.get("max_session_minutes", 0),
         )
         if dlg.exec():
             self._db.update_timer(
@@ -1490,6 +1524,7 @@ class TimerCard(QWidget):
                 hourly_rate=dlg.result_rate,
                 currency=dlg.result_currency,
                 color=dlg.result_color,
+                max_session_minutes=dlg.result_max_session_minutes,
             )
             self.reload_timer()
 
@@ -2832,6 +2867,7 @@ class TimerView(QWidget):
                 hourly_rate=dlg.result_rate,
                 currency=dlg.result_currency,
                 color=dlg.result_color,
+                max_session_minutes=dlg.result_max_session_minutes,
             )
             self.reload()
             if self._section == "stats":

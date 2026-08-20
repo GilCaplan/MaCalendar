@@ -116,13 +116,15 @@ CREATE TABLE IF NOT EXISTS timers (
     created_at  TEXT    NOT NULL,
     archived    INTEGER NOT NULL DEFAULT 0,
     timer_type  TEXT    NOT NULL DEFAULT 'work',
-    currency    TEXT    NOT NULL DEFAULT 'ILS'
+    currency    TEXT    NOT NULL DEFAULT 'ILS',
+    max_session_minutes INTEGER NOT NULL DEFAULT 0
 )
 """
 
 _TIMER_MIGRATIONS = [
     "ALTER TABLE timers ADD COLUMN timer_type TEXT NOT NULL DEFAULT 'work'",
     "ALTER TABLE timers ADD COLUMN currency TEXT NOT NULL DEFAULT 'ILS'",
+    "ALTER TABLE timers ADD COLUMN max_session_minutes INTEGER NOT NULL DEFAULT 0",
 ]
 
 _CREATE_TIMER_SESSIONS_TABLE = """
@@ -1134,12 +1136,13 @@ class CalendarDB:
         color: str = "#1a6fc4",
         timer_type: str = "work",
         currency: str = "ILS",
+        max_session_minutes: int = 0,
     ) -> int:
         """Create a new timer project. Returns new row id."""
         with self._conn() as conn:
             cur = conn.execute(
-                "INSERT INTO timers (title, hourly_rate, color, created_at, timer_type, currency) VALUES (?, ?, ?, ?, ?, ?)",
-                (title, hourly_rate, color, datetime.datetime.now().isoformat(), timer_type, currency),
+                "INSERT INTO timers (title, hourly_rate, color, created_at, timer_type, currency, max_session_minutes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (title, hourly_rate, color, datetime.datetime.now().isoformat(), timer_type, currency, max_session_minutes),
             )
             return cur.lastrowid
 
@@ -1154,7 +1157,7 @@ class CalendarDB:
 
     def update_timer(self, timer_id: int, **kwargs) -> None:
         """Update allowed fields on a timer."""
-        allowed = {"title", "hourly_rate", "color", "archived", "timer_type", "currency"}
+        allowed = {"title", "hourly_rate", "color", "archived", "timer_type", "currency", "max_session_minutes"}
         fields = {k: v for k, v in kwargs.items() if k in allowed}
         if not fields:
             return
