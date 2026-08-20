@@ -25,10 +25,12 @@ from typing import Optional
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -37,6 +39,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QDoubleSpinBox,
+    QStackedWidget,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -182,6 +185,78 @@ def _fmt_datetime_short(iso: str) -> str:
 def _sessions_total_secs(sessions: list[dict]) -> float:
     """Sum of all session durations (open sessions counted to now)."""
     return sum(_duration_secs(s["start_time"], s.get("end_time")) for s in sessions)
+
+
+def _time_bucket(dt: datetime.datetime) -> str:
+    """Coarse time-of-day label for a press timestamp."""
+    if dt.hour < 12:
+        return "Morning"
+    elif dt.hour < 18:
+        return "Afternoon"
+    else:
+        return "Evening"
+
+
+def _fmt_press_when(iso: str) -> str:
+    """'2025-04-15T09:30:00' → 'Today · Morning' / 'Apr 15 · Afternoon'."""
+    try:
+        dt = datetime.datetime.fromisoformat(iso)
+        today = datetime.date.today()
+        if dt.date() == today:
+            day_str = "Today"
+        elif dt.date().year == today.year:
+            day_str = dt.strftime("%b %-d")
+        else:
+            day_str = dt.strftime("%b %-d %Y")
+        return f"{day_str} · {_time_bucket(dt)}"
+    except Exception:
+        return iso
+
+
+def _presses_total(presses: list[dict]) -> int:
+    """Net count from a list of press rows."""
+    return sum(p.get("delta", 0) for p in presses)
+
+
+def _fmt_payout(count: int, price_per_unit: float, currency: str = "ILS") -> str:
+    if price_per_unit <= 0:
+        return ""
+    symbol = _currency_symbol(currency)
+    return f"{symbol}{count * price_per_unit:,.2f}"
+
+
+def _parse_dt_aware(iso: str) -> datetime.datetime:
+    """Parse an ISO datetime string, normalizing naive timestamps to the
+    system's current local offset (mirrors _duration_secs's approach) so
+    comparisons between naive (dialog-entered) and aware (live-tap) rows
+    stay consistent."""
+    dt = datetime.datetime.fromisoformat(iso)
+    if dt.tzinfo is None:
+        dt = dt.astimezone()
+    return dt
+
+
+def _presses_since(presses: list[dict], cycle_start_iso: Optional[str]) -> list[dict]:
+    """Presses belonging to the current (open) tally cycle — those at or
+    after cycle_start_iso. cycle_start_iso is None for a counter that's
+    never been cashed out, meaning its entire press history is the current
+    cycle. Malformed timestamps are kept rather than silently dropped."""
+    if not cycle_start_iso:
+        return presses
+    try:
+        start_dt = _parse_dt_aware(cycle_start_iso)
+    except Exception:
+        return presses
+    kept = []
+    for p in presses:
+        try:
+            p_dt = _parse_dt_aware(p.get("pressed_at", ""))
+        except Exception:
+            kept.append(p)
+            continue
+        if p_dt >= start_dt:
+            kept.append(p)
+    return kept
 
 
 # ---------------------------------------------------------------------------
@@ -401,6 +476,306 @@ class TimerDialog(QDialog):
     @property
     def result_color(self) -> str:
         return self._color
+
+
+# ---------------------------------------------------------------------------
+# New / Edit Counter dialog
+# ---------------------------------------------------------------------------
+
+class CounterDialog(QDialog):
+    """Create or edit a tally counter: title, price per unit, currency, colour."""
+
+    def __init__(
+        self,
+        parent=None,
+        *,
+        title: str = "",
+        price_per_unit: float = 0.0,
+        currency: str = _DEFAULT_CURRENCY,
+        color: str = _styles.BLUE,
+    ):
+        super().__init__(parent)
+        self.setWindowTitle("Counter Settings")
+        self.setMinimumWidth(380)
+
+        self._color = color
+
+        root = QVBoxLayout(self)
+        root.setSpacing(14)
+
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        form.setSpacing(10)
+
+        self._title_edit = QLineEdit(title)
+        self._title_edit.setPlaceholderText("e.g. Widgets Packed, Calls Made…")
+        form.addRow("Title:", self._title_edit)
+
+        color_row = QHBoxLayout()
+        self._color_btn = QPushButton()
+        self._color_btn.setFixedSize(32, 24)
+        self._color_btn.setToolTip("Pick colour")
+        self._color_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._color_btn.clicked.connect(self._pick_color)
+        self._apply_color_btn()
+        color_row.addWidget(self._color_btn)
+        color_row.addStretch()
+        form.addRow("Colour:", color_row)
+
+        self._rate_spin = QDoubleSpinBox()
+        self._rate_spin.setRange(0, 99999)
+        self._rate_spin.setDecimals(2)
+        self._rate_spin.setSingleStep(0.5)
+        self._rate_spin.setValue(price_per_unit)
+        self._rate_spin.setSuffix(" / unit")
+        self._rate_spin.setSpecialValueText("No price set")
+        form.addRow("Price per unit:", self._rate_spin)
+
+        self._currency_picker = CurrencyPicker(currency, self)
+        form.addRow("Currency:", self._currency_picker)
+
+        root.addLayout(form)
+
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        root.addWidget(line)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        ok_btn.setDefault(True)
+        install_enter_confirms(self, ok_btn)
+        root.addWidget(buttons)
+
+    def _pick_color(self) -> None:
+        c = QColorDialog.getColor(QColor(self._color), self, "Pick Counter Colour")
+        if c.isValid():
+            self._color = c.name()
+            self._apply_color_btn()
+
+    def _apply_color_btn(self) -> None:
+        self._color_btn.setStyleSheet(
+            f"background-color: {self._color}; border: 1px solid #aaa; border-radius: 4px;"
+        )
+
+    @property
+    def result_title(self) -> str:
+        return self._title_edit.text().strip() or "Untitled Counter"
+
+    @property
+    def result_rate(self) -> float:
+        return self._rate_spin.value()
+
+    @property
+    def result_currency(self) -> str:
+        return self._currency_picker.selected_code
+
+    @property
+    def result_color(self) -> str:
+        return self._color
+
+
+# ---------------------------------------------------------------------------
+# Press edit dialog
+# ---------------------------------------------------------------------------
+
+class PressEditDialog(QDialog):
+    """Edit a single counter press: label, +/- direction, and when it happened."""
+
+    def __init__(self, parent=None, *, press: dict):
+        super().__init__(parent)
+        self.setWindowTitle("Edit Press")
+        self.setMinimumWidth(340)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        form.setSpacing(8)
+
+        self._label_edit = QLineEdit(press.get("label", ""))
+        self._label_edit.setPlaceholderText("What was this for? (optional)")
+        form.addRow("Label:", self._label_edit)
+
+        from PyQt6.QtWidgets import QComboBox as _QComboBox
+        self._sign_box = _QComboBox()
+        self._sign_box.addItem("+ (add)", 1)
+        self._sign_box.addItem("− (subtract)", -1)
+        self._sign_box.setCurrentIndex(0 if press.get("delta", 1) >= 0 else 1)
+        form.addRow("Direction:", self._sign_box)
+
+        when_raw = press.get("pressed_at")
+        when_dt = datetime.datetime.fromisoformat(when_raw) if when_raw else datetime.datetime.now()
+        self._when_edit = QDateTimeEdit(when_dt)
+        self._when_edit.setDisplayFormat("MMM d yyyy  h:mm AP")
+        self._when_edit.setCalendarPopup(True)
+        form.addRow("When:", self._when_edit)
+
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        ok_btn.setDefault(True)
+        install_enter_confirms(self, ok_btn)
+        layout.addWidget(buttons)
+
+    @property
+    def result_label(self) -> str:
+        return self._label_edit.text().strip()
+
+    @property
+    def result_delta(self) -> int:
+        return self._sign_box.currentData()
+
+    @property
+    def result_pressed_at(self) -> str:
+        return self._when_edit.dateTime().toPyDateTime().isoformat()
+
+
+# ---------------------------------------------------------------------------
+# Cash Out dialog — close a counter's current tally cycle as a logged payout
+# ---------------------------------------------------------------------------
+
+class CashOutDialog(QDialog):
+    """Log a payout for a counter's current tally cycle.
+
+    Shows the read-only cycle count, an editable amount (pre-filled from
+    count × price_per_unit when a rate is set), a date, and an optional
+    note. Mirrors PressEditDialog's structure/styling.
+    """
+
+    def __init__(self, parent=None, *, count: int, price_per_unit: float = 0.0, currency: str = _DEFAULT_CURRENCY):
+        super().__init__(parent)
+        self.setWindowTitle("Cash Out")
+        self.setMinimumWidth(340)
+        self._count = count
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        form.setSpacing(8)
+
+        count_lbl = QLabel(f"{count:,}")
+        count_font = QFont()
+        count_font.setWeight(QFont.Weight.DemiBold)
+        count_lbl.setFont(count_font)
+        form.addRow("Cycle count:", count_lbl)
+
+        symbol = _currency_symbol(currency)
+        self._amount_spin = QDoubleSpinBox()
+        self._amount_spin.setRange(0, 9_999_999)
+        self._amount_spin.setDecimals(2)
+        self._amount_spin.setPrefix(f"{symbol} ")
+        self._amount_spin.setValue(round(count * price_per_unit, 2) if price_per_unit > 0 else 0.0)
+        form.addRow("Amount:", self._amount_spin)
+
+        self._when_edit = QDateTimeEdit(datetime.datetime.now())
+        self._when_edit.setDisplayFormat("MMM d yyyy  h:mm AP")
+        self._when_edit.setCalendarPopup(True)
+        form.addRow("Date:", self._when_edit)
+
+        self._note_edit = QLineEdit()
+        self._note_edit.setPlaceholderText("Note (optional)")
+        form.addRow("Note:", self._note_edit)
+
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        ok_btn.setText("Cash Out")
+        ok_btn.setDefault(True)
+        install_enter_confirms(self, ok_btn)
+        layout.addWidget(buttons)
+
+    @property
+    def result_count(self) -> int:
+        return self._count
+
+    @property
+    def result_amount(self) -> float:
+        return self._amount_spin.value()
+
+    @property
+    def result_payout_at(self) -> str:
+        return self._when_edit.dateTime().toPyDateTime().isoformat()
+
+    @property
+    def result_note(self) -> str:
+        return self._note_edit.text().strip()
+
+
+# ---------------------------------------------------------------------------
+# Payout edit dialog
+# ---------------------------------------------------------------------------
+
+class PayoutEditDialog(QDialog):
+    """Edit a logged payout: date, amount, and note.
+
+    Count and cycle start are immutable snapshots (see counter_payouts
+    schema) — count is shown read-only, cycle start isn't shown at all.
+    """
+
+    def __init__(self, parent=None, *, payout: dict):
+        super().__init__(parent)
+        self.setWindowTitle("Edit Payout")
+        self.setMinimumWidth(340)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        form.setSpacing(8)
+
+        count_lbl = QLabel(f"{payout.get('count', 0):,}")
+        count_font = QFont()
+        count_font.setWeight(QFont.Weight.DemiBold)
+        count_lbl.setFont(count_font)
+        form.addRow("Cycle count:", count_lbl)
+
+        currency = payout.get("currency", _DEFAULT_CURRENCY)
+        symbol = _currency_symbol(currency)
+        self._amount_spin = QDoubleSpinBox()
+        self._amount_spin.setRange(0, 9_999_999)
+        self._amount_spin.setDecimals(2)
+        self._amount_spin.setPrefix(f"{symbol} ")
+        self._amount_spin.setValue(payout.get("amount") or 0.0)
+        form.addRow("Amount:", self._amount_spin)
+
+        when_raw = payout.get("payout_at")
+        when_dt = datetime.datetime.fromisoformat(when_raw) if when_raw else datetime.datetime.now()
+        self._when_edit = QDateTimeEdit(when_dt)
+        self._when_edit.setDisplayFormat("MMM d yyyy  h:mm AP")
+        self._when_edit.setCalendarPopup(True)
+        form.addRow("Date:", self._when_edit)
+
+        self._note_edit = QLineEdit(payout.get("note", ""))
+        self._note_edit.setPlaceholderText("Note (optional)")
+        form.addRow("Note:", self._note_edit)
+
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        ok_btn.setDefault(True)
+        install_enter_confirms(self, ok_btn)
+        layout.addWidget(buttons)
+
+    @property
+    def result_amount(self) -> float:
+        return self._amount_spin.value()
+
+    @property
+    def result_payout_at(self) -> str:
+        return self._when_edit.dateTime().toPyDateTime().isoformat()
+
+    @property
+    def result_note(self) -> str:
+        return self._note_edit.text().strip()
 
 
 # ---------------------------------------------------------------------------
@@ -1166,6 +1541,717 @@ class TimerCard(QWidget):
 
 
 # ---------------------------------------------------------------------------
+# Press row widget
+# ---------------------------------------------------------------------------
+
+class PressRow(QWidget):
+    """One row in the presses panel: sign | when (date · time-of-day) | label | actions."""
+
+    delete_requested = pyqtSignal(int)   # press_id
+    edit_requested = pyqtSignal(int)     # press_id
+
+    def __init__(self, press: dict, parent=None):
+        super().__init__(parent)
+        self._press = press
+        self._build()
+
+    def _build(self) -> None:
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 2, 0, 2)
+        layout.setSpacing(6)
+
+        self._sign_lbl = QLabel()
+        self._sign_lbl.setFixedWidth(16)
+        sign_font = QFont()
+        sign_font.setWeight(QFont.Weight.DemiBold)
+        self._sign_lbl.setFont(sign_font)
+        layout.addWidget(self._sign_lbl)
+
+        self._when_lbl = QLabel()
+        self._when_lbl.setMinimumWidth(140)
+        self._when_lbl.setObjectName("secondary")
+        layout.addWidget(self._when_lbl)
+
+        self._label_lbl = QLabel()
+        self._label_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        layout.addWidget(self._label_lbl)
+
+        edit_btn = QPushButton("Edit")
+        edit_btn.setObjectName("flat")
+        edit_btn.setFixedHeight(22)
+        edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        edit_btn.clicked.connect(lambda: self.edit_requested.emit(self._press["id"]))
+        layout.addWidget(edit_btn)
+
+        del_btn = QPushButton("✕")
+        del_btn.setObjectName("flat")
+        del_btn.setFixedHeight(22)
+        del_btn.setFixedWidth(22)
+        del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        del_btn.setToolTip("Delete this press")
+        del_btn.clicked.connect(lambda: self.delete_requested.emit(self._press["id"]))
+        layout.addWidget(del_btn)
+
+        self.refresh(self._press)
+
+    def refresh(self, press: dict) -> None:
+        self._press = press
+        delta = press.get("delta", 1)
+        live = _styles.DESTRUCTIVE_DARK if _styles._dark else _styles.DESTRUCTIVE
+        if delta >= 0:
+            self._sign_lbl.setText(f"+{delta}")
+            self._sign_lbl.setStyleSheet("color: #2fae5c;")
+        else:
+            self._sign_lbl.setText(str(delta))
+            self._sign_lbl.setStyleSheet(f"color: {live};")
+        self._when_lbl.setText(_fmt_press_when(press["pressed_at"]))
+        self._label_lbl.setText(press.get("label") or "—")
+
+
+# ---------------------------------------------------------------------------
+# Presses panel (collapsible)
+# ---------------------------------------------------------------------------
+
+class PressesPanel(QWidget):
+    """Expandable panel showing every logged +/- press for a counter."""
+
+    presses_changed = pyqtSignal()
+
+    def __init__(self, counter_id: int, db: CalendarDB, parent=None):
+        super().__init__(parent)
+        self._counter_id = counter_id
+        self._db = db
+        self._press_rows: dict[int, PressRow] = {}
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(24, 4, 4, 8)
+        outer.setSpacing(0)
+
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setObjectName("divider")
+        outer.addWidget(line)
+
+        self._rows_layout = QVBoxLayout()
+        self._rows_layout.setContentsMargins(0, 4, 0, 0)
+        self._rows_layout.setSpacing(0)
+        outer.addLayout(self._rows_layout)
+
+        add_btn = QPushButton("+ Add manual press")
+        add_btn.setObjectName("flat")
+        add_btn.setFixedHeight(24)
+        add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        add_btn.clicked.connect(self._add_manual_press)
+        outer.addWidget(add_btn)
+
+        self.reload()
+
+    def reload(self) -> None:
+        presses = list(reversed(self._db.get_counter_presses(self._counter_id)))  # newest first
+        while self._rows_layout.count():
+            item = self._rows_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self._press_rows.clear()
+
+        if not presses:
+            lbl = QLabel("No presses yet. Tap + or − on the counter, or add one manually.")
+            lbl.setObjectName("secondary")
+            lbl.setContentsMargins(0, 4, 0, 4)
+            self._rows_layout.addWidget(lbl)
+            return
+
+        for p in presses:
+            row = PressRow(p, self)
+            row.delete_requested.connect(self._on_delete)
+            row.edit_requested.connect(self._on_edit)
+            self._press_rows[p["id"]] = row
+            self._rows_layout.addWidget(row)
+
+    def _on_delete(self, press_id: int) -> None:
+        confirm = QMessageBox.question(
+            self, "Delete Press",
+            "Remove this press? This cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Yes,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        self._db.delete_counter_press(press_id)
+        self.presses_changed.emit()
+        self.reload()
+
+    def _on_edit(self, press_id: int) -> None:
+        presses = self._db.get_counter_presses(self._counter_id)
+        press = next((p for p in presses if p["id"] == press_id), None)
+        if not press:
+            return
+        dlg = PressEditDialog(self, press=press)
+        if dlg.exec():
+            self._db.update_counter_press(
+                press_id,
+                label=dlg.result_label,
+                delta=dlg.result_delta,
+                pressed_at=dlg.result_pressed_at,
+            )
+            self.presses_changed.emit()
+            self.reload()
+
+    def _add_manual_press(self) -> None:
+        fake = {"id": -1, "counter_id": self._counter_id, "delta": 1, "label": "", "pressed_at": datetime.datetime.now().isoformat()}
+        dlg = PressEditDialog(self, press=fake)
+        if dlg.exec():
+            self._db.create_counter_press(
+                self._counter_id,
+                delta=dlg.result_delta,
+                label=dlg.result_label,
+                pressed_at=dlg.result_pressed_at,
+            )
+            self.presses_changed.emit()
+            self.reload()
+
+
+# ---------------------------------------------------------------------------
+# Payout row widget
+# ---------------------------------------------------------------------------
+
+class PayoutRow(QWidget):
+    """One row in the payouts panel: date | count | amount | note | actions."""
+
+    delete_requested = pyqtSignal(int)   # payout_id
+    edit_requested = pyqtSignal(int)     # payout_id
+
+    def __init__(self, payout: dict, parent=None):
+        super().__init__(parent)
+        self._payout = payout
+        self._build()
+
+    def _build(self) -> None:
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 2, 0, 2)
+        layout.setSpacing(6)
+
+        self._when_lbl = QLabel()
+        self._when_lbl.setMinimumWidth(120)
+        self._when_lbl.setObjectName("secondary")
+        layout.addWidget(self._when_lbl)
+
+        self._count_lbl = QLabel()
+        self._count_lbl.setFixedWidth(60)
+        self._count_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(self._count_lbl)
+
+        self._amount_lbl = QLabel()
+        self._amount_lbl.setObjectName("earn_label")
+        self._amount_lbl.setFixedWidth(90)
+        self._amount_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(self._amount_lbl)
+
+        self._note_lbl = QLabel()
+        self._note_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        layout.addWidget(self._note_lbl)
+
+        edit_btn = QPushButton("Edit")
+        edit_btn.setObjectName("flat")
+        edit_btn.setFixedHeight(22)
+        edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        edit_btn.clicked.connect(lambda: self.edit_requested.emit(self._payout["id"]))
+        layout.addWidget(edit_btn)
+
+        del_btn = QPushButton("✕")
+        del_btn.setObjectName("flat")
+        del_btn.setFixedHeight(22)
+        del_btn.setFixedWidth(22)
+        del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        del_btn.setToolTip("Delete this payout")
+        del_btn.clicked.connect(lambda: self.delete_requested.emit(self._payout["id"]))
+        layout.addWidget(del_btn)
+
+        self.refresh(self._payout)
+
+    def refresh(self, payout: dict) -> None:
+        self._payout = payout
+        self._when_lbl.setText(_fmt_datetime_short(payout.get("payout_at", "")))
+        self._count_lbl.setText(f"{payout.get('count', 0):,}")
+        amount = payout.get("amount")
+        currency = payout.get("currency", _DEFAULT_CURRENCY)
+        if amount:
+            symbol = _currency_symbol(currency)
+            self._amount_lbl.setText(f"{symbol}{amount:,.2f}")
+        else:
+            self._amount_lbl.setText("—")
+        self._note_lbl.setText(payout.get("note") or "—")
+
+
+# ---------------------------------------------------------------------------
+# Payouts panel (collapsible) — payout / "cash out" history for a counter
+# ---------------------------------------------------------------------------
+
+class PayoutsPanel(QWidget):
+    """Expandable panel showing every logged payout for a counter, newest first."""
+
+    payouts_changed = pyqtSignal()
+
+    def __init__(self, counter_id: int, db: CalendarDB, parent=None):
+        super().__init__(parent)
+        self._counter_id = counter_id
+        self._db = db
+        self._payout_rows: dict[int, PayoutRow] = {}
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(24, 4, 4, 8)
+        outer.setSpacing(0)
+
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setObjectName("divider")
+        outer.addWidget(line)
+
+        heading = QLabel("Payout history")
+        heading.setObjectName("secondary")
+        heading.setContentsMargins(0, 4, 0, 0)
+        outer.addWidget(heading)
+
+        self._rows_layout = QVBoxLayout()
+        self._rows_layout.setContentsMargins(0, 4, 0, 0)
+        self._rows_layout.setSpacing(0)
+        outer.addLayout(self._rows_layout)
+
+        self.reload()
+
+    def reload(self) -> None:
+        payouts = self._db.get_counter_payouts(self._counter_id)  # already newest first
+        # setParent(None) before deleteLater() detaches rows from the widget
+        # tree immediately — see TimerView._clear_layout for why the naive
+        # deleteLater()-only version ghosts stale rows on reload.
+        while self._rows_layout.count():
+            item = self._rows_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.setParent(None)
+                w.deleteLater()
+        self._payout_rows.clear()
+
+        if not payouts:
+            lbl = QLabel("No payouts yet. Use Cash Out to log one.")
+            lbl.setObjectName("secondary")
+            lbl.setContentsMargins(0, 4, 0, 4)
+            self._rows_layout.addWidget(lbl)
+            return
+
+        for p in payouts:
+            row = PayoutRow(p, self)
+            row.delete_requested.connect(self._on_delete)
+            row.edit_requested.connect(self._on_edit)
+            self._payout_rows[p["id"]] = row
+            self._rows_layout.addWidget(row)
+
+    def _on_delete(self, payout_id: int) -> None:
+        confirm = QMessageBox.question(
+            self, "Delete Payout",
+            "Delete this payout record? This only removes the payout log "
+            "entry — the underlying press history is unaffected. This "
+            "cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Yes,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        self._db.delete_counter_payout(payout_id)
+        self.payouts_changed.emit()
+        self.reload()
+
+    def _on_edit(self, payout_id: int) -> None:
+        payouts = self._db.get_counter_payouts(self._counter_id)
+        payout = next((p for p in payouts if p["id"] == payout_id), None)
+        if not payout:
+            return
+        dlg = PayoutEditDialog(self, payout=payout)
+        if dlg.exec():
+            self._db.update_counter_payout(
+                payout_id,
+                amount=dlg.result_amount,
+                payout_at=dlg.result_payout_at,
+                note=dlg.result_note,
+            )
+            self.payouts_changed.emit()
+            self.reload()
+
+
+# ---------------------------------------------------------------------------
+# Counter card
+# ---------------------------------------------------------------------------
+
+class CounterCard(QWidget):
+    """A single tally-counter card: +/- controls, live count and payout, press log."""
+
+    changed = pyqtSignal()               # presses added/removed/edited → parent re-totals
+    delete_requested = pyqtSignal(int)   # counter_id
+
+    def __init__(self, counter: dict, db: CalendarDB, parent=None):
+        super().__init__(parent)
+        self._counter = counter
+        self._db = db
+        self._expanded = False
+        self._payouts_expanded = False
+        self._cached_presses: list[dict] | None = None
+        self._build()
+
+    def _build(self) -> None:
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        card = QWidget()
+        card.setObjectName("timer_card")
+        outer.addWidget(card)
+
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(12, 10, 12, 10)
+        card_layout.setSpacing(0)
+
+        header = QHBoxLayout()
+        header.setSpacing(8)
+
+        self._dot = QLabel("●")
+        dot_font = QFont()
+        dot_font.setPointSize(16)
+        self._dot.setFont(dot_font)
+        self._dot.setFixedWidth(20)
+        header.addWidget(self._dot)
+
+        self._title_lbl = QLabel()
+        title_font = QFont()
+        title_font.setPointSize(13)
+        title_font.setWeight(QFont.Weight.DemiBold)
+        self._title_lbl.setFont(title_font)
+        self._title_lbl.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._title_lbl.setToolTip("Click to edit counter settings")
+        self._title_lbl.mousePressEvent = lambda _: self._on_edit()
+        header.addWidget(self._title_lbl)
+
+        header.addStretch()
+
+        # Live count
+        self._count_lbl = QLabel()
+        count_font = QFont()
+        count_font.setFamily("Menlo, Monaco, monospace")
+        count_font.setPointSize(18)
+        count_font.setWeight(QFont.Weight.DemiBold)
+        self._count_lbl.setFont(count_font)
+        self._count_lbl.setMinimumWidth(60)
+        self._count_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        header.addWidget(self._count_lbl)
+
+        # Payout
+        self._payout_lbl = QLabel()
+        self._payout_lbl.setObjectName("earn_label")
+        self._payout_lbl.setMinimumWidth(80)
+        self._payout_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        header.addWidget(self._payout_lbl)
+
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setFixedHeight(22)
+        header.addWidget(sep)
+
+        # − button
+        self._minus_btn = QPushButton("−")
+        self._minus_btn.setObjectName("stop_btn")
+        self._minus_btn.setFixedHeight(28)
+        self._minus_btn.setFixedWidth(36)
+        self._minus_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._minus_btn.setToolTip("Subtract one")
+        self._minus_btn.clicked.connect(lambda: self._on_press(-1))
+        header.addWidget(self._minus_btn)
+
+        # + button
+        self._plus_btn = QPushButton("+")
+        self._plus_btn.setObjectName("start_btn")
+        self._plus_btn.setFixedHeight(28)
+        self._plus_btn.setFixedWidth(36)
+        self._plus_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._plus_btn.setToolTip("Add one")
+        self._plus_btn.clicked.connect(lambda: self._on_press(1))
+        header.addWidget(self._plus_btn)
+
+        self._payouts_btn = QPushButton("🧾")
+        self._payouts_btn.setObjectName("flat")
+        self._payouts_btn.setFixedSize(28, 28)
+        self._payouts_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._payouts_btn.setToolTip("Show / hide payout history")
+        self._payouts_btn.clicked.connect(self._toggle_payouts)
+        header.addWidget(self._payouts_btn)
+
+        more_btn = QPushButton("⋯")
+        more_btn.setObjectName("flat")
+        more_btn.setFixedSize(28, 28)
+        more_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        more_btn.setToolTip("Edit / Delete counter")
+        more_btn.clicked.connect(self._on_more)
+        header.addWidget(more_btn)
+
+        self._expand_btn = QPushButton("▸")
+        self._expand_btn.setObjectName("flat")
+        self._expand_btn.setFixedSize(28, 28)
+        self._expand_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._expand_btn.setToolTip("Show / hide press log")
+        self._expand_btn.clicked.connect(self._toggle_expand)
+        header.addWidget(self._expand_btn)
+
+        card_layout.addLayout(header)
+
+        self._presses_panel = PressesPanel(self._counter["id"], self._db, card)
+        self._presses_panel.presses_changed.connect(self.changed.emit)
+        self._presses_panel.presses_changed.connect(self._invalidate_cache)
+        self._presses_panel.presses_changed.connect(self.refresh)
+        self._presses_panel.hide()
+        card_layout.addWidget(self._presses_panel)
+
+        self._payouts_panel = PayoutsPanel(self._counter["id"], self._db, card)
+        self._payouts_panel.payouts_changed.connect(self.changed.emit)
+        self._payouts_panel.payouts_changed.connect(self._invalidate_cache)
+        self._payouts_panel.payouts_changed.connect(self.refresh)
+        self._payouts_panel.hide()
+        card_layout.addWidget(self._payouts_panel)
+
+        self.refresh()
+
+    # ------------------------------------------------------------------
+    def _invalidate_cache(self) -> None:
+        self._cached_presses = None
+
+    def _cycle_start(self) -> Optional[str]:
+        """Start of the counter's current (open) tally cycle: the most
+        recent payout's date, or the counter's own created_at if it's
+        never been cashed out."""
+        return self._db.get_counter_cycle_start(self._counter["id"]) or self._counter.get("created_at")
+
+    def refresh(self) -> None:
+        if self._cached_presses is None:
+            self._cached_presses = self._db.get_counter_presses(self._counter["id"])
+
+        cycle_presses = _presses_since(self._cached_presses, self._cycle_start())
+        count = _presses_total(cycle_presses)
+        self._dot.setStyleSheet(f"color: {self._counter['color']};")
+        self._title_lbl.setText(self._counter["title"])
+        self._count_lbl.setText(f"{count:,}")
+
+        payout = _fmt_payout(count, self._counter.get("price_per_unit", 0), self._counter.get("currency", _DEFAULT_CURRENCY))
+        self._payout_lbl.setText(payout)
+        self._payout_lbl.setVisible(bool(payout))
+
+        if self._expanded:
+            self._presses_panel.reload()
+        if self._payouts_expanded:
+            self._payouts_panel.reload()
+
+    def reload_counter(self) -> None:
+        """Reload counter metadata from DB (after an edit)."""
+        counters = self._db.get_counters(include_archived=True)
+        for c in counters:
+            if c["id"] == self._counter["id"]:
+                self._counter = c
+                break
+        self._invalidate_cache()
+        self.refresh()
+
+    def current_count(self) -> int:
+        """Net count for the counter's current (open) tally cycle."""
+        if self._cached_presses is None:
+            self._cached_presses = self._db.get_counter_presses(self._counter["id"])
+        return _presses_total(_presses_since(self._cached_presses, self._cycle_start()))
+
+    # ------------------------------------------------------------------
+    def _on_press(self, delta: int) -> None:
+        self._db.create_counter_press(self._counter["id"], delta=delta)
+        self._invalidate_cache()
+        self.refresh()
+        self.changed.emit()
+
+    def _toggle_expand(self) -> None:
+        self._expanded = not self._expanded
+        if self._expanded:
+            self._presses_panel.reload()
+            self._presses_panel.show()
+            self._expand_btn.setText("▾")
+        else:
+            self._presses_panel.hide()
+            self._expand_btn.setText("▸")
+
+    def _toggle_payouts(self) -> None:
+        self._payouts_expanded = not self._payouts_expanded
+        if self._payouts_expanded:
+            self._payouts_panel.reload()
+            self._payouts_panel.show()
+        else:
+            self._payouts_panel.hide()
+
+    def _on_edit(self) -> None:
+        dlg = CounterDialog(
+            self,
+            title=self._counter["title"],
+            price_per_unit=self._counter.get("price_per_unit", 0),
+            currency=self._counter.get("currency", _DEFAULT_CURRENCY),
+            color=self._counter.get("color", _styles.BLUE),
+        )
+        if dlg.exec():
+            self._db.update_counter(
+                self._counter["id"],
+                title=dlg.result_title,
+                price_per_unit=dlg.result_rate,
+                currency=dlg.result_currency,
+                color=dlg.result_color,
+            )
+            self.reload_counter()
+
+    def _on_cash_out(self) -> None:
+        """Close out the current tally cycle: log a payout and start a
+        fresh cycle (the displayed count returns to 0) without touching
+        the underlying press log."""
+        count = self.current_count()
+        price = self._counter.get("price_per_unit", 0)
+        currency = self._counter.get("currency", _DEFAULT_CURRENCY)
+        dlg = CashOutDialog(self, count=count, price_per_unit=price, currency=currency)
+        if dlg.exec():
+            self._db.create_counter_payout(
+                self._counter["id"],
+                cycle_started_at=self._cycle_start(),
+                payout_at=dlg.result_payout_at,
+                count=dlg.result_count,
+                amount=dlg.result_amount,
+                currency=currency,
+                note=dlg.result_note,
+            )
+            self._invalidate_cache()
+            self.refresh()
+            self.changed.emit()
+
+    def _on_more(self) -> None:
+        from PyQt6.QtWidgets import QMenu
+        menu = QMenu(self)
+        edit_act = menu.addAction("Edit counter settings")
+        cashout_act = menu.addAction("Cash Out…")
+        archive_act = menu.addAction("Archive counter")
+        menu.addSeparator()
+        hard_reset_act = menu.addAction("Hard reset (discard press log)…")
+        del_act = menu.addAction("Delete counter…")
+
+        action = menu.exec(self._plus_btn.mapToGlobal(self._plus_btn.rect().bottomLeft()))
+        if action == edit_act:
+            self._on_edit()
+        elif action == cashout_act:
+            self._on_cash_out()
+        elif action == archive_act:
+            self._db.update_counter(self._counter["id"], archived=1)
+            self.delete_requested.emit(self._counter["id"])
+        elif action == hard_reset_act:
+            # Secondary/destructive path for genuine data-entry corrections —
+            # unlike Cash Out, this leaves no record a payout ever happened.
+            # Defaults to Cancel since it's no longer the easy default action.
+            confirm = QMessageBox.question(
+                self, "Hard Reset Counter",
+                f"Discard the entire press log for \"{self._counter['title']}\" "
+                "without logging a payout? This permanently erases press "
+                "history and cannot be undone. Use Cash Out instead if you "
+                "want to keep a record of this cycle.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            if confirm == QMessageBox.StandardButton.Yes:
+                for p in self._db.get_counter_presses(self._counter["id"]):
+                    self._db.delete_counter_press(p["id"])
+                self._invalidate_cache()
+                self.refresh()
+                self.changed.emit()
+        elif action == del_act:
+            confirm = QMessageBox.question(
+                self, "Delete Counter",
+                f"Delete \"{self._counter['title']}\" and its entire press "
+                "and payout log? This cannot be undone.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Yes,
+            )
+            if confirm == QMessageBox.StandardButton.Yes:
+                self._db.delete_counter(self._counter["id"])
+                self.delete_requested.emit(self._counter["id"])
+
+
+# ---------------------------------------------------------------------------
+# Archived timer row (Archive panel list item)
+# ---------------------------------------------------------------------------
+
+class ArchivedTimerRow(QWidget):
+    """One row in the Archive panel: colour dot, title, lifetime totals,
+    and Unarchive / Delete actions."""
+
+    unarchive_requested = pyqtSignal(int)   # timer_id
+    delete_requested = pyqtSignal(int)      # timer_id
+
+    def __init__(self, timer: dict, db: CalendarDB, parent=None):
+        super().__init__(parent)
+        self._timer = timer
+        self._db = db
+        self._build()
+
+    def _build(self) -> None:
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        card = QWidget()
+        card.setObjectName("timer_card")
+        outer.addWidget(card)
+
+        layout = QHBoxLayout(card)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(8)
+
+        dot = QLabel("●")
+        dot_font = QFont()
+        dot_font.setPointSize(16)
+        dot.setFont(dot_font)
+        dot.setFixedWidth(20)
+        dot.setStyleSheet(f"color: {self._timer.get('color', _styles.BLUE)};")
+        layout.addWidget(dot)
+
+        info = QVBoxLayout()
+        info.setSpacing(2)
+        title_lbl = QLabel(self._timer.get("title", "Untitled Timer"))
+        title_font = QFont()
+        title_font.setWeight(QFont.Weight.DemiBold)
+        title_lbl.setFont(title_font)
+        info.addWidget(title_lbl)
+
+        sessions = self._db.get_timer_sessions(self._timer["id"])
+        total_secs = _sessions_total_secs(sessions)
+        sub_parts = [f"{_fmt_duration(total_secs)} tracked lifetime", f"{len(sessions)} session(s)"]
+        is_work = self._timer.get("timer_type", "work") == "work"
+        if is_work and self._timer.get("hourly_rate", 0) > 0:
+            earn = _fmt_earnings(
+                total_secs, self._timer["hourly_rate"], self._timer.get("currency", _DEFAULT_CURRENCY)
+            )
+            if earn:
+                sub_parts.append(f"{earn} earned lifetime")
+        sub_lbl = QLabel("  ·  ".join(sub_parts))
+        sub_lbl.setObjectName("secondary")
+        info.addWidget(sub_lbl)
+        layout.addLayout(info, 1)
+
+        unarchive_btn = QPushButton("Unarchive")
+        unarchive_btn.setObjectName("flat")
+        unarchive_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        unarchive_btn.setToolTip("Move this timer back to Active")
+        unarchive_btn.clicked.connect(lambda: self.unarchive_requested.emit(self._timer["id"]))
+        layout.addWidget(unarchive_btn)
+
+        del_btn = QPushButton("Delete")
+        del_btn.setObjectName("stop_btn")
+        del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        del_btn.setToolTip("Permanently delete this timer and its session history")
+        del_btn.clicked.connect(lambda: self.delete_requested.emit(self._timer["id"]))
+        layout.addWidget(del_btn)
+
+
+# ---------------------------------------------------------------------------
 # Main timer view
 # ---------------------------------------------------------------------------
 
@@ -1179,7 +2265,12 @@ class TimerView(QWidget):
         super().__init__(parent)
         self._db = db
         self._cards: dict[int, TimerCard] = {}  # timer_id → card
+        self._counter_cards: dict[int, CounterCard] = {}  # counter_id → card
         self._dark = False
+
+        self._section = "active"        # "active" | "archive" | "stats"
+        self._stats_period = "week"     # "week" | "month" | "all"
+        self._stats_selected_ids: set[int] = set()  # empty = aggregate all active timers
 
         self._build()
 
@@ -1230,6 +2321,16 @@ class TimerView(QWidget):
         heading.setFont(heading_font)
         top_layout.addWidget(heading)
 
+        top_layout.addSpacing(12)
+        for label, sect in [("Active", "active"), ("Archive", "archive"), ("Stats", "stats")]:
+            btn = QPushButton(label)
+            btn.setObjectName("seg_btn")
+            btn.setFixedHeight(28)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda _, s=sect: self._set_section(s))
+            top_layout.addWidget(btn)
+            setattr(self, f"_sect_btn_{sect}", btn)
+
         top_layout.addStretch()
 
         # Daily summary
@@ -1245,28 +2346,326 @@ class TimerView(QWidget):
         new_btn.clicked.connect(self._on_new_timer)
         top_layout.addWidget(new_btn)
 
+        new_counter_btn = QPushButton("+ New Counter")
+        new_counter_btn.setObjectName("seg_btn")
+        new_counter_btn.setFixedHeight(30)
+        new_counter_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        new_counter_btn.clicked.connect(self._on_new_counter)
+        top_layout.addWidget(new_counter_btn)
+
         root.addWidget(top)
 
-        # ── Scroll area for cards ─────────────────────────────────────────
+        # ── Scroll area for cards (Active view) ─────────────────────────────
+        self._active_panel = QScrollArea()
+        self._active_panel.setWidgetResizable(True)
+        self._active_panel.setFrameShape(QFrame.Shape.NoFrame)
+
+        self._cards_widget = QWidget()
+        outer_layout = QVBoxLayout(self._cards_widget)
+        outer_layout.setContentsMargins(16, 12, 16, 12)
+        outer_layout.setSpacing(8)
+
+        # Timers section
+        self._cards_layout = QVBoxLayout()
+        self._cards_layout.setSpacing(8)
+        outer_layout.addLayout(self._cards_layout)
+
+        # Counters section
+        outer_layout.addSpacing(8)
+        counters_heading = QLabel("Counters")
+        counters_heading_font = QFont()
+        counters_heading_font.setPointSize(12)
+        counters_heading_font.setWeight(QFont.Weight.DemiBold)
+        counters_heading.setFont(counters_heading_font)
+        counters_heading.setObjectName("secondary")
+        outer_layout.addWidget(counters_heading)
+
+        self._counters_layout = QVBoxLayout()
+        self._counters_layout.setSpacing(8)
+        outer_layout.addLayout(self._counters_layout)
+
+        outer_layout.addStretch()
+
+        self._active_panel.setWidget(self._cards_widget)
+
+        self._archive_panel = self._build_archive_panel()
+        self._stats_panel = self._build_stats_panel()
+
+        self._stack = QStackedWidget()
+        self._stack.addWidget(self._active_panel)
+        self._stack.addWidget(self._archive_panel)
+        self._stack.addWidget(self._stats_panel)
+        root.addWidget(self._stack, stretch=1)
+
+        self._set_section("active")
+
+    def _build_archive_panel(self) -> QWidget:
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
+        w = QWidget()
+        layout = QVBoxLayout(w)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(8)
+        self._archive_layout = QVBoxLayout()
+        self._archive_layout.setSpacing(8)
+        layout.addLayout(self._archive_layout)
+        layout.addStretch()
+        scroll.setWidget(w)
+        return scroll
 
-        self._cards_widget = QWidget()
-        self._cards_layout = QVBoxLayout(self._cards_widget)
-        self._cards_layout.setContentsMargins(16, 12, 16, 12)
-        self._cards_layout.setSpacing(8)
-        self._cards_layout.addStretch()
+    def _build_stats_panel(self) -> QWidget:
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        w = QWidget()
+        layout = QVBoxLayout(w)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(12)
 
-        scroll.setWidget(self._cards_widget)
-        root.addWidget(scroll, stretch=1)
+        period_row = QHBoxLayout()
+        for label, period in [("Week", "week"), ("Month", "month"), ("All-time", "all")]:
+            btn = QPushButton(label)
+            btn.setObjectName("seg_btn")
+            btn.setFixedHeight(26)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda _, p=period: self._set_stats_period(p))
+            period_row.addWidget(btn)
+            setattr(self, f"_period_btn_{period}", btn)
+        period_row.addStretch()
+        layout.addLayout(period_row)
+
+        tiles_row = QGridLayout()
+        tiles_row.setSpacing(10)
+        self._tile_tracked_time = self._make_stat_tile("Tracked Time")
+        self._tile_earnings = self._make_stat_tile("Total Earnings")
+        self._tile_active_timers = self._make_stat_tile("Active Timers")
+        self._tile_sessions = self._make_stat_tile("Sessions")
+        tiles_row.addWidget(self._tile_tracked_time, 0, 0)
+        tiles_row.addWidget(self._tile_earnings, 0, 1)
+        tiles_row.addWidget(self._tile_active_timers, 0, 2)
+        tiles_row.addWidget(self._tile_sessions, 0, 3)
+        layout.addLayout(tiles_row)
+
+        checklist_heading = QLabel("Timers  (check to aggregate a subset — none checked = all)")
+        heading_font = QFont()
+        heading_font.setPointSize(12)
+        heading_font.setWeight(QFont.Weight.DemiBold)
+        checklist_heading.setFont(heading_font)
+        checklist_heading.setObjectName("secondary")
+        layout.addWidget(checklist_heading)
+
+        self._stats_checklist_layout = QVBoxLayout()
+        self._stats_checklist_layout.setSpacing(4)
+        layout.addLayout(self._stats_checklist_layout)
+
+        layout.addStretch()
+        scroll.setWidget(w)
+        return scroll
+
+    def _make_stat_tile(self, title: str) -> QWidget:
+        tile = QWidget()
+        tile.setObjectName("timer_card")
+        tl = QVBoxLayout(tile)
+        tl.setContentsMargins(14, 10, 14, 10)
+        tl.setSpacing(2)
+        val_lbl = QLabel("—")
+        val_lbl.setWordWrap(True)
+        vf = QFont()
+        vf.setPointSize(18)
+        vf.setWeight(QFont.Weight.Bold)
+        val_lbl.setFont(vf)
+        tl.addWidget(val_lbl)
+        title_lbl = QLabel(title)
+        title_lbl.setObjectName("secondary")
+        tl.addWidget(title_lbl)
+        tile._value_label = val_lbl  # stash for later updates
+        return tile
+
+    # ------------------------------------------------------------------
+    # Section / period switching (Active / Archive / Stats)
+    # ------------------------------------------------------------------
+
+    def _style_seg_btn(self, btn: QPushButton, active: bool) -> None:
+        btn.setProperty("active", active)
+        btn.style().unpolish(btn)
+        btn.style().polish(btn)
+
+    def _set_section(self, section: str) -> None:
+        self._section = section
+        widget = {
+            "active": self._active_panel,
+            "archive": self._archive_panel,
+            "stats": self._stats_panel,
+        }[section]
+        self._stack.setCurrentWidget(widget)
+        for s in ("active", "archive", "stats"):
+            btn = getattr(self, f"_sect_btn_{s}", None)
+            if btn:
+                self._style_seg_btn(btn, s == section)
+        if section == "active":
+            self.reload()
+        elif section == "archive":
+            self._reload_archive()
+        elif section == "stats":
+            self._reload_stats_panel()
+
+    def _set_stats_period(self, period: str) -> None:
+        self._stats_period = period
+        for p in ("week", "month", "all"):
+            btn = getattr(self, f"_period_btn_{p}", None)
+            if btn:
+                self._style_seg_btn(btn, p == period)
+        self._recompute_stats_tiles()
+
+    def _period_start_date(self) -> Optional[str]:
+        today = datetime.date.today()
+        if self._stats_period == "week":
+            return (today - datetime.timedelta(days=7)).isoformat()
+        if self._stats_period == "month":
+            return (today - datetime.timedelta(days=30)).isoformat()
+        return None  # all-time
+
+    @staticmethod
+    def _clear_layout(layout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            w = item.widget()
+            if w:
+                # setParent(None) detaches it from the widget tree immediately
+                # (so it stops being painted); deleteLater() alone leaves it
+                # visible at its old position until the deferred-delete event
+                # actually runs, which briefly ghosts the old row on reload.
+                w.setParent(None)
+                w.deleteLater()
+
+    # ------------------------------------------------------------------
+    # Archive panel
+    # ------------------------------------------------------------------
+
+    def _reload_archive(self) -> None:
+        self._clear_layout(self._archive_layout)
+        archived = [t for t in self._db.get_timers(include_archived=True) if t.get("archived")]
+        if not archived:
+            lbl = QLabel("No archived timers.\nArchive a timer from its ⋯ menu to see it here.")
+            lbl.setObjectName("secondary")
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lbl.setContentsMargins(0, 40, 0, 0)
+            self._archive_layout.addWidget(lbl)
+            return
+        for t in archived:
+            row = ArchivedTimerRow(t, self._db, self)
+            row.unarchive_requested.connect(self._on_unarchive_timer)
+            row.delete_requested.connect(self._on_delete_archived_timer)
+            self._archive_layout.addWidget(row)
+
+    def _on_unarchive_timer(self, timer_id: int) -> None:
+        self._db.update_timer(timer_id, archived=0)
+        self._reload_archive()
+        self.reload()
+
+    def _on_delete_archived_timer(self, timer_id: int) -> None:
+        timer = next((t for t in self._db.get_timers(include_archived=True) if t["id"] == timer_id), None)
+        title = timer["title"] if timer else "this timer"
+        confirm = QMessageBox.question(
+            self, "Delete Archived Timer",
+            f"Permanently delete \"{title}\" and its entire session history? This cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Yes,  # Enter confirms; Escape still cancels
+        )
+        if confirm == QMessageBox.StandardButton.Yes:
+            self._db.delete_timer(timer_id)
+            self._reload_archive()
+
+    # ------------------------------------------------------------------
+    # Stats panel
+    # ------------------------------------------------------------------
+
+    def _reload_stats_panel(self) -> None:
+        active_timers = self._db.get_timers(include_archived=False)
+        valid_ids = {t["id"] for t in active_timers}
+        # Drop selections for timers that no longer exist / got archived.
+        self._stats_selected_ids &= valid_ids
+
+        self._clear_layout(self._stats_checklist_layout)
+        if not active_timers:
+            lbl = QLabel("No active timers yet.")
+            lbl.setObjectName("secondary")
+            self._stats_checklist_layout.addWidget(lbl)
+        for t in active_timers:
+            row = QWidget()
+            rl = QHBoxLayout(row)
+            rl.setContentsMargins(2, 0, 2, 0)
+            rl.setSpacing(6)
+            dot = QLabel("●")
+            dot.setStyleSheet(f"color: {t.get('color', _styles.BLUE)};")
+            dot.setFixedWidth(16)
+            rl.addWidget(dot)
+            chk = QCheckBox(t["title"])
+            chk.setChecked(t["id"] in self._stats_selected_ids)
+            chk.toggled.connect(lambda checked, tid=t["id"]: self._on_stats_checkbox_toggled(tid, checked))
+            rl.addWidget(chk)
+            rl.addStretch()
+            self._stats_checklist_layout.addWidget(row)
+
+        self._recompute_stats_tiles()
+
+    def _on_stats_checkbox_toggled(self, timer_id: int, checked: bool) -> None:
+        if checked:
+            self._stats_selected_ids.add(timer_id)
+        else:
+            self._stats_selected_ids.discard(timer_id)
+        self._recompute_stats_tiles()
+
+    def _recompute_stats_tiles(self) -> None:
+        active_timers = self._db.get_timers(include_archived=False)
+        included_ids = self._stats_selected_ids if self._stats_selected_ids else {t["id"] for t in active_timers}
+        period_start = self._period_start_date()
+
+        total_secs = 0.0
+        earn_by_currency: dict[str, float] = {}
+        session_count = 0
+
+        for t in active_timers:
+            if t["id"] not in included_ids:
+                continue
+            sessions = self._db.get_timer_sessions(t["id"])
+            is_work = t.get("timer_type", "work") == "work"
+            currency = t.get("currency", _DEFAULT_CURRENCY)
+            rate = t.get("hourly_rate", 0)
+            for s in sessions:
+                try:
+                    s_date = datetime.datetime.fromisoformat(s["start_time"]).date().isoformat()
+                except Exception:
+                    s_date = ""
+                if period_start is not None and s_date < period_start:
+                    continue
+                secs = _duration_secs(s["start_time"], s.get("end_time"))
+                total_secs += secs
+                session_count += 1
+                if is_work and rate > 0:
+                    earn_by_currency[currency] = earn_by_currency.get(currency, 0.0) + (secs / 3600) * rate
+
+        self._tile_tracked_time._value_label.setText(_fmt_duration(total_secs))
+        if earn_by_currency:
+            parts = [f"{_currency_symbol(c)}{amt:,.2f}" for c, amt in earn_by_currency.items()]
+            self._tile_earnings._value_label.setText("  ·  ".join(parts))
+        else:
+            self._tile_earnings._value_label.setText("—")
+        self._tile_active_timers._value_label.setText(str(len(included_ids)))
+        self._tile_sessions._value_label.setText(str(session_count))
 
     # ------------------------------------------------------------------
     # Load / reload
     # ------------------------------------------------------------------
 
     def reload(self) -> None:
-        """Rebuild card list from DB."""
+        """Rebuild card lists from DB."""
+        self._reload_timers()
+        self._reload_counters()
+        self._update_summary()
+
+    def _reload_timers(self) -> None:
         timers = self._db.get_timers(include_archived=False)
         timer_ids = {t["id"] for t in timers}
 
@@ -1275,6 +2674,12 @@ class TimerView(QWidget):
             if tid not in timer_ids:
                 card = self._cards.pop(tid)
                 self._cards_layout.removeWidget(card)
+                # setParent(None) detaches it from the widget tree immediately
+                # (so it stops being painted); deleteLater() alone leaves it
+                # visible at its old position — still a child, just no longer
+                # layout-managed — until the deferred-delete event actually
+                # runs, which briefly ghosts the old card under the new list.
+                card.setParent(None)
                 card.deleteLater()
 
         # Add cards for new timers (insert before the stretch)
@@ -1286,8 +2691,27 @@ class TimerView(QWidget):
                 self._cards[t["id"]] = card
                 self._cards_layout.insertWidget(i, card)
 
-        self._update_summary()
         self._show_empty_state(len(timers) == 0)
+
+    def _reload_counters(self) -> None:
+        counters = self._db.get_counters(include_archived=False)
+        counter_ids = {c["id"] for c in counters}
+
+        for cid in list(self._counter_cards.keys()):
+            if cid not in counter_ids:
+                card = self._counter_cards.pop(cid)
+                self._counters_layout.removeWidget(card)
+                card.deleteLater()
+
+        for i, c in enumerate(counters):
+            if c["id"] not in self._counter_cards:
+                card = CounterCard(c, self._db, self)
+                card.changed.connect(self._update_summary)
+                card.delete_requested.connect(self._on_counter_card_deleted)
+                self._counter_cards[c["id"]] = card
+                self._counters_layout.insertWidget(i, card)
+
+        self._show_counters_empty_state(len(counters) == 0)
 
     def _show_empty_state(self, empty: bool) -> None:
         if not hasattr(self, "_empty_lbl"):
@@ -1299,6 +2723,17 @@ class TimerView(QWidget):
             self._empty_lbl.setContentsMargins(0, 40, 0, 0)
             self._cards_layout.insertWidget(0, self._empty_lbl)
         self._empty_lbl.setVisible(empty)
+
+    def _show_counters_empty_state(self, empty: bool) -> None:
+        if not hasattr(self, "_counters_empty_lbl"):
+            self._counters_empty_lbl = QLabel(
+                "No counters yet.\nClick \"+ New Counter\" to start a tally."
+            )
+            self._counters_empty_lbl.setObjectName("secondary")
+            self._counters_empty_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._counters_empty_lbl.setContentsMargins(0, 16, 0, 16)
+            self._counters_layout.insertWidget(0, self._counters_empty_lbl)
+        self._counters_empty_lbl.setVisible(empty)
 
     def _update_summary(self) -> None:
         """Recompute daily total and earnings across all timers.
@@ -1338,7 +2773,30 @@ class TimerView(QWidget):
                 if s.get("end_time") is None:
                     any_running = True
 
+        # Fold today's counter payouts into the same per-currency totals.
+        total_count_today = 0
+        for counter_id, card in self._counter_cards.items():
+            c = card._counter
+            presses = card._cached_presses
+            if presses is None:
+                presses = self._db.get_counter_presses(counter_id)
+            currency = c.get("currency", _DEFAULT_CURRENCY)
+            price = c.get("price_per_unit", 0)
+            for p in presses:
+                try:
+                    p_date = datetime.datetime.fromisoformat(p["pressed_at"]).date().isoformat()
+                except Exception:
+                    p_date = ""
+                if p_date == today:
+                    total_count_today += p.get("delta", 0)
+                    if price > 0:
+                        earn_by_currency[currency] = (
+                            earn_by_currency.get(currency, 0.0) + p.get("delta", 0) * price
+                        )
+
         parts = [f"Today: {_fmt_duration(total_secs)}"]
+        if total_count_today:
+            parts.append(f"{total_count_today:,} counted")
         for cur, amount in earn_by_currency.items():
             sym = _currency_symbol(cur)
             parts.append(f"{sym}{amount:,.2f} earned")
@@ -1376,14 +2834,39 @@ class TimerView(QWidget):
                 color=dlg.result_color,
             )
             self.reload()
+            if self._section == "stats":
+                self._reload_stats_panel()
 
     def _on_card_deleted(self, timer_id: int) -> None:
         card = self._cards.pop(timer_id, None)
         if card:
             self._cards_layout.removeWidget(card)
+            card.setParent(None)  # detach immediately — see _reload_timers note
             card.deleteLater()
         timers = self._db.get_timers()
         self._show_empty_state(len(timers) == 0)
+        self._update_summary()
+
+    def _on_new_counter(self) -> None:
+        existing = self._db.get_counters(include_archived=True)
+        color = _TIMER_COLORS[len(existing) % len(_TIMER_COLORS)]
+        dlg = CounterDialog(self, color=color)
+        if dlg.exec():
+            self._db.create_counter(
+                title=dlg.result_title,
+                price_per_unit=dlg.result_rate,
+                currency=dlg.result_currency,
+                color=dlg.result_color,
+            )
+            self.reload()
+
+    def _on_counter_card_deleted(self, counter_id: int) -> None:
+        card = self._counter_cards.pop(counter_id, None)
+        if card:
+            self._counters_layout.removeWidget(card)
+            card.deleteLater()
+        counters = self._db.get_counters()
+        self._show_counters_empty_state(len(counters) == 0)
         self._update_summary()
 
     # ------------------------------------------------------------------
