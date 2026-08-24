@@ -67,6 +67,38 @@ _PRIORITY_COLORS = {
 
 _PRIORITY_LABELS = ["none", "low", "medium", "high"]
 
+UNTAGGED_KEY = "__untagged__"
+
+
+def _tag_colors(db) -> dict[str, str]:
+    """name(lower) → hex color for every known tag (falls back to a stable hue)."""
+    out: dict[str, str] = {}
+    for t in db.get_tags():
+        color = t.get("color") or ""
+        if not color:
+            h = sum(ord(c) * 31 ** i for i, c in enumerate(t["name"])) % 360
+            from PyQt6.QtGui import QColor
+            color = QColor.fromHsv(h, 140, 205).name()
+        out[t["name"].lower()] = color
+    return out
+
+
+def _tag_color(colors: dict[str, str], name: str) -> str:
+    return colors.get(name.lower(), "#8a8a8a")
+
+
+def _chip_style(color: str, selected: bool, size: int = 11) -> str:
+    """QSS for a pill-shaped tag chip (QLabel or QPushButton)."""
+    if selected:
+        return (
+            f"background: {color}; color: #ffffff; border: 1px solid {color};"
+            f" border-radius: 9px; padding: 1px 8px; font-size: {size}px; font-weight: 600;"
+        )
+    return (
+        f"background: transparent; color: {color}; border: 1px solid {color};"
+        f" border-radius: 9px; padding: 1px 8px; font-size: {size}px; font-weight: 600;"
+    )
+
 IMG_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tiff", ".heic"}
 
 
@@ -411,6 +443,18 @@ class TodoDetailPanel(QWidget):
         self._att_row.addStretch()
         outer.addLayout(self._att_row)
 
+        # ── Tags row (toggle chips) ───────────────────────────────────
+        tags_row = QHBoxLayout()
+        tags_row.setSpacing(6)
+        self._tags_lbl = QLabel("Tags:")
+        tags_row.addWidget(self._tags_lbl)
+        self._tags_chip_layout = QHBoxLayout()
+        self._tags_chip_layout.setSpacing(6)
+        tags_row.addLayout(self._tags_chip_layout)
+        tags_row.addStretch()
+        outer.addLayout(tags_row)
+        self._tag_chips: list[QPushButton] = []
+
         # ── Metadata row (due date + priority) ────────────────────────
         meta_row = QHBoxLayout()
         meta_row.setSpacing(12)
@@ -508,6 +552,40 @@ class TodoDetailPanel(QWidget):
         idx = _PRIORITY_LABELS.index(pri) if pri in _PRIORITY_LABELS else 0
         self._priority_combo.setCurrentIndex(idx)
         self._priority_combo.blockSignals(False)
+
+        # Tags
+        self._reload_tag_chips()
+
+    def _reload_tag_chips(self) -> None:
+        for chip in self._tag_chips:
+            self._tags_chip_layout.removeWidget(chip)
+            chip.deleteLater()
+        self._tag_chips.clear()
+        colors = _tag_colors(self._db)
+        current = [t.lower() for t in (self._todo.get("tags") or [])]
+        for tag in self._db.get_tags():
+            name = tag["name"]
+            btn = QPushButton(name)
+            btn.setCheckable(True)
+            btn.setChecked(name.lower() in current)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFixedHeight(20)
+            color = _tag_color(colors, name)
+            btn.setStyleSheet(
+                f"QPushButton {{ {_chip_style(color, False)} }}"
+                f"QPushButton:checked {{ {_chip_style(color, True)} }}"
+            )
+            btn.toggled.connect(lambda on, n=name: self._on_tag_toggled(n, on))
+            self._tags_chip_layout.addWidget(btn)
+            self._tag_chips.append(btn)
+
+    def _on_tag_toggled(self, name: str, on: bool) -> None:
+        tags = [t for t in (self._todo.get("tags") or []) if t.lower() != name.lower()]
+        if on:
+            tags.append(name)
+        self._db.update_todo(self._todo["id"], tags=tags)
+        self._todo["tags"] = tags
+        self.changed.emit()
 
     def apply_theme(self, dark: bool) -> None:
         self._apply_theme(dark)
@@ -766,7 +844,7 @@ class TodoDetailPanel(QWidget):
 
         text2 = D_GRAY_TEXT if dark else GRAY_TEXT
         hover_bg = D_GRAY_BG if dark else GRAY_BG
-        for lbl in (self._att_lbl, self._due_lbl, self._pri_lbl):
+        for lbl in (self._att_lbl, self._due_lbl, self._pri_lbl, self._tags_lbl):
             lbl.setStyleSheet(f"font-size: 11px; font-weight: 600; color: {text2};")
         self._add_att_btn.setStyleSheet(
             f"QPushButton {{ background: transparent; border: 1px solid {bdr}; color: {text}; "
@@ -912,6 +990,12 @@ class TodoItemWidget(QWidget):
         self._meta_priority.setObjectName("meta_chip")
         meta_layout.addWidget(self._meta_priority)
 
+        # Tag chips (rebuilt in _refresh_meta)
+        self._meta_tags_layout = QHBoxLayout()
+        self._meta_tags_layout.setSpacing(4)
+        meta_layout.addLayout(self._meta_tags_layout)
+        self._meta_tag_labels: list[QLabel] = []
+
         meta_layout.addStretch()
         self._meta_row.hide()  # hidden until we know there's something to show
         outer.addWidget(self._meta_row)
@@ -975,6 +1059,22 @@ class TodoItemWidget(QWidget):
             chips_visible += 1
         else:
             self._meta_priority.hide()
+
+        # Tag chips
+        for lbl in self._meta_tag_labels:
+            self._meta_tags_layout.removeWidget(lbl)
+            lbl.deleteLater()
+        self._meta_tag_labels.clear()
+        tags = self._todo.get("tags") or []
+        if tags:
+            colors = _tag_colors(self._db)
+            for name in tags:
+                lbl = QLabel(name)
+                lbl.setObjectName("meta_chip")
+                lbl.setStyleSheet(_chip_style(_tag_color(colors, name), True, self._font_size - 4))
+                self._meta_tags_layout.addWidget(lbl)
+                self._meta_tag_labels.append(lbl)
+            chips_visible += 1
 
         # Only show the meta row if not expanded AND there's something to display
         if not self._expanded and chips_visible > 0:
@@ -1106,8 +1206,32 @@ class TodoItemWidget(QWidget):
 
     def contextMenuEvent(self, event) -> None:
         menu = QMenu(self)
+        tags_menu = menu.addMenu("Tags")
+        current = [t.lower() for t in (self._todo.get("tags") or [])]
+        tag_actions = {}
+        for tag in self._db.get_tags():
+            act = tags_menu.addAction(tag["name"])
+            act.setCheckable(True)
+            act.setChecked(tag["name"].lower() in current)
+            tag_actions[act] = tag["name"]
+        if not tag_actions:
+            tags_menu.addAction("No tags").setEnabled(False)
+        menu.addSeparator()
         delete_action = menu.addAction("Delete task")
         action = menu.exec(event.globalPos())
+        if action in tag_actions:
+            name = tag_actions[action]
+            tags = [t for t in (self._todo.get("tags") or []) if t.lower() != name.lower()]
+            if action.isChecked():
+                tags.append(name)
+            self._db.update_todo(self._todo["id"], tags=tags)
+            self._todo["tags"] = tags
+            self._refresh_meta()
+            if self._detail_panel is not None:
+                self._detail_panel._todo["tags"] = tags
+                self._detail_panel._reload_tag_chips()
+            self.detail_saved.emit()
+            return
         if action == delete_action:
             self.deleted.emit(self._todo["id"])
 
@@ -1164,6 +1288,8 @@ class TodoListWidget(QWidget):
         self._reorder_enabled = True
         self._font_size = 13
         self._sort_mode: str = "manual"  # "manual" | "priority" | "due_date"
+        self._tag_filter: str = ""       # "" | tag name | UNTAGGED_KEY
+        self._auto_tag: str = ""         # "tag mode": tag every new task with this
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -1194,9 +1320,30 @@ class TodoListWidget(QWidget):
     def set_sort_mode(self, mode: str) -> None:
         """mode: 'manual' | 'priority' | 'due_date'"""
         self._sort_mode = mode
-        drag_on = (mode == "manual")
+        self._update_drag_enabled()
+
+    def set_tag_filter(self, tag: str) -> None:
+        """'' = show all, UNTAGGED_KEY = untagged only, else only todos with that tag."""
+        self._tag_filter = tag or ""
+        self._update_drag_enabled()
+
+    def set_auto_tag(self, tag: str) -> None:
+        self._auto_tag = tag or ""
+
+    def _update_drag_enabled(self) -> None:
+        # Manual reorder only makes sense when every row is visible.
+        drag_on = (self._sort_mode == "manual") and not self._tag_filter
         self._list_widget.setDragEnabled(drag_on)
         self._list_widget.setAcceptDrops(drag_on)
+
+    def _new_task_tags(self) -> list[str]:
+        """Tag mode wins; otherwise inherit the active filter tag so the new
+        task doesn't vanish from the list the user is looking at."""
+        if self._auto_tag:
+            return [self._auto_tag]
+        if self._tag_filter and self._tag_filter != UNTAGGED_KEY:
+            return [self._tag_filter]
+        return []
 
     def _sorted_todos(self, todos: list) -> list:
         if self._sort_mode == "priority":
@@ -1225,7 +1372,10 @@ class TodoListWidget(QWidget):
         self._list_widget.clear()
         self._item_widgets.clear()
 
-        todos = self._db.get_todos(list_name=self._list_name, include_completed=show_completed)
+        todos = self._db.get_todos(
+            list_name=self._list_name, include_completed=show_completed,
+            tag=self._tag_filter or None,
+        )
         todos = self._sorted_todos(todos)
 
         for todo in todos:
@@ -1299,7 +1449,9 @@ class TodoListWidget(QWidget):
             self._new_task_editor.blockSignals(False)
             self._plus_label.show()
             if title:
-                self._db.create_todo(title=title, list_name=self._list_name)
+                self._db.create_todo(
+                    title=title, list_name=self._list_name, tags=self._new_task_tags()
+                )
                 QTimer.singleShot(0, self.todo_changed.emit)
 
         def _cancel():
@@ -1337,7 +1489,7 @@ class TodoListWidget(QWidget):
                 todo_id = item.data(Qt.ItemDataRole.UserRole)
                 if todo_id is not None:
                     ids.append(todo_id)
-        if ids:
+        if ids and not self._tag_filter:
             self._db.reorder_todos(self._list_name, ids)
 
     # ------------------------------------------------------------------
@@ -1445,6 +1597,226 @@ class _SortBar(QWidget):
 
     def apply_theme(self, dark: bool) -> None:
         self._apply_theme(dark)
+
+
+# ---------------------------------------------------------------------------
+# _TagBar — filter chips (All | tags… | Untagged | +) and the "tag mode" combo
+# ---------------------------------------------------------------------------
+
+class _TagBar(QWidget):
+    """Tag filter strip plus a "New tasks get:" combo (tag mode)."""
+
+    filter_changed   = pyqtSignal(str)  # "" | tag name | UNTAGGED_KEY
+    auto_tag_changed = pyqtSignal(str)  # "" | tag name
+    tags_changed     = pyqtSignal()     # palette edited (add/delete)
+
+    def __init__(self, db, dark: bool = False, auto_tag: str = "", parent=None) -> None:
+        super().__init__(parent)
+        self._db = db
+        self._dark = dark
+        self._active = ""
+        self._auto_tag = auto_tag
+        self._chips: dict[str, QLabel] = {}
+
+        vl = QVBoxLayout(self)
+        vl.setContentsMargins(14, 2, 14, 6)
+        vl.setSpacing(4)
+
+        # Row 1: filter chips (scrolls horizontally when there are many tags)
+        chips_host = QWidget()
+        hl = QHBoxLayout(chips_host)
+        hl.setContentsMargins(0, 0, 0, 0)
+        hl.setSpacing(6)
+
+        self._filter_lbl = QLabel("Show:")
+        hl.addWidget(self._filter_lbl)
+
+        self._chip_layout = QHBoxLayout()
+        self._chip_layout.setSpacing(6)
+        hl.addLayout(self._chip_layout)
+
+        self._add_btn = QLabel("+")
+        self._add_btn.setToolTip("New tag")
+        self._add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._add_btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._add_btn.setFixedSize(20, 20)
+        self._add_btn.mousePressEvent = lambda _e: self._on_add_tag()  # type: ignore[assignment]
+        hl.addWidget(self._add_btn)
+        hl.addStretch()
+
+        self._chips_scroll = QScrollArea()
+        self._chips_scroll.setWidgetResizable(True)
+        self._chips_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._chips_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._chips_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._chips_scroll.setWidget(chips_host)
+        self._chips_scroll.setFixedHeight(30)
+        self._chips_scroll.setStyleSheet("QScrollArea { background: transparent; }")
+        chips_host.setStyleSheet("background: transparent;")
+        vl.addWidget(self._chips_scroll)
+
+        # Row 2: tag mode
+        mode_row = QHBoxLayout()
+        mode_row.setContentsMargins(0, 0, 0, 0)
+        mode_row.setSpacing(6)
+        self._mode_lbl = QLabel("Tag mode — new tasks get:")
+        mode_row.addWidget(self._mode_lbl)
+        self._mode_combo = QComboBox()
+        self._mode_combo.setFixedWidth(130)
+        self._mode_combo.setToolTip(
+            "Every task you add (here, by voice, or from the iPhone when it\n"
+            "doesn't pick a tag itself) is automatically given this tag."
+        )
+        self._mode_combo.currentIndexChanged.connect(self._on_mode_changed)
+        mode_row.addWidget(self._mode_combo)
+        self._mode_hint = QLabel("")
+        mode_row.addWidget(self._mode_hint)
+        mode_row.addStretch()
+        vl.addLayout(mode_row)
+
+        self.reload()
+
+    # -- public ---------------------------------------------------------
+
+    def active_filter(self) -> str:
+        return self._active
+
+    def auto_tag(self) -> str:
+        return self._auto_tag
+
+    def reload(self) -> None:
+        """Rebuild chips + combo from the DB palette."""
+        for chip in self._chips.values():
+            self._chip_layout.removeWidget(chip)
+            chip.deleteLater()
+        self._chips.clear()
+
+        tags = self._db.get_tags()
+        names = {t["name"].lower() for t in tags}
+        if self._active and self._active != UNTAGGED_KEY and self._active.lower() not in names:
+            self._active = ""
+        if self._auto_tag and self._auto_tag.lower() not in names:
+            self._auto_tag = ""
+            self.auto_tag_changed.emit("")
+
+        self._make_chip("", "All")
+        for t in tags:
+            self._make_chip(t["name"], t["name"], builtin=bool(t.get("builtin")))
+        self._make_chip(UNTAGGED_KEY, "Untagged")
+
+        self._mode_combo.blockSignals(True)
+        self._mode_combo.clear()
+        self._mode_combo.addItem("Off", "")
+        for t in tags:
+            self._mode_combo.addItem(t["name"], t["name"])
+        idx = self._mode_combo.findData(self._auto_tag)
+        self._mode_combo.setCurrentIndex(max(idx, 0))
+        self._mode_combo.blockSignals(False)
+
+        self._apply_theme(self._dark)
+
+    def apply_theme(self, dark: bool) -> None:
+        self._apply_theme(dark)
+
+    # -- internal -------------------------------------------------------
+
+    def _make_chip(self, key: str, label: str, builtin: bool = True) -> None:
+        chip = QLabel(label)
+        chip.setCursor(Qt.CursorShape.PointingHandCursor)
+        chip.setFixedHeight(20)
+        chip.setProperty("_key", key)
+        chip.setProperty("_builtin", builtin)
+        chip.mousePressEvent = lambda e, k=key: self._on_chip_press(e, k)  # type: ignore[assignment]
+        self._chip_layout.addWidget(chip)
+        self._chips[key] = chip
+
+    def _on_chip_press(self, event, key: str) -> None:
+        if event.button() == Qt.MouseButton.RightButton:
+            self._chip_menu(event, key)
+            return
+        self._select("" if key == self._active else key)
+
+    def _select(self, key: str) -> None:
+        if key == self._active:
+            return
+        self._active = key
+        self._apply_theme(self._dark)
+        self.filter_changed.emit(key)
+
+    def _chip_menu(self, event, key: str) -> None:
+        if key in ("", UNTAGGED_KEY):
+            return
+        menu = QMenu(self)
+        if self._auto_tag.lower() == key.lower():
+            mode_act = menu.addAction("Stop tag mode")
+        else:
+            mode_act = menu.addAction(f"Tag mode: new tasks get \u201c{key}\u201d")
+        chip = self._chips.get(key)
+        del_act = None
+        if chip is not None and not chip.property("_builtin"):
+            menu.addSeparator()
+            del_act = menu.addAction("Delete tag")
+        action = menu.exec(event.globalPosition().toPoint())
+        if action is mode_act:
+            idx = self._mode_combo.findData("" if self._auto_tag.lower() == key.lower() else key)
+            self._mode_combo.setCurrentIndex(max(idx, 0))
+        elif del_act is not None and action is del_act:
+            self._db.delete_tag(key)
+            self.reload()
+            self.tags_changed.emit()
+
+    def _on_add_tag(self) -> None:
+        from PyQt6.QtWidgets import QInputDialog
+        name, ok = QInputDialog.getText(self, "New tag", "Tag name:")
+        name = (name or "").strip()
+        if ok and name:
+            self._db.create_tag(name)
+            self.reload()
+            self.tags_changed.emit()
+            self._select(name)
+
+    def _on_mode_changed(self, _idx: int) -> None:
+        tag = self._mode_combo.currentData() or ""
+        if tag == self._auto_tag:
+            return
+        self._auto_tag = tag
+        self._apply_theme(self._dark)
+        self.auto_tag_changed.emit(tag)
+
+    def _apply_theme(self, dark: bool) -> None:
+        self._dark = dark
+        colors = _tag_colors(self._db)
+        border = D_GRAY_BORDER if dark else GRAY_BORDER
+        bg = D_WHITE if dark else WHITE
+        text = D_GRAY_DARK if dark else GRAY_DARK
+        muted = D_GRAY_TEXT if dark else GRAY_TEXT
+        for key, chip in self._chips.items():
+            if key == "":
+                color = BLUE
+            elif key == UNTAGGED_KEY:
+                color = "#8a8a8a"
+            else:
+                color = _tag_color(colors, key)
+            selected = key == self._active
+            style = _chip_style(color, selected)
+            if key == self._auto_tag and key:
+                style += " text-decoration: underline;"
+            chip.setStyleSheet(style)
+        for lbl in (self._filter_lbl, self._mode_lbl):
+            lbl.setStyleSheet(f"font-size: 11px; color: {muted};")
+        if self._auto_tag:
+            self._mode_hint.setText("● on")
+            self._mode_hint.setStyleSheet(f"font-size: 10px; color: {BLUE}; font-weight: 600;")
+        else:
+            self._mode_hint.setText("")
+        self._add_btn.setStyleSheet(
+            f"color: {muted}; border: 1px dashed {border}; border-radius: 10px; font-size: 13px;"
+        )
+        active_border = BLUE if self._auto_tag else border
+        self._mode_combo.setStyleSheet(
+            f"QComboBox {{ background: {bg}; color: {text}; border: 1px solid {active_border}; "
+            f"border-radius: 4px; padding: 1px 6px; font-size: 11px; }}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1609,6 +1981,7 @@ class TodoView(QWidget):
         self._dark = False
         self._show_completed = config.todo.show_completed if config else False
         self._sync_mode = config.todo.sync.mode if config else "off"
+        self._auto_tag = getattr(config.todo, "auto_tag", "") if config else ""
         self._ui_config = config.ui if config else None
         self._build_ui()
 
@@ -1636,6 +2009,13 @@ class TodoView(QWidget):
         self._sort_bar.sort_changed.connect(self._on_sort_changed)
         self._content_layout.addWidget(self._sort_bar)
 
+        # ── Tag bar (filter chips + tag mode) ──
+        self._tag_bar = _TagBar(self._db, dark=self._dark, auto_tag=self._auto_tag)
+        self._tag_bar.filter_changed.connect(self._on_tag_filter_changed)
+        self._tag_bar.auto_tag_changed.connect(self._on_auto_tag_changed)
+        self._tag_bar.tags_changed.connect(self.refresh)
+        self._content_layout.addWidget(self._tag_bar)
+
         # ── Today section ──
         self._today_header = SectionHeader(
             "Today", show_sync_button=True, show_sync_gear=True, dark=self._dark
@@ -1648,6 +2028,7 @@ class TodoView(QWidget):
         self._content_layout.addWidget(self._today_header)
 
         self._today_list = TodoListWidget(self._db, "today", dark=self._dark)
+        self._today_list.set_auto_tag(self._auto_tag)
         self._today_list.todo_changed.connect(self.refresh)
         self._today_list.count_changed.connect(self._today_header.set_count)
         self._content_layout.addWidget(self._today_list)
@@ -1665,6 +2046,7 @@ class TodoView(QWidget):
         self._content_layout.addWidget(self._general_header)
 
         self._general_list = TodoListWidget(self._db, "general", dark=self._dark)
+        self._general_list.set_auto_tag(self._auto_tag)
         self._general_list.todo_changed.connect(self.refresh)
         self._general_list.count_changed.connect(self._general_header.set_count)
         self._content_layout.addWidget(self._general_list)
@@ -1692,6 +2074,7 @@ class TodoView(QWidget):
         bg = D_WHITE if dark else WHITE
         self.setStyleSheet(f"background-color: {bg};")
         self._sort_bar.apply_theme(dark)
+        self._tag_bar.apply_theme(dark)
         self._general_header.apply_theme(dark)
         self._today_list.apply_theme(dark)
         self._general_list.apply_theme(dark)
@@ -1716,6 +2099,45 @@ class TodoView(QWidget):
         self._today_list.set_sort_mode(mode)
         self._general_list.set_sort_mode(mode)
         self.refresh()
+
+    def _on_tag_filter_changed(self, tag: str) -> None:
+        self._today_list.set_tag_filter(tag)
+        self._general_list.set_tag_filter(tag)
+        self.refresh()
+
+    def _on_auto_tag_changed(self, tag: str) -> None:
+        self._auto_tag = tag
+        self._today_list.set_auto_tag(tag)
+        self._general_list.set_auto_tag(tag)
+        if self._config is not None:
+            self._config.todo.auto_tag = tag
+            self._write_todo_config_key("auto_tag", tag)
+
+    def _write_todo_config_key(self, key: str, value: str) -> None:
+        """Persist a scalar under the top-level `todo:` block of config.yaml."""
+        import os
+        import re
+        config_path = os.path.abspath("config.yaml")
+        if not os.path.exists(config_path):
+            return
+        try:
+            with open(config_path) as f:
+                txt = f.read()
+            block = re.search(r"^todo:\n((?:[ \t]+.*\n|\n)*)", txt, flags=re.MULTILINE)
+            if block is None:
+                txt = txt.rstrip("\n") + f'\n\ntodo:\n  {key}: "{value}"\n'
+            else:
+                body = block.group(1)
+                pat = re.compile(rf"^([ \t]+{key}:\s*)(\"[^\"]*\"|'[^']*'|[^#\n]*)", re.MULTILINE)
+                if pat.search(body):
+                    new_body = pat.sub(lambda m: m.group(1) + f'"{value}"', body, count=1)
+                else:
+                    new_body = f'  {key}: "{value}"\n' + body
+                txt = txt[: block.start(1)] + new_body + txt[block.end(1):]
+            with open(config_path, "w") as f:
+                f.write(txt)
+        except Exception:
+            pass
 
     def _update_clear_buttons(self) -> None:
         today_todos = self._db.get_todos(list_name="today", include_completed=True)

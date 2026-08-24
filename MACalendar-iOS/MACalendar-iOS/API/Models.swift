@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 struct CalendarEvent: Identifiable, Codable, Equatable {
     let id: Int
@@ -43,13 +44,82 @@ struct Todo: Identifiable, Codable, Equatable {
     var completed: Int
     var priority: String
     var dueDate: String
+    var tags: [String]
 
     enum CodingKeys: String, CodingKey {
-        case id, title, list, completed, priority
+        case id, title, list, completed, priority, tags
         case dueDate = "due_date"
     }
 
+    init(id: Int, title: String, list: String, completed: Int,
+         priority: String, dueDate: String, tags: [String] = []) {
+        self.id = id; self.title = title; self.list = list
+        self.completed = completed; self.priority = priority
+        self.dueDate = dueDate; self.tags = tags
+    }
+
+    // Tolerant decode: older cached JSON (and older servers) have no `tags`.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id        = try c.decode(Int.self,    forKey: .id)
+        title     = try c.decode(String.self, forKey: .title)
+        list      = try c.decode(String.self, forKey: .list)
+        completed = try c.decode(Int.self,    forKey: .completed)
+        priority  = try c.decodeIfPresent(String.self, forKey: .priority) ?? "none"
+        dueDate   = try c.decodeIfPresent(String.self, forKey: .dueDate)  ?? ""
+        tags      = try c.decodeIfPresent([String].self, forKey: .tags)   ?? []
+    }
+
     var isDone: Bool { completed != 0 }
+
+    func hasTag(_ name: String) -> Bool {
+        tags.contains { $0.caseInsensitiveCompare(name) == .orderedSame }
+    }
+}
+
+/// A tag in the shared palette (server table `todo_tags`).
+struct TodoTag: Identifiable, Codable, Equatable, Hashable {
+    let name: String
+    var color: String
+    var builtin: Int
+
+    var id: String { name }
+
+    enum CodingKeys: String, CodingKey { case name, color, builtin }
+
+    init(name: String, color: String = "", builtin: Int = 0) {
+        self.name = name; self.color = color; self.builtin = builtin
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name    = try c.decode(String.self, forKey: .name)
+        color   = try c.decodeIfPresent(String.self, forKey: .color) ?? ""
+        builtin = try c.decodeIfPresent(Int.self, forKey: .builtin) ?? 0
+    }
+
+    /// Fallback palette so tags still look distinct when the server sends no color.
+    static let defaultPalette: [String: String] = [
+        "coursework": "#7c6ff0", "groceries": "#3fb27f", "errands": "#e0a020",
+        "work": "#4a9edd", "personal": "#e0608a",
+    ]
+
+    var hexColor: String {
+        if !color.isEmpty { return color }
+        if let c = Self.defaultPalette[name.lowercased()] { return c }
+        // Deterministic hue from the name so custom tags get a stable color.
+        let h = name.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0xffff }
+        let hue = Double(h % 360) / 360.0
+        return UIColor(hue: hue, saturation: 0.55, brightness: 0.8, alpha: 1).hexString
+    }
+}
+
+extension UIColor {
+    var hexString: String {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        getRed(&r, green: &g, blue: &b, alpha: &a)
+        return String(format: "#%02x%02x%02x", Int(r * 255), Int(g * 255), Int(b * 255))
+    }
 }
 
 struct VoiceResponse: Codable {

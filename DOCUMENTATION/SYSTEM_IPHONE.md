@@ -150,12 +150,26 @@ Launched automatically alongside the Mac app via `Launch Calendar.command`.
 #### Todos
 | Method | Path | Query / Body |
 |--------|------|------|
-| GET | `/todos` | `?list=today\|general\|all&include_completed=true` |
-| POST | `/todos` | `{title, list_name, priority, due_date}` |
+| GET | `/todos` | `?list=today\|general\|all&include_completed=true&tag=<name\|__untagged__>` |
+| POST | `/todos` | `{title, list_name, priority, due_date, tags:[…]}` — omit `tags` to inherit the server's `todo.auto_tag` |
 | PATCH | `/todos/<id>` | any subset of todo fields |
 | PATCH | `/todos/<id>/toggle` | — (toggles completed) |
 | DELETE | `/todos/<id>` | — |
 | POST | `/todos/sync` | `{list_name}` |
+
+#### Tags (task categories: Coursework / Groceries / … + user-made)
+| Method | Path | Body / Query |
+|---|---|---|
+| GET | `/tags` | — → `[{name, color, builtin}]` |
+| POST | `/tags` | `{name, color?}` |
+| DELETE | `/tags/<name>` | — (also strips the tag from every todo) |
+
+Each todo carries `tags: [String]`. The iPhone Tasks tab has a chip filter bar
+(All · tags · Untagged · +), a **tag mode** (toolbar tag icon or long-press a chip)
+that auto-tags every task added from the phone, a Manage Tags sheet, and per-row
+tag toggles (expanded row or long-press → Tags). Filter/mode persist in
+`UserDefaults` (`taskTagFilter`, `taskAutoTag`); the tag palette is cached in
+`mc_tags.json` for offline use.
 
 #### Config / Health
 | Method | Path |
@@ -188,7 +202,7 @@ MACalendar-iOS/
   LocalStore.swift          JSON cache + offline pending queue (singleton)
   API/
     APIClient.swift         URLSession wrapper — offline-aware, falls back to LocalStore
-    Models.swift            CalendarEvent, Todo, VoiceResponse, HealthResponse (Codable)
+    Models.swift            CalendarEvent, Todo (+tags), TodoTag, VoiceResponse, HealthResponse (Codable)
   CourseStore.swift         Local-only JSON store for Course + Assignment (singleton, no Mac sync)
   Views/
     ContentView.swift       TabView: Calendar | Tasks | Coursework | Settings + offline banner
@@ -197,8 +211,8 @@ MACalendar-iOS/
     WeekView.swift          Horizontal week strip
     DayView.swift           Hourly timeline
     EventDetailView.swift   View + edit single event
-    TasksView.swift         Today + General sections
-    TaskRowView.swift       Checkbox row + swipe-to-delete
+    TasksView.swift         Tag filter bar + tag mode + Today/General sections + ManageTagsSheet
+    TaskRowView.swift       Checkbox row + tag chips + swipe-to-delete; TagChip pill view
     CourseworkView.swift    Course list with assignments, due dates, calendar sync
     VoiceButton.swift       Mic button — records WAV, POSTs to /voice, speaks response
     SettingsView.swift      Server URL, API key, TTS voice (3 options), Test Connection

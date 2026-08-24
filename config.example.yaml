@@ -81,3 +81,11 @@ ui:
   compact_ui: false
   accent_color: "#f5a524"   # hex; brand accent used app-wide (also editable from Settings → Accent Color)
 
+
+todo:
+  sync:
+    mode: "off"               # "today" | "general" | "off" — pull calendar events into the task list
+    auto_sync_on_open: false
+  show_completed: false       # show completed tasks in the list
+  default_list: "today"       # which list new voice-created tasks go to by default
+  auto_tag: ""                # "tag mode": every new task gets this tag (e.g. "Groceries"); "" = off

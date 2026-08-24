@@ -39,6 +39,26 @@ _TODO_MIGRATIONS = [
     "ALTER TABLE todos ADD COLUMN completed_at TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE todos ADD COLUMN position INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE todos ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]'",
+    "ALTER TABLE todos ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'",
+]
+
+# Known tag names (so user-created tags persist even when no todo uses them).
+# `todos.tags` holds a JSON list of tag names; this table is the palette.
+_CREATE_TAGS_TABLE = """
+CREATE TABLE IF NOT EXISTS todo_tags (
+    name       TEXT PRIMARY KEY,
+    color      TEXT NOT NULL DEFAULT '',
+    builtin    INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+)
+"""
+
+DEFAULT_TODO_TAGS = [
+    ("Coursework", "#7c6ff0"),
+    ("Groceries",  "#3fb27f"),
+    ("Errands",    "#e0a020"),
+    ("Work",       "#4a9edd"),
+    ("Personal",   "#e0608a"),
 ]
 
 _CREATE_SUBTASKS_TABLE = """
@@ -363,6 +383,8 @@ class CalendarDB:
             self._migrate(conn)
             conn.execute(_CREATE_TODOS_TABLE)
             self._migrate_todos(conn)
+            conn.execute(_CREATE_TAGS_TABLE)
+            self._seed_default_tags(conn)
             conn.execute(_CREATE_SUBTASKS_TABLE)
             conn.execute(_CREATE_TIMERS_TABLE)
             self._migrate_timers(conn)
@@ -406,6 +428,49 @@ class CalendarDB:
                     conn.execute(stmt)
                 except sqlite3.OperationalError:
                     pass  # already exists
+
+    def _seed_default_tags(self, conn: sqlite3.Connection) -> None:
+        """Insert the built-in tag palette once (first launch after upgrade)."""
+        if conn.execute("SELECT COUNT(*) FROM todo_tags").fetchone()[0]:
+            return
+        now = datetime.datetime.now().isoformat()
+        conn.executemany(
+            "INSERT OR IGNORE INTO todo_tags (name, color, builtin, created_at) VALUES (?, ?, 1, ?)",
+            [(n, c, now) for n, c in DEFAULT_TODO_TAGS],
+        )
+
+    @staticmethod
+    def _decode_tags(row: dict) -> dict:
+        """Turn the JSON `tags` column into a Python list (in place)."""
+        raw = row.get("tags")
+        if isinstance(raw, str):
+            try:
+                wren = json.loads(raw or "[]")
+            except ValueError:
+                wren = []
+            row["tags"] = [str(t) for t in wren] if isinstance(wren, list) else []
+        elif raw is None:
+            row["tags"] = []
+        return row
+
+    @staticmethod
+    def _encode_tags(tags) -> str:
+        """Normalise a tags value (list / JSON string / comma string) to JSON."""
+        if isinstance(tags, str):
+            try:
+                parsed = json.loads(tags)
+                if isinstance(parsed, list):
+                    tags = parsed
+                else:
+                    tags = [tags]
+            except ValueError:
+                tags = [t for t in tags.split(",")]
+        seen: List[str] = []
+        for t in tags or []:
+            t = str(t).strip()
+            if t and t not in seen:
+                seen.append(t)
+        return json.dumps(seen)
 
     def _migrate_timers(self, conn: sqlite3.Connection) -> None:
         """Apply any missing timers schema migrations safely."""
@@ -891,8 +956,10 @@ class CalendarDB:
         notes: str = "",
         source: str = "manual",
         source_event_id: Optional[int] = None,
+        tags: Optional[List[str]] = None,
     ) -> int:
         """Insert a new todo item. Returns the new row id."""
+        tags_json = self._encode_tags(tags or [])
         with self._conn() as conn:
             max_pos = conn.execute(
                 "SELECT COALESCE(MAX(position), -1) FROM todos WHERE list = ?",
@@ -902,8 +969,8 @@ class CalendarDB:
                 """
                 INSERT INTO todos
                     (title, list, completed, priority, due_date, notes,
-                     source, source_event_id, created_at, completed_at, position)
-                VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, '', ?)
+                     source, source_event_id, created_at, completed_at, position, tags)
+                VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, '', ?, ?)
                 """,
                 (
                     title,
@@ -915,6 +982,7 @@ class CalendarDB:
                     source_event_id,
                     datetime.datetime.now().isoformat(),
                     max_pos + 1,
+                    tags_json,
                 ),
             )
             return cur.lastrowid
@@ -927,8 +995,13 @@ class CalendarDB:
         self,
         list_name: Optional[str] = None,
         include_completed: bool = False,
+        tag: Optional[str] = None,
     ) -> List[dict]:
-        """Return todos, optionally filtered by list and/or completion state."""
+        """Return todos, optionally filtered by list, completion state and/or tag.
+
+        `tag` matches todos whose JSON tag list contains that name (case-insensitive).
+        Pass tag="" / None for no tag filter; tag="__untagged__" for todos with no tags.
+        """
         query = "SELECT * FROM todos"
         conditions: List[str] = []
         params: List = []
@@ -942,12 +1015,19 @@ class CalendarDB:
         query += " ORDER BY completed ASC, position ASC, created_at ASC"
         with self._conn() as conn:
             rows = conn.execute(query, params).fetchall()
-        return [dict(r) for r in rows]
+        todos = [self._decode_tags(dict(r)) for r in rows]
+        if tag:
+            if tag == "__untagged__":
+                todos = [t for t in todos if not t["tags"]]
+            else:
+                want = tag.strip().lower()
+                todos = [t for t in todos if any(x.lower() == want for x in t["tags"])]
+        return todos
 
     def get_todo(self, todo_id: int) -> Optional[dict]:
         with self._conn() as conn:
             row = conn.execute("SELECT * FROM todos WHERE id = ?", (todo_id,)).fetchone()
-        return dict(row) if row else None
+        return self._decode_tags(dict(row)) if row else None
 
     def get_todos_by_source(
         self, source: str, source_event_id: Optional[int] = None
@@ -963,15 +1043,19 @@ class CalendarDB:
                 rows = conn.execute(
                     "SELECT * FROM todos WHERE source = ?", (source,)
                 ).fetchall()
-        return [dict(r) for r in rows]
+        return [self._decode_tags(dict(r)) for r in rows]
 
     # ------------------------------------------------------------------
     # Todos: Update
     # ------------------------------------------------------------------
 
     def update_todo(self, todo_id: int, **fields) -> None:
-        allowed = {"title", "list", "completed", "priority", "due_date", "notes", "completed_at", "attachments"}
+        allowed = {"title", "list", "completed", "priority", "due_date", "notes", "completed_at", "attachments", "tags"}
+        if "list_name" in fields and "list" not in fields:   # API clients send list_name
+            fields["list"] = fields.pop("list_name")
         updates = {k: v for k, v in fields.items() if k in allowed}
+        if "tags" in updates:
+            updates["tags"] = self._encode_tags(updates["tags"])
         if not updates:
             return
         set_clause = ", ".join(f"{k} = ?" for k in updates)
@@ -1022,6 +1106,49 @@ class CalendarDB:
                     "UPDATE todos SET position = ? WHERE id = ? AND list = ?",
                     (pos, todo_id, list_name),
                 )
+
+    # ------------------------------------------------------------------
+    # Todo tags: CRUD
+    # ------------------------------------------------------------------
+
+    def get_tags(self) -> List[dict]:
+        """All known tags (built-in first, then user-created, alphabetical)."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM todo_tags ORDER BY builtin DESC, name COLLATE NOCASE ASC"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def create_tag(self, name: str, color: str = "") -> Optional[dict]:
+        """Add a user tag. Returns the row (existing one if the name is taken)."""
+        name = (name or "").strip()
+        if not name:
+            return None
+        with self._conn() as conn:
+            existing = conn.execute(
+                "SELECT * FROM todo_tags WHERE name = ? COLLATE NOCASE", (name,)
+            ).fetchone()
+            if existing:
+                return dict(existing)
+            conn.execute(
+                "INSERT INTO todo_tags (name, color, builtin, created_at) VALUES (?, ?, 0, ?)",
+                (name, color, datetime.datetime.now().isoformat()),
+            )
+            return dict(conn.execute("SELECT * FROM todo_tags WHERE name = ?", (name,)).fetchone())
+
+    def delete_tag(self, name: str) -> None:
+        """Remove a tag from the palette and strip it from every todo."""
+        with self._conn() as conn:
+            conn.execute("DELETE FROM todo_tags WHERE name = ?", (name,))
+            rows = conn.execute("SELECT id, tags FROM todos WHERE tags LIKE ?", (f"%{name}%",)).fetchall()
+            for r in rows:
+                tags = self._decode_tags({"tags": r["tags"]})["tags"]
+                kept = [t for t in tags if t.lower() != name.lower()]
+                if len(kept) != len(tags):
+                    conn.execute("UPDATE todos SET tags = ? WHERE id = ?", (json.dumps(kept), r["id"]))
+
+    def set_todo_tags(self, todo_id: int, tags: List[str]) -> None:
+        self.update_todo(todo_id, tags=tags)
 
     # ------------------------------------------------------------------
     # Subtasks: CRUD

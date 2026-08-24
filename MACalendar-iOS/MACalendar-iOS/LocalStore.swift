@@ -27,6 +27,7 @@ class LocalStore: ObservableObject {
 
     private var events:  [CalendarEvent] = []
     private var todos:   [Todo]          = []
+    private var tags:    [TodoTag]       = []
     private var pending: [PendingChange] = []
     private var nextTemp = -1
 
@@ -43,6 +44,7 @@ class LocalStore: ObservableObject {
         let d = JSONDecoder()
         events  = (try? d.decode([CalendarEvent].self, from: Data(contentsOf: url("mc_events.json"))))  ?? []
         todos   = (try? d.decode([Todo].self,          from: Data(contentsOf: url("mc_todos.json"))))   ?? []
+        tags    = (try? d.decode([TodoTag].self,       from: Data(contentsOf: url("mc_tags.json"))))    ?? []
         pending = (try? d.decode([PendingChange].self, from: Data(contentsOf: url("mc_pending.json")))) ?? []
         pendingCount = pending.count
         // Prevent temp-ID collisions after a restart: start below the lowest existing negative ID.
@@ -54,6 +56,7 @@ class LocalStore: ObservableObject {
         let e = JSONEncoder()
         try? e.encode(events).write(to:  url("mc_events.json"))
         try? e.encode(todos).write(to:   url("mc_todos.json"))
+        try? e.encode(tags).write(to:    url("mc_tags.json"))
         try? e.encode(pending).write(to: url("mc_pending.json"))
         pendingCount = pending.count
     }
@@ -132,9 +135,9 @@ class LocalStore: ObservableObject {
         }
     }
 
-    func insertTodo(title: String, list: String) -> Todo {
+    func insertTodo(title: String, list: String, tags: [String] = []) -> Todo {
         let t = Todo(id: nextTemp, title: title, list: list,
-                     completed: 0, priority: "none", dueDate: "")
+                     completed: 0, priority: "none", dueDate: "", tags: tags)
         nextTemp -= 1
         todos.append(t)
         persist()
@@ -155,10 +158,42 @@ class LocalStore: ObservableObject {
         if let v = fields["list_name"] as? String { todos[i].list     = v }
         if let v = fields["priority"]  as? String { todos[i].priority = v }
         if let v = fields["due_date"]  as? String { todos[i].dueDate  = v }
+        if let v = fields["tags"]      as? [String] { todos[i].tags   = v }
         persist()
     }
 
     func removeTodo(_ id: Int) { todos.removeAll { $0.id == id }; persist() }
+
+    // MARK: - Tags (palette cache)
+
+    func cacheTags(_ fresh: [TodoTag]) {
+        tags = fresh
+        persist()
+    }
+
+    func allTags() -> [TodoTag] {
+        if tags.isEmpty {
+            // Never-synced device: show the server's built-in set so tag mode is usable offline.
+            return ["Coursework", "Groceries", "Errands", "Work", "Personal"].map { TodoTag(name: $0, builtin: 1) }
+        }
+        return tags
+    }
+
+    func insertTag(_ tag: TodoTag) {
+        var current = allTags()
+        guard !current.contains(where: { $0.name.caseInsensitiveCompare(tag.name) == .orderedSame }) else { return }
+        current.append(tag)
+        tags = current
+        persist()
+    }
+
+    func removeTag(_ name: String) {
+        tags = allTags().filter { $0.name.caseInsensitiveCompare(name) != .orderedSame }
+        for i in todos.indices {
+            todos[i].tags.removeAll { $0.caseInsensitiveCompare(name) == .orderedSame }
+        }
+        persist()
+    }
 
     // MARK: - Pending queue
 

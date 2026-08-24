@@ -54,6 +54,16 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(hideCompletedTasks, forKey: "hideCompletedTasks") }
     }
 
+    // Tasks tab tag filter ("" = show everything, "__untagged__" = only untagged).
+    @Published var taskTagFilter: String {
+        didSet { UserDefaults.standard.set(taskTagFilter, forKey: "taskTagFilter") }
+    }
+
+    // "Tag mode": every task added from this phone gets this tag ("" = off).
+    @Published var taskAutoTag: String {
+        didSet { UserDefaults.standard.set(taskAutoTag, forKey: "taskAutoTag") }
+    }
+
     // Same pattern as hideCompletedTasks above, applied to Coursework assignments.
     @Published var hideCompletedAssignments: Bool {
         didSet { UserDefaults.standard.set(hideCompletedAssignments, forKey: "hideCompletedAssignments") }
@@ -97,6 +107,9 @@ class AppSettings: ObservableObject {
 
         self.hideCompletedTasks = UserDefaults.standard.object(forKey: "hideCompletedTasks") == nil
             ? true : UserDefaults.standard.bool(forKey: "hideCompletedTasks")
+
+        self.taskTagFilter = UserDefaults.standard.string(forKey: "taskTagFilter") ?? ""
+        self.taskAutoTag   = UserDefaults.standard.string(forKey: "taskAutoTag") ?? ""
 
         self.hideCompletedAssignments = UserDefaults.standard.object(forKey: "hideCompletedAssignments") == nil
             ? true : UserDefaults.standard.bool(forKey: "hideCompletedAssignments")

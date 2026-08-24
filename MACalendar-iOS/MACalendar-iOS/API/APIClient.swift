@@ -184,17 +184,50 @@ class APIClient: ObservableObject {
         }
     }
 
-    func createTodo(title: String, list: String = "today") async throws -> Int {
+    /// Tags are always sent explicitly (possibly empty) so the server's own
+    /// "tag mode" (config.todo.auto_tag) never overrides what the phone chose.
+    func createTodo(title: String, list: String = "today", tags: [String] = []) async throws -> Int {
+        let body: [String: Any] = ["title": title, "list_name": list, "tags": tags]
         do {
-            let data = try await request("/todos", method: "POST",
-                                         body: ["title": title, "list_name": list])
+            let data = try await request("/todos", method: "POST", body: body)
             let obj  = try JSONSerialization.jsonObject(with: data) as? [String: Any]
             return obj?["id"] as? Int ?? 0
         } catch APIError.offline, APIError.badURL {
-            let local = LocalStore.shared.insertTodo(title: title, list: list)
-            LocalStore.shared.enqueue(method: "POST", path: "/todos",
-                                      body: ["title": title, "list_name": list])
+            let local = LocalStore.shared.insertTodo(title: title, list: list, tags: tags)
+            LocalStore.shared.enqueue(method: "POST", path: "/todos", body: body)
             return local.id
+        }
+    }
+
+    // MARK: - Tags
+
+    func tags() async throws -> [TodoTag] {
+        do {
+            let data  = try await request("/tags")
+            let items = try decode([TodoTag].self, from: data)
+            LocalStore.shared.cacheTags(items)
+            return items
+        } catch APIError.offline, APIError.badURL {
+            return LocalStore.shared.allTags()
+        }
+    }
+
+    func createTag(name: String) async throws {
+        LocalStore.shared.insertTag(TodoTag(name: name))    // optimistic
+        do {
+            _ = try await request("/tags", method: "POST", body: ["name": name])
+        } catch APIError.offline, APIError.badURL {
+            LocalStore.shared.enqueue(method: "POST", path: "/tags", body: ["name": name])
+        }
+    }
+
+    func deleteTag(name: String) async throws {
+        LocalStore.shared.removeTag(name)                    // optimistic
+        let encoded = name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name
+        do {
+            _ = try await request("/tags/\(encoded)", method: "DELETE")
+        } catch APIError.offline, APIError.badURL {
+            LocalStore.shared.enqueue(method: "DELETE", path: "/tags/\(encoded)")
         }
     }
 
@@ -226,12 +259,14 @@ class APIClient: ObservableObject {
     }
 
     func updateTodo(id: Int, title: String? = nil, list: String? = nil,
-                    priority: String? = nil, dueDate: String? = nil) async throws {
+                    priority: String? = nil, dueDate: String? = nil,
+                    tags: [String]? = nil) async throws {
         var fields: [String: Any] = [:]
         if let title    { fields["title"]    = title }
         if let list     { fields["list_name"] = list }
         if let priority { fields["priority"] = priority }
         if let dueDate  { fields["due_date"] = dueDate }
+        if let tags     { fields["tags"]     = tags }
         guard !fields.isEmpty else { return }
         do {
             _ = try await request("/todos/\(id)", method: "PATCH", body: fields)

@@ -446,11 +446,12 @@ def create_app() -> Flask:
         db = get_db()
         list_name = request.args.get("list")  # today | general | all | None
         include_completed = request.args.get("include_completed", "false").lower() == "true"
+        tag = request.args.get("tag") or None  # tag name | "__untagged__" | None
 
         if list_name == "all":
             list_name = None  # get_todos(None) returns everything
 
-        rows = db.get_todos(list_name=list_name, include_completed=include_completed)
+        rows = db.get_todos(list_name=list_name, include_completed=include_completed, tag=tag)
         return jsonify(rows)
 
     @app.post("/todos")
@@ -460,12 +461,19 @@ def create_app() -> Flask:
         if not title:
             return jsonify({"error": "Missing 'title' field", "code": 400}), 400
         db = get_db()
+        if "tags" in data:
+            tags = data.get("tags") or []
+        else:
+            # Client didn't say — fall back to the server-side "tag mode".
+            auto_tag = load_config().todo.auto_tag
+            tags = [auto_tag] if auto_tag else []
         todo_id = db.create_todo(
             title=title,
             list_name=data.get("list_name", "today"),
             priority=data.get("priority", "none"),
             due_date=data.get("due_date", ""),
             notes=data.get("notes", ""),
+            tags=tags,
         )
         return jsonify({"id": todo_id}), 201
 
@@ -519,6 +527,28 @@ def create_app() -> Flask:
         db = get_db()
         count = db.delete_completed_todos(list_name=list_name or None)
         return jsonify({"deleted": count})
+
+    # ------------------------------------------------------------------
+    # Todo tags
+    # ------------------------------------------------------------------
+
+    @app.get("/tags")
+    def tags_list():
+        return jsonify(get_db().get_tags())
+
+    @app.post("/tags")
+    def tag_create():
+        data = request.get_json(silent=True) or {}
+        name = (data.get("name") or "").strip()
+        if not name:
+            return jsonify({"error": "Missing 'name' field", "code": 400}), 400
+        row = get_db().create_tag(name, color=data.get("color", ""))
+        return jsonify(row), 201
+
+    @app.delete("/tags/<path:name>")
+    def tag_delete(name: str):
+        get_db().delete_tag(name)
+        return jsonify({"deleted": name})
 
     # ------------------------------------------------------------------
     # Courses

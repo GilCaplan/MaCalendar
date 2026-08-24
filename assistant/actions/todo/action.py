@@ -135,6 +135,10 @@ class CreateTodoAction(BaseAction):
         from assistant.db import get_db
         db = get_db()
 
+        # "Tag mode": auto-apply the configured tag to every voice-created task.
+        auto_tag = getattr(getattr(_config, "todo", None), "auto_tag", "") or ""
+        tags = [auto_tag] if auto_tag else []
+
         created = []
         for title in intent.titles:
             todo_id = db.create_todo(
@@ -142,6 +146,7 @@ class CreateTodoAction(BaseAction):
                 list_name=intent.list_name,
                 priority=intent.priority,
                 due_date=intent.due_date or "",
+                tags=tags,
             )
             context_memory.update_todo(todo_id, title)
             created.append(title)

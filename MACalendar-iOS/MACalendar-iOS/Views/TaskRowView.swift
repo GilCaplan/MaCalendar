@@ -1,16 +1,42 @@
 import SwiftUI
 
+/// Small pill used for task tags everywhere in the Tasks tab (rows, filter bar,
+/// tag pickers). `selected` fills it with the tag color; otherwise it's outlined.
+struct TagChip: View {
+    let name: String
+    let hex: String
+    var selected: Bool = true
+    var compact: Bool = false
+
+    private var color: Color { Color(hex: hex) ?? .accentColor }
+
+    var body: some View {
+        Text(name)
+            .font(.system(size: compact ? 10 : 12, weight: .semibold))
+            .lineLimit(1)
+            .padding(.horizontal, compact ? 6 : 10)
+            .padding(.vertical, compact ? 2 : 5)
+            .background(
+                Capsule().fill(selected ? color.opacity(0.9) : color.opacity(0.12))
+            )
+            .overlay(Capsule().stroke(color.opacity(selected ? 0 : 0.6), lineWidth: 1))
+            .foregroundColor(selected ? Color.onColor(hex: hex) : color)
+    }
+}
+
 struct TaskRowView: View {
     @EnvironmentObject var settings: AppSettings
     var todo: Todo
+    var allTags: [TodoTag]
     var onToggle: () -> Void
     var onDelete: () -> Void
-    var onSave: (String, String, String) -> Void  // title, priority, dueDate
+    var onSave: (String, String, String, [String]) -> Void  // title, priority, dueDate, tags
 
     @State private var isExpanded = false
     @State private var editTitle: String
     @State private var editPriority: String
     @State private var editDueDate: Date?
+    @State private var editTags: [String]
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -19,16 +45,24 @@ struct TaskRowView: View {
     }()
 
     init(todo: Todo,
+         allTags: [TodoTag] = [],
          onToggle: @escaping () -> Void,
          onDelete: @escaping () -> Void,
-         onSave: @escaping (String, String, String) -> Void) {
+         onSave: @escaping (String, String, String, [String]) -> Void) {
         self.todo = todo
+        self.allTags = allTags
         self.onToggle = onToggle
         self.onDelete = onDelete
         self.onSave = onSave
         _editTitle    = State(initialValue: todo.title)
         _editPriority = State(initialValue: todo.priority)
         _editDueDate  = State(initialValue: Self.dateFormatter.date(from: todo.dueDate))
+        _editTags     = State(initialValue: todo.tags)
+    }
+
+    private func hex(for name: String) -> String {
+        allTags.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }?.hexColor
+            ?? TodoTag(name: name).hexColor
     }
 
     var body: some View {
@@ -43,10 +77,21 @@ struct TaskRowView: View {
                 }
                 .buttonStyle(.plain)
 
-                Text(todo.title)
-                    .font(.system(size: settings.fontTasks))
-                    .strikethrough(todo.isDone)
-                    .foregroundColor(todo.isDone ? .secondary : .primary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(todo.title)
+                        .font(.system(size: settings.fontTasks))
+                        .strikethrough(todo.isDone)
+                        .foregroundColor(todo.isDone ? .secondary : .primary)
+
+                    if !todo.tags.isEmpty && !isExpanded {
+                        HStack(spacing: 4) {
+                            ForEach(todo.tags, id: \.self) { t in
+                                TagChip(name: t, hex: hex(for: t), selected: true, compact: true)
+                                    .opacity(todo.isDone ? 0.5 : 1)
+                            }
+                        }
+                    }
+                }
 
                 Spacer()
 
@@ -73,6 +118,29 @@ struct TaskRowView: View {
                         .font(.system(size: settings.fontTasks - 1))
                         .textFieldStyle(.roundedBorder)
                         .submitLabel(.done)
+
+                    // Tags — tap to toggle membership
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Tags")
+                            .font(.system(size: settings.fontTasks - 2))
+                            .foregroundColor(.secondary)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(allTags) { tag in
+                                    let on = editTags.contains { $0.caseInsensitiveCompare(tag.name) == .orderedSame }
+                                    TagChip(name: tag.name, hex: tag.hexColor, selected: on)
+                                        .contentShape(Capsule())
+                                        .onTapGesture { toggleTag(tag.name) }
+                                }
+                                if allTags.isEmpty {
+                                    Text("No tags yet — add one with the tag button above.")
+                                        .font(.system(size: settings.fontTasks - 3))
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
 
                     // Priority picker
                     HStack(spacing: 6) {
@@ -132,6 +200,7 @@ struct TaskRowView: View {
             editTitle    = newTodo.title
             editPriority = newTodo.priority
             editDueDate  = Self.dateFormatter.date(from: newTodo.dueDate)
+            editTags     = newTodo.tags
         }
         .swipeActions(edge: .trailing) {
             Button(role: .destructive, action: onDelete) {
@@ -140,11 +209,19 @@ struct TaskRowView: View {
         }
     }
 
+    private func toggleTag(_ name: String) {
+        if let i = editTags.firstIndex(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
+            editTags.remove(at: i)
+        } else {
+            editTags.append(name)
+        }
+    }
+
     private func toggleExpand() {
         if isExpanded {
             // Collapsing — persist edits
             let dueDateStr = editDueDate.map { Self.dateFormatter.string(from: $0) } ?? ""
-            onSave(editTitle, editPriority, dueDateStr)
+            onSave(editTitle, editPriority, dueDateStr, editTags)
         }
         withAnimation(.easeInOut(duration: 0.2)) {
             isExpanded.toggle()

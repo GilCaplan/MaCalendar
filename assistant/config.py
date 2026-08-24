@@ -96,6 +96,9 @@ class TodoConfig(BaseModel):
     sync: TodoSyncConfig = TodoSyncConfig()
     show_completed: bool = False
     default_list: Literal["today", "general"] = "today"
+    # "Tag mode": every newly created task (Mac UI, voice, API without explicit
+    # tags) automatically gets this tag. Empty = off.
+    auto_tag: str = ""
 
 
 class UIConfig(BaseModel):
