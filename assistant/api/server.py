@@ -1099,6 +1099,47 @@ def create_app() -> Flask:
         return jsonify({"ok": True})
 
     # ------------------------------------------------------------------
+    # Event categories (colours)
+    # ------------------------------------------------------------------
+
+    @app.get("/categories")
+    def categories_list():
+        from assistant.actions.calendar import categories as _cat
+        return jsonify({"categories": _cat.all_categories()})
+
+    @app.post("/categories")
+    def categories_upsert():
+        """{"name": "Volunteering", "color": "#…", "alt": "#…", "keywords": [...], "add_keywords": [...]}"""
+        from assistant.actions.calendar import categories as _cat
+        body = request.get_json(silent=True) or {}
+        try:
+            return jsonify(_cat.upsert(str(body.get("name", "")), body.get("color"), body.get("alt"),
+                                       body.get("keywords"), body.get("add_keywords")))
+        except ValueError as e:
+            return jsonify({"error": str(e), "code": 400}), 400
+
+    @app.delete("/categories/<path:name>")
+    def categories_delete(name: str):
+        from assistant.actions.calendar import categories as _cat
+        if not _cat.remove(name):
+            return jsonify({"error": "Not found (Personal cannot be removed)", "code": 404}), 404
+        return jsonify({"ok": True})
+
+    @app.post("/categories/classify")
+    def categories_classify():
+        from assistant.actions.calendar import categories as _cat
+        b = request.get_json(silent=True) or {}
+        cat = _cat.classify(b.get("title", ""), b.get("attendees"), b.get("location", ""), b.get("description", ""))
+        color, alt = _cat.color_for(cat)
+        return jsonify({"category": cat, "color": color, "alt": alt})
+
+    @app.post("/categories/recolor")
+    def categories_recolor():
+        """Apply categories/colours to existing events. ?force=1 re-does everything."""
+        n = get_db().recategorise_all(force=request.args.get("force") == "1")
+        return jsonify({"updated": n})
+
+    # ------------------------------------------------------------------
     # Events
     # ------------------------------------------------------------------
 

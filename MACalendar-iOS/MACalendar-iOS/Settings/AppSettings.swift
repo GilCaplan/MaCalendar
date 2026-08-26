@@ -87,6 +87,11 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(showThinking, forKey: "showThinking") }
     }
 
+    // Read the assistant's reply aloud (mirrors the Mac's tts.mute).
+    @Published var speakReplies: Bool {
+        didSet { UserDefaults.standard.set(speakReplies, forKey: "speakReplies") }
+    }
+
     // Stop-word / silence auto-stop while recording (mirrors the Mac's behaviour).
     @Published var stopWordsEnabled: Bool {
         didSet { UserDefaults.standard.set(stopWordsEnabled, forKey: "stopWordsEnabled") }
@@ -101,6 +106,8 @@ class AppSettings: ObservableObject {
     }
 
     init() {
+        self.speakReplies = UserDefaults.standard.object(forKey: "speakReplies") == nil
+            ? true : UserDefaults.standard.bool(forKey: "speakReplies")
         self.stopWordsEnabled = UserDefaults.standard.object(forKey: "stopWordsEnabled") == nil
             ? true : UserDefaults.standard.bool(forKey: "stopWordsEnabled")
         let sil = UserDefaults.standard.double(forKey: "silenceStopSeconds")

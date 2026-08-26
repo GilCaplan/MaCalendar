@@ -25,7 +25,38 @@ struct VoiceButton: View {
 
     enum Status { case idle, recording, thinking, speaking }
 
+    /// True while there is something worth reopening: work in flight, or a result
+    /// from the last ~2 minutes.
+    private var canReopen: Bool {
+        status == .thinking || status == .speaking || (finished && lastResponse != nil && Date().timeIntervalSince(finishedAt) < 120)
+    }
+    @State private var finishedAt = Date.distantPast
+
     var body: some View {
+        VStack(spacing: 8) {
+            if settings.showThinking && !showThinking && canReopen {
+                Button { showThinking = true } label: {
+                    HStack(spacing: 6) {
+                        if status == .thinking { ProgressView().scaleEffect(0.7) }
+                        else { AssistantIcon(finished ? .done : .llm).frame(width: 12, height: 12) }
+                        Text(status == .thinking ? "Thinking… \(steps.count) step\(steps.count == 1 ? "" : "s")"
+                             : status == .speaking ? "Speaking…" : "Show what it did")
+                            .font(.caption.weight(.medium))
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(.regularMaterial)
+                    .clipShape(Capsule())
+                    .shadow(radius: 2)
+                }
+                .buttonStyle(.plain)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+            micButton
+        }
+        .animation(.easeInOut(duration: 0.2), value: canReopen)
+    }
+
+    private var micButton: some View {
         Button(action: handleTap) {
             ZStack {
                 Circle()
@@ -192,6 +223,7 @@ struct VoiceButton: View {
             steps = t
         }
         finished = true
+        finishedAt = Date()
         onRefresh?(response.refresh)
         onResponse?(response)
 
@@ -205,12 +237,12 @@ struct VoiceButton: View {
                                            detail: speech.isEmpty ? "Corrected the \(result.severity ?? "") issue" : speech,
                                            ms: 0, atMs: (steps.last?.atMs ?? 0), ok: true))
                     if let r = result.refresh, !r.isEmpty { onRefresh?(r) }
-                    if !speech.isEmpty { player.speak(speech, voiceIdentifier: settings.ttsVoice) }
+                    if !speech.isEmpty && settings.speakReplies { player.speak(speech, voiceIdentifier: settings.ttsVoice) }
                 }
             }
         }
 
-        if !response.message.isEmpty {
+        if !response.message.isEmpty && settings.speakReplies {
             status = .speaking
             player.speak(response.message, voiceIdentifier: settings.ttsVoice)
             // Wait for speech to finish

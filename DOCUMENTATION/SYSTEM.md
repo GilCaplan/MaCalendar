@@ -56,3 +56,7 @@ Voice command
 New endpoints: `GET/POST /vocab`, `POST /vocab/alias`, `DELETE /vocab/<word>[?alias=]`, `PATCH /vocab/settings`, `POST /vocab/preview`, `GET/POST /vocab/onboarding`, `GET /memory`, `GET /memory/similar?q=`, `POST /memory/<id>/feedback`, `DELETE /memory/<id>`, `GET /pending`, `POST /pending/<id>/retry`, `DELETE /pending/<id>`, `POST /voice/stream`. `/health` now reports `llm_status` (`ok` / `offline` / model not pulled).
 
 Speed: Ollama `keep_alive: -1` + startup warm-up of Whisper, spaCy and the LLM (`warm_up_components`) remove the cold-start cost that made the first phone command take 10–20 s.
+
+## Event categories & colours
+
+`assistant/actions/calendar/categories.py` tags every new event (Work, Study, Meeting, Social, Family, Prayer, Fitness, Health, Errand, Meal, Travel, Personal) from its title/attendees/location with a keyword classifier — "Personal" when unsure — and picks the category colour. If the event immediately before or after on the same day already has that colour, the category's alternate shade is used, so two adjacent events never look the same. A colour chosen by hand is never overridden. Users add/remove categories, change colours and keywords from iOS → Settings → *Event colours* (stored in `~/.assistant_tools/categories.json`, local only). API: `GET/POST /categories`, `DELETE /categories/<name>`, `POST /categories/classify`, `POST /categories/recolor[?force=1]` (backfills existing events).

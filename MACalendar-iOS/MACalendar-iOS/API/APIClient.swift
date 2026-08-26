@@ -644,6 +644,28 @@ class APIClient: ObservableObject {
         _ = try? await request("/memory/\(id)/feedback", method: "POST", body: ["feedback": feedback])
     }
 
+    // MARK: - Event categories
+
+    func categories() async throws -> [EventCategory] {
+        try decode(CategoriesResponse.self, from: try await request("/categories")).categories
+    }
+
+    func upsertCategory(name: String, color: String, alt: String, keywords: [String]) async -> Bool {
+        (try? await request("/categories", method: "POST",
+                            body: ["name": name, "color": color, "alt": alt, "keywords": keywords])) != nil
+    }
+
+    func deleteCategory(_ name: String) async {
+        let enc = name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name
+        _ = try? await request("/categories/\(enc)", method: "DELETE")
+    }
+
+    func recolorEvents(force: Bool) async -> Int? {
+        guard let data = try? await request("/categories/recolor" + (force ? "?force=1" : ""), method: "POST", body: [:]),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        return obj["updated"] as? Int
+    }
+
     // MARK: - Courses
 
     func courses() async throws -> [Course] {

@@ -39,6 +39,7 @@ _TODO_MIGRATIONS = [
     "ALTER TABLE todos ADD COLUMN completed_at TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE todos ADD COLUMN position INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE todos ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]'",
+    "ALTER TABLE events ADD COLUMN category TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE todos ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'",
 ]
 
@@ -385,6 +386,39 @@ def _memory_feedback(record_type: str, record_id: int, feedback: str,
         pass
 
 
+_AUTO_COLORS = {"#0078d4", "", None}   # "no colour chosen" markers → pick by category
+
+
+def _neighbour_colors(conn: sqlite3.Connection, date: str, start_time: str, exclude_id: int | None = None) -> list[str]:
+    """Colours of the events immediately before and after on the same day."""
+    rows = conn.execute("SELECT id, start_time, color FROM events WHERE date = ? ORDER BY start_time", (date,)).fetchall()
+    rows = [r for r in rows if r[0] != exclude_id]
+    before = [r for r in rows if r[1] <= (start_time or "")]
+    after = [r for r in rows if r[1] > (start_time or "")]
+    out = []
+    if before: out.append(before[-1][2])
+    if after: out.append(after[0][2])
+    return [c for c in out if c]
+
+
+def auto_category_and_color(conn: sqlite3.Connection, title: str, date: str, start_time: str,
+                            attendees="", location: str = "", description: str = "",
+                            color: str | None = None, category: str | None = None,
+                            exclude_id: int | None = None) -> tuple[str, str]:
+    """Return (category, colour). A colour the user chose explicitly is kept; otherwise the
+    category's colour, switched to its alternate shade if a neighbouring event has it."""
+    try:
+        from assistant.actions.calendar import categories as _cat
+        cat = category or _cat.classify(title, attendees, location, description)
+        if color not in _AUTO_COLORS and not category:
+            return cat, color                      # explicit user colour wins
+        if color not in _AUTO_COLORS and category:
+            return cat, color
+        return cat, _cat.pick_color(cat, _neighbour_colors(conn, date, start_time, exclude_id))
+    except Exception:
+        return category or "", color or "#0078d4"
+
+
 class CalendarDB:
     """Thread-safe SQLite calendar event store."""
 
@@ -422,6 +456,23 @@ class CalendarDB:
                 stmt = stmt.strip()
                 if stmt:
                     conn.execute(stmt)
+
+    def recategorise_all(self, force: bool = False) -> int:
+        """(Re)assign category + colour for existing events. Without force, only events
+        that still carry the default colour / no category are touched."""
+        n = 0
+        with self._conn() as conn:
+            rows = conn.execute("SELECT id, title, date, start_time, attendees, location, description, color, category FROM events ORDER BY date, start_time").fetchall()
+            for r in rows:
+                rid, title, date, st, att, loc, desc, color, cat = r
+                if not force and cat and color not in _AUTO_COLORS:
+                    continue
+                new_cat, new_color = auto_category_and_color(conn, title, date, st, att, loc, desc,
+                                                             None if (force or color in _AUTO_COLORS) else color,
+                                                             None if force else (cat or None), exclude_id=rid)
+                conn.execute("UPDATE events SET category = ?, color = ? WHERE id = ?", (new_cat, new_color, rid))
+                n += 1
+        return n
 
     def _migrate(self, conn: sqlite3.Connection) -> None:
         """Apply any missing schema migrations safely."""
@@ -519,12 +570,15 @@ class CalendarDB:
         recur_until = getattr(intent, "recur_until", None) or ""
 
         with self._conn() as conn:
+            category, color = auto_category_and_color(
+                conn, intent.title, intent.date, intent.start_time, intent.attendees,
+                intent.location or "", intent.description or "", color)
             cur = conn.execute(
                 """
                 INSERT INTO events
                     (title, date, start_time, end_time, attendees, location, description,
-                     color, created_at, series_id, recurrence, recurrence_end)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     color, created_at, series_id, recurrence, recurrence_end, category)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     intent.title,
@@ -539,6 +593,7 @@ class CalendarDB:
                     None,       # series_id set below if recurring
                     recurrence,
                     recur_until,
+                    category,
                 ),
             )
             first_id = cur.lastrowid
@@ -609,12 +664,16 @@ class CalendarDB:
         recur_until = data.get("recurrence_end", "")
 
         with self._conn() as conn:
+            category, color = auto_category_and_color(
+                conn, data["title"], data["date"], data["start_time"], data.get("attendees", ""),
+                data.get("location", ""), data.get("description", ""), data.get("color"), data.get("category"))
+            data = dict(data, color=color)
             cur = conn.execute(
                 """
                 INSERT INTO events
                     (title, date, start_time, end_time, attendees, location, description,
-                     color, created_at, series_id, recurrence, recurrence_end)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     color, created_at, series_id, recurrence, recurrence_end, category)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     data["title"],
@@ -624,11 +683,12 @@ class CalendarDB:
                     data.get("attendees", ""),
                     data.get("location", ""),
                     data.get("description", ""),
-                    data.get("color", "#0078d4"),
+                    color,
                     datetime.datetime.now().isoformat(),
                     None,
                     recurrence,
                     recur_until,
+                    category,
                 ),
             )
             first_id = cur.lastrowid
@@ -740,7 +800,7 @@ class CalendarDB:
 
     def update_event(self, event_id: int, **fields) -> None:
         allowed = {"title", "date", "start_time", "end_time", "attendees",
-                   "location", "description", "color", "recurrence", "recurrence_end"}
+                   "location", "description", "color", "recurrence", "recurrence_end", "category"}
         updates = {k: v for k, v in fields.items() if k in allowed}
         if not updates:
             return

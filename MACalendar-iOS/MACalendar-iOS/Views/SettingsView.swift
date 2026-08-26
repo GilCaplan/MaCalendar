@@ -175,12 +175,20 @@ struct SettingsView: View {
                     // MARK: Voice
                     GroupBox(label: Label("Voice", systemImage: "speaker.wave.2")) {
                         VStack(alignment: .leading, spacing: 12) {
+                            Toggle(isOn: $settings.speakReplies) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Speak replies aloud")
+                                    Text("Reads the result of each command. Off = silent, the text still shows in the thinking sheet.")
+                                        .font(.caption).foregroundColor(.secondary)
+                                }
+                            }
                             Picker("TTS Voice", selection: $settings.ttsVoice) {
                                 ForEach(voices, id: \.language) { v in
                                     Text(v.label).tag(v.language)
                                 }
                             }
                             .pickerStyle(.segmented)
+                            .disabled(!settings.speakReplies)
 
                             Divider()
 
@@ -233,6 +241,19 @@ struct SettingsView: View {
                                     Label("Vocabulary", systemImage: "character.book.closed")
                                     Spacer()
                                     Text("Names & words it should know")
+                                        .font(.caption).foregroundColor(.secondary)
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption).foregroundColor(.secondary)
+                                }
+                            }
+
+                            NavigationLink {
+                                CategoriesView()
+                            } label: {
+                                HStack {
+                                    Label("Event colours", systemImage: "paintpalette")
+                                    Spacer()
+                                    Text("Categories & colours")
                                         .font(.caption).foregroundColor(.secondary)
                                     Image(systemName: "chevron.right")
                                         .font(.caption).foregroundColor(.secondary)
