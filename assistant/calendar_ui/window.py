@@ -191,6 +191,19 @@ class CalendarWindow(QMainWindow):
             self._poll_timer.timeout.connect(self._poll_status)
             self._poll_timer.start()
 
+        # Changes made from the phone land in the same SQLite file via the API server;
+        # pick them up without a manual refresh by watching the file's mtime.
+        import os as _os
+        self._db_mtime = 0.0
+        try:
+            self._db_mtime = _os.path.getmtime(self._db.path)
+        except OSError:
+            pass
+        self._sync_timer = QTimer(self)
+        self._sync_timer.setInterval(5000)
+        self._sync_timer.timeout.connect(self._auto_refresh_if_db_changed)
+        self._sync_timer.start()
+
         # Periodic background sync for connected calendars (ICS subscriptions +
         # two-way Outlook). Independent of the pipeline status timer above.
         self._sync_results_queue: queue.Queue = queue.Queue()
@@ -796,6 +809,16 @@ class CalendarWindow(QMainWindow):
         elif status == STATUS_SWITCH_TODO:
             self._set_view("todo")
             self.refresh_todos()
+
+    def _auto_refresh_if_db_changed(self) -> None:
+        import os as _os
+        try:
+            m = _os.path.getmtime(self._db.path)
+        except OSError:
+            return
+        if m != self._db_mtime:
+            self._db_mtime = m
+            self.refresh_todos()   # refreshes calendar views too
 
     def refresh_calendar(self) -> None:
         """Reload events from DB in all calendar views."""
