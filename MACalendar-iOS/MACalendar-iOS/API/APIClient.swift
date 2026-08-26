@@ -53,9 +53,10 @@ class APIClient: ObservableObject {
         } catch let err as APIError {
             throw err
         } catch {
-            // URLError / network unreachable
+            // URLError / network unreachable — keep the real reason for Settings › Test Connection
             isOnline = false
-            throw APIError.offline
+            lastError = "\(url.absoluteString): \(error.localizedDescription)"
+            throw APIError.offline(error.localizedDescription)
         }
     }
 
@@ -508,7 +509,7 @@ class APIClient: ObservableObject {
             return try decode(VoiceResponse.self, from: data)
         } catch {
             isOnline = false
-            throw APIError.offline
+            throw APIError.offline(error.localizedDescription)
         }
     }
 
@@ -559,7 +560,7 @@ class APIClient: ObservableObject {
             throw err
         } catch {
             isOnline = false
-            throw APIError.offline
+            throw APIError.offline(error.localizedDescription)
         }
     }
 
@@ -704,15 +705,15 @@ class APIClient: ObservableObject {
 
 enum APIError: LocalizedError {
     case badURL
-    case offline
+    case offline(String = "")
     case serverError(String)
 
     var errorDescription: String? {
         switch self {
         case .badURL:
-            return "Server URL is not configured. Go to Settings and enter your Mac's Tailscale address."
-        case .offline:
-            return "Mac is unreachable — changes saved locally and will sync when connected."
+            return "Server URL is not configured. Go to Settings and enter your Mac's Tailscale address (http://100.92.216.112:8080)."
+        case .offline(let why):
+            return "Mac is unreachable" + (why.isEmpty ? "" : " (\(why))") + " — changes saved locally and will sync when connected."
         case .serverError(let msg):
             return msg
         }

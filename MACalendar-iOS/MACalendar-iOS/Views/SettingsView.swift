@@ -143,7 +143,7 @@ struct SettingsView: View {
                     }
 
                     // MARK: Hebrew Calendar
-                    GroupBox(label: Label("Hebrew Calendar", systemImage: "star.of.david")) {
+                    GroupBox(label: Label("Hebrew Calendar", systemImage: "calendar.badge.clock")) {
                         VStack(alignment: .leading, spacing: 12) {
                             Picker("Show dates as", selection: $settings.hebrewDisplayMode) {
                                 Text("English").tag("english")
@@ -261,7 +261,7 @@ struct SettingsView: View {
                 let h = try await api.health()
                 healthStatus = "✓ \(h.llm)"
             } catch {
-                healthStatus = "✗ \(error.localizedDescription)"
+                healthStatus = "✗ \(error.localizedDescription) — \(settings.serverURL.isEmpty ? "no server URL set" : settings.serverURL)"
             }
             checking = false
         }
