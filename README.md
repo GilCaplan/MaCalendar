@@ -10,9 +10,9 @@ A privacy-focused, voice-driven calendar assistant for macOS. This tool uses loc
 
 ![MACalendar assistant architecture](DOCUMENTATION/img/assistant-architecture.svg)
 
-A spoken command goes: **Whisper (MLX, on the Apple GPU)** → **personal vocabulary auto-correct** → **rule parser** (spaCy + date recognizer; answers ~40% of commands in ~100 ms with no LLM) → **local LLM** (Ollama, llama3.1:8b) only when the rule parser is unsure, with your most similar past commands injected as examples → validation → actions → SQLite. Every command is remembered; your edits, deletes and 👍/👎 become feedback that improves the next parse. A live stage-by-stage trace streams to the phone. Details: `DOCUMENTATION/SYSTEM.md`, audit: `DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md`.
+A spoken command goes: **Whisper (MLX, on the Apple GPU)** → **personal vocabulary auto-correct** → **rule parser** (spaCy + date recognizer; answers ~40% of commands in ~100 ms with no LLM) → **local LLM** (Ollama, llama3.1:8b) only when the rule parser is unsure, with your most similar past commands injected as examples → validation → actions → SQLite. Every command is remembered; your edits, deletes and approve/reject become feedback that improves the next parse. A live stage-by-stage trace streams to the phone. Details: [DOCUMENTATION/SYSTEM.md](DOCUMENTATION/SYSTEM.md), audit: [DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md](DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md).
 
-## 🛠 Prerequisites
+## Prerequisites
 
 Before installation, ensure you have the following:
 
@@ -22,7 +22,7 @@ Before installation, ensure you have the following:
 - **Ollama:** Download and install [Ollama](https://ollama.ai).
   - After installing Ollama, pull the reasoning model: `ollama pull llama3.1:8b` (or your preferred model according to `config.yaml`).
 
-## 🚀 Installation
+## Installation
 
 1. **Clone the project:**
    ```bash
@@ -42,7 +42,7 @@ Before installation, ensure you have the following:
    pip install -e .
    ```
 
-## ⚙️ Configuration
+## Configuration
 
 The application uses `config.yaml` for customization. If it doesn't exist, you can create it from the example:
 ```bash
@@ -61,7 +61,7 @@ cp config.example.yaml config.yaml
   - `rate`: Talking speed.
   - `mute`: Set to `true` for a silent assistant.
 
-## 📅 Usage
+## Usage
 
 ### Starting the App
 - **The easy way:** Double-click `Launch Calendar.command` in the Finder.
@@ -73,7 +73,7 @@ cp config.example.yaml config.yaml
 - **Tasks** — Apple Reminders-style task panel with Today and General lists (see below).
 
 ### Morning Briefing
-Click the **🌅 Brief Me** button in the Day view (or ask via voice) to have your assistant read today's full schedule aloud — great for hands-free mornings.
+Click the **Brief Me** button in the Day view (or ask via voice) to have your assistant read today's full schedule aloud — great for hands-free mornings.
 
 Voice triggers: *"What does my day look like?"*, *"When is my first meeting?"*, *"What's next?"*, *"How many events do I have today?"*
 
@@ -82,12 +82,12 @@ Switch to **Tasks** in the toolbar to manage your todo list with two sections:
 
 | Section | Purpose |
 |---------|---------|
-| **Today** | Tasks for today. Click **🔄 Sync Today** to pull in today's calendar events automatically. |
+| **Today** | Tasks for today. Click **Sync Today** to pull in today's calendar events automatically. |
 | **General** | Ongoing or someday tasks, independent of any date. |
 
 **Manual editing:** Click any task title to edit it inline. Click the checkbox to complete it. Hover to reveal the × delete button. Click **+ New Task** to add from the keyboard.
 
-**Calendar sync:** The **🔄 Sync Today** button in the Today header pulls all of today's calendar events into your Today list as tasks. The ⚙ gear offers additional sync options (upcoming week → General list, or clear synced tasks).
+**Calendar sync:** The **Sync Today** button in the Today header pulls all of today's calendar events into your Today list as tasks. The gear icon offers additional sync options (upcoming week → General list, or clear synced tasks).
 
 **Voice commands (Tasks mode):**
 When the Tasks tab is active, the mic button enters *Tasks mode* — voice commands are automatically biased towards task actions:
@@ -106,18 +106,18 @@ When the Tasks tab is active, the mic button enters *Tasks mode* — voice comma
 1. **Trigger:** Press the hotkey (`Cmd+Shift+Space`) to start listening.
 2. **Speak:** State your request clearly (e.g., *"Schedule a dentist appointment for tomorrow at 2 PM"* or *"Cancel my meeting with Alex"*).
 3. **Finish:** Say **"execute"**, **"done"**, or simply press the hotkey again to trigger the actions immediately.
-4. **Autonomous Mode:** You can toggle "Auto-Approve" in the **⚙️ Settings** icon in the UI to skip confirmation dialogs.
+4. **Autonomous Mode:** You can toggle "Auto-Approve" in the **Settings** icon in the UI to skip confirmation dialogs.
 
 > [!TIP]
 > **Context Memory:** You can refer to the last event you created by saying "delete **it**" or "move **that event**". Same works for tasks.
 
-## 🔒 Security & Privacy
+## Security & Privacy
 - **LLM Choices:** By default, everything is local and private using Ollama. If you switch to `openai`, `gemini`, or `claude`, your transcripts will be sent to the respective provider's API.
 - **Full Local Logic:** Audio is transcribed locally using `faster-whisper`.
 - **Prompt Injection Defense:** Basic sanitization prevents malicious commands from being executed via voice.
 - **Persistence:** closing the application will save all your changes to the `.db` file normally.
 
-## 🧪 Testing
+## Testing
 A comprehensive test suite is provided to verify model reasoning and database logic:
 ```bash
 # Calendar voice command tests (requires Ollama running)
@@ -133,7 +133,7 @@ python tests/test_todo_parser.py
 pytest tests/
 ```
 
-## 📱 iPhone App
+## iPhone App
 
 MACalendar includes a native SwiftUI companion app and a Flask REST API. The Mac acts as the source of truth, and the iPhone connects via Tailscale to manage events and tasks from anywhere.
 
@@ -150,7 +150,7 @@ Tailscale provides a secure, private tunnel between your Mac and iPhone without 
 3. **Start API:** `python -m assistant.api --tailscale` (Prints your 100.x.x.x IP).
 4. **App Settings:** Set Server URL to `http://<your-tailscale-ip>:8080`.
 
-For full deployment details and API reference, see [**SYSTEM_IPHONE.md**](./SYSTEM_IPHONE.md).
+For full deployment details and API reference, see [**SYSTEM_IPHONE.md**](DOCUMENTATION/SYSTEM_IPHONE.md).
 
 ### API endpoints (quick reference)
 
@@ -163,10 +163,10 @@ For full deployment details and API reference, see [**SYSTEM_IPHONE.md**](./SYST
 | GET | `/todos` | Todo list |
 | PATCH | `/todos/<id>/toggle` | Complete a task |
 
-Full API reference: [SYSTEM_IPHONE.md](./SYSTEM_IPHONE.md)
+Full API reference: [SYSTEM_IPHONE.md](DOCUMENTATION/SYSTEM_IPHONE.md)
 
 ---
 
-## 🤖 For Developers & AI Assistants
+## For Developers & AI Assistants
 
-If you are an AI assistant or a developer working on this codebase, please **read [SYSTEM.md](./SYSTEM.md) first**. It contains the full project architecture, recent core enhancements (Streaming STT, Universal LLM Parser), and current state details to help you resume work without loss of context.
+If you are an AI assistant or a developer working on this codebase, please **read [SYSTEM.md](DOCUMENTATION/SYSTEM.md) first**. It contains the full project architecture, recent core enhancements (Streaming STT, Universal LLM Parser), and current state details to help you resume work without loss of context.
