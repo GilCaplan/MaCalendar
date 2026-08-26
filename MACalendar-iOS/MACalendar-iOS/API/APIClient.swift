@@ -18,11 +18,19 @@ class APIClient: ObservableObject {
 
     // MARK: - Base
 
+    /// Normalised server base URL. Accepts what people actually type:
+    /// "100.92.216.112", "100.92.216.112:8080", "http://100.92.216.112:8080/",
+    /// "macbook-air" (Tailscale MagicDNS) — and always yields http://host:port.
     private var base: String {
         var url = settings.serverURL
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: .init(charactersIn: "/"))
+        guard !url.isEmpty else { return "" }
         if url.hasPrefix("https://") { url = "http://" + url.dropFirst(8) }
+        if !url.hasPrefix("http://") { url = "http://" + url }
+        // add the default port when none was given (host may be an IP or a name)
+        let hostPart = url.dropFirst(7)
+        if !hostPart.contains(":") { url += ":8080" }
         return url
     }
 

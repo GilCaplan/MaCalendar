@@ -77,7 +77,7 @@ struct SettingsView: View {
                                 }
                             }
 
-                            Text("Your Mac's Tailscale IP, e.g. http://100.64.0.1:8080")
+                            Text("Your Mac's Tailscale IP — this Mac is 100.92.216.112 (the port 8080 and http:// are added for you)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
