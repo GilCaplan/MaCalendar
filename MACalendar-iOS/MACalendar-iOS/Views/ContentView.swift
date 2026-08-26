@@ -41,6 +41,22 @@ struct ContentView: View {
                 .background(Color.orange)
             }
 
+            if unreviewed >= 5 {
+                Button { showReview = true } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.bubble")
+                        Text("\(unreviewed) voice commands to review — was the assistant right?")
+                            .font(.footnote.weight(.medium))
+                        Spacer()
+                        Text("Review").font(.footnote.weight(.semibold))
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+                    .background(settings.accentColor.opacity(0.18))
+                    .foregroundColor(.primary)
+                }
+                .buttonStyle(.plain)
+            }
+
             TabView(selection: $selectedTab) {
 
                 // ── Calendar Tab ──────────────────────────────────────────
@@ -267,23 +283,6 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showReview, onDismiss: { Task { unreviewed = await api.unreviewedCount() } }) {
             AssistantReviewView()
-        }
-        .safeAreaInset(edge: .top) {
-            if unreviewed >= 5 {
-                Button { showReview = true } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.bubble")
-                        Text("\(unreviewed) voice commands to review — was the assistant right?")
-                            .font(.footnote.weight(.medium))
-                        Spacer()
-                        Text("Review").font(.footnote.weight(.semibold))
-                    }
-                    .padding(.horizontal, 14).padding(.vertical, 8)
-                    .background(settings.accentColor.opacity(0.18))
-                    .foregroundColor(.primary)
-                }
-                .buttonStyle(.plain)
-            }
         }
         .onReceive(importInbox.$pendingText) { t in
             if let t { sharedImportText = t; importInbox.pendingText = nil }
