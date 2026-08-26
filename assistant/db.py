@@ -372,10 +372,26 @@ def _next_date(d: datetime.date, recurrence: str, anchor_day: int | None = None)
     raise ValueError(f"Unknown recurrence: {recurrence!r}")
 
 
+def _memory_feedback(record_type: str, record_id: int, feedback: str,
+                     changed: dict | None = None) -> None:
+    """Implicit NLU feedback: a user edit/delete of a voice-created record.
+
+    Best-effort and silent — the memory layer must never affect DB writes.
+    """
+    try:
+        from assistant.intent.memory import get_memory
+        get_memory().feedback_for_record(record_type, record_id, feedback, changed)
+    except Exception:
+        pass
+
+
 class CalendarDB:
     """Thread-safe SQLite calendar event store."""
 
     def __init__(self, path: str | None = None) -> None:
+        # MACALENDAR_DB lets tests/audits point at a scratch database.
+        if path is None:
+            path = os.environ.get("MACALENDAR_DB") or None
         self.path = path if path is not None else DB_PATH
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
         with self._conn() as conn:
@@ -728,6 +744,7 @@ class CalendarDB:
         updates = {k: v for k, v in fields.items() if k in allowed}
         if not updates:
             return
+        _memory_feedback("event", event_id, "corrected", updates)
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values()) + [_utcnow_iso(), event_id]
         with self._conn() as conn:
@@ -851,6 +868,7 @@ class CalendarDB:
         re-rooted to the next chronological instance so remaining instances keep a
         valid series_id reference and can still be edited/extended as a group.
         """
+        _memory_feedback("event", event_id, "rejected")
         with self._conn() as conn:
             if self._is_externally_locked(conn, event_id):
                 return
@@ -1050,6 +1068,7 @@ class CalendarDB:
     # ------------------------------------------------------------------
 
     def update_todo(self, todo_id: int, **fields) -> None:
+        _memory_feedback("todo", todo_id, "corrected", {k: v for k, v in fields.items() if k in ("title", "list_name", "tags")})
         allowed = {"title", "list", "completed", "priority", "due_date", "notes", "completed_at", "attachments", "tags"}
         if "list_name" in fields and "list" not in fields:   # API clients send list_name
             fields["list"] = fields.pop("list_name")
@@ -1078,6 +1097,7 @@ class CalendarDB:
     # ------------------------------------------------------------------
 
     def delete_todo(self, todo_id: int) -> None:
+        _memory_feedback("todo", todo_id, "rejected")
         with self._conn() as conn:
             conn.execute("DELETE FROM todos WHERE id = ?", (todo_id,))
 

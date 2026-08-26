@@ -19,6 +19,11 @@
 		AA00000A000000000000001A /* TaskRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000A000000000000001B /* TaskRowView.swift */; };
 		AA00000B000000000000001A /* TasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000B000000000000001B /* TasksView.swift */; };
 		AA00000C000000000000001A /* VoiceButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000C000000000000001B /* VoiceButton.swift */; };
+		AA00009A00000000000000A1 /* VocabularyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00009A00000000000000B1 /* VocabularyView.swift */; };
+		AA00009B00000000000000A1 /* VocabOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00009B00000000000000B1 /* VocabOnboardingView.swift */; };
+		AA00009D00000000000000A1 /* VocabImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00009D00000000000000B1 /* VocabImportView.swift */; };
+		AA00009E00000000000000A1 /* AssistantReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00009E00000000000000B1 /* AssistantReviewView.swift */; };
+		AA00009C00000000000000A1 /* AssistantIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00009C00000000000000B1 /* AssistantIcons.swift */; };
 		AA00000D000000000000001A /* WeekView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000D000000000000001B /* WeekView.swift */; };
 		AA00000E000000000000001A /* SpeechPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000E000000000000001B /* SpeechPlayer.swift */; };
 		AA00000F000000000000001A /* VoiceRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000F000000000000001B /* VoiceRecorder.swift */; };
@@ -50,6 +55,11 @@
 		AA00000A000000000000001B /* TaskRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskRowView.swift; sourceTree = "<group>"; };
 		AA00000B000000000000001B /* TasksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksView.swift; sourceTree = "<group>"; };
 		AA00000C000000000000001B /* VoiceButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceButton.swift; sourceTree = "<group>"; };
+		AA00009A00000000000000B1 /* VocabularyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VocabularyView.swift; sourceTree = "<group>"; };
+		AA00009B00000000000000B1 /* VocabOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VocabOnboardingView.swift; sourceTree = "<group>"; };
+		AA00009D00000000000000B1 /* VocabImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VocabImportView.swift; sourceTree = "<group>"; };
+		AA00009E00000000000000B1 /* AssistantReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantReviewView.swift; sourceTree = "<group>"; };
+		AA00009C00000000000000B1 /* AssistantIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantIcons.swift; sourceTree = "<group>"; };
 		AA00000D000000000000001B /* WeekView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekView.swift; sourceTree = "<group>"; };
 		AA00000E000000000000001B /* SpeechPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechPlayer.swift; sourceTree = "<group>"; };
 		AA00000F000000000000001B /* VoiceRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRecorder.swift; sourceTree = "<group>"; };
@@ -129,6 +139,11 @@
 				AA00000A000000000000001B /* TaskRowView.swift */,
 				AA00000B000000000000001B /* TasksView.swift */,
 				AA00000C000000000000001B /* VoiceButton.swift */,
+				AA00009A00000000000000B1 /* VocabularyView.swift */,
+				AA00009B00000000000000B1 /* VocabOnboardingView.swift */,
+				AA00009D00000000000000B1 /* VocabImportView.swift */,
+				AA00009E00000000000000B1 /* AssistantReviewView.swift */,
+				AA00009C00000000000000B1 /* AssistantIcons.swift */,
 				AA00000D000000000000001B /* WeekView.swift */,
 				AA000038000000000000001A /* Workout */,
 			);
@@ -262,6 +277,11 @@
 				AA00000A000000000000001A /* TaskRowView.swift in Sources */,
 				AA00000B000000000000001A /* TasksView.swift in Sources */,
 				AA00000C000000000000001A /* VoiceButton.swift in Sources */,
+				AA00009A00000000000000A1 /* VocabularyView.swift in Sources */,
+				AA00009B00000000000000A1 /* VocabOnboardingView.swift in Sources */,
+				AA00009D00000000000000A1 /* VocabImportView.swift in Sources */,
+				AA00009E00000000000000A1 /* AssistantReviewView.swift in Sources */,
+				AA00009C00000000000000A1 /* AssistantIcons.swift in Sources */,
 				AA00000D000000000000001A /* WeekView.swift in Sources */,
 				AA00000E000000000000001A /* SpeechPlayer.swift in Sources */,
 				AA00000F000000000000001A /* VoiceRecorder.swift in Sources */,

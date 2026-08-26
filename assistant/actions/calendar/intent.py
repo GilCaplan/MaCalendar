@@ -34,6 +34,60 @@ class CalendarIntent(BaseIntent):
             return None
         return v
 
+    @field_validator("recurrence", mode="after")
+    @classmethod
+    def recurrence_known(cls, v: Any) -> Any:
+        """Only daily/weekly/monthly; LLM noise ('unknown', 'none', 'once', 'every monday') → None/weekly."""
+        if v is None:
+            return None
+        sv = str(v).strip().lower()
+        if sv in ("daily", "weekly", "monthly"):
+            return sv
+        if "day" in sv and "week" not in sv and "mon" not in sv:
+            return "daily"
+        if "week" in sv or any(d in sv for d in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")):
+            return "weekly"
+        if "month" in sv:
+            return "monthly"
+        return None
+
+    @field_validator("date", "recur_until", mode="after")
+    @classmethod
+    def date_must_be_iso(cls, v: Any) -> Any:
+        """Only ISO dates survive. Junk the LLM sometimes emits ('unknown', 'tbd',
+        'this Friday', a placeholder) becomes None — the server's sanity pass then
+        resolves relative dates from the transcript — rather than failing the command."""
+        if v is None:
+            return None
+        import re as _re
+        sv = str(v).strip()
+        if _re.fullmatch(r"\d{4}-\d{2}-\d{2}", sv):
+            return sv
+        m = _re.fullmatch(r"(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ].*)?", sv)   # 2026-8-5, 2026-08-05T10:00
+        if m:
+            return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+        return None
+
+    @field_validator("start_time", "end_time", mode="after")
+    @classmethod
+    def time_must_be_hhmm(cls, v: Any) -> Any:
+        """Normalise '9 AM', '12:00 PM', '9.30pm', '0915' → 'HH:MM'; reject anything else."""
+        if v is None:
+            return None
+        import re as _re
+        t = str(v).strip().lower().replace(".", ":")
+        m = _re.fullmatch(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm|a:m|p:m)?", t) or _re.fullmatch(r"(\d{2})(\d{2})()", t)
+        if not m:
+            raise ValueError(f"time must be HH:MM, got {v!r}")
+        h, mm, ap = int(m.group(1)), int(m.group(2) or 0), (m.group(3) or "").replace(":", "")
+        if ap == "pm" and h < 12:
+            h += 12
+        if ap == "am" and h == 12:
+            h = 0
+        if h > 23 or mm > 59:
+            raise ValueError(f"time out of range: {v!r}")
+        return f"{h:02d}:{mm:02d}"
+
     @model_validator(mode="after")
     def fill_defaults(self) -> "CalendarIntent":
         """Fill in missing date and time fields with sensible defaults."""

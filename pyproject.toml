@@ -29,6 +29,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+mlx = ["mlx-whisper>=0.4"]   # Whisper on Apple Silicon GPU (stt_engine: "mlx")
 nlp = [
     "spacy>=3.7,<4.0",
     "recognizers-text-date-time>=1.0.2a0",

@@ -54,9 +54,10 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(hideCompletedTasks, forKey: "hideCompletedTasks") }
     }
 
-    // Tasks tab tag filter ("" = show everything, "__untagged__" = only untagged).
-    @Published var taskTagFilter: String {
-        didSet { UserDefaults.standard.set(taskTagFilter, forKey: "taskTagFilter") }
+    // Tasks tab tag filters: tag names and/or "__untagged__". Empty = show everything.
+    // A task is shown when it matches ANY selected filter.
+    @Published var taskTagFilters: [String] {
+        didSet { UserDefaults.standard.set(taskTagFilters, forKey: "taskTagFilters") }
     }
 
     // "Tag mode": every task added from this phone gets this tag ("" = off).
@@ -80,7 +81,21 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(showWorkoutTab, forKey: "showWorkoutTab") }
     }
 
+    // Show the assistant's step-by-step "thinking" timeline while a voice
+    // command runs (streams live from the Mac). Local-only preference.
+    @Published var showThinking: Bool {
+        didSet { UserDefaults.standard.set(showThinking, forKey: "showThinking") }
+    }
+
+    // First-run vocabulary interview shown/skipped (local-only flag).
+    @Published var vocabOnboardingDone: Bool {
+        didSet { UserDefaults.standard.set(vocabOnboardingDone, forKey: "vocabOnboardingDone") }
+    }
+
     init() {
+        self.vocabOnboardingDone = UserDefaults.standard.bool(forKey: "vocabOnboardingDone")
+        self.showThinking = UserDefaults.standard.object(forKey: "showThinking") == nil
+            ? true : UserDefaults.standard.bool(forKey: "showThinking")
         self.serverURL = UserDefaults.standard.string(forKey: "serverURL") ?? ""
         self.apiKey    = UserDefaults.standard.string(forKey: "apiKey") ?? ""
         self.ttsVoice  = UserDefaults.standard.string(forKey: "ttsVoice") ?? "en-US"
@@ -108,7 +123,13 @@ class AppSettings: ObservableObject {
         self.hideCompletedTasks = UserDefaults.standard.object(forKey: "hideCompletedTasks") == nil
             ? true : UserDefaults.standard.bool(forKey: "hideCompletedTasks")
 
-        self.taskTagFilter = UserDefaults.standard.string(forKey: "taskTagFilter") ?? ""
+        if let arr = UserDefaults.standard.stringArray(forKey: "taskTagFilters") {
+            self.taskTagFilters = arr
+        } else {
+            // Migrate the old single-value filter.
+            let old = UserDefaults.standard.string(forKey: "taskTagFilter") ?? ""
+            self.taskTagFilters = old.isEmpty ? [] : [old]
+        }
         self.taskAutoTag   = UserDefaults.standard.string(forKey: "taskAutoTag") ?? ""
 
         self.hideCompletedAssignments = UserDefaults.standard.object(forKey: "hideCompletedAssignments") == nil

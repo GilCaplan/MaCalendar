@@ -5,6 +5,13 @@ A privacy-focused, voice-driven calendar assistant for macOS. This tool uses loc
 > [!IMPORTANT]
 > This application is specifically designed for **macOS** and leverages native features like the `say` command, system accessibility hooks, and macOS native dialogs.
 
+
+## How the AI assistant works
+
+![MACalendar assistant architecture](DOCUMENTATION/img/assistant-architecture.svg)
+
+A spoken command goes: **Whisper (MLX, on the Apple GPU)** → **personal vocabulary auto-correct** → **rule parser** (spaCy + date recognizer; answers ~40% of commands in ~100 ms with no LLM) → **local LLM** (Ollama, llama3.1:8b) only when the rule parser is unsure, with your most similar past commands injected as examples → validation → actions → SQLite. Every command is remembered; your edits, deletes and 👍/👎 become feedback that improves the next parse. A live stage-by-stage trace streams to the phone. Details: `DOCUMENTATION/SYSTEM.md`, audit: `DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md`.
+
 ## 🛠 Prerequisites
 
 Before installation, ensure you have the following:

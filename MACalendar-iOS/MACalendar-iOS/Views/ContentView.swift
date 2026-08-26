@@ -14,6 +14,11 @@ struct ContentView: View {
     @State private var monthHolidays: [Holiday] = []
     @State private var loadingMonth = false
     @State private var showCreateSheet = false
+    @State private var showVocabOnboarding = false
+    @ObservedObject private var importInbox = ImportInbox.shared
+    @State private var sharedImportText: String? = nil
+    @State private var unreviewed = 0
+    @State private var showReview = false
 
     enum CalendarMode { case month, week, day }
 
@@ -257,7 +262,47 @@ struct ContentView: View {
                 }
             }
         }
+        .sheet(isPresented: $showVocabOnboarding) {
+            VocabOnboardingView()
+        }
+        .sheet(isPresented: $showReview, onDismiss: { Task { unreviewed = await api.unreviewedCount() } }) {
+            AssistantReviewView()
+        }
+        .safeAreaInset(edge: .top) {
+            if unreviewed >= 5 {
+                Button { showReview = true } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.bubble")
+                        Text("\(unreviewed) voice commands to review — was the assistant right?")
+                            .font(.footnote.weight(.medium))
+                        Spacer()
+                        Text("Review").font(.footnote.weight(.semibold))
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+                    .background(settings.accentColor.opacity(0.18))
+                    .foregroundColor(.primary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .onReceive(importInbox.$pendingText) { t in
+            if let t { sharedImportText = t; importInbox.pendingText = nil }
+        }
+        .sheet(isPresented: Binding(get: { sharedImportText != nil }, set: { if !$0 { sharedImportText = nil } })) {
+            VocabImportView(initialText: sharedImportText, initialName: importInbox.pendingName)
+        }
         .task {
+            // First run: once the Mac is reachable and the vocabulary hasn't
+            // been set up, ask the user to teach the assistant their words.
+            if !settings.vocabOnboardingDone, !settings.serverURL.isEmpty,
+               let ob = try? await api.vocabOnboarding(), !ob.done {
+                showVocabOnboarding = true
+            } else if let ob = try? await api.vocabOnboarding(), ob.done {
+                settings.vocabOnboardingDone = true
+            }
+
+            unreviewed = await api.unreviewedCount()
+
             // Wire the Workout store up to the network layer once, so its
             // local mutations (saveTemplate, finishSession, etc.) can push
             // themselves to the server immediately — see WorkoutStore.configure.

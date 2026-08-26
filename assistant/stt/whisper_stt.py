@@ -37,12 +37,20 @@ class WhisperSTT(STTProvider):
             raise WhisperError(f"Failed to load Whisper model '{config.model_size}': {e}") from e
 
     def transcribe(self, audio: np.ndarray) -> str:
+        # Personal vocabulary → Whisper prompt bias (names, non-English words).
+        initial_prompt = None
+        try:
+            from assistant.stt.vocab import get_vocab
+            initial_prompt = get_vocab().whisper_prompt()
+        except Exception:  # vocab must never break transcription
+            initial_prompt = None
         try:
             segments, _ = self._model.transcribe(
                 audio,
                 language=self._language,
                 beam_size=self._beam_size,
                 vad_filter=True,  # built-in VAD strips silence
+                initial_prompt=initial_prompt,
             )
             return " ".join(seg.text.strip() for seg in segments).strip()
         except Exception as e:

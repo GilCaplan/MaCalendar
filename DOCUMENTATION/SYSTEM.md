@@ -41,3 +41,18 @@ Voice command
 ## Log prefixes
 - `🖥️` — Mac app logs (pipeline, audio, STT, LLM, actions)
 - `📱` — iPhone API logs (audio received, transcript, parsed actions, response)
+
+## Personalisation layer (added 2026-08-26)
+
+| Piece | File | What it does |
+|---|---|---|
+| Vocabulary | `assistant/stt/vocab.py` | Personal words (names, Hebrew, places). Fed to Whisper as `initial_prompt`; transcripts auto-corrected via learned aliases + fuzzy match (difflib ≥ 0.80, protected common words). Every fuzzy fix is remembered as an alias. Store: `~/.assistant_tools/vocab.json` (local only). |
+| Onboarding | `assistant/stt/vocab_onboarding.py` | First-run interview (6 questions) + opt-in starter packs (prayer/Shabbat, holidays, Israeli life, family, life events). iOS `VocabOnboardingView`, Mac `VocabDialog › Set up…`. |
+| Command memory (RAG) | `assistant/intent/memory.py` | Every command → executed intents → result → timings in `~/.assistant_tools/nlu_memory.db`. Edits/deletes of a voice-created record within 24 h become `corrected`/`rejected` feedback (hooked in `db.update_event/delete_event/update_todo/delete_todo`). `few_shot_block()` injects the k most similar examples (dates masked) into the LLM system prompt (`nlu.memory_examples`). Also holds the **pending queue** of commands that failed because the LLM was offline; the API server retries them every 30 s. |
+| Trace | `assistant/trace.py` | Stage-by-stage "thinking" log with ms timings. Returned in `/voice` responses and streamed live as NDJSON from `POST /voice/stream` (iOS `ThinkingView`, toggle in Settings › Voice). |
+| Self-check | `IntentParser.verify_actions_async` + `server._run_server_verify` | After execution on **any** path, a background LLM call re-reasons over transcript + executed actions + user history and applies minor patches / undo-redo on the Mac; phone polls `GET /voice/verify/<token>` for the outcome. |
+| Benchmark | `scripts/benchmark_models.py` → `DOCUMENTATION/MODEL_BENCHMARK.md` | Accuracy + latency of Ollama models on real commands. |
+
+New endpoints: `GET/POST /vocab`, `POST /vocab/alias`, `DELETE /vocab/<word>[?alias=]`, `PATCH /vocab/settings`, `POST /vocab/preview`, `GET/POST /vocab/onboarding`, `GET /memory`, `GET /memory/similar?q=`, `POST /memory/<id>/feedback`, `DELETE /memory/<id>`, `GET /pending`, `POST /pending/<id>/retry`, `DELETE /pending/<id>`, `POST /voice/stream`. `/health` now reports `llm_status` (`ok` / `offline` / model not pulled).
+
+Speed: Ollama `keep_alive: -1` + startup warm-up of Whisper, spaCy and the LLM (`warm_up_components`) remove the cold-start cost that made the first phone command take 10–20 s.

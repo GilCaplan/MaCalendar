@@ -116,6 +116,7 @@ class RuleParseResult:
     raw_slots: dict  # {action_name: {slot_name: value}}
     transcript: str
     routed_to_llm: bool = False
+    dropped_spans: int = 0   # parts of the command the rule parser could not route
 
 
 class RuleParserSkip(Exception):
@@ -712,6 +713,15 @@ def _extract_temporal(span_text: str, today: datetime.date) -> dict:
 # ---------------------------------------------------------------------------
 
 
+_ROUTE_OVERRIDES = [
+    (re.compile(r"^\s*(?:please\s+)?(?:add|put)\s+.+\s+(?:on|to)\s+(?:my|the)\s+(?:\w+\s+)?list\b"), "create_todo"),
+    (re.compile(r"^\s*(?:please\s+)?(?:i\s+)?(?:need|have|want|got)\s+to\s+"), "create_todo"),
+    (re.compile(r"^\s*(?:please\s+)?remind me\b"), "create_todo"),
+    (re.compile(r"^\s*(?:please\s+)?add\s+(?:a\s+|\d+\s+|two\s+|three\s+)?(?:new\s+)?tasks?\b"), "create_todo"),
+    (re.compile(r"^\s*(?:what|which|show|list|read)\b.*\b(?:tasks?|todos?|to-dos?)\b"), "query_todos"),
+]
+
+
 def _route_intent(span, current_view: str) -> tuple[str | None, str, bool, bool]:
     """Route a span to an (action_name, domain, domain_inferred, domain_material) tuple.
 
@@ -725,6 +735,11 @@ def _route_intent(span, current_view: str) -> tuple[str | None, str, bool, bool]
     """
     span_text = span.text.lower()
     span_words = set(re.findall(r"\w+", span_text))
+
+    # --- Phrase-level overrides (checked before verb heuristics) ---
+    for pat, action in _ROUTE_OVERRIDES:
+        if pat.search(span_text):
+            return action, ("todo" if "todo" in action else "calendar"), False, False
 
     # --- Domain detection ---
     has_calendar = bool(span_words & _CALENDAR_SIGNALS)
@@ -853,6 +868,48 @@ def _in_temporal(tok, temporal_spans: list[tuple[int, int]]) -> bool:
     return any(start <= tok.idx < end for start, end in temporal_spans)
 
 
+_PRONOUN_TITLES = frozenset({"me", "i", "it", "you", "us", "them", "that", "this", "task", "tasks", "todo", "reminder", "list"})
+
+_TODO_LEAD = re.compile(
+    r"^\s*(?:(?:please|hey|ok|okay)[,\s]+)?"
+    r"(?:remind me(?:\s+(?:tomorrow|today|tonight|later|on\s+\w+|next\s+\w+|this\s+\w+))?\s+(?:to|about|that)\s+"
+    r"|add\s+(?:a\s+|the\s+|\d+\s+|two\s+|three\s+)?(?:new\s+)?tasks?\s*(?:to|:|-|—)?\s*(?:my\s+list\s*)?(?:to\s+)?"
+    r"|(?:i\s+)?(?:need|have|want|got)\s+to\s+"
+    r"|(?:add|put)\s+(?:to\s+(?:my|the)\s+(?:\w+\s+)?list\s*:?\s*)"
+    r"|(?:make|create)\s+(?:a\s+)?(?:todo|task|reminder)\s+(?:to\s+|for\s+|:\s*)?"
+    r"|(?:todo|task|reminder)\s*:\s*)",
+    re.IGNORECASE,
+)
+_TODO_TRAIL = re.compile(
+    r"\s+(?:on|to)\s+(?:my|the)\s+(?:\w+\s+)?list\s*$|\s+(?:due|by|for|on)\s+(?:tomorrow|today|tonight|next\s+\w+|this\s+\w+|\w+day|the\s+\d+\w*)\s*$",
+    re.IGNORECASE,
+)
+
+
+def _todo_titles_from_text(text: str, temporal_spans, span) -> list[str]:
+    """'remind me tomorrow to send the syllabus to Guri' → ['send the syllabus to Guri'];
+    'add buy milk, eggs and bread to my list' → ['buy milk', 'eggs', 'bread']."""
+    t = text.strip().rstrip(".!?")
+    m = _TODO_LEAD.match(t)
+    if not m:
+        # "put milk and bananas on the groceries list" / "add X to my list"
+        m2 = re.match(r"^\s*(?:add|put)\s+(.+?)\s+(?:on|to)\s+(?:my|the)\s+(?:\w+\s+)?list\s*$", t, re.IGNORECASE)
+        if not m2:
+            return []
+        body = m2.group(1)
+    else:
+        body = t[m.end():]
+        body = _TODO_TRAIL.sub("", body)
+    body = re.sub(r"\s+(?:due|by)\s+.*$", "", body, flags=re.IGNORECASE).strip(" ,;:")
+    if not body:
+        return []
+    # split lists: commas / semicolons / " and " (but keep "X and Y" when it's a 2-word object)
+    parts = re.split(r"\s*[,;]\s*|\s+and\s+(?=\w)", body)
+    parts = [p.strip(" .") for p in parts if p.strip(" .")]
+    parts = [p for p in parts if p.lower() not in _PRONOUN_TITLES]
+    return parts[:10]
+
+
 def _extract_title(span, temporal_spans: list[tuple[int, int]]) -> str | None:
     """Extract the best title from a span, blocking temporal token positions."""
     # Priority 1: noun chunk containing dobj of root verb
@@ -861,8 +918,10 @@ def _extract_title(span, temporal_spans: list[tuple[int, int]]) -> str | None:
         if chunk.root.dep_ == "dobj"
         and not any(_in_temporal(t, temporal_spans) for t in chunk)
     ]
-    if dobj_chunks:
-        return _clean_title(dobj_chunks[0].text)
+    for c in dobj_chunks:
+        t = _clean_title(c.text)
+        if t:
+            return t
 
     # Priority 2: noun chunk containing pobj (object of preposition)
     pobj_chunks = [
@@ -870,8 +929,10 @@ def _extract_title(span, temporal_spans: list[tuple[int, int]]) -> str | None:
         if chunk.root.dep_ == "pobj"
         and not any(_in_temporal(t, temporal_spans) for t in chunk)
     ]
-    if pobj_chunks:
-        return _clean_title(pobj_chunks[0].text)
+    for c in pobj_chunks:
+        t = _clean_title(c.text)
+        if t:
+            return t
 
     # Priority 3: any noun chunk not in temporal zone, closest to root
     root_tok = next((tok for tok in span if tok.dep_ == "ROOT"), span[0])
@@ -904,9 +965,9 @@ def _clean_title(text: str) -> str:
     words = text.split()
     while words and words[0].lower() in _TITLE_STRIP_VERBS:
         words = words[1:]
-    text = " ".join(words) if words else text
+    text = " ".join(words)          # may be empty when the chunk was only a verb ("book")
     text = re.sub(r"\s+", " ", text)
-    return text if text else text
+    return text
 
 
 def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> dict:
@@ -934,6 +995,9 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
                         attendees.append(child.text)
         if attendees:
             slots["attendees"] = attendees
+            # "set a meeting with Ravid" → title "meeting with Ravid" instead of a bare placeholder
+            if slots.get("title", "").lower() in {"meeting", "set meeting", "event", "appointment", "call", "lunch", "dinner", "coffee", "zoom"}:
+                slots["title"] = f"{slots['title'].replace('set ', '')} with {' and '.join(attendees)}"
 
     elif action_name == "update_event":
         # Detect whether this is an extend/shorten action (vs. a move/reschedule)
@@ -1037,8 +1101,22 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
         else:
             slots["query_type"] = "full"
 
+    elif action_name == "create_todo" and temporal.get("start_time") and re.search(r"\bremind me (?:about|of)\b", span.text, re.I):
+        # "remind me about X at 9 am" is a calendar event, not a task
+        slots["_reroute"] = "create_event"
+        slots["title"] = re.sub(r"^\s*remind me (?:about|of)\s+(?:the\s+|my\s+)?", "", span.text, flags=re.I)
+        slots["title"] = re.sub(r"\s+(?:tomorrow|today|tonight|on\s+\w+|next\s+\w+|this\s+\w+|at\s+[\d:.]+\s*(?:am|pm)?).*$", "", slots["title"], flags=re.I).strip() or "reminder"
+        if temporal.get("date"):
+            slots["date"] = temporal["date"]
+        slots["start_time"] = temporal["start_time"]
+        slots["end_time"] = temporal.get("end_time") or ""
     elif action_name == "create_todo":
-        if title:
+        # Phrase-level extraction first: dependency heuristics produce "me"
+        # for "remind me to …" and "task" for "add a task to …".
+        phrase_titles = _todo_titles_from_text(span.text, temporal_spans, span)
+        if phrase_titles:
+            slots["titles"] = phrase_titles
+        elif title and title.lower() not in _PRONOUN_TITLES:
             slots["titles"] = [title]
         if temporal.get("date"):
             slots["due_date"] = temporal["date"]
@@ -1192,6 +1270,11 @@ def _compute_confidence(
     if used_anaphora:
         multiplier *= 0.80
 
+    # Two distinct clock times in one span usually means two events ("lunch at noon
+    # and coffee at 9") — the single-intent slots can't represent that; force hybrid.
+    if action_name == "create_event" and temporal.get("_n_times", 0) >= 2 and not temporal.get("end_time"):
+        multiplier *= 0.7
+
     confidence = base * multiplier
 
     # Bonus for optional slots
@@ -1247,6 +1330,7 @@ class RuleBasedParser:
         all_missing: list[str] = []
         all_raw_slots: dict = {}
         confidences: list[float] = []
+        dropped_spans = 0
 
         for span in spans:
             # Phase 2: Temporal extraction
@@ -1257,11 +1341,19 @@ class RuleBasedParser:
             if action_name is None:
                 if len(spans) == 1:
                     raise RuleParserSkip(f"No action matched for: {span.text!r}")
-                # Multi-span: skip unmatched span, continue
+                # Multi-span: skip unmatched span, continue — but remember it: part of
+                # the command was ignored, so the LLM should get a look (hybrid).
+                dropped_spans += 1
                 continue
 
             # Phase 4: Slot filling
+            _tt = re.sub(r"(\d)\.(\d)", r"\1:\2", span.text)   # 4.30 pm → 4:30 pm
+            temporal["_n_times"] = len(re.findall(
+                r"(?<![\d:])(?:\d{1,2}:\d{2}\s*(?:am|pm|a\.m\.|p\.m\.)?|\d{1,2}\s*(?:am|pm|a\.m\.|p\.m\.)|noon|midnight|\d{1,2}\s*o'clock|at\s+\d{1,2}(?![\d:]))\b",
+                _tt, re.I))
             slots = _fill_slots(span, action_name, temporal, current_view)
+            if "_reroute" in slots:
+                action_name = slots.pop("_reroute")
 
             # Phase 5: Anaphora resolution
             slots, used_anaphora = _resolve_anaphora(slots, action_name, self._memory)
@@ -1302,7 +1394,7 @@ class RuleBasedParser:
         if not confidences:
             raise RuleParserSkip("No spans produced confident results")
 
-        overall_confidence = min(confidences)
+        overall_confidence = min(confidences) * (0.7 if dropped_spans else 1.0)
 
         return RuleParseResult(
             confidence=overall_confidence,
@@ -1310,6 +1402,7 @@ class RuleBasedParser:
             missing_slots=all_missing,
             raw_slots=all_raw_slots,
             transcript=normalized,
+            dropped_spans=dropped_spans,
         )
 
     def parse(self, transcript: str, current_view: str = "month") -> list[tuple[str, "BaseIntent"]]:

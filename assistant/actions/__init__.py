@@ -103,7 +103,19 @@ class ActionRegistry:
             "  - 'next week on [Day]' = that day in the 'Next week' block above.",
             "  - 'this [Day]' = the entry labelled 'this [Day]' in this week's block.",
             "  - If the user specifies an explicit calendar date number (e.g., 'the 14th', 'April 15'), use that date directly — do not apply any additional week offset on top of it.",
+            "  - A bare weekday ('on thursday', 'friday 9 am') = the COMING occurrence of that weekday — look it up in the table above. Use today's date ONLY when the user says today/tonight (or the weekday named is today's). NEVER a date before today.",
+            "  - 'tonight' / 'this evening' = today. 'tomorrow morning/night' = tomorrow.",
             "  - Never guess — always copy the exact ISO date from the table above.",
+            "",
+            "Rules for titles and recurrence:",
+            "  - title = the activity and who/where, 2-6 words (e.g. 'Meeting with Ravid at Kems', 'Dentist appointment'). NEVER put the date, weekday or time in the title.",
+            "  - 'every monday', 'mondays', 'weekly' → recurrence='weekly'; 'every day', 'daily' → 'daily'; 'monthly' → 'monthly'. Set recurrence whenever such words appear.",
+            "  - 'X to Y' / 'from X until Y' gives start_time AND end_time. 'for an hour' = end_time one hour after start.",
+            "",
+            "Rules for tasks vs events:",
+            "  - 'remind me to <do something>', 'add a task', 'I need to …', 'put X on my list' → create_todo. Use the 'titles' array; split 'A, B and C' into separate titles; a due date ('due friday', 'by tomorrow') goes in due_date, not in the title.",
+            "  - 'remind me about <thing> at <clock time>' or anything with a specific clock time → create_event.",
+            "  - Do not add an extra create_event for a command that is only about tasks.",
             "",
             "Return ONLY valid JSON. The format MUST be exactly:",
             '{"actions": [{"action": "<name>", "parameters": {...}}, ...]}',
@@ -125,9 +137,8 @@ class ActionRegistry:
         for name, cls in self._actions.items():
             lines.append(f"\n  action: \"{name}\"")
             lines.append(f"  description: {cls.description}")
-            lines.append(f"  parameters schema:")
-            for schema_line in json.dumps(cls.parameters_schema, indent=4).splitlines():
-                lines.append(f"    {schema_line}")
+            # compact one-line schema: same information, ~40% fewer tokens
+            lines.append(f"  parameters schema: {json.dumps(cls.parameters_schema, separators=(',', ':'))}")
 
         return "\n".join(lines)
 

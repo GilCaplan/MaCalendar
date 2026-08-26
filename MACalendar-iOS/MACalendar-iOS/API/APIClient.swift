@@ -508,6 +508,129 @@ class APIClient: ObservableObject {
         }
     }
 
+    /// Streaming variant of sendAudio: POST /voice/stream returns NDJSON —
+    /// one {"type":"step",...} line per pipeline stage, then {"type":"result",...}.
+    /// `onStep` fires on the main actor as each stage arrives.
+    func sendAudioStreaming(_ audioData: Data,
+                            onStep: @escaping (TraceStep) -> Void) async throws -> VoiceResponse {
+        guard !base.isEmpty, let url = URL(string: base + "/voice/stream") else {
+            throw APIError.badURL
+        }
+        var req = URLRequest(url: url, timeoutInterval: 120)
+        req.httpMethod = "POST"
+        if !settings.apiKey.isEmpty {
+            req.setValue(settings.apiKey, forHTTPHeaderField: "X-API-Key")
+        }
+        let boundary = UUID().uuidString
+        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"audio\"; filename=\"audio.wav\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
+        body.append(audioData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        req.httpBody = body
+
+        let decoder = JSONDecoder()
+        do {
+            let (bytes, resp) = try await URLSession.shared.bytes(for: req)
+            guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                throw APIError.serverError("HTTP error")
+            }
+            isOnline = true
+            var final: VoiceResponse?
+            for try await line in bytes.lines {
+                guard let data = line.data(using: .utf8),
+                      let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let type = obj["type"] as? String else { continue }
+                if type == "step", let step = try? decoder.decode(TraceStep.self, from: data) {
+                    onStep(step)
+                } else if type == "result" {
+                    final = try? decoder.decode(VoiceResponse.self, from: data)
+                }
+            }
+            guard let final else { throw APIError.serverError("Stream ended without a result") }
+            return final
+        } catch let err as APIError {
+            throw err
+        } catch {
+            isOnline = false
+            throw APIError.offline
+        }
+    }
+
+    // MARK: - Vocabulary (STT auto-correct)
+
+    func vocab() async throws -> VocabState {
+        try decode(VocabState.self, from: try await request("/vocab"))
+    }
+
+    func vocabAddWord(_ word: String, aliases: [String] = []) async throws {
+        _ = try await request("/vocab", method: "POST", body: ["word": word, "aliases": aliases])
+    }
+
+    /// Teach a correction: STT heard `wrong`, you meant `right`.
+    func vocabTeach(wrong: String, right: String) async throws {
+        _ = try await request("/vocab/alias", method: "POST", body: ["wrong": wrong, "right": right])
+    }
+
+    func vocabDelete(word: String, alias: String? = nil) async throws {
+        var path = "/vocab/" + (word.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? word)
+        if let alias, let a = alias.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            path += "?alias=" + a
+        }
+        _ = try await request(path, method: "DELETE")
+    }
+
+    func vocabSettings(autoCorrect: Bool? = nil, learnAliases: Bool? = nil, threshold: Double? = nil) async throws -> VocabState {
+        var body: [String: Any] = [:]
+        if let autoCorrect { body["auto_correct"] = autoCorrect }
+        if let learnAliases { body["learn_aliases"] = learnAliases }
+        if let threshold { body["threshold"] = threshold }
+        return try decode(VocabState.self, from: try await request("/vocab/settings", method: "PATCH", body: body))
+    }
+
+    func vocabImport(text: String? = nil, source: String? = nil, names: [String]? = nil) async throws -> [VocabCandidate] {
+        var body: [String: Any] = [:]
+        if let text { body["text"] = text }
+        if let source { body["source"] = source }
+        if let names { body["names"] = names }
+        return try decode(VocabImportResult.self, from: try await request("/vocab/import", method: "POST", body: body)).candidates
+    }
+
+    func vocabAddWords(_ words: [String]) async throws {
+        _ = try await request("/vocab/bulk", method: "POST", body: ["words": words])
+    }
+
+    func vocabOnboarding() async throws -> VocabOnboarding {
+        try decode(VocabOnboarding.self, from: try await request("/vocab/onboarding"))
+    }
+
+    func vocabOnboardingSubmit(answers: [String: [String]], presets: [String]) async throws {
+        _ = try await request("/vocab/onboarding", method: "POST",
+                              body: ["answers": answers, "presets": presets, "done": true])
+    }
+
+    // MARK: - Pending (queued) commands
+
+    func retryPending(id: Int) async throws -> VoiceResponse {
+        try decode(VoiceResponse.self, from: try await request("/pending/\(id)/retry", method: "POST"))
+    }
+
+    // MARK: - Command memory feedback
+
+    func unreviewedCommands(limit: Int = 30) async throws -> [MemoryExample] {
+        try decode(UnreviewedResponse.self, from: try await request("/memory/unreviewed?limit=\(limit)")).examples
+    }
+
+    func unreviewedCount() async -> Int {
+        (try? await unreviewedCommands(limit: 50).count) ?? 0
+    }
+
+    func memoryFeedback(id: Int, feedback: String) async {
+        _ = try? await request("/memory/\(id)/feedback", method: "POST", body: ["feedback": feedback])
+    }
+
     // MARK: - Courses
 
     func courses() async throws -> [Course] {

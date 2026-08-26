@@ -6,6 +6,7 @@ struct SettingsView: View {
     @EnvironmentObject var api: APIClient
     @State private var healthStatus: String? = nil
     @State private var checking = false
+    @State private var unreviewed = 0
     @FocusState private var urlFocused: Bool
     @FocusState private var keyFocused: Bool
 
@@ -173,12 +174,57 @@ struct SettingsView: View {
 
                     // MARK: Voice
                     GroupBox(label: Label("Voice", systemImage: "speaker.wave.2")) {
-                        Picker("TTS Voice", selection: $settings.ttsVoice) {
-                            ForEach(voices, id: \.language) { v in
-                                Text(v.label).tag(v.language)
+                        VStack(alignment: .leading, spacing: 12) {
+                            Picker("TTS Voice", selection: $settings.ttsVoice) {
+                                ForEach(voices, id: \.language) { v in
+                                    Text(v.label).tag(v.language)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+
+                            Divider()
+
+                            Toggle(isOn: $settings.showThinking) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Show assistant thinking")
+                                    Text("Live step-by-step log while a command runs")
+                                        .font(.caption).foregroundColor(.secondary)
+                                }
+                            }
+
+                            NavigationLink {
+                                AssistantReviewView()
+                            } label: {
+                                HStack {
+                                    Label("Review commands", systemImage: "checkmark.bubble")
+                                    Spacer()
+                                    if unreviewed > 0 {
+                                        Text("\(unreviewed)")
+                                            .font(.caption.weight(.semibold))
+                                            .padding(.horizontal, 7).padding(.vertical, 2)
+                                            .background(settings.accentColor.opacity(0.2))
+                                            .foregroundColor(settings.accentColor)
+                                            .clipShape(Capsule())
+                                    } else {
+                                        Text("Was it right? Tap yes or no").font(.caption).foregroundColor(.secondary)
+                                    }
+                                    Image(systemName: "chevron.right").font(.caption).foregroundColor(.secondary)
+                                }
+                            }
+
+                            NavigationLink {
+                                VocabularyView()
+                            } label: {
+                                HStack {
+                                    Label("Vocabulary", systemImage: "character.book.closed")
+                                    Spacer()
+                                    Text("Names & words it should know")
+                                        .font(.caption).foregroundColor(.secondary)
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption).foregroundColor(.secondary)
+                                }
                             }
                         }
-                        .pickerStyle(.segmented)
                         .padding(.vertical, 4)
                     }
 
@@ -200,6 +246,7 @@ struct SettingsView: View {
                 if !validLanguages.contains(settings.ttsVoice) {
                     settings.ttsVoice = "en-US"
                 }
+                Task { unreviewed = await api.unreviewedCount() }
             }
         }
     }

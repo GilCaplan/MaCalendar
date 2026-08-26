@@ -128,10 +128,116 @@ struct VoiceResponse: Codable {
     let refresh: String
     let parse: String           // "rule" | "hybrid" | "llm" | "error"
     let verifyToken: String?    // present only for "rule" responses; poll /voice/verify/<token>
+    // Added with the vocabulary / thinking-trace work. All optional so older
+    // servers (and the empty-transcript reply) still decode.
+    let transcript: String?          // after stop-word strip + vocab auto-correct
+    let originalTranscript: String?  // raw Whisper output
+    let corrections: [VocabCorrection]?
+    let trace: [TraceStep]?
+    let memoryId: Int?               // row in the command memory (for feedback)
+    let pendingId: Int?              // set when the command was queued (LLM offline/slow)
+    let uncertainWords: [UncertainWord]?
 
     enum CodingKeys: String, CodingKey {
-        case message, actions, refresh, parse
+        case message, actions, refresh, parse, transcript, corrections, trace
         case verifyToken = "verify_token"
+        case originalTranscript = "original_transcript"
+        case memoryId = "memory_id"
+        case pendingId = "pending_id"
+        case uncertainWords = "uncertain_words"
+    }
+}
+
+/// A word the assistant isn't sure about — near-miss of a vocab word, or an
+/// unknown capitalised token that's probably a name.
+struct UncertainWord: Codable, Identifiable, Equatable {
+    var id: String { heard }
+    let heard: String
+    let candidate: String?
+    let score: Double
+    let reason: String   // "near-miss" | "unknown-name"
+}
+
+/// One stage of the assistant's "thinking" — streamed live from POST /voice/stream
+/// and also returned in full as `VoiceResponse.trace`.
+struct TraceStep: Codable, Identifiable, Equatable {
+    var id: String { "\(atMs)-\(stage)-\(title)" }
+    let stage: String     // stt | vocab | rule | memory | llm | validate | execute | verify | done | error
+    let title: String
+    let detail: String
+    let ms: Int
+    let atMs: Int
+    let ok: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case stage, title, detail, ms, ok
+        case atMs = "at_ms"
+    }
+
+    static func == (a: TraceStep, b: TraceStep) -> Bool { a.id == b.id && a.detail == b.detail }
+}
+
+struct VocabCorrection: Codable, Identifiable, Equatable {
+    var id: String { from + "→" + to }
+    let from: String
+    let to: String
+    let reason: String    // "alias" | "fuzzy"
+    let score: Double
+}
+
+struct VocabWord: Codable, Identifiable, Equatable {
+    var id: String { word }
+    let word: String
+    let aliases: [String]
+    let hits: Int
+}
+
+struct VocabRecent: Codable, Identifiable {
+    var id: Double { ts }
+    let ts: Double
+    let source: String
+    let original: String
+    let corrected: String
+    let corrections: [VocabCorrection]
+}
+
+struct VocabState: Codable {
+    let autoCorrect: Bool
+    let learnAliases: Bool
+    let threshold: Double
+    let onboarded: Bool?
+    let words: [VocabWord]
+    let recent: [VocabRecent]
+
+    enum CodingKeys: String, CodingKey {
+        case words, recent, threshold, onboarded
+        case autoCorrect = "auto_correct"
+        case learnAliases = "learn_aliases"
+    }
+}
+
+struct VocabQuestion: Codable, Identifiable {
+    let id: String
+    let question: String
+    let hint: String
+    let examples: [String]
+}
+
+struct VocabPreset: Codable, Identifiable {
+    let id: String
+    let label: String
+    let words: [String]
+    let already: Int
+}
+
+struct VocabOnboarding: Codable {
+    let done: Bool
+    let questions: [VocabQuestion]
+    let presets: [VocabPreset]
+    let wordCount: Int
+    enum CodingKeys: String, CodingKey {
+        case done, questions, presets
+        case wordCount = "word_count"
     }
 }
 
@@ -234,3 +340,59 @@ struct AnyCodable: Codable {
         }
     }
 }
+
+/// A vocabulary candidate mined from text / contacts / calendar (POST /vocab/import).
+struct VocabCandidate: Codable, Identifiable {
+    var id: String { word }
+    let word: String
+    let count: Int
+    let reason: String   // sender | contact | name | hebrew | non-english
+    let sample: String
+}
+
+struct VocabImportResult: Codable { let candidates: [VocabCandidate] }
+
+extension AnyCodable {
+    var stringValue: String? {
+        if let s = value as? String { return s }
+        if let i = value as? Int { return String(i) }
+        if let d = value as? Double { return String(d) }
+        return nil
+    }
+    var arrayValue: [AnyCodable]? {
+        if let a = value as? [String] { return a.map { AnyCodable($0) } }
+        if let a = value as? [AnyCodable] { return a }
+        return nil
+    }
+}
+
+/// One executed action inside a remembered command (GET /memory, /memory/unreviewed).
+struct MemoryAction: Codable {
+    let action: String
+    let parameters: [String: AnyCodable]
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        action = try c.decode(String.self, forKey: .action)
+        parameters = (try? c.decode([String: AnyCodable].self, forKey: .parameters)) ?? [:]
+    }
+    enum CodingKeys: String, CodingKey { case action, parameters }
+}
+
+/// A remembered voice command from the Mac's command memory.
+struct MemoryExample: Codable, Identifiable {
+    let id: Int
+    let ts: Double
+    let time: String
+    let source: String
+    let transcript: String
+    let parsePath: String
+    let actions: [MemoryAction]
+    let result: String
+    let feedback: String
+    enum CodingKeys: String, CodingKey {
+        case id, ts, time, source, transcript, actions, result, feedback
+        case parsePath = "parse_path"
+    }
+}
+
+struct UnreviewedResponse: Codable { let examples: [MemoryExample]; let count: Int }

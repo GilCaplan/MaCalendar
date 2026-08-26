@@ -1,7 +1,7 @@
 """Configuration loading and validation."""
 
 import os
-from typing import List, Literal, Optional
+from typing import Union, List, Literal, Optional
 
 import yaml
 from pydantic import BaseModel, field_validator
@@ -31,6 +31,12 @@ class WhisperConfig(BaseModel):
     beam_size: int = 1  # 1 = greedy decode; faster for short voice commands
 
 
+class MlxWhisperConfig(BaseModel):
+    """Whisper on the Apple GPU via MLX (stt_engine: "mlx")."""
+    model: str = "mlx-community/whisper-base-mlx"   # …/whisper-small-mlx, …/whisper-large-v3-turbo
+    language: Optional[str] = "en"
+
+
 class GoogleSTTConfig(BaseModel):
     api_key: Optional[str] = None
 
@@ -40,6 +46,20 @@ class OllamaConfig(BaseModel):
     model: str = "llama3.1:8b"
     temperature: float = 0.1
     timeout_seconds: int = 60
+    # Keep the model resident in memory between commands ("30m", "-1" = forever).
+    # Ollama's default (5 min) means the first command after a pause pays a
+    # multi-second reload — that's most of the perceived latency.
+    keep_alive: Union[int, str] = -1   # int seconds (-1 = forever) or "30m"
+    # Two-tier models: `model` answers the user (latency matters); `verify_model`
+    # does the background self-check / re-reasoning where a slower, stronger
+    # model is fine. None = same as `model`.
+    verify_model: Optional[str] = None
+    # Context window. Ollama's default (4096) is SMALLER than our system prompt
+    # (~4k tokens): the window overflows on every call, the prefix cache is
+    # lost and the date table gets truncated. 8192 fits prompt + few-shot + output.
+    num_ctx: int = 8192
+    # Warm the model at startup so the first command is fast.
+    warm_up: bool = True
 
 
 class OpenAIConfig(BaseModel):
@@ -130,13 +150,19 @@ class NLUConfig(BaseModel):
     # created immediately with the keyword as a placeholder title, then the LLM
     # silently patches it with a proper title derived from the full transcript.
     event_keywords: List[str] = ["meeting", "appointment", "activity"]
+    # Few-shot personalisation: inject the k most similar past commands
+    # (with user corrections) into the LLM prompt. 0 = off.
+    memory_examples: int = 4
+    # Record every command + outcome to ~/.assistant_tools/nlu_memory.db
+    memory_enabled: bool = True
 
 
 class AppConfig(BaseModel):
     hotkey: HotkeyConfig
-    stt_engine: Literal["whisper", "google"] = "whisper"
+    stt_engine: Literal["whisper", "mlx", "google"] = "whisper"
     llm_engine: Literal["ollama", "openai", "gemini", "claude"] = "ollama"
     whisper: WhisperConfig = WhisperConfig()
+    mlx_whisper: MlxWhisperConfig = MlxWhisperConfig()
     google_stt: GoogleSTTConfig = GoogleSTTConfig()
     ollama: OllamaConfig = OllamaConfig()
     openai: OpenAIConfig = OpenAIConfig()
@@ -145,6 +171,10 @@ class AppConfig(BaseModel):
     microsoft: Optional[MicrosoftConfig] = None
     confirmation_level: int = 1
     verify_fast_path: bool = True   # background LLM check of rule-parser results
+    # Apply the self-check's corrections automatically? The 2026-08-26 audit showed the
+    # verifier proposes changes on ~98% of commands and fixes fewer than it breaks, so
+    # by default it is ADVISORY: logged + shown in the trace, not applied.
+    self_check_apply: bool = False
     audio: AudioConfig = AudioConfig()
     tts: TTSConfig = TTSConfig()
     todo: TodoConfig = TodoConfig()

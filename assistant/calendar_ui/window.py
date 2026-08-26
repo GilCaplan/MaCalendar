@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
 )
 
+from assistant.calendar_ui import icons
 from assistant.calendar_ui.day_view import DayView
 from assistant.calendar_ui.event_dialog import EventDialog
 from assistant.calendar_ui.month_view import MonthView
@@ -955,6 +956,17 @@ class CalendarWindow(QMainWindow):
         auto_cb = QCheckBox("Auto-Approve Actions (No Confirmations)")
         auto_cb.setChecked(self._pipeline._confirmer.level == 0)
         layout.addWidget(auto_cb)
+
+        # Personal vocabulary (STT auto-correct) + recent assistant commands
+        vocab_btn = QPushButton(icons.icon("vocab"), "Vocabulary & Assistant Log…")
+        vocab_btn.setToolTip("Teach the assistant names and words it mishears; review recent commands")
+        vocab_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        def _open_vocab():
+            from assistant.calendar_ui.vocab_dialog import VocabDialog
+            VocabDialog(self).exec()
+        vocab_btn.clicked.connect(_open_vocab)
+        layout.addWidget(vocab_btn)
 
         layout.addStretch(1)
 

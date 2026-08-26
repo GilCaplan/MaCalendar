@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime
 import logging
 import os
+import re
 import sqlite3
 from typing import Any
 
@@ -59,6 +60,8 @@ def _get_parser():
         from assistant.intent.parser import IntentParser
         cfg = load_config()
         _parser = IntentParser(cfg, _get_registry())
+        if cfg.llm_engine == "ollama" and cfg.ollama.warm_up:
+            _threading.Thread(target=_parser.warm_up, daemon=True).start()
     return _parser
 
 
@@ -74,40 +77,113 @@ def _get_rule_parser():
     return _rule_parser
 
 
-def _run_server_verify(token: str, transcript: str, rule_result) -> None:
-    """Background worker: runs LLM verification and stores result for iOS polling.
+def _run_server_verify(token: str, transcript: str, rule_result, executed=None,
+                       records=None, memory_id=None) -> None:
+    """Background self-check for a voice command (any parse path).
 
-    The iOS app polls GET /voice/verify/<token> every ~5 s after receiving a
-    rule-path voice response. This function populates the store so the poll
-    can return the correction (if any) or {"ok": true}.
+    The LLM re-reasons over the transcript, what was executed, and the user's
+    similar past commands. Unlike the original iOS design (which handed the
+    correction to the phone to re-execute), corrections are applied HERE on
+    the Mac — minor patches via db.update_*, major ones as delete + re-run —
+    and the phone only polls GET /voice/verify/<token> to learn what happened
+    (speech to say, what to refresh).
 
-    Three-tier outcome — matches pipeline.py logic:
-      • ok=true            → {"ok": true}  — iOS takes no action
-      • severity="minor"  → {"ok": false, "severity": "minor", "patch": {...},
-                             "speech": "...", "refresh": "events"|"todos"}
-      • severity="major"  → {"ok": false, "severity": "major",
-                             "action": "...", "parameters": {...},
-                             "speech": "...", "refresh": "..."}
-    iOS re-executes major corrections via the normal REST endpoints
-    (create/patch/delete) and plays the speech string locally.
+      • {"ok": true}
+      • {"ok": false, "severity": "minor"|"major", "applied": bool,
+         "speech": "...", "refresh": "events"|"todos"|""}
     """
+    result: dict = {"ok": True}
     try:
         parser = _get_parser()
-        correction = parser.verify_fast_path_async(transcript, rule_result)
-
-        result: dict
-        if correction is None:
-            result = {"ok": True}
+        if executed:
+            correction = parser.verify_actions_async(transcript, executed)
         else:
-            severity = correction.get("severity", "major")
-            # Determine which entity type to refresh
-            action = correction.get("action", "")
-            refresh = "events" if "event" in action else "todos" if "todo" in action else ""
-            result = {**correction, "ok": False, "refresh": refresh}
+            correction = parser.verify_fast_path_async(transcript, rule_result)
 
-        logger.info("📱 Server verify token=%s result=%s", token[:8], result)
+        if correction is not None:
+            severity = correction.get("severity", "major")
+            speech = correction.get("speech", "")
+            applied = False
+            refresh = ""
+            db = get_db()
+            recs = list(records or [])
+            try:
+                if not load_config().self_check_apply:
+                    raise ValueError("self-check is advisory (config self_check_apply=false)")
+                if severity == "minor":
+                    import re as _re
+                    patch = {k: v for k, v in (correction.get("patch") or {}).items() if v not in (None, "")}
+                    # Be conservative: the verifier over-proposes. Only accept a time if that
+                    # clock time is actually spoken in the command; never accept a date change
+                    # (the parser + sanity pass own dates); accept a title only when the
+                    # current title is a placeholder.
+                    spoken = _spoken_times(transcript)
+                    for k in ("start_time", "end_time", "new_start_time", "new_end_time"):
+                        if k in patch and _hhmm(patch[k]) not in spoken:
+                            patch.pop(k)
+                    for k in ("date", "new_date", "recur_until", "match_date"):
+                        patch.pop(k, None)
+                    if "title" in patch or "new_title" in patch:
+                        cur = ""
+                        for rtype, rid, _a in recs:
+                            if rtype == "event":
+                                ev = db.get_event(rid); cur = (ev or {}).get("title", "")
+                        if cur.strip().lower() not in {"meeting", "set meeting", "event", "appointment", "activity", "task", ""}:
+                            patch.pop("title", None); patch.pop("new_title", None)
+                    patch = {k: v for k, v in patch.items() if k not in ("description", "location", "attendees", "list_name", "new_list", "priority", "new_priority")}
+                    # never let a malformed date/time through (e.g. an echoed placeholder)
+                    for k in ("date", "new_date", "recur_until"):
+                        if k in patch and not _re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(patch[k])):
+                            patch.pop(k)
+                    for k in ("start_time", "end_time"):
+                        if k in patch and not _re.fullmatch(r"\d{1,2}:\d{2}", str(patch[k])):
+                            patch.pop(k)
+                    if not patch:
+                        raise ValueError("patch had no valid fields")
+                    for rtype, rid, _act in recs:
+                        if rtype == "event":
+                            db.update_event(rid, **patch); refresh = "events"; applied = True
+                        elif rtype == "todo":
+                            db.update_todo(rid, **{k: v for k, v in patch.items() if k in ("title", "list_name")})
+                            refresh = "todos"; applied = True
+                else:
+                    action = correction.get("action", "")
+                    params = correction.get("parameters") or {}
+                    action_cls = _get_registry().get(action)
+                    executed_names = [n for n, _ in (executed or [])]
+                    if action == "create_event" and "create_todo" in executed_names and not _spoken_times(transcript):
+                        raise ValueError("refusing task→event flip without a spoken time")
+                    if action in executed_names:
+                        raise ValueError("major correction proposes the same action")
+                    if action_cls is not None and action.startswith(("create_",)):
+                        for rtype, rid, act in recs:
+                            if act.startswith("create_"):
+                                (db.delete_event if rtype == "event" else db.delete_todo)(rid)
+                        intent = action_cls.intent_model(**params)
+                        action_cls().execute(intent, load_config())
+                        refresh = "events" if "event" in action else "todos" if "todo" in action else ""
+                        applied = True
+                        if memory_id is not None:
+                            from assistant.intent.memory import get_memory
+                            get_memory().set_feedback(memory_id, "corrected",
+                                                      [{"action": action, "parameters": params}],
+                                                      notes="llm self-check")
+            except Exception as exc:
+                logger.warning("📱 Self-check correction not applied: %s", exc)
+            result = {"ok": False, "severity": severity, "applied": applied,
+                      "speech": speech if applied else "", "refresh": refresh}
+            # NLU bug corpus — the server path never wrote here before
+            try:
+                from assistant.pipeline import Pipeline as _Pipeline
+                _Pipeline._append_scenario_bug(
+                    transcript, issue_type=f"self_check/{severity}",
+                    details=f"executed={executed and [n for n, _ in executed]} correction={correction} applied={applied}",
+                )
+            except Exception:
+                pass
+        logger.info("📱 Self-check token=%s result=%s", token[:8], result)
     except Exception as exc:
-        logger.warning("📱 Server verify failed: %s", exc)
+        logger.warning("📱 Self-check failed: %s", exc)
         result = {"ok": True}  # assume correct on error — don't confuse the user
 
     with _verify_lock:
@@ -118,22 +194,135 @@ def _run_server_verify(token: str, transcript: str, rule_result) -> None:
     # Purge expired tokens (housekeeping)
     now = _time.time()
     with _verify_lock:
-        expired = [t for t, v in _verify_store.items() if v["expires"] < now]
-        for t in expired:
-            del _verify_store[t]
+        for t in [t for t, e in _verify_store.items() if e["expires"] < now]:
+            _verify_store.pop(t, None)
+
+
+def build_stt(cfg):
+    """STT provider per config.stt_engine (shared with the Mac pipeline)."""
+    if cfg.stt_engine == "mlx":
+        from assistant.stt.mlx_whisper_stt import MlxWhisperSTT
+        return MlxWhisperSTT(cfg.mlx_whisper)
+    if cfg.stt_engine == "google":
+        from assistant.stt.google_stt import GoogleSTT
+        return GoogleSTT(cfg.google_stt)
+    from assistant.stt.whisper_stt import WhisperSTT
+    return WhisperSTT(cfg.whisper)
+
+
+def _hhmm(v) -> str:
+    import re as _re
+    m = _re.match(r"^\s*(\d{1,2}):(\d{2})", str(v))
+    return f"{int(m.group(1)):02d}:{m.group(2)}" if m else ""
+
+
+def _spoken_times(text: str) -> set[str]:
+    """All clock times a command mentions, as HH:MM (both 12h readings for bare hours)."""
+    import re as _re
+    out: set[str] = set()
+    t = text.lower().replace(".", ":")
+    for m in _re.finditer(r"\b(\d{1,2})(?::(\d{2}))?\s*(am|pm|a:m|p:m)?\b", t):
+        h, mm, ap = int(m.group(1)), m.group(2) or "00", (m.group(3) or "").replace(":", "")
+        if h > 24:
+            continue
+        if ap == "pm" and h < 12: h += 12
+        if ap == "am" and h == 12: h = 0
+        out.add(f"{h % 24:02d}:{mm}")
+        if not ap and h <= 12:
+            out.add(f"{(h + 12) % 24:02d}:{mm}")
+    for m in _re.finditer(r"\b(\d{2})(\d{2})\b", t):          # 1930, 0915
+        h, mm = int(m.group(1)), m.group(2)
+        if h < 24 and int(mm) < 60:
+            out.add(f"{h:02d}:{mm}")
+    if "noon" in t: out.add("12:00")
+    if "midnight" in t: out.add("00:00")
+    return out
+
+
+def _fix_title_bg(transcript: str, event_id: int, keyword: str) -> None:
+    try:
+        new_title = _get_parser().fix_title_async(transcript, keyword)
+        if new_title and new_title.strip().lower() != keyword.strip().lower():
+            get_db().update_event(event_id, title=new_title.strip())
+            logger.info("📱 Title fixed for event %s: %r → %r", event_id, keyword, new_title)
+    except Exception as e:
+        logger.debug("📱 Title fix skipped: %s", e)
 
 
 def _get_stt():
     global _stt
     if _stt is None:
-        from assistant.stt.whisper_stt import WhisperSTT
         cfg = load_config()
-        _stt = WhisperSTT(cfg.whisper)
+        _stt = build_stt(cfg)
     return _stt
+
+
+def warm_up_components() -> None:
+    """Load Whisper, spaCy and the LLM model up front (in a daemon thread) so
+    the first phone command doesn't pay 10–20 s of cold starts."""
+    def _go() -> None:
+        import time as _t
+        t0 = _t.perf_counter()
+        for name, fn in (("rule parser", _get_rule_parser), ("whisper", _get_stt),
+                         ("llm parser", _get_parser)):
+            try:
+                fn()
+            except Exception as e:
+                logger.warning("Warm-up of %s failed: %s", name, e)
+        try:
+            rp = _get_rule_parser()
+            if rp is not None:
+                rp.analyze("meeting tomorrow at 3pm")  # forces spaCy + datetime models
+        except Exception:
+            pass
+        logger.info("Warm-up finished in %.1fs", _t.perf_counter() - t0)
+    _threading.Thread(target=_go, daemon=True, name="warm-up").start()
+
+
+def _llm_reachable(cfg) -> bool:
+    if cfg.llm_engine != "ollama":
+        return True
+    try:
+        import requests as _rq
+        return _rq.get(f"{cfg.ollama.base_url}/api/tags", timeout=1.5).ok
+    except Exception:
+        return False
+
+
+def start_pending_retry_loop(run_transcript, interval: float = 30.0) -> None:
+    """Daemon: whenever the LLM is reachable, re-run queued commands (max 5 tries each)."""
+    def _loop() -> None:
+        from assistant.intent.memory import get_memory
+        while True:
+            _time.sleep(interval)
+            try:
+                mem = get_memory()
+                rows = mem.pending()
+                if not rows:
+                    continue
+                cfg = load_config()
+                if not _llm_reachable(cfg):
+                    continue
+                for row in rows:
+                    if row["attempts"] >= 5:
+                        mem.resolve_pending(row["id"], "failed", "gave up after 5 attempts")
+                        continue
+                    logger.info("📱 Retrying queued command #%s: %s", row["id"], row["transcript"])
+                    result = run_transcript(row["transcript"])
+                    if result.get("parse") == "error":
+                        mem.bump_pending(row["id"])
+                    else:
+                        mem.resolve_pending(row["id"], "done", result.get("message", ""))
+            except Exception as e:
+                logger.warning("📱 Pending retry loop error: %s", e)
+    _threading.Thread(target=_loop, daemon=True, name="pending-retry").start()
 
 
 def create_app() -> Flask:
     app = Flask(__name__)
+    _no_bg = os.environ.get("MACALENDAR_NO_WARMUP") == "1"   # tests
+    if not _no_bg:
+        warm_up_components()
 
     # ------------------------------------------------------------------
     # Optional API-key auth — enforced via before_request so every route is
@@ -162,9 +351,21 @@ def create_app() -> Flask:
     def health():
         cfg = load_config()
         db = get_db()
+        llm_status = "ok"
+        if cfg.llm_engine == "ollama":
+            try:
+                import requests as _rq
+                r = _rq.get(f"{cfg.ollama.base_url}/api/tags", timeout=1.5)
+                names = [m.get("name", "") for m in r.json().get("models", [])]
+                llm_status = "ok" if any(n.startswith(cfg.ollama.model.split(":")[0]) for n in names) \
+                    else f"model {cfg.ollama.model} not pulled"
+            except Exception:
+                llm_status = "offline"
         return jsonify({
             "status": "ok",
-            "llm": cfg.llm_engine,
+            "llm": f"{cfg.llm_engine} ({getattr(cfg, cfg.llm_engine).model}) — {llm_status}",
+            "llm_engine": cfg.llm_engine,
+            "llm_status": llm_status,
             "db": db.path,
         })
 
@@ -203,15 +404,48 @@ def create_app() -> Flask:
     # Voice endpoints
     # ------------------------------------------------------------------
 
-    def _run_transcript(transcript: str) -> dict[str, Any]:
-        """Parse and execute a transcript; return the API response dict."""
+    def _run_transcript(transcript: str, trace: "Trace | None" = None) -> dict[str, Any]:
+        """Parse and execute a transcript; return the API response dict.
+
+        Builds a stage-by-stage ``trace`` (the "thinking log" shown on the
+        phone) and records the command in the personalisation memory.
+        """
         from assistant.intent.rule_parser import RULE_THRESHOLD, RuleParserSkip
+        from assistant.intent.context import ContextMemory
+        from assistant.pipeline import _strip_stop_keyword
+        from assistant.stt.vocab import apply_vocab
+        from assistant.trace import (
+            Trace, VOCAB, RULE, MEMORY, LLM, VALIDATE, EXECUTE, DONE, ERROR,
+        )
+        trace = trace or Trace(source="ios")
         parser = _get_parser()
         rule_parser = _get_rule_parser()
         cfg = load_config()
 
+        raw_transcript = transcript
+        # Parity with the Mac pipeline: drop trailing "execute"/"done"/… stop words
+        transcript = _strip_stop_keyword(transcript, cfg.audio.stop_phrases)
+        # Personal vocabulary auto-correct
+        transcript, vocab_fixes = apply_vocab(transcript, source="ios")
+        corrections = [c.to_dict() for c in vocab_fixes]
+        trace.step(VOCAB, "Vocabulary",
+                   ("Fixed " + ", ".join(f"{c.original}→{c.replacement}" for c in vocab_fixes))
+                   if vocab_fixes else "No corrections needed",
+                   transcript=transcript, corrections=corrections or None)
+
         parsed = None
         parse_path = "llm"
+        rule_result = None
+        llm_ms = 0
+
+        def _llm_step(title: str) -> None:
+            nonlocal llm_ms
+            llm_ms += parser.last_llm_ms
+            trace.step(LLM, title,
+                       f"{cfg.llm_engine}:{getattr(cfg, cfg.llm_engine).model} · "
+                       f"{parser.last_examples_used} history example(s) used",
+                       raw=(parser.last_raw_response or "")[:1500] or None,
+                       examples=parser.last_examples_used)
 
         if rule_parser is not None:
             try:
@@ -223,22 +457,37 @@ def create_app() -> Flask:
                         "📱 Rule fast-path: confidence=%.2f actions=%s",
                         rule_result.confidence, [n for n, _ in parsed],
                     )
+                    trace.step(RULE, "Rule parser",
+                               f"Confident ({rule_result.confidence:.2f}) — no LLM needed: "
+                               + ", ".join(n for n, _ in parsed),
+                               confidence=round(rule_result.confidence, 2),
+                               actions=[n for n, _ in parsed])
                 else:
                     logger.info(
                         "📱 Rule partial handoff: confidence=%.2f missing=%s",
                         rule_result.confidence, rule_result.missing_slots,
                     )
+                    trace.step(RULE, "Rule parser",
+                               f"Partial ({rule_result.confidence:.2f})"
+                               + (f", missing {', '.join(rule_result.missing_slots)}" if rule_result.missing_slots else "")
+                               + " — asking the LLM to fill gaps",
+                               confidence=round(rule_result.confidence, 2),
+                               missing=list(rule_result.missing_slots) or None)
                     try:
                         parsed = parser.parse_with_context(transcript, rule_result)
                         parse_path = "hybrid"
-                    except AssistantError:
+                        _llm_step("LLM (hybrid)")
+                    except AssistantError as e:
+                        trace.step(LLM, "LLM (hybrid)", f"Failed: {e} — retrying full parse", ok=False)
                         parsed = None  # fall through to full LLM below
             except RuleParserSkip as e:
                 logger.debug("📱 Rule parser skipped: %s", e)
+                trace.step(RULE, "Rule parser", f"Skipped: {e}")
 
         if parsed is None:
             try:
                 parsed = parser.parse(transcript)
+                _llm_step("LLM parse")
             except AssistantError as e:
                 logger.warning("📱 Parse error: %s", e)
                 from assistant.pipeline import Pipeline as _Pipeline
@@ -247,29 +496,70 @@ def create_app() -> Flask:
                     args=(transcript, "llm", False, [], [], False, f"parse_error: {e}", "ios"),
                     daemon=True,
                 ).start()
-                return {"message": str(e), "actions": [], "refresh": "", "parse": "error"}
+                msg = str(e)
+                pending_id = None
+                retryable = any(w in msg.lower() for w in ("offline", "timed out", "timeout", "connection"))
+                if retryable:
+                    try:
+                        from assistant.intent.memory import get_memory
+                        pending_id = get_memory().add_pending(transcript, msg, source="ios")
+                    except Exception as pe:
+                        logger.warning("📱 Could not queue command: %s", pe)
+                if "offline" in msg.lower():
+                    msg = ("The AI model on your Mac (Ollama) is offline. I saved this command and "
+                           "will run it automatically when the model is back — or tap Retry.")
+                elif retryable:
+                    msg = "The model took too long. I saved this command — tap Retry to try again."
+                trace.step(ERROR, "Parse failed", str(e)
+                           + (" — queued for retry" if pending_id else ""), ok=False)
+                _record_memory(cfg, raw_transcript, transcript, "llm", [], msg, False, llm_ms, trace, [])
+                resp = {"message": msg, "actions": [], "refresh": "", "parse": "error",
+                        "transcript": transcript, "original_transcript": raw_transcript,
+                        "corrections": corrections, "trace": trace.to_list(),
+                        "uncertain_words": _uncertain(transcript)}
+                if pending_id:
+                    resp["pending_id"] = pending_id
+                return resp
 
+        parsed, fixes = _normalise_intents(parsed, transcript,
+                                           rule_actions=list(rule_result.raw_slots) if rule_result is not None else [])
+        if fixes:
+            trace.step(VALIDATE, "Sanity fixes", "; ".join(fixes))
         logger.info("📱 Parsed actions: %s", [a for a, _ in parsed])
+        trace.step(VALIDATE, "Validated",
+                   ", ".join(f"{n}({', '.join(f'{k}={v}' for k, v in _intent_summary(i).items())})"
+                             for n, i in parsed) or "no actions",
+                   actions=[{"action": n, "parameters": _intent_summary(i)} for n, i in parsed])
 
         messages: list[str] = []
         action_names: list[str] = []
         refresh_set: set[str] = set()
+        records: list[tuple[str, int, str]] = []
+        ctx = ContextMemory()
 
         for action_name, intent in parsed:
             if action_name == "unknown":
                 logger.warning("📱 Unknown intent for transcript: %s", transcript)
                 messages.append("Sorry, I didn't understand that.")
+                trace.step(EXECUTE, "Unknown intent", "The model returned no recognisable action", ok=False)
                 continue
             registry = _get_registry()
             action_cls = registry.get(action_name)
             if action_cls is None:
                 logger.warning("📱 No action class for: %s", action_name)
+                trace.step(EXECUTE, action_name, "No such action registered", ok=False)
                 continue
             try:
+                ev_before, td_before = ctx.last_event_id, ctx.last_todo_id
                 result = action_cls().execute(intent, cfg)
                 logger.info("📱 Action %s → %s", action_name, result)
                 messages.append(result or "")
                 action_names.append(action_name)
+                if ctx.last_event_id != ev_before and ctx.last_event_id is not None:
+                    records.append(("event", ctx.last_event_id, action_name))
+                if ctx.last_todo_id != td_before and ctx.last_todo_id is not None:
+                    records.append(("todo", ctx.last_todo_id, action_name))
+                trace.step(EXECUTE, action_name.replace("_", " ").title(), result or "done")
                 if "event" in action_name:
                     refresh_set.add("events")
                 elif "todo" in action_name:
@@ -277,6 +567,7 @@ def create_app() -> Flask:
             except Exception as e:
                 logger.exception("📱 Action %s failed: %s", action_name, e)
                 messages.append(f"Error: {e}")
+                trace.step(EXECUTE, action_name.replace("_", " ").title(), f"Failed: {e}", ok=False)
 
         if "events" in refresh_set and "todos" in refresh_set:
             refresh = "both"
@@ -303,19 +594,37 @@ def create_app() -> Flask:
 
         # For rule-path results: kick off background LLM verification
         # and hand the iOS app a token it can poll with GET /voice/verify/<token>
+        # Rule fast-path parity with the Mac: a placeholder title ("meeting",
+        # "set meeting", …) gets a proper title from the LLM in the background.
+        if parse_path == "rule":
+            keywords = {k.lower() for k in cfg.nlu.event_keywords} | {"event", "set meeting", "meeting", "appointment"}
+            for rtype, rid, act in records:
+                if rtype == "event" and act == "create_event":
+                    ev = get_db().get_event(rid)
+                    if ev and ev["title"].strip().lower() in keywords:
+                        _threading.Thread(target=_fix_title_bg, args=(transcript, rid, ev["title"]), daemon=True).start()
+
+        trace.step(DONE, "Done", f"{parse_path} path · {trace.total_ms} ms total", path=parse_path)
+        memory_id = _record_memory(cfg, raw_transcript, transcript, parse_path,
+                                   [(n, i) for n, i in parsed if n != "unknown"],
+                                   response_msg, _success, llm_ms, trace, records)
+
+        # Background self-check (any parse path): LLM re-reasons over the
+        # transcript + what ran + the user's history, and fixes itself if needed.
         verify_token: str | None = None
-        if parse_path == "rule" and rule_result is not None:
+        checkable = [(n, i) for n, i in parsed if n in action_names and n not in ("clarify", "query_schedule", "query_todos")]
+        if _success and checkable and cfg.verify_fast_path:
             import uuid
             verify_token = str(uuid.uuid4())
             with _verify_lock:
                 _verify_store[verify_token] = {
                     "ready": False,
                     "correction": None,
-                    "expires": _time.time() + 90,   # 90 s TTL
+                    "expires": _time.time() + 120,
                 }
             _threading.Thread(
                 target=_run_server_verify,
-                args=(verify_token, transcript, rule_result),
+                args=(verify_token, transcript, rule_result, checkable, records, memory_id),
                 daemon=True,
             ).start()
 
@@ -324,10 +633,174 @@ def create_app() -> Flask:
             "actions": action_names,
             "refresh": refresh,
             "parse": parse_path,
+            "transcript": transcript,
+            "original_transcript": raw_transcript,
+            "corrections": corrections,
+            "trace": trace.to_list(),
+            "uncertain_words": _uncertain(transcript),
         }
+        if memory_id is not None:
+            resp["memory_id"] = memory_id
         if verify_token:
             resp["verify_token"] = verify_token
         return resp
+
+    def _uncertain(transcript: str) -> list:
+        try:
+            from assistant.stt.vocab import get_vocab
+            return get_vocab().suggestions(transcript)
+        except Exception:
+            return []
+
+    _RECUR_WORDS = [(r"\bevery\s*day\b|\bdaily\b", "daily"), (r"\bevery\s+\w+day\b|\bweekly\b|\b(?:mon|tues|wednes|thurs|fri|satur|sun)days\b", "weekly"),
+                    (r"\bevery\s+month\b|\bmonthly\b", "monthly")]
+    _JUNK_TITLES = {"task", "tasks", "todo", "event", "events", "reminder", "list", "item", "items"}
+
+    _WD = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6,
+           "mon": 0, "tue": 1, "tues": 1, "wed": 2, "thu": 3, "thur": 3, "thurs": 3, "fri": 4, "sat": 5, "sun": 6}
+
+    def _relative_dates(transcript: str) -> list:
+        """Deterministic reading of relative-date phrases, in order of appearance.
+        Returns ISO dates. 'thursday' = coming Thursday (today if today is Thursday),
+        'next thursday' = the one after that when today is Thursday, else the coming one
+        in *next* week; 'tomorrow', 'today/tonight', 'the 19th' handled too."""
+        import datetime as _dt, re as _re
+        today = _dt.date.today(); out = []
+        t = transcript.lower()
+        pat = _re.compile(r"\b(day after tomorrow|tomorrow|today|tonight|this evening|this morning|"
+                          r"(?:next|this|coming)\s+(?:week\s+(?:on\s+)?)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)s?|"
+                          r"(monday|tuesday|wednesday|thursday|friday|saturday|sunday)s?|"
+                          r"(?:on\s+)?the\s+(\d{1,2})(?:st|nd|rd|th)\b)")
+        for m in pat.finditer(t):
+            full = m.group(1)
+            if full == "day after tomorrow":
+                out.append((today + _dt.timedelta(days=2)).isoformat())
+            elif full == "tomorrow":
+                out.append((today + _dt.timedelta(days=1)).isoformat())
+            elif full in ("today", "tonight", "this evening", "this morning"):
+                out.append(today.isoformat())
+            elif m.group(2):                                   # next/this <weekday>
+                wd = _WD[m.group(2)]; days = (wd - today.weekday()) % 7
+                if full.startswith("next"):
+                    days = (7 - today.weekday()) + wd     # that weekday in NEXT calendar week
+                out.append((today + _dt.timedelta(days=days)).isoformat())
+            elif m.group(3):                                   # bare weekday → coming one (today if today)
+                wd = _WD[m.group(3)]; days = (wd - today.weekday()) % 7
+                out.append((today + _dt.timedelta(days=days)).isoformat())
+            elif m.group(4):                                   # the 19th → this month if not past, else next
+                n = int(m.group(4)); d0 = today
+                for _ in range(3):
+                    try:
+                        cand = d0.replace(day=n)
+                    except ValueError:
+                        cand = None
+                    if cand and cand >= today:
+                        out.append(cand.isoformat()); break
+                    d0 = (d0.replace(day=1) + _dt.timedelta(days=32)).replace(day=1)
+        return out
+
+    _EVENING_WORDS = re.compile(r"\b(dinner|drinks?|beer|pub|bar|party|pregame|pizza|kems|movie|cinema|show|concert|tonight|evening|night|maariv|mincha)\b", re.I)
+
+    def _bare_hour_pm(transcript: str, hhmm: str) -> str | None:
+        """'Kems tomorrow at 8' → 20:00. A bare hour (no am/pm) between 1 and 8 is far
+        more often PM in calendar speech; 7–8 only when evening words are present."""
+        m = re.match(r"(\d{2}):(\d{2})", hhmm or "")
+        if not m:
+            return None
+        h = int(m.group(1))
+        if not (1 <= h <= 8):
+            return None
+        tl = transcript.lower()
+        # was this hour spoken with am/pm or as 24h?  then leave it
+        if re.search(rf"\b{h}(?::\d{{2}})?\s*(?:am|a\.m\.)\b", tl) or re.search(rf"\b0?{h}:\d{{2}}\b(?!\s*pm)", tl) and re.search(rf"\b(?:0{h}|{h+12}):", tl):
+            return None
+        if re.search(rf"\b{h}(?::\d{{2}})?\s*(?:pm|p\.m\.)\b", tl):
+            return None
+        if not re.search(rf"\b(?:at\s+)?{h}(?::\d{{2}})?\b", tl):
+            return None
+        if h <= 6 or _EVENING_WORDS.search(tl):
+            return f"{h + 12:02d}:{m.group(2)}"
+        return None
+
+    def _normalise_intents(parsed, transcript: str, rule_actions=()):
+        """Cheap deterministic guards on top of whatever parser produced the intents:
+        • create_event dated in the past → next occurrence (LLMs pick yesterday's weekday)
+        • recurrence words in the transcript but none on the intent → set it
+        • hybrid junk: an extra create_event with a generic title and no real time
+        Returns (parsed, list_of_human_readable_fixes)."""
+        import datetime as _dt, re as _re
+        today = _dt.date.today(); fixes = []; out = []
+        tl = transcript.lower()
+        recur = next((v for pat, v in _RECUR_WORDS if _re.search(pat, tl)), None)
+        n_events = sum(1 for n, _ in parsed if n == "create_event")
+        rel = _relative_dates(transcript)
+        ev_idx = 0
+        for name, intent in parsed:
+            if name == "create_event":
+                d = getattr(intent, "date", None)
+                # Deterministic relative dates beat the model's guess: one phrase → all
+                # events; N phrases for N events → positional.
+                if rel and not recur:
+                    if len(set(rel)) == 1:
+                        want = rel[0]                      # "tomorrow … tomorrow" → every event
+                    else:
+                        want = rel[ev_idx] if ev_idx < len(rel) and len(rel) == n_events else None
+                    if want and d != want:
+                        fixes.append(f"date {d}→{want} ('{transcript[:30]}…' says so)"); intent.date = want; d = want
+                ev_idx += 1
+                if d:
+                    try:
+                        dd = _dt.date.fromisoformat(d)
+                        if dd < today:
+                            bump = dd
+                            while bump < today:
+                                bump += _dt.timedelta(days=7 if (today - dd).days <= 7 else 1)
+                            intent.date = bump.isoformat(); fixes.append(f"date {d}→{intent.date} (was in the past)")
+                    except ValueError:
+                        pass
+                if recur and not getattr(intent, "recurrence", None):
+                    intent.recurrence = recur; fixes.append(f"recurrence={recur}")
+                pm = _bare_hour_pm(transcript, getattr(intent, "start_time", None) or "")
+                if pm and not re.search(r"\b(?:morning|breakfast|shacharit|am)\b", tl):
+                    old_s, old_e = intent.start_time, getattr(intent, "end_time", None)
+                    intent.start_time = pm
+                    if old_e:
+                        try:
+                            hh, mm = map(int, old_e.split(":")); intent.end_time = f"{(hh + 12) % 24:02d}:{mm:02d}"
+                        except Exception:
+                            pass
+                    fixes.append(f"bare hour {old_s}→{pm} (PM)")
+                if "create_todo" in rule_actions and "create_event" not in rule_actions and not _spoken_times(transcript):
+                    fixes.append(f"dropped event '{getattr(intent, 'title', '')}' — rule parser saw a task and no clock time was spoken"); continue
+                t = (getattr(intent, "title", "") or "").strip().lower()
+                if n_events > 0 and t in _JUNK_TITLES and any(n2 == "create_todo" for n2, _ in parsed):
+                    fixes.append(f"dropped junk event '{t}'"); continue
+            out.append((name, intent))
+        return out, fixes
+
+    def _intent_summary(intent) -> dict:
+        try:
+            return intent.model_dump(exclude_none=True, exclude_defaults=True)
+        except Exception:
+            return {}
+
+    def _record_memory(cfg, raw, transcript, parse_path, actions, result, success,
+                       llm_ms, trace, records) -> int | None:
+        if not getattr(cfg.nlu, "memory_enabled", True):
+            return None
+        try:
+            from assistant.intent.memory import get_memory
+            return get_memory().record(
+                transcript=transcript, raw_transcript=raw, source="ios",
+                parse_path=parse_path, actions=actions, result=result,
+                success=success, llm_ms=llm_ms, total_ms=trace.total_ms, records=records,
+            )
+        except Exception as e:
+            logger.warning("📱 Memory record failed: %s", e)
+            return None
+
+    if not _no_bg:
+        start_pending_retry_loop(_run_transcript)
 
     @app.post("/voice")
     def voice_audio():
@@ -344,6 +817,8 @@ def create_app() -> Flask:
             logger.error("📱 Audio decode failed: %s", e)
             return jsonify({"error": f"Audio decode failed: {e}", "code": 422}), 422
 
+        from assistant.trace import Trace, STT
+        trace = Trace(source="ios")
         try:
             stt = _get_stt()
             transcript = stt.transcribe(audio_np)
@@ -351,10 +826,80 @@ def create_app() -> Flask:
             return jsonify({"error": f"Transcription failed: {e}", "code": 500}), 500
 
         if not transcript.strip():
-            return jsonify({"message": "I didn't catch that.", "actions": [], "refresh": ""})
+            return jsonify({"message": "I didn't catch that.", "actions": [], "refresh": "",
+                            "parse": "error", "trace": trace.to_list()})
 
         logger.info("📱 Transcript: %s", transcript)
-        return jsonify(_run_transcript(transcript))
+        trace.step(STT, "Heard", transcript, transcript=transcript)
+        return jsonify(_run_transcript(transcript, trace))
+
+    @app.post("/voice/stream")
+    def voice_audio_stream():
+        """Same as POST /voice but streams the thinking trace live as NDJSON.
+
+        Each line is a JSON object: {"type": "step", ...TraceStep} while the
+        request is processed, then a final {"type": "result", ...response}.
+        The iOS app renders the steps as a timeline as they arrive.
+        """
+        from flask import Response, stream_with_context
+        import json as _json
+        import queue as _queue
+        from assistant.trace import Trace, STT, ERROR
+
+        if "audio" in request.files:
+            audio_bytes = request.files["audio"].read()
+            text_cmd = None
+        else:
+            body = request.get_json(silent=True) or {}
+            text_cmd = (body.get("transcript") or "").strip()
+            audio_bytes = b""
+            if not text_cmd:
+                return jsonify({"error": "Missing 'audio' file or 'transcript'", "code": 400}), 400
+
+        q: "_queue.Queue[dict | None]" = _queue.Queue()
+        trace = Trace(source="ios")
+        trace.on_step(lambda st: q.put({"type": "step", **st.to_dict()}))
+
+        def work() -> None:
+            try:
+                if text_cmd is not None:
+                    transcript = text_cmd
+                    trace.step(STT, "Typed", transcript, transcript=transcript)
+                else:
+                    logger.info("📱 Audio received (stream): %.1f KB", len(audio_bytes) / 1024)
+                    from assistant.api.audio_utils import audio_bytes_to_numpy
+                    audio_np = audio_bytes_to_numpy(audio_bytes)
+                    q.put({"type": "step", "stage": STT, "title": "Listening",
+                           "detail": "Transcribing with Whisper…", "ms": 0, "at_ms": 0, "ok": True})
+                    transcript = _get_stt().transcribe(audio_np)
+                    if not transcript.strip():
+                        trace.step(ERROR, "Nothing heard", "The recording was silent", ok=False)
+                        q.put({"type": "result", "message": "I didn't catch that.", "actions": [],
+                               "refresh": "", "parse": "error", "trace": trace.to_list()})
+                        return
+                    logger.info("📱 Transcript: %s", transcript)
+                    trace.step(STT, "Heard", transcript, transcript=transcript)
+                result = _run_transcript(transcript, trace)
+                q.put({"type": "result", **result})
+            except Exception as e:  # never leave the stream hanging
+                logger.exception("📱 Stream pipeline failed: %s", e)
+                trace.step(ERROR, "Failed", str(e), ok=False)
+                q.put({"type": "result", "message": f"Error: {e}", "actions": [], "refresh": "",
+                       "parse": "error", "trace": trace.to_list()})
+            finally:
+                q.put(None)
+
+        _threading.Thread(target=work, daemon=True).start()
+
+        def gen():
+            while True:
+                item = q.get()
+                if item is None:
+                    break
+                yield _json.dumps(item, ensure_ascii=False) + "\n"
+
+        return Response(stream_with_context(gen()), mimetype="application/x-ndjson",
+                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     @app.post("/voice/text")
     def voice_text():
@@ -365,6 +910,193 @@ def create_app() -> Flask:
             return jsonify({"error": "Missing 'transcript' field", "code": 400}), 400
         logger.info("📱 Text command: %s", transcript)
         return jsonify(_run_transcript(transcript))
+
+    # ------------------------------------------------------------------
+    # Personal vocabulary (STT auto-correct)
+    # ------------------------------------------------------------------
+
+    @app.get("/vocab")
+    def vocab_get():
+        from assistant.stt.vocab import get_vocab
+        return jsonify(get_vocab().to_dict())
+
+    @app.post("/vocab")
+    def vocab_add():
+        from assistant.stt.vocab import get_vocab
+        body = request.get_json(silent=True) or {}
+        word = str(body.get("word", "")).strip()
+        if not word:
+            return jsonify({"error": "Missing 'word'", "code": 400}), 400
+        aliases = [str(a) for a in body.get("aliases", []) if str(a).strip()]
+        entry = get_vocab().add_word(word, aliases)
+        return jsonify(entry.to_dict()), 201
+
+    @app.post("/vocab/alias")
+    def vocab_alias():
+        """Teach a correction: {"wrong": "Kyira", "right": "Kyra"}."""
+        from assistant.stt.vocab import get_vocab
+        body = request.get_json(silent=True) or {}
+        wrong = str(body.get("wrong", "")).strip()
+        right = str(body.get("right", "")).strip()
+        if not wrong or not right:
+            return jsonify({"error": "Need 'wrong' and 'right'", "code": 400}), 400
+        entry = get_vocab().add_alias(wrong, right)
+        return jsonify(entry.to_dict())
+
+    @app.delete("/vocab/<path:word>")
+    def vocab_delete(word: str):
+        from assistant.stt.vocab import get_vocab
+        alias = request.args.get("alias")
+        store = get_vocab()
+        ok = store.remove_alias(word, alias) if alias else store.remove_word(word)
+        if not ok:
+            return jsonify({"error": "Not found", "code": 404}), 404
+        return jsonify({"ok": True})
+
+    @app.patch("/vocab/settings")
+    def vocab_settings():
+        from assistant.stt.vocab import get_vocab
+        body = request.get_json(silent=True) or {}
+        store = get_vocab()
+        store.update_settings(
+            auto_correct=body.get("auto_correct"),
+            learn_aliases=body.get("learn_aliases"),
+            threshold=body.get("threshold"),
+        )
+        return jsonify(store.to_dict())
+
+    @app.get("/vocab/onboarding")
+    def vocab_onboarding_get():
+        from assistant.stt.vocab import get_vocab
+        from assistant.stt import vocab_onboarding
+        return jsonify(vocab_onboarding.payload(get_vocab()))
+
+    @app.post("/vocab/onboarding")
+    def vocab_onboarding_post():
+        """{"answers": {"people": ["Kyra"], ...}, "presets": ["tefillah"], "done": true}"""
+        from assistant.stt.vocab import get_vocab
+        from assistant.stt import vocab_onboarding
+        body = request.get_json(silent=True) or {}
+        return jsonify(vocab_onboarding.apply(
+            get_vocab(), body.get("answers"), body.get("presets"), bool(body.get("done", True))))
+
+    @app.post("/vocab/import")
+    def vocab_import():
+        """Mine vocabulary candidates. Body: {"text": "..."} (WhatsApp export / notes)
+        or {"source": "calendar"} or {"names": ["Rocky Caplan", ...]} (phone contacts).
+        Returns candidates only — nothing is added."""
+        from assistant.stt.vocab import get_vocab
+        from assistant.stt import vocab_import
+        body = request.get_json(silent=True) or {}
+        known = {e.word for e in get_vocab().entries}
+        if body.get("names"):
+            cands = vocab_import.from_names([str(n) for n in body["names"]], known)
+        elif body.get("source") == "calendar":
+            cands = vocab_import.from_calendar(known)
+        else:
+            text = str(body.get("text", ""))
+            if len(text) > 5_000_000:
+                return jsonify({"error": "Text too large", "code": 413}), 413
+            cands = vocab_import.extract(text, known)
+        return jsonify({"candidates": cands})
+
+    @app.post("/vocab/bulk")
+    def vocab_bulk():
+        """Add many words at once: {"words": ["Kyra", ...]}"""
+        from assistant.stt.vocab import get_vocab
+        body = request.get_json(silent=True) or {}
+        store = get_vocab()
+        added = 0
+        for w in body.get("words", []):
+            w = str(w).strip()
+            if w and store._find(w) is None:
+                store.add_word(w); added += 1
+        return jsonify({"added": added, "total": len(store.entries)})
+
+    @app.post("/vocab/preview")
+    def vocab_preview():
+        """Dry-run: what would the corrector do to this text? (no learning)"""
+        from assistant.stt.vocab import get_vocab
+        body = request.get_json(silent=True) or {}
+        text = str(body.get("text", ""))
+        fixed, fixes = get_vocab().correct(text, learn=False)
+        return jsonify({"original": text, "corrected": fixed,
+                        "corrections": [c.to_dict() for c in fixes]})
+
+    # ------------------------------------------------------------------
+    # Pending commands (failed because the LLM was offline/slow)
+    # ------------------------------------------------------------------
+
+    @app.get("/pending")
+    def pending_list():
+        from assistant.intent.memory import get_memory
+        return jsonify({"pending": get_memory().pending(include_done=request.args.get("all") == "1")})
+
+    @app.post("/pending/<int:pending_id>/retry")
+    def pending_retry(pending_id: int):
+        from assistant.intent.memory import get_memory
+        mem = get_memory()
+        row = mem.get_pending(pending_id)
+        if row is None:
+            return jsonify({"error": "Not found", "code": 404}), 404
+        result = _run_transcript(row["transcript"])
+        if result.get("parse") == "error":
+            mem.bump_pending(pending_id)
+        else:
+            mem.resolve_pending(pending_id, "done", result.get("message", ""))
+        result["pending_id"] = pending_id
+        return jsonify(result)
+
+    @app.delete("/pending/<int:pending_id>")
+    def pending_dismiss(pending_id: int):
+        from assistant.intent.memory import get_memory
+        get_memory().resolve_pending(pending_id, "dismissed")
+        return jsonify({"ok": True})
+
+    # ------------------------------------------------------------------
+    # Command memory (RAG personalisation + feedback)
+    # ------------------------------------------------------------------
+
+    @app.get("/memory")
+    def memory_list():
+        from assistant.intent.memory import get_memory
+        limit = int(request.args.get("limit", 50))
+        return jsonify({"examples": get_memory().recent(limit), "stats": get_memory().stats()})
+
+    @app.get("/memory/unreviewed")
+    def memory_unreviewed():
+        """Commands with no feedback yet (for the phone's review screen)."""
+        from assistant.intent.memory import get_memory
+        limit = int(request.args.get("limit", 30))
+        rows = [r for r in get_memory().recent(200) if r["feedback"] == "none" and r["success"] and r["actions"]][:limit]
+        return jsonify({"examples": rows, "count": len(rows)})
+
+    @app.get("/memory/similar")
+    def memory_similar():
+        from assistant.intent.memory import get_memory
+        q = request.args.get("q", "")
+        return jsonify(get_memory().retrieve(q, k=int(request.args.get("k", 4))))
+
+    @app.post("/memory/<int:example_id>/feedback")
+    def memory_feedback(example_id: int):
+        """{"feedback": "approved"|"corrected"|"rejected", "correction": [...]?, "notes": "..."}"""
+        from assistant.intent.memory import get_memory
+        body = request.get_json(silent=True) or {}
+        try:
+            ok = get_memory().set_feedback(example_id, body.get("feedback", "approved"),
+                                          body.get("correction"), body.get("notes", ""))
+        except ValueError as e:
+            return jsonify({"error": str(e), "code": 400}), 400
+        if not ok:
+            return jsonify({"error": "Not found", "code": 404}), 404
+        return jsonify(get_memory().get(example_id))
+
+    @app.delete("/memory/<int:example_id>")
+    def memory_delete(example_id: int):
+        from assistant.intent.memory import get_memory
+        if not get_memory().delete(example_id):
+            return jsonify({"error": "Not found", "code": 404}), 404
+        return jsonify({"ok": True})
 
     # ------------------------------------------------------------------
     # Events

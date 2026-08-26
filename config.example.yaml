@@ -4,13 +4,17 @@ hotkey:
 
 # "whisper" = free, local, runs on your Mac (no internet needed)
 # "google"  = free tier, requires internet
-stt_engine: "whisper"
+stt_engine: "whisper"    # "mlx" = Whisper on Apple GPU via mlx-whisper (fastest on M-series)
 
 whisper:
   model_size: "base"       # tiny | base | small | medium | large-v3
   compute_type: "int8"     # int8 is fastest on Apple Silicon
   device: "cpu"            # cpu recommended (CTranslate2 int8 is very fast on M-series)
   language: "en"           # null = auto-detect
+
+mlx_whisper:
+  model: "mlx-community/whisper-base-mlx"
+  language: "en"
 
 google_stt:
   api_key: null            # null = free tier (no key needed)
@@ -22,8 +26,13 @@ google_stt:
 llm_engine: "ollama"
 
 ollama:
+  keep_alive: -1           # keep the model loaded between commands (-1 = forever, or "30m")
+  warm_up: true            # preload the model at startup so the first command is fast
+  verify_model: null       # stronger/slower model for the background self-check (null = same as model)
   base_url: "http://localhost:11434"
   model: "llama3.1:8b"
+  keep_alive: -1           # keep the model loaded between commands (-1 = forever, or "30m")
+  warm_up: true            # preload the model at startup so the first command is fast
   temperature: 0.1
   timeout_seconds: 180
 
@@ -89,3 +98,8 @@ todo:
   show_completed: false       # show completed tasks in the list
   default_list: "today"       # which list new voice-created tasks go to by default
   auto_tag: ""                # "tag mode": every new task gets this tag (e.g. "Groceries"); "" = off
+
+nlu:
+  event_keywords: [meeting, appointment, activity]
+  memory_enabled: true     # remember every command + outcome in ~/.assistant_tools/nlu_memory.db
+  memory_examples: 4       # few-shot: inject the k most similar past commands into the LLM prompt (0 = off)

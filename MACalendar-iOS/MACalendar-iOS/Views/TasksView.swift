@@ -20,21 +20,28 @@ struct TasksView: View {
     /// Tag applied to tasks added from the add row:
     /// explicit "tag mode" wins; otherwise, while filtering by a tag, new tasks
     /// inherit that tag so they don't vanish from the list you're looking at.
-    private var effectiveAutoTag: String {
-        if !settings.taskAutoTag.isEmpty { return settings.taskAutoTag }
-        let f = settings.taskTagFilter
-        return f.isEmpty || f == Self.untaggedKey ? "" : f
+    private var effectiveAutoTags: [String] {
+        if !settings.taskAutoTag.isEmpty { return [settings.taskAutoTag] }
+        return settings.taskTagFilters.filter { $0 != Self.untaggedKey }
+    }
+
+    /// True when `todo` matches any of the selected filters (or nothing is selected).
+    private func matchesFilter(_ todo: Todo) -> Bool {
+        let f = settings.taskTagFilters
+        if f.isEmpty { return true }
+        for key in f {
+            if key == Self.untaggedKey {
+                if todo.tags.isEmpty { return true }
+            } else if todo.hasTag(key) {
+                return true
+            }
+        }
+        return false
     }
 
     private var visibleTodos: [Todo] {
-        var v = settings.hideCompletedTasks ? todos.filter { !$0.isDone } : todos
-        let f = settings.taskTagFilter
-        if f == Self.untaggedKey {
-            v = v.filter { $0.tags.isEmpty }
-        } else if !f.isEmpty {
-            v = v.filter { $0.hasTag(f) }
-        }
-        return v
+        let v = settings.hideCompletedTasks ? todos.filter { !$0.isDone } : todos
+        return v.filter(matchesFilter)
     }
     private var todayTasks: [Todo]   { visibleTodos.filter { $0.list == "today" } }
     private var generalTasks: [Todo] { visibleTodos.filter { $0.list == "general" } }
@@ -43,7 +50,7 @@ struct TasksView: View {
         todos.contains { $0.isDone }
     }
 
-    private var isFiltering: Bool { !settings.taskTagFilter.isEmpty }
+    private var isFiltering: Bool { !settings.taskTagFilters.isEmpty }
 
     private func hex(for name: String) -> String {
         tags.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }?.hexColor
@@ -85,7 +92,7 @@ struct TasksView: View {
                                 }
                                 .disabled(newTaskTitle.isEmpty)
                             }
-                            if !effectiveAutoTag.isEmpty {
+                            if !effectiveAutoTags.isEmpty {
                                 HStack(spacing: 6) {
                                     Image(systemName: "tag.fill")
                                         .font(.system(size: 10))
@@ -93,7 +100,9 @@ struct TasksView: View {
                                     Text(settings.taskAutoTag.isEmpty ? "New tasks get" : "Tag mode:")
                                         .font(.system(size: settings.fontTasks - 3))
                                         .foregroundColor(.secondary)
-                                    TagChip(name: effectiveAutoTag, hex: hex(for: effectiveAutoTag), compact: true)
+                                    ForEach(effectiveAutoTags, id: \.self) { t in
+                                        TagChip(name: t, hex: hex(for: t), compact: true)
+                                    }
                                 }
                             }
                         }
@@ -182,14 +191,14 @@ struct TasksView: View {
     // MARK: - Sub-views
 
     private var navTitle: String {
-        let f = settings.taskTagFilter
-        if f == Self.untaggedKey { return "Untagged" }
-        return f.isEmpty ? "Tasks" : f
+        let f = settings.taskTagFilters
+        if f.isEmpty { return "Tasks" }
+        return f.map { $0 == Self.untaggedKey ? "Untagged" : $0 }.joined(separator: " · ")
     }
 
     private var addPlaceholder: String {
-        let f = settings.taskTagFilter
-        if f.caseInsensitiveCompare("groceries") == .orderedSame { return "Add grocery item…" }
+        let f = settings.taskTagFilters
+        if f.count == 1, f[0].caseInsensitiveCompare("groceries") == .orderedSame { return "Add grocery item…" }
         return "Add task…"
     }
 
@@ -280,7 +289,7 @@ struct TasksView: View {
     }
 
     private func filterChip(label: String, key: String, hex: String) -> some View {
-        let selected = settings.taskTagFilter == key
+        let selected = key.isEmpty ? settings.taskTagFilters.isEmpty : settings.taskTagFilters.contains(key)
         let n = key.isEmpty ? 0 : count(for: key)
         return HStack(spacing: 4) {
             TagChip(name: label, hex: hex, selected: selected)
@@ -293,7 +302,13 @@ struct TasksView: View {
         .contentShape(Capsule())
         .onTapGesture {
             withAnimation(.easeInOut(duration: 0.15)) {
-                settings.taskTagFilter = selected ? "" : key
+                if key.isEmpty {
+                    settings.taskTagFilters = []            // "All" clears every filter
+                } else if selected {
+                    settings.taskTagFilters.removeAll { $0 == key }   // re-tap turns that tag off
+                } else {
+                    settings.taskTagFilters.append(key)
+                }
             }
         }
     }
@@ -340,11 +355,10 @@ struct TasksView: View {
                 tags  = (try? await g) ?? tags
                 // Drop stale filter / tag-mode choices that point at a deleted tag.
                 let names = Set(tags.map { $0.name.lowercased() })
-                if !settings.taskTagFilter.isEmpty,
-                   settings.taskTagFilter != Self.untaggedKey,
-                   !names.contains(settings.taskTagFilter.lowercased()) {
-                    settings.taskTagFilter = ""
+                let pruned = settings.taskTagFilters.filter {
+                    $0 == Self.untaggedKey || names.contains($0.lowercased())
                 }
+                if pruned != settings.taskTagFilters { settings.taskTagFilters = pruned }
                 if !settings.taskAutoTag.isEmpty, !names.contains(settings.taskAutoTag.lowercased()) {
                     settings.taskAutoTag = ""
                 }
@@ -359,8 +373,7 @@ struct TasksView: View {
         guard !newTaskTitle.isEmpty else { return }
         let title = newTaskTitle
         let list  = newTaskList
-        let auto  = effectiveAutoTag
-        let newTags = auto.isEmpty ? [] : [auto]
+        let newTags = effectiveAutoTags
         newTaskTitle = ""
         Task {
             _ = try? await api.createTodo(title: title, list: list, tags: newTags)
@@ -385,7 +398,7 @@ struct TasksView: View {
         for i in todos.indices {
             todos[i].tags.removeAll { $0.caseInsensitiveCompare(name) == .orderedSame }
         }
-        if settings.taskTagFilter.caseInsensitiveCompare(name) == .orderedSame { settings.taskTagFilter = "" }
+        settings.taskTagFilters.removeAll { $0.caseInsensitiveCompare(name) == .orderedSame }
         if settings.taskAutoTag.caseInsensitiveCompare(name) == .orderedSame { settings.taskAutoTag = "" }
         Task { try? await api.deleteTag(name: name) }
     }

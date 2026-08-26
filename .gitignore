@@ -47,3 +47,8 @@ MACalendar.app/
 
 # Allow the config example to be pushed
 !config.example.yaml
+
+# raw voice transcripts (names, personal) — kept locally only
+DOCUMENTATION/NLU_TRACKING.md
+DOCUMENTATION/SCENARIO_BUG.md
+DOCUMENTATION/ASSISTANT_AUDIT.md.json

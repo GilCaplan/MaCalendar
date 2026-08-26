@@ -1288,7 +1288,7 @@ class TodoListWidget(QWidget):
         self._reorder_enabled = True
         self._font_size = 13
         self._sort_mode: str = "manual"  # "manual" | "priority" | "due_date"
-        self._tag_filter: str = ""       # "" | tag name | UNTAGGED_KEY
+        self._tag_filter: list[str] = []  # any of: tag names | UNTAGGED_KEY (empty = all)
         self._auto_tag: str = ""         # "tag mode": tag every new task with this
 
         outer = QVBoxLayout(self)
@@ -1322,10 +1322,25 @@ class TodoListWidget(QWidget):
         self._sort_mode = mode
         self._update_drag_enabled()
 
-    def set_tag_filter(self, tag: str) -> None:
-        """'' = show all, UNTAGGED_KEY = untagged only, else only todos with that tag."""
-        self._tag_filter = tag or ""
+    def set_tag_filter(self, tags) -> None:
+        """Empty = show all. Otherwise show todos matching ANY of the keys
+        (tag names and/or UNTAGGED_KEY)."""
+        if isinstance(tags, str):
+            tags = [tags] if tags else []
+        self._tag_filter = [t for t in (tags or []) if t]
         self._update_drag_enabled()
+
+    def _matches_filter(self, todo: dict) -> bool:
+        if not self._tag_filter:
+            return True
+        todo_tags = {x.lower() for x in (todo.get("tags") or [])}
+        for key in self._tag_filter:
+            if key == UNTAGGED_KEY:
+                if not todo_tags:
+                    return True
+            elif key.strip().lower() in todo_tags:
+                return True
+        return False
 
     def set_auto_tag(self, tag: str) -> None:
         self._auto_tag = tag or ""
@@ -1341,9 +1356,7 @@ class TodoListWidget(QWidget):
         task doesn't vanish from the list the user is looking at."""
         if self._auto_tag:
             return [self._auto_tag]
-        if self._tag_filter and self._tag_filter != UNTAGGED_KEY:
-            return [self._tag_filter]
-        return []
+        return [t for t in self._tag_filter if t != UNTAGGED_KEY]
 
     def _sorted_todos(self, todos: list) -> list:
         if self._sort_mode == "priority":
@@ -1374,9 +1387,8 @@ class TodoListWidget(QWidget):
 
         todos = self._db.get_todos(
             list_name=self._list_name, include_completed=show_completed,
-            tag=self._tag_filter or None,
         )
-        todos = self._sorted_todos(todos)
+        todos = self._sorted_todos([t for t in todos if self._matches_filter(t)])
 
         for todo in todos:
             item = QListWidgetItem(self._list_widget)
@@ -1606,7 +1618,7 @@ class _SortBar(QWidget):
 class _TagBar(QWidget):
     """Tag filter strip plus a "New tasks get:" combo (tag mode)."""
 
-    filter_changed   = pyqtSignal(str)  # "" | tag name | UNTAGGED_KEY
+    filter_changed   = pyqtSignal(list)  # selected keys (tag names / UNTAGGED_KEY); empty = all
     auto_tag_changed = pyqtSignal(str)  # "" | tag name
     tags_changed     = pyqtSignal()     # palette edited (add/delete)
 
@@ -1614,7 +1626,7 @@ class _TagBar(QWidget):
         super().__init__(parent)
         self._db = db
         self._dark = dark
-        self._active = ""
+        self._active: list[str] = []   # multi-select; empty = "All"
         self._auto_tag = auto_tag
         self._chips: dict[str, QLabel] = {}
 
@@ -1678,8 +1690,8 @@ class _TagBar(QWidget):
 
     # -- public ---------------------------------------------------------
 
-    def active_filter(self) -> str:
-        return self._active
+    def active_filter(self) -> list[str]:
+        return list(self._active)
 
     def auto_tag(self) -> str:
         return self._auto_tag
@@ -1693,8 +1705,10 @@ class _TagBar(QWidget):
 
         tags = self._db.get_tags()
         names = {t["name"].lower() for t in tags}
-        if self._active and self._active != UNTAGGED_KEY and self._active.lower() not in names:
-            self._active = ""
+        pruned = [k for k in self._active if k == UNTAGGED_KEY or k.lower() in names]
+        if pruned != self._active:
+            self._active = pruned
+            self.filter_changed.emit(list(self._active))
         if self._auto_tag and self._auto_tag.lower() not in names:
             self._auto_tag = ""
             self.auto_tag_changed.emit("")
@@ -1734,14 +1748,29 @@ class _TagBar(QWidget):
         if event.button() == Qt.MouseButton.RightButton:
             self._chip_menu(event, key)
             return
-        self._select("" if key == self._active else key)
+        self._toggle(key)
+
+    def _toggle(self, key: str) -> None:
+        """Click a tag to add/remove it from the active set; "All" clears."""
+        if key == "":
+            if not self._active:
+                return
+            self._active = []
+        elif key in self._active:
+            self._active = [k for k in self._active if k != key]
+        else:
+            self._active = self._active + [key]
+        self._apply_theme(self._dark)
+        self.filter_changed.emit(list(self._active))
 
     def _select(self, key: str) -> None:
-        if key == self._active:
+        """Make `key` the only active filter ("" = All)."""
+        want = [key] if key else []
+        if want == self._active:
             return
-        self._active = key
+        self._active = want
         self._apply_theme(self._dark)
-        self.filter_changed.emit(key)
+        self.filter_changed.emit(list(self._active))
 
     def _chip_menu(self, event, key: str) -> None:
         if key in ("", UNTAGGED_KEY):
@@ -1797,7 +1826,7 @@ class _TagBar(QWidget):
                 color = "#8a8a8a"
             else:
                 color = _tag_color(colors, key)
-            selected = key == self._active
+            selected = (key in self._active) if key else not self._active
             style = _chip_style(color, selected)
             if key == self._auto_tag and key:
                 style += " text-decoration: underline;"
@@ -2100,9 +2129,9 @@ class TodoView(QWidget):
         self._general_list.set_sort_mode(mode)
         self.refresh()
 
-    def _on_tag_filter_changed(self, tag: str) -> None:
-        self._today_list.set_tag_filter(tag)
-        self._general_list.set_tag_filter(tag)
+    def _on_tag_filter_changed(self, tags: list) -> None:
+        self._today_list.set_tag_filter(list(tags))
+        self._general_list.set_tag_filter(list(tags))
         self.refresh()
 
     def _on_auto_tag_changed(self, tag: str) -> None:

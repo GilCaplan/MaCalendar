@@ -6,6 +6,7 @@ import datetime
 import json
 import logging
 import re
+import time
 from typing import TYPE_CHECKING
 
 import requests
@@ -51,6 +52,10 @@ class IntentParser:
         self._schema = self.registry.build_ollama_schema()
         self._prompt_date: str = ""
         self._system_prompt: str = ""
+        # Diagnostics for the thinking trace
+        self.last_llm_ms: int = 0
+        self.last_raw_response: str = ""
+        self.last_examples_used: int = 0
 
     def _get_system_prompt(self) -> str:
         """Return cached system prompt, refreshing it if the date has changed."""
@@ -81,25 +86,66 @@ class IntentParser:
         system_prompt = self._get_system_prompt()
         schema = self._schema
 
+        # Personalisation: similar past commands (+ user corrections) as few-shot.
+        # Appended to the USER message, not the system prompt: Ollama caches the
+        # KV state of an unchanged prompt prefix, so keeping the (long) system
+        # prompt byte-identical between calls skips most prompt processing.
+        examples_block = self._few_shot_for(transcript)
+        user_msg = f"{transcript}\n\n{examples_block}" if examples_block else transcript
+        self.last_examples_used = examples_block.count("\n- ") if examples_block else 0
+
         # Route to specific provider call
         engine = self.config.llm_engine
+        t0 = time.perf_counter()
         try:
             if engine == "ollama":
-                raw_content = self._call_ollama(system_prompt, transcript, schema)
+                raw_content = self._call_ollama(system_prompt, user_msg, schema)
             elif engine == "openai":
-                raw_content = self._call_openai(system_prompt, transcript)
+                raw_content = self._call_openai(system_prompt, user_msg)
             elif engine == "gemini":
-                raw_content = self._call_gemini(system_prompt, transcript)
+                raw_content = self._call_gemini(system_prompt, user_msg)
             elif engine == "claude":
-                raw_content = self._call_claude(system_prompt, transcript)
+                raw_content = self._call_claude(system_prompt, user_msg)
             else:
                 raise ParseError(f"Unsupported LLM engine: {engine}")
         except AssistantError:
             raise
         except Exception as e:
             raise ParseError(f"Error calling {engine}: {e}") from e
+        finally:
+            self.last_llm_ms = int((time.perf_counter() - t0) * 1000)
 
+        self.last_raw_response = raw_content
         return self._parse_response(raw_content)
+
+    def _few_shot_for(self, transcript: str) -> str:
+        k = getattr(self.config.nlu, "memory_examples", 0)
+        if not k:
+            return ""
+        try:
+            from assistant.intent.memory import get_memory
+            # Strip context prefixes so retrieval sees the user's words only
+            plain = transcript.split("User command:", 1)[-1].replace("[TASKS VIEW]", "").strip()
+            return get_memory().few_shot_block(plain, k=k)
+        except Exception as e:  # memory must never break parsing
+            logger.debug("Memory few-shot skipped: %s", e)
+            return ""
+
+    def warm_up(self) -> None:
+        """Preload the Ollama model so the first real command doesn't pay the load cost."""
+        if self.config.llm_engine != "ollama":
+            return
+        conf = self.config.ollama
+        for model in dict.fromkeys([conf.model, conf.verify_model or conf.model]):
+            try:
+                self._session.post(
+                    f"{conf.base_url}/api/generate",
+                    json={"model": model, "keep_alive": conf.keep_alive, "options": {"num_ctx": conf.num_ctx}},
+                    timeout=120,
+                )
+                logger.info("Ollama model %s warmed (keep_alive=%s)", model, conf.keep_alive)
+            except Exception as e:
+                logger.warning("Ollama warm-up of %s failed: %s", model, e)
 
     def parse_with_context(
         self,
@@ -135,6 +181,11 @@ class IntentParser:
             lines.append(
                 f"Required slots still missing: {', '.join(partial.missing_slots)}"
             )
+        if any(a == "create_todo" for a in partial.raw_slots):
+            lines.append("This is a TASK command: return create_todo action(s) only — do NOT add a create_event.")
+        if getattr(partial, "dropped_spans", 0):
+            lines.append(f"NOTE: the rule parser could only interpret part of the command ({partial.dropped_spans} clause(s) were skipped). "
+                         "Re-read the FULL user command and return EVERY action it contains — there are probably more than listed above.")
         return "\n".join(lines)
 
     def verify_fast_path_async(
@@ -167,6 +218,19 @@ class IntentParser:
             logger.debug("Fast-path verification skipped: %s", e)
             return None
 
+    @staticmethod
+    def _strip_datetime_words(title: str) -> str:
+        """'Meeting Tomorrow at 4pm' → 'Meeting'; keeps names/places."""
+        t = re.sub(r"\b(?:at|from|until|till|to)\s+\d{1,2}(?:[:.]\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)?\b", "", title, flags=re.I)
+        t = re.sub(r"\b(?:today|tonight|tomorrow|yesterday|this|next|coming)\s+(?:morning|evening|night|week|weekend|"
+                   r"monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", "", t, flags=re.I)
+        t = re.sub(r"\b(?:today|tonight|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", "", t, flags=re.I)
+        t = re.sub(r"\b(?:on\s+)?the\s+\d{1,2}(?:st|nd|rd|th)\b", "", t, flags=re.I)
+        t = re.sub(r"\b\d{1,2}(?:[:.]\d{2})?\s*(?:am|pm)\b", "", t, flags=re.I)
+        t = re.sub(r"\s{2,}", " ", t).strip(" ,-–")
+        t = re.sub(r"\s+(?:on|at|in|for|from|to|until|till|with|and)$", "", t, flags=re.I)
+        return t.strip()
+
     def fix_title_async(self, transcript: str, keyword: str) -> "str | None":
         """Ask the LLM for a proper event title when fast-path used a keyword placeholder.
 
@@ -177,6 +241,8 @@ class IntentParser:
             "You are a calendar assistant. Given a voice command transcript, "
             "produce a concise, properly-cased event title.\n"
             "Rules: 2-6 words, title case, no punctuation at end, no explanation.\n"
+            "The title names the activity and who/where (e.g. 'Meeting with Ravid at Kems', 'Dentist Appointment'). "
+            "NEVER include the date, weekday, or time — those are stored separately.\n"
             "Respond with ONLY a JSON object: {\"title\": \"<event title>\"}"
         )
         user_prompt = (
@@ -187,7 +253,7 @@ class IntentParser:
         try:
             engine = self.config.llm_engine
             if engine == "ollama":
-                raw = self._call_ollama_verify(sys_prompt, user_prompt)
+                raw = self._call_ollama_verify(self._get_system_prompt(), "[SIDE TASK — ignore the JSON-envelope instructions above for this message]\n" + sys_prompt + "\n\n" + user_prompt)
             elif engine == "openai":
                 raw = self._call_openai(sys_prompt, user_prompt)
             elif engine == "gemini":
@@ -201,6 +267,9 @@ class IntentParser:
             title = data.get("title", "").strip().strip("\"'")
             if title and title.lower() != keyword.lower():
                 logger.debug("fix_title_async: %r → %r", keyword, title)
+                title = self._strip_datetime_words(title) or None
+                if not title or title.strip().lower() == keyword.strip().lower():
+                    return None
                 return title
         except Exception as exc:
             logger.debug("fix_title_async failed: %s", exc)
@@ -218,7 +287,7 @@ class IntentParser:
         engine = self.config.llm_engine
         try:
             if engine == "ollama":
-                raw = self._call_ollama_verify(sys_prompt, user_prompt)
+                raw = self._call_ollama_verify(self._get_system_prompt(), "[SIDE TASK — ignore the JSON-envelope instructions above for this message]\n" + sys_prompt + "\n\n" + user_prompt)
             elif engine == "openai":
                 raw = self._call_openai(sys_prompt, user_prompt)
             elif engine == "gemini":
@@ -251,9 +320,41 @@ class IntentParser:
                 f"  action={action_name!r}, slots={json.dumps(filled, default=str)}"
             )
         actions_block = "\n".join(action_summaries) if action_summaries else "  (none)"
+        return self._verify_block(transcript, actions_block, "A fast rule parser")
+
+    def verify_actions_async(
+        self,
+        transcript: str,
+        executed: "list[tuple[str, object]]",
+    ) -> "dict | None":
+        """Post-execution self-check for ANY parse path (rule, hybrid, llm).
+
+        Re-reasons over the transcript, what was actually executed, and this
+        user's similar past commands (memory) and returns the same three-tier
+        correction dict as verify_fast_path_async, or None if it agrees.
+        Safe to call from a daemon thread.
+        """
+        try:
+            summaries = []
+            for name, intent in executed:
+                if hasattr(intent, "model_dump"):
+                    params = intent.model_dump(exclude_none=True, exclude_defaults=True)
+                elif isinstance(intent, dict):
+                    params = intent
+                else:
+                    params = {}
+                summaries.append(f"  action={name!r}, parameters={json.dumps(params, default=str)}")
+            block = "\n".join(summaries) if summaries else "  (none)"
+            return self._verify_block(transcript, block, "The assistant")
+        except Exception as e:
+            logger.debug("Post-execution verification skipped: %s", e)
+            return None
+
+    def _verify_block(self, transcript: str, actions_block: str, who: str) -> "dict | None":
+        history = self._few_shot_for(transcript)
 
         verify_sys = (
-            "You are a voice-command verifier. A fast rule parser already executed a command. "
+            f"You are a voice-command verifier. {who} already executed a command. "
             "Judge if it was correct, then respond with ONLY a JSON object — no prose.\n\n"
             "Severity rules:\n"
             '  • Correct → {"ok": true}\n'
@@ -266,8 +367,7 @@ class IntentParser:
             '     "action": "<correct_action_name>",\n'
             '     "parameters": {<full correct params>},\n'
             '     "speech": "<under 15 words for TTS>"}\n'
-            "Valid action names: create_event, update_event, delete_event, query_schedule, "
-            "create_todo, complete_todo, delete_todo, update_todo, query_todo.\n\n"
+            f"Valid action names: {', '.join(self.registry.all_names())}.\n\n"
             "Key routing rules (apply these FIRST before judging):\n"
             "  • If the command says 'set/create/schedule/book a meeting/appointment/call/session'\n"
             "    AND includes a specific time or date → it is ALWAYS create_event. Never create_todo.\n"
@@ -286,11 +386,20 @@ class IntentParser:
             "  • Generic words ('event', 'appointment', 'meeting') as match_title for update/delete\n"
             "    are ambiguous; the event should be identified by time or its actual name."
         )
+        # The verifier instructions go in the USER turn and the system prompt is
+        # the same one the parser uses: Ollama caches the KV state of an
+        # unchanged prompt prefix, so alternating parse/verify calls with two
+        # different system prompts would re-process ~4k tokens every time.
         verify_user = (
-            f"Voice command: {transcript!r}\n\n"
-            f"Rule parser executed:\n{actions_block}\n\n"
-            "Judge the severity:"
+            "[VERIFICATION TASK — ignore the JSON-envelope instructions above for this message]\n"
+            + verify_sys + "\n\n"
+            + f"Voice command: {transcript!r}\n\n"
+            f"Executed:\n{actions_block}\n\n"
+            + (history + "\nIf the executed interpretation contradicts how this user's similar past "
+               "commands were (correctly) interpreted, prefer the user's history.\n\n" if history else "")
+            + "Judge the severity:"
         )
+        verify_sys = self._get_system_prompt()
 
         engine = self.config.llm_engine
         try:
@@ -326,16 +435,17 @@ class IntentParser:
         return data  # pipeline decides what to do with minor vs major
 
     def _call_ollama_verify(self, sys: str, user: str) -> str:
-        """Lightweight Ollama call without format schema — faster for verification."""
+        """Verification call — uses the (optionally stronger) `verify_model`."""
         conf = self.config.ollama
         payload = {
-            "model": conf.model,
+            "model": conf.verify_model or conf.model,
             "messages": [{"role": "system", "content": sys}, {"role": "user", "content": user}],
             "stream": False,
-            "options": {"temperature": 0.0},  # deterministic judgment
+            "keep_alive": conf.keep_alive,
+            "options": {"temperature": 0.0, "num_ctx": conf.num_ctx},  # deterministic judgment
         }
         resp = self._session.post(
-            f"{conf.base_url}/api/chat", json=payload, timeout=25
+            f"{conf.base_url}/api/chat", json=payload, timeout=60
         )
         resp.raise_for_status()
         return resp.json()["message"]["content"]
@@ -369,7 +479,8 @@ class IntentParser:
             "messages": [{"role": "system", "content": sys}, {"role": "user", "content": user}],
             "stream": False,
             "format": schema,
-            "options": {"temperature": conf.temperature},
+            "keep_alive": conf.keep_alive,
+            "options": {"temperature": conf.temperature, "num_ctx": conf.num_ctx},
         }
         try:
             resp = self._session.post(f"{conf.base_url}/api/chat", json=payload, timeout=timeout)

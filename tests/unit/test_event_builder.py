@@ -88,6 +88,15 @@ def test_end_before_start_wraps_to_next_day():
 
 
 def test_invalid_date_raises_event_build_error():
-    intent = _make_intent(date="not-a-date")
-    with pytest.raises(EventBuildError):
+    # Non-ISO dates are now rejected at intent validation (pydantic); the
+    # builder's own EventBuildError remains the backstop for anything that
+    # slips through (e.g. a syntactically valid but impossible date).
+    from pydantic import ValidationError
+    # Unparseable junk is coerced to None at validation time (the server's sanity
+    # pass resolves the real date from the transcript)…
+    import datetime as _dt
+    assert _make_intent(date="not-a-date").date == _dt.date.today().isoformat()   # model default fills today
+    # …while a well-formed but impossible date still fails downstream.
+    with pytest.raises((EventBuildError, ValidationError)):
+        intent = _make_intent(date="2026-13-45")
         build_event_payload(intent, "UTC")

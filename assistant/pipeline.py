@@ -48,6 +48,9 @@ _DOUBLE_TAP_SEC = 0.4
 
 
 def _build_stt(config: AppConfig):
+    if config.stt_engine == "mlx":
+        from assistant.stt.mlx_whisper_stt import MlxWhisperSTT
+        return MlxWhisperSTT(config.mlx_whisper)
     if config.stt_engine == "whisper":
         from assistant.stt.whisper_stt import WhisperSTT
         return WhisperSTT(config.whisper)
@@ -257,6 +260,13 @@ class Pipeline:
         # Strip stop keywords from the tail of the transcript
         transcript = _strip_stop_keyword(transcript, self.config.audio.stop_phrases)
 
+        # Personal vocabulary auto-correct (names / non-English words)
+        from assistant.stt.vocab import apply_vocab
+        transcript, _vocab_fixes = apply_vocab(transcript, source="mac")
+        if _vocab_fixes:
+            self._set_status(STATUS_PROCESSING,
+                             "Fixed: " + ", ".join(f"{c.original}→{c.replacement}" for c in _vocab_fixes))
+
         # Combine mode: prepend previous transcript so the LLM sees one unified request
         if combine and self._last_transcript:
             transcript = self._last_transcript + ", " + transcript
@@ -373,6 +383,9 @@ class Pipeline:
         # 4. Confirm + execute each action
         t_exec = time.perf_counter()
         results: List[str] = []
+        from assistant.intent.context import ContextMemory as _CM
+        _ctx_mem = _CM()
+        _memory_records: list = []
         for action_name, intent in valid:
             if action_name == "clarify":
                 pass  # never prompt confirmation for a clarification question
@@ -388,8 +401,13 @@ class Pipeline:
 
             try:
                 self._set_status(STATUS_PROCESSING, f"⚙️ Executing {action_name.replace('_', ' ')}…")
+                _ev_before, _td_before = _ctx_mem.last_event_id, _ctx_mem.last_todo_id
                 result_text = action_cls().execute(intent, self.config)
                 results.append(result_text)
+                if _ctx_mem.last_event_id != _ev_before and _ctx_mem.last_event_id is not None:
+                    _memory_records.append(("event", _ctx_mem.last_event_id, action_name))
+                if _ctx_mem.last_todo_id != _td_before and _ctx_mem.last_todo_id is not None:
+                    _memory_records.append(("todo", _ctx_mem.last_todo_id, action_name))
                 logger.info("🖥️ Action '%s' complete: %s", action_name, result_text)
             except AuthExpiredError as e:
                 self._tts.speak("Microsoft login expired. Use Re-authenticate in the menu.")
@@ -472,6 +490,20 @@ class Pipeline:
                       [n for n, _ in valid], results),
                 daemon=True,
             ).start()
+
+        # Command memory (few-shot personalisation + feedback linking)
+        if valid and results and getattr(self.config.nlu, "memory_enabled", True):
+            try:
+                from assistant.intent.memory import get_memory
+                get_memory().record(
+                    transcript=transcript, source="mac", parse_path=_parse_method,
+                    actions=valid, result=" ".join(results), success=True,
+                    llm_ms=getattr(self._parser, "last_llm_ms", 0),
+                    total_ms=int((time.perf_counter() - t_start) * 1000),
+                    records=_memory_records,
+                )
+            except Exception as e:
+                logger.warning("🖥️ Memory record failed: %s", e)
 
         logger.info("🖥️ ⏱ Total pipeline: %.2fs", time.perf_counter() - t_start)
         self._phase = STATUS_IDLE
