@@ -18,7 +18,18 @@ import yaml
 from flask import Flask, jsonify, request
 
 from assistant.actions import ActionRegistry
-from assistant.config import load_config
+from assistant.config import AppConfig, ConfigError, load_config as _load_config_file
+
+
+def load_config(path: str = "config.yaml") -> AppConfig:
+    """config.yaml is local-only (gitignored); fall back to the example, then defaults (CI)."""
+    try:
+        return _load_config_file(path)
+    except ConfigError:
+        try:
+            return _load_config_file("config.example.yaml")
+        except ConfigError:
+            return AppConfig()
 from assistant.db import get_db
 from assistant.exceptions import AssistantError
 
