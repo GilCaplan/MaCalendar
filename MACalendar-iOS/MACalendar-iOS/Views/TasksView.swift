@@ -175,6 +175,9 @@ struct TasksView: View {
                 Color.clear.frame(height: 100)
             }
             .task { load() }
+            // The list only refreshed on appear / pull, so a fetch that failed while the
+            // Mac was restarting left it empty. Reload when the Mac comes back.
+            .onChange(of: api.isOnline) { online in if online { load() } }
             .overlay(alignment: .bottom) {
                 VoiceButton(onRefresh: { refresh in
                     if refresh == "todos" || refresh == "both" { load() }

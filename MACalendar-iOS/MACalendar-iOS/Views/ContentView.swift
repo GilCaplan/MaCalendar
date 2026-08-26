@@ -312,6 +312,10 @@ struct ContentView: View {
             // changes upload as soon as the Mac comes back online.
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 30_000_000_000)
+                if !api.isOnline, (try? await api.health()) != nil {
+                    // Mac is back: isOnline flipped true inside request(); reload everything
+                    await loadMonth()
+                }
                 let synced = await api.syncPending()
                 if synced {
                     await loadMonth()
