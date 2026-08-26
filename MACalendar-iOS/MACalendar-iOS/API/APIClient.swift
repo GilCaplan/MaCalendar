@@ -5,6 +5,10 @@ class APIClient: ObservableObject {
     @Published var isLoading  = false
     @Published var lastError: String?
     @Published var isOnline   = true
+    /// Bumped whenever every view should re-fetch from the Mac (foreground, 30 s poll,
+    /// reconnect, voice command). Views subscribe with `.onReceive(api.$refreshTick)`.
+    @Published var refreshTick = 0
+    func requestRefresh() { refreshTick &+= 1 }
 
     private let settings: AppSettings
 
@@ -44,7 +48,7 @@ class APIClient: ObservableObject {
                 let msg = String(data: data, encoding: .utf8) ?? "Unknown error"
                 throw APIError.serverError(msg)
             }
-            isOnline = true
+            if !isOnline { isOnline = true; requestRefresh() } else { isOnline = true }
             return data
         } catch let err as APIError {
             throw err

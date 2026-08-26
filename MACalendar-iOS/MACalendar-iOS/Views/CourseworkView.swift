@@ -72,6 +72,7 @@ struct CourseworkView: View {
             }
         }
         .task { await load() }
+        .onReceive(api.$refreshTick) { _ in Task { await load() } }
         .sheet(isPresented: $showAddCourse) {
             CourseEditSheet(course: nil).environmentObject(api)
         }

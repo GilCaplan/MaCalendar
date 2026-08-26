@@ -254,11 +254,11 @@ struct ContentView: View {
         .onChange(of: scenePhase) { phase in
             if phase == .active {
                 Task {
-                    let synced = await api.syncPending()
-                    if synced {
-                        await loadMonth()
-                        await refreshWorkoutIfNeeded()
-                    }
+                    _ = await api.syncPending()
+                    // Always re-fetch on foreground: the Mac app may have changed things.
+                    await loadMonth()
+                    await refreshWorkoutIfNeeded()
+                    api.requestRefresh()
                 }
             }
         }
@@ -312,15 +312,12 @@ struct ContentView: View {
             // changes upload as soon as the Mac comes back online.
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 30_000_000_000)
-                if !api.isOnline, (try? await api.health()) != nil {
-                    // Mac is back: isOnline flipped true inside request(); reload everything
-                    await loadMonth()
-                }
-                let synced = await api.syncPending()
-                if synced {
-                    await loadMonth()
-                    await refreshWorkoutIfNeeded()
-                }
+                guard scenePhase == .active else { continue }
+                if !api.isOnline { _ = try? await api.health() }   // flips isOnline (+refresh) when the Mac is back
+                _ = await api.syncPending()
+                // Poll: keep the phone in step with whatever was changed on the Mac.
+                await loadMonth()
+                api.requestRefresh()
             }
         }
     }

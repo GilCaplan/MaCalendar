@@ -138,6 +138,13 @@ struct WorkoutView: View {
             _ = try? await api.workoutTemplates(includeDrafts: false)
             _ = try? await api.workoutSessions(limit: 50)
         }
+        .onReceive(api.$refreshTick) { _ in
+            Task {
+                _ = try? await api.workoutExercises()
+                _ = try? await api.workoutTemplates(includeDrafts: false)
+                _ = try? await api.workoutSessions(limit: 50)
+            }
+        }
     }
 
     // MARK: - AI-generated routine trigger + review
