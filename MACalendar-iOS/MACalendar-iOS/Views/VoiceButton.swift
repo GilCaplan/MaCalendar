@@ -125,15 +125,32 @@ struct VoiceButton: View {
             requestPermission { granted in
                 guard granted else { return }
                 Task { @MainActor in
+                    if settings.stopWordsEnabled {
+                        _ = await VoiceRecorder.requestSpeechPermission()   // no-op once granted
+                    }
+                    recorder.stopWordsEnabled = settings.stopWordsEnabled
+                    recorder.silenceStopSeconds = settings.silenceStopSeconds
+                    recorder.onAutoStop = { [self] in finishRecording() }
                     status = .recording
                     recorder.start()
                 }
             }
         case .recording:
-            guard let audioData = recorder.stop(), !audioData.isEmpty else {
-                status = .idle
-                return
-            }
+            finishRecording()
+        default:
+            player.stop()
+            status = .idle
+        }
+    }
+
+    /// Ends the recording (tap, stop word, or silence) and sends it to the Mac.
+    private func finishRecording() {
+        guard status == .recording else { return }
+        guard let audioData = recorder.stop(), !audioData.isEmpty else {
+            status = .idle
+            return
+        }
+        do {   // one block so the placeholder row + upload read top-to-bottom
             status = .thinking
             steps = []
             finished = false
@@ -166,9 +183,6 @@ struct VoiceButton: View {
                     status = .idle
                 }
             }
-        default:
-            player.stop()
-            status = .idle
         }
     }
 

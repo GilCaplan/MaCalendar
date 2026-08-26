@@ -184,6 +184,20 @@ struct SettingsView: View {
 
                             Divider()
 
+                            Toggle(isOn: $settings.stopWordsEnabled) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Stop on “execute”")
+                                    Text("Say execute / done / submit / confirm and the recording ends by itself (on-device, like the Mac)")
+                                        .font(.caption).foregroundColor(.secondary)
+                                }
+                            }
+                            HStack {
+                                Text("Auto-stop after silence")
+                                Spacer()
+                                Text("\(Int(settings.silenceStopSeconds)) s").font(.caption.monospacedDigit()).foregroundColor(.secondary)
+                            }
+                            Slider(value: $settings.silenceStopSeconds, in: 2...12, step: 1)
+
                             Toggle(isOn: $settings.showThinking) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Show assistant thinking")

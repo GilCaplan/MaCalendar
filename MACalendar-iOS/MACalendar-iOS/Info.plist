@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Used only on this phone to notice when you say a stop word like “execute” so recording ends by itself. The transcript itself is made on your Mac.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>MACalendar talks to the assistant server running on your Mac over your local network or Tailscale.</string>
 	<key>CFBundleDocumentTypes</key>

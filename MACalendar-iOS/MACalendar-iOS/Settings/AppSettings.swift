@@ -87,12 +87,24 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(showThinking, forKey: "showThinking") }
     }
 
+    // Stop-word / silence auto-stop while recording (mirrors the Mac's behaviour).
+    @Published var stopWordsEnabled: Bool {
+        didSet { UserDefaults.standard.set(stopWordsEnabled, forKey: "stopWordsEnabled") }
+    }
+    @Published var silenceStopSeconds: Double {
+        didSet { UserDefaults.standard.set(silenceStopSeconds, forKey: "silenceStopSeconds") }
+    }
+
     // First-run vocabulary interview shown/skipped (local-only flag).
     @Published var vocabOnboardingDone: Bool {
         didSet { UserDefaults.standard.set(vocabOnboardingDone, forKey: "vocabOnboardingDone") }
     }
 
     init() {
+        self.stopWordsEnabled = UserDefaults.standard.object(forKey: "stopWordsEnabled") == nil
+            ? true : UserDefaults.standard.bool(forKey: "stopWordsEnabled")
+        let sil = UserDefaults.standard.double(forKey: "silenceStopSeconds")
+        self.silenceStopSeconds = sil == 0 ? 6 : sil
         self.vocabOnboardingDone = UserDefaults.standard.bool(forKey: "vocabOnboardingDone")
         self.showThinking = UserDefaults.standard.object(forKey: "showThinking") == nil
             ? true : UserDefaults.standard.bool(forKey: "showThinking")
