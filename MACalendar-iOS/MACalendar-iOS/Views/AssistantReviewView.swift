@@ -12,6 +12,7 @@ struct AssistantReviewView: View {
     @State private var loading = false
     @State private var error: String?
     @State private var done = 0
+    @State private var confirmSkip = false
 
     var body: some View {
         NavigationView {
@@ -39,7 +40,18 @@ struct AssistantReviewView: View {
             }
             .navigationTitle("Review commands")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("Done") { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if !items.isEmpty {
+                        Button("Dismiss all") { confirmSkip = true }
+                            .confirmationDialog("Dismiss all \(items.count) without a verdict? They won't count as right or wrong.",
+                                                isPresented: $confirmSkip, titleVisibility: .visible) {
+                                Button("Dismiss all", role: .destructive) { Task { _ = await api.skipAllUnreviewed(); items = []; done = 0 } }
+                            }
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) { Button("Done") { dismiss() } }
+            }
             .overlay { if loading && items.isEmpty { ProgressView() } }
             .task { await load() }
             .refreshable { await load() }
@@ -68,19 +80,29 @@ private struct ReviewRow: View {
         example.actions.map { a in
             let p = a.parameters
             switch a.action {
-            case "create_event":
-                let t = (p["title"]?.stringValue ?? "event")
-                let when = [p["date"]?.stringValue, p["start_time"]?.stringValue].compactMap { $0 }.joined(separator: " ")
-                return "Event: \(t)\(when.isEmpty ? "" : " · " + when)"
+            case "create_event", "update_event":
+                let real = example.resolved?.first { $0.type == "event" && ($0.title == p["title"]?.stringValue || example.resolved?.count == 1) }
+                let t = real?.title ?? p["title"]?.stringValue ?? "event"
+                let date = real?.date ?? p["date"]?.stringValue
+                let time = (real?.startTime).flatMap { $0.isEmpty ? nil : $0 } ?? p["start_time"]?.stringValue
+                let when = [date.map(Self.prettyDate), time].compactMap { $0 }.joined(separator: " ")
+                return "\(a.action == "update_event" ? "Updated event" : "Event"): \(t)\(when.isEmpty ? "" : " · " + when)"
             case "create_todo":
                 let titles = (p["titles"]?.arrayValue ?? []).compactMap { $0.stringValue }
                 return "Task\(titles.count > 1 ? "s" : ""): " + titles.joined(separator: ", ")
-            case "update_event": return "Updated event \(p["match_title"]?.stringValue ?? "")"
             case "delete_event": return "Deleted event \(p["match_title"]?.stringValue ?? "")"
             case "query_schedule": return "Read schedule"
             default: return a.action.replacingOccurrences(of: "_", with: " ")
             }
         }.joined(separator: " · ")
+    }
+
+    /// "2026-08-27" → "Thu 27 Aug"
+    static func prettyDate(_ iso: String) -> String {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        guard let d = f.date(from: iso) else { return iso }
+        let o = DateFormatter(); o.dateFormat = "EEE d MMM"
+        return o.string(from: d)
     }
 
     var body: some View {

@@ -389,10 +389,21 @@ struct MemoryExample: Codable, Identifiable {
     let actions: [MemoryAction]
     let result: String
     let feedback: String
+    var resolved: [ResolvedRecord]? = nil
     enum CodingKeys: String, CodingKey {
-        case id, ts, time, source, transcript, actions, result, feedback
+        case id, ts, time, source, transcript, actions, result, feedback, resolved
         case parsePath = "parse_path"
     }
 }
 
 struct UnreviewedResponse: Codable { let examples: [MemoryExample]; let count: Int }
+
+/// What a voice command actually put in the calendar (server joins example → record).
+struct ResolvedRecord: Codable, Equatable {
+    let type: String
+    let action: String
+    let title: String
+    let date: String
+    let startTime: String
+    enum CodingKeys: String, CodingKey { case type, action, title, date; case startTime = "start_time" }
+}

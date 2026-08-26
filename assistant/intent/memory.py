@@ -34,6 +34,7 @@ FEEDBACK_NONE = "none"
 FEEDBACK_APPROVED = "approved"
 FEEDBACK_CORRECTED = "corrected"
 FEEDBACK_REJECTED = "rejected"
+FEEDBACK_SKIPPED = "skipped"     # dismissed from the review list without a verdict
 
 # How long after a voice command an edit/delete of the created record still
 # counts as feedback on that command.
@@ -204,6 +205,18 @@ class CommandMemory:
             )
             logger.info("Memory feedback %s on example %s (%s #%s)", feedback, row["id"], record_type, record_id)
             return int(row["id"])
+
+    def records_for(self, example_id: int) -> list[dict[str, Any]]:
+        """(record_type, record_id, action) rows this command created/changed."""
+        with self._conn() as c:
+            return [dict(r) for r in c.execute(
+                "SELECT record_type, record_id, action FROM example_records WHERE example_id = ?", (example_id,))]
+
+    def skip_unreviewed(self) -> int:
+        """Dismiss every command that still has no feedback (stale backlog)."""
+        with self._lock, self._conn() as c:
+            return c.execute("UPDATE examples SET feedback = ? WHERE feedback = ?",
+                             (FEEDBACK_SKIPPED, FEEDBACK_NONE)).rowcount
 
     def delete(self, example_id: int) -> bool:
         with self._lock, self._conn() as c:

@@ -235,6 +235,13 @@ struct ContentView: View {
                         .tag(4)
                 }
 
+                // ── Timer Tab ────────────────────────────────────────────
+                if settings.showTimerTab {
+                    TimerView()
+                        .tabItem { Label("Timer", systemImage: "timer") }
+                        .tag(5)
+                }
+
                 // ── Settings Tab ─────────────────────────────────────────
                 SettingsView()
                     .tabItem { Label("Settings", systemImage: "gear") }

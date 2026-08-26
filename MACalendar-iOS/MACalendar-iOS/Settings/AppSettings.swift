@@ -77,6 +77,9 @@ class AppSettings: ObservableObject {
     }
 
     // Same pattern as showCourseworkTab above, for the local-only Workout tab.
+    @Published var showTimerTab: Bool {
+        didSet { UserDefaults.standard.set(showTimerTab, forKey: "showTimerTab") }
+    }
     @Published var showWorkoutTab: Bool {
         didSet { UserDefaults.standard.set(showWorkoutTab, forKey: "showWorkoutTab") }
     }
@@ -157,6 +160,8 @@ class AppSettings: ObservableObject {
         self.showCourseworkTab = UserDefaults.standard.object(forKey: "showCourseworkTab") == nil
             ? true : UserDefaults.standard.bool(forKey: "showCourseworkTab")
 
+        self.showTimerTab = UserDefaults.standard.object(forKey: "showTimerTab") == nil
+            ? true : UserDefaults.standard.bool(forKey: "showTimerTab")
         self.showWorkoutTab = UserDefaults.standard.object(forKey: "showWorkoutTab") == nil
             ? true : UserDefaults.standard.bool(forKey: "showWorkoutTab")
     }

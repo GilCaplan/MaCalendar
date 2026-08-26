@@ -640,9 +640,39 @@ class APIClient: ObservableObject {
         (try? await unreviewedCommands(limit: 50).count) ?? 0
     }
 
+    func skipAllUnreviewed() async -> Int? {
+        guard let d = try? await request("/memory/unreviewed/skip", method: "POST", body: [:]),
+              let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return nil }
+        return o["skipped"] as? Int
+    }
+
     func memoryFeedback(id: Int, feedback: String) async {
         _ = try? await request("/memory/\(id)/feedback", method: "POST", body: ["feedback": feedback])
     }
+
+    // MARK: - Timers & counters
+
+    func timers(archived: Bool = false) async throws -> [WorkTimer] {
+        try decode(TimersResponse.self, from: try await request("/timers" + (archived ? "?archived=1" : ""))).timers
+    }
+    func createTimer(_ body: [String: Any]) async -> Bool { (try? await request("/timers", method: "POST", body: body)) != nil }
+    func updateTimer(_ id: Int, _ body: [String: Any]) async { _ = try? await request("/timers/\(id)", method: "PATCH", body: body) }
+    func deleteTimer(_ id: Int) async { _ = try? await request("/timers/\(id)", method: "DELETE") }
+    func startTimer(_ id: Int) async { _ = try? await request("/timers/\(id)/start", method: "POST", body: [:]) }
+    func stopTimer(_ id: Int) async { _ = try? await request("/timers/\(id)/stop", method: "POST", body: [:]) }
+    func timerSessions(_ id: Int) async throws -> [TimerSession] {
+        try decode(TimerSessionsResponse.self, from: try await request("/timers/\(id)/sessions")).sessions
+    }
+    func deleteTimerSession(_ id: Int) async { _ = try? await request("/timer_sessions/\(id)", method: "DELETE") }
+
+    func counters(archived: Bool = false) async throws -> [TallyCounter] {
+        try decode(CountersResponse.self, from: try await request("/counters" + (archived ? "?archived=1" : ""))).counters
+    }
+    func createCounter(_ body: [String: Any]) async -> Bool { (try? await request("/counters", method: "POST", body: body)) != nil }
+    func updateCounter(_ id: Int, _ body: [String: Any]) async { _ = try? await request("/counters/\(id)", method: "PATCH", body: body) }
+    func deleteCounter(_ id: Int) async { _ = try? await request("/counters/\(id)", method: "DELETE") }
+    func pressCounter(_ id: Int, delta: Int) async { _ = try? await request("/counters/\(id)/press", method: "POST", body: ["delta": delta]) }
+    func cashOutCounter(_ id: Int) async { _ = try? await request("/counters/\(id)/cashout", method: "POST", body: [:]) }
 
     // MARK: - Event categories
 

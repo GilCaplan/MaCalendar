@@ -1079,8 +1079,35 @@ def create_app() -> Flask:
         """Commands with no feedback yet (for the phone's review screen)."""
         from assistant.intent.memory import get_memory
         limit = int(request.args.get("limit", 30))
-        rows = [r for r in get_memory().recent(200) if r["feedback"] == "none" and r["success"] and r["actions"]][:limit]
+        mem = get_memory(); db = get_db()
+        rows = [r for r in mem.recent(200) if r["feedback"] == "none" and r["success"] and r["actions"]][:limit]
+        # Attach what actually landed in the calendar (date/time/title) so the
+        # review screen can show the real date even when the stored example
+        # parameters carry none.
+        for r in rows:
+            resolved = []
+            for rec in mem.records_for(r["id"]):
+                try:
+                    if rec["record_type"] == "event":
+                        ev = db.get_event(int(rec["record_id"]))
+                        if ev:
+                            resolved.append({"type": "event", "action": rec["action"], "title": ev["title"],
+                                             "date": ev["date"], "start_time": ev["start_time"]})
+                    else:
+                        td = db.get_todo(int(rec["record_id"]))
+                        if td:
+                            resolved.append({"type": "todo", "action": rec["action"], "title": td["title"],
+                                             "date": td.get("due_date", ""), "start_time": ""})
+                except Exception:
+                    pass
+            r["resolved"] = resolved
         return jsonify({"examples": rows, "count": len(rows)})
+
+    @app.post("/memory/unreviewed/skip")
+    def memory_skip_unreviewed():
+        """Dismiss the whole review backlog (e.g. stale seeded history)."""
+        from assistant.intent.memory import get_memory
+        return jsonify({"skipped": get_memory().skip_unreviewed()})
 
     @app.get("/memory/similar")
     def memory_similar():
@@ -1108,6 +1135,193 @@ def create_app() -> Flask:
         if not get_memory().delete(example_id):
             return jsonify({"error": "Not found", "code": 404}), 404
         return jsonify({"ok": True})
+
+    # ------------------------------------------------------------------
+    # Timers & counters (shared with the Mac Timer tab; same DB tables)
+    # ------------------------------------------------------------------
+
+    def _dt(iso: str) -> datetime.datetime:
+        try:
+            d = datetime.datetime.fromisoformat(iso)
+        except Exception:
+            return datetime.datetime.now().astimezone()
+        return d if d.tzinfo else d.astimezone()
+
+    def _secs(start: str, end: str | None) -> float:
+        e = _dt(end) if end else datetime.datetime.now().astimezone()
+        return max(0.0, (e - _dt(start)).total_seconds())
+
+    def _session_out(sess: dict) -> dict:
+        out = dict(sess)
+        out["seconds"] = round(_secs(sess["start_time"], sess.get("end_time")), 1)
+        out["running"] = sess.get("end_time") in (None, "")
+        return out
+
+    def _enforce_max(db, timer: dict, running: dict | None) -> dict | None:
+        """Mirror the Mac's auto-stop: a running session past max_session_minutes is closed at the limit."""
+        limit = int(timer.get("max_session_minutes") or 0)
+        if running and limit > 0:
+            cutoff = _dt(running["start_time"]) + datetime.timedelta(minutes=limit)
+            if datetime.datetime.now().astimezone() >= cutoff:
+                db.stop_timer_session(running["id"], cutoff.isoformat())
+                return None
+        return running
+
+    def _timer_out(db, t: dict) -> dict:
+        sessions = db.get_timer_sessions(t["id"])
+        running = _enforce_max(db, t, next((x for x in sessions if not x.get("end_time")), None))
+        today = datetime.date.today().isoformat()
+        total = sum(_secs(x["start_time"], x.get("end_time")) for x in sessions)
+        today_s = sum(_secs(x["start_time"], x.get("end_time")) for x in sessions if x["start_time"][:10] == today)
+        out = dict(t)
+        out["running"] = _session_out(running) if running else None
+        out["total_seconds"] = round(total, 1)
+        out["today_seconds"] = round(today_s, 1)
+        out["session_count"] = len(sessions)
+        out["earnings"] = round(total / 3600 * float(t.get("hourly_rate") or 0), 2)
+        return out
+
+    @app.get("/timers")
+    def timers_list():
+        db = get_db()
+        inc = request.args.get("archived") == "1"
+        return jsonify({"timers": [_timer_out(db, t) for t in db.get_timers(include_archived=inc)]})
+
+    @app.post("/timers")
+    def timers_create():
+        b = request.get_json(silent=True) or {}
+        db = get_db()
+        tid = db.create_timer(title=str(b.get("title") or "Untitled Timer"), hourly_rate=float(b.get("hourly_rate") or 0),
+                              color=str(b.get("color") or "#1a6fc4"), timer_type=str(b.get("timer_type") or "work"),
+                              currency=str(b.get("currency") or "ILS"), max_session_minutes=int(b.get("max_session_minutes") or 0))
+        t = next(x for x in db.get_timers(include_archived=True) if x["id"] == tid)
+        return jsonify(_timer_out(db, t)), 201
+
+    @app.patch("/timers/<int:tid>")
+    def timers_update(tid: int):
+        b = request.get_json(silent=True) or {}
+        db = get_db()
+        db.update_timer(tid, **{k: v for k, v in b.items()})
+        t = next((x for x in db.get_timers(include_archived=True) if x["id"] == tid), None)
+        if not t:
+            return jsonify({"error": "Not found", "code": 404}), 404
+        return jsonify(_timer_out(db, t))
+
+    @app.delete("/timers/<int:tid>")
+    def timers_delete(tid: int):
+        get_db().delete_timer(tid)
+        return jsonify({"ok": True})
+
+    @app.post("/timers/<int:tid>/start")
+    def timers_start(tid: int):
+        b = request.get_json(silent=True) or {}
+        db = get_db()
+        run = db.get_running_session(tid)
+        if run:
+            return jsonify(_session_out(run))
+        sid = db.create_timer_session(tid, title=str(b.get("title") or ""))
+        return jsonify(_session_out(next(x for x in db.get_timer_sessions(tid) if x["id"] == sid))), 201
+
+    @app.post("/timers/<int:tid>/stop")
+    def timers_stop(tid: int):
+        db = get_db()
+        run = db.get_running_session(tid)
+        if not run:
+            return jsonify({"error": "Not running", "code": 409}), 409
+        db.stop_timer_session(run["id"])
+        return jsonify(_session_out(next(x for x in db.get_timer_sessions(tid) if x["id"] == run["id"])))
+
+    @app.get("/timers/<int:tid>/sessions")
+    def timers_sessions(tid: int):
+        return jsonify({"sessions": [_session_out(x) for x in reversed(get_db().get_timer_sessions(tid))]})
+
+    @app.patch("/timer_sessions/<int:sid>")
+    def timer_session_update(sid: int):
+        b = request.get_json(silent=True) or {}
+        get_db().update_timer_session(sid, **b)
+        return jsonify({"ok": True})
+
+    @app.delete("/timer_sessions/<int:sid>")
+    def timer_session_delete(sid: int):
+        get_db().delete_timer_session(sid)
+        return jsonify({"ok": True})
+
+    def _counter_out(db, c: dict) -> dict:
+        presses = db.get_counter_presses(c["id"])
+        cycle = db.get_counter_cycle_start(c["id"])
+        in_cycle = [p for p in presses if not cycle or p["pressed_at"] > cycle]
+        today = datetime.date.today().isoformat()
+        out = dict(c)
+        out["count"] = sum(int(p["delta"]) for p in in_cycle)
+        out["total_count"] = sum(int(p["delta"]) for p in presses)
+        out["today_count"] = sum(int(p["delta"]) for p in presses if p["pressed_at"][:10] == today)
+        out["cycle_started_at"] = cycle
+        out["payout"] = round(out["count"] * float(c.get("price_per_unit") or 0), 2)
+        return out
+
+    @app.get("/counters")
+    def counters_list():
+        db = get_db()
+        inc = request.args.get("archived") == "1"
+        return jsonify({"counters": [_counter_out(db, c) for c in db.get_counters(include_archived=inc)]})
+
+    @app.post("/counters")
+    def counters_create():
+        b = request.get_json(silent=True) or {}
+        db = get_db()
+        cid = db.create_counter(title=str(b.get("title") or "Untitled Counter"), price_per_unit=float(b.get("price_per_unit") or 0),
+                                currency=str(b.get("currency") or "ILS"), color=str(b.get("color") or "#1a6fc4"))
+        return jsonify(_counter_out(db, next(x for x in db.get_counters(include_archived=True) if x["id"] == cid))), 201
+
+    @app.patch("/counters/<int:cid>")
+    def counters_update(cid: int):
+        b = request.get_json(silent=True) or {}
+        db = get_db()
+        db.update_counter(cid, **b)
+        c = next((x for x in db.get_counters(include_archived=True) if x["id"] == cid), None)
+        if not c:
+            return jsonify({"error": "Not found", "code": 404}), 404
+        return jsonify(_counter_out(db, c))
+
+    @app.delete("/counters/<int:cid>")
+    def counters_delete(cid: int):
+        get_db().delete_counter(cid)
+        return jsonify({"ok": True})
+
+    @app.post("/counters/<int:cid>/press")
+    def counters_press(cid: int):
+        b = request.get_json(silent=True) or {}
+        db = get_db()
+        db.create_counter_press(cid, delta=int(b.get("delta") or 1), label=str(b.get("label") or ""))
+        return jsonify(_counter_out(db, next(x for x in db.get_counters(include_archived=True) if x["id"] == cid)))
+
+    @app.get("/counters/<int:cid>/presses")
+    def counters_presses(cid: int):
+        return jsonify({"presses": list(reversed(get_db().get_counter_presses(cid)))})
+
+    @app.delete("/counter_presses/<int:pid>")
+    def counter_press_delete(pid: int):
+        get_db().delete_counter_press(pid)
+        return jsonify({"ok": True})
+
+    @app.post("/counters/<int:cid>/cashout")
+    def counters_cashout(cid: int):
+        b = request.get_json(silent=True) or {}
+        db = get_db()
+        c = next((x for x in db.get_counters(include_archived=True) if x["id"] == cid), None)
+        if not c:
+            return jsonify({"error": "Not found", "code": 404}), 404
+        info = _counter_out(db, c)
+        now = datetime.datetime.now().astimezone().isoformat()
+        cycle_start = info["cycle_started_at"] or (db.get_counter_presses(cid) or [{"pressed_at": c["created_at"]}])[0]["pressed_at"]
+        amount = b.get("amount")
+        amount = float(amount) if amount is not None else info["payout"]
+        db.create_counter_payout(cid, cycle_start, now, info["count"], amount, c["currency"], note=str(b.get("note") or ""))
+        return jsonify(_counter_out(db, c)), 201
+
+    @app.get("/counters/<int:cid>/payouts")
+    def counters_payouts(cid: int):
+        return jsonify({"payouts": get_db().get_counter_payouts(cid)})
 
     # ------------------------------------------------------------------
     # Event categories (colours)
