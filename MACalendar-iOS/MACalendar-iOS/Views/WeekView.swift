@@ -7,7 +7,10 @@ struct WeekView: View {
     var onDateSelected: ((Date) -> Void)? = nil
     @EnvironmentObject var settings: AppSettings
 
+    @EnvironmentObject var api: APIClient
     @State private var now: Date = Date()
+    @State private var popped: Int?
+    @State private var selected: CalendarEvent?
     private let timer = Timer.publish(every: 900, on: .main, in: .common).autoconnect()
 
     private let hourHeight: CGFloat = 44
@@ -65,7 +68,7 @@ struct WeekView: View {
                         // Day columns
                         ForEach(Array(weekDays.enumerated()), id: \.offset) { i, day in
                             WeekDayColumn(
-                                day: day,
+                                    day: day, popped: $popped, onOpen: { selected = $0 },
                                 events: eventsForDay(day),
                                 now: now,
                                 hourHeight: hourHeight,
@@ -76,7 +79,10 @@ struct WeekView: View {
                     .padding(.top, 4)
                 }
                 .onAppear { proxy.scrollTo(startHour, anchor: .top) }
-                .onChange(of: selectedDate) { _ in proxy.scrollTo(startHour, anchor: .top) }
+                .onChange(of: selectedDate) { _ in proxy.scrollTo(startHour, anchor: .top); popped = nil }
+                .sheet(item: $selected) { ev in
+                    EventDetailView(event: ev, onDismiss: { api.requestRefresh() })
+                }
             }
         }
         .onReceive(timer) { d in now = d }
@@ -153,6 +159,8 @@ private struct WeekDayHeader: View {
 private struct WeekDayColumn: View {
     @EnvironmentObject var settings: AppSettings
     var day: Date
+    @Binding var popped: Int?
+    var onOpen: (CalendarEvent) -> Void
     var events: [CalendarEvent]
     var now: Date
     var hourHeight: CGFloat
@@ -181,13 +189,22 @@ private struct WeekDayColumn: View {
             Color.clear
                 .overlay(
                     GeometryReader { geo in
-                        // Event blocks
-                        ForEach(events) { ev in
-                            if let (top, h) = eventPos(ev) {
-                                WeekEventBlock(event: ev, height: h)
-                                    .frame(width: geo.size.width - 3, height: h)
-                                    .offset(x: 1, y: top)
-                            }
+                        // Event blocks — binder stacking for overlaps (see EventStacking)
+                        let colW = geo.size.width - 3
+                        let items = EventStacking.layout(events, hourHeight: hourHeight, minHeight: 18)
+                        let poppedCluster = items.first { $0.id == popped }?.cluster
+                        ForEach(items) { it in
+                            let isPopped = popped == it.id
+                            let inset = isPopped ? 0 : EventStacking.inset(depth: it.depth, size: it.stackSize, step: 7, width: colW)
+                            WeekEventBlock(event: it.event, height: it.height)
+                                .frame(width: max(colW - inset, 24), height: it.height)
+                                .modifier(StackedCardModifier(stacked: it.stackSize > 1, popped: isPopped,
+                                                              dimmed: poppedCluster == it.cluster && !isPopped, radius: 3))
+                                .offset(x: 1 + inset, y: it.top)
+                                .zIndex(isPopped ? 1000 : Double(it.depth))
+                                .onTapGesture {
+                                    if it.stackSize > 1 && !isPopped { popped = it.id } else { onOpen(it.event) }
+                                }
                         }
 
                         // Current time line (today only) — follows the accent
@@ -210,6 +227,8 @@ private struct WeekDayColumn: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: hourHeight * 24)
+        .contentShape(Rectangle())
+        .onTapGesture { popped = nil }
         .overlay(
             Rectangle()
                 .fill(showLeftBorder ? Color(.separator) : Color.clear)

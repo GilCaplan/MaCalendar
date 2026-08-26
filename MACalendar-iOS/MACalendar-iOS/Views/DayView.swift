@@ -7,6 +7,7 @@ struct DayView: View {
     @State private var events: [CalendarEvent] = []
     @State private var holidays: [Holiday] = []
     @State private var selected: CalendarEvent?
+    @State private var popped: Int?
     @State private var now: Date = Date()
     private let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
@@ -60,15 +61,27 @@ struct DayView: View {
                         }
                     }
 
-                    // Event blocks
-                    ForEach(events) { ev in
-                        if let (top, height) = position(ev) {
-                            EventBlock(event: ev, height: height)
-                                .offset(x: 44, y: top)
-                                .padding(.trailing, 8)
-                                .onTapGesture { selected = ev }
+                    // Event blocks — overlapping events stack like a binder;
+                    // tap a buried card to pop it out, tap again to open it.
+                    GeometryReader { geo in
+                        let colW = geo.size.width - 44 - 8
+                        let items = EventStacking.layout(events, hourHeight: hourHeight, minHeight: 24)
+                        let poppedCluster = items.first { $0.id == popped }?.cluster
+                        ForEach(items) { it in
+                            let isPopped = popped == it.id
+                            let inset = isPopped ? 0 : EventStacking.inset(depth: it.depth, size: it.stackSize, step: 14, width: colW)
+                            EventBlock(event: it.event, height: it.height)
+                                .frame(width: max(colW - inset, 40), height: it.height)
+                                .modifier(StackedCardModifier(stacked: it.stackSize > 1, popped: isPopped,
+                                                              dimmed: poppedCluster == it.cluster && !isPopped, radius: 6))
+                                .offset(x: 44 + inset, y: it.top)
+                                .zIndex(isPopped ? 1000 : Double(it.depth))
+                                .onTapGesture {
+                                    if it.stackSize > 1 && !isPopped { popped = it.id } else { selected = it.event }
+                                }
                         }
                     }
+                    .frame(height: hourHeight * 24)
 
                     // Current time line (today only) — follows the accent
                     // color, same convention as the Mac app.
@@ -84,6 +97,8 @@ struct DayView: View {
                     }
                 }
                 .padding(.top, 8)
+                .contentShape(Rectangle())
+                .onTapGesture { popped = nil }
             }
             .onAppear {
                 proxy.scrollTo(startHour, anchor: .top)
@@ -95,6 +110,7 @@ struct DayView: View {
                 // for the network (or offline fallback) to respond.
                 let d = DateFormatter.isoDay.string(from: date)
                 events = LocalStore.shared.eventsForDate(d)
+                popped = nil
                 proxy.scrollTo(startHour, anchor: .top)
                 load()
             }

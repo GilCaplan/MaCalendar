@@ -42,6 +42,7 @@ RESIZE_HANDLE = 7  # px at top/bottom edge that activate resize mode
 _COL_GAP = 2       # px between side-by-side overlapping event columns
 _LEFT_PAD = 2
 _RIGHT_PAD = 2
+_STACK_STEP = 8    # px each overlapping card steps in (binder tabs)
 _TEAL_TODO = "#0e9f8c"   # deadline pill colour (matches month view)
 
 
@@ -387,67 +388,25 @@ class DayColumn(QWidget):
             e = self._to_min(ev.get("end_time", "0:00"))
             return max(e, s + 15)
 
-        sorted_evs = sorted(events, key=lambda ev: (ev_s(ev), -ev_e(ev)))
-
-        clusters: List[List[dict]] = []
-        cluster: List[dict] = []
-        cluster_end = -1
-        for ev in sorted_evs:
-            s = ev_s(ev)
-            if cluster and s >= cluster_end:
-                clusters.append(cluster)
-                cluster = []
-                cluster_end = -1
-            cluster.append(ev)
-            cluster_end = max(cluster_end, ev_e(ev))
-        if cluster:
-            clusters.append(cluster)
-
-        result = []
-        for grp in clusters:
-            col_ends: List[int] = []
-            ev_col: List[int] = []
-            for ev in grp:
-                s = ev_s(ev)
-                placed = False
-                for ci, ce in enumerate(col_ends):
-                    if s >= ce:
-                        col_ends[ci] = ev_e(ev)
-                        ev_col.append(ci)
-                        placed = True
-                        break
-                if not placed:
-                    ev_col.append(len(col_ends))
-                    col_ends.append(ev_e(ev))
-
-            n_cols = len(col_ends)
-            usable = avail_w - _LEFT_PAD - _RIGHT_PAD
-            col_w = (usable - _COL_GAP * (n_cols - 1)) / n_cols
-
-            for i, ev in enumerate(grp):
-                ci = ev_col[i]
-                s = ev_s(ev)
-                e = ev_e(ev)
-                top = int(s / 60 * self.hour_height)
-                height = max(int((e - s) / 60 * self.hour_height), min_block_h)
-                x = _LEFT_PAD + int(ci * (col_w + _COL_GAP))
-                w = max(int(col_w), 30)
-                # +1 top / -2 height creates a 2px gap between adjacent events
-                result.append((ev, x, w, top + 1, height - 2))
-
-        return result
+        from assistant.calendar_ui.stack_layout import stacked_layout
+        self._placed = stacked_layout(events, avail_w, self.hour_height, min_block_h, _LEFT_PAD, _RIGHT_PAD,
+                                      _STACK_STEP, self._to_min)
+        return [(pl.event, pl.x, pl.w, pl.top, pl.height) for pl in self._placed]
 
     def load_events(self, events: List[dict]) -> None:
         self._events = events
         for w in self._event_widgets:
             w.deleteLater()
         self._event_widgets.clear()
+        self._popped = None
 
         fs = 11 if not self._ui_config else self._ui_config.font_week
         self._fs = fs
         for ev, x, w, top, h in self._compute_layout(events, self.width(), fs):
             block = EventBlock(ev, font_size=fs, hour_height=self.hour_height, parent=self)
-            block.clicked.connect(self.event_clicked)
+            pl = self._placed[len(self._event_widgets)]
+            block._stack = (pl.depth, pl.stack_size, pl.full_x, pl.full_w)
+            block.clicked.connect(self._on_block_clicked)
             block.resized.connect(self.event_rescheduled)
             block.setGeometry(x, top, w, h)
             # setGeometry() on a still-hidden widget doesn't reliably deliver
@@ -463,6 +422,47 @@ class DayColumn(QWidget):
             self._event_widgets.append(block)
         if self._overlay:
             self._overlay.raise_()
+
+    # -- binder pop-out ------------------------------------------------
+    def _on_block_clicked(self, ev: dict) -> None:
+        block = self.sender()
+        depth, size, full_x, full_w = getattr(block, "_stack", (0, 1, 0, 0))
+        if size > 1 and getattr(self, "_popped", None) is not block:
+            self._pop(block, full_x, full_w)
+            return
+        self.event_clicked.emit(ev)
+
+    def _pop(self, block, full_x: int, full_w: int) -> None:
+        self._unpop()
+        block._popped_geom = block.geometry()
+        block.setGeometry(full_x, block.y(), full_w, block.height())
+        block._update_display()
+        block.raise_()
+        eff = block.graphicsEffect()
+        if eff is not None:
+            eff.setBlurRadius(18); eff.setOffset(0, 5); eff.setColor(QColor(0, 0, 0, 140))
+        self._popped = block
+        if self._overlay:
+            self._overlay.raise_()
+
+    def _unpop(self) -> None:
+        block = getattr(self, "_popped", None)
+        if block is None:
+            return
+        try:
+            block.setGeometry(block._popped_geom)
+            block._update_display()
+            eff = block.graphicsEffect()
+            if eff is not None:
+                eff.setBlurRadius(6); eff.setOffset(0, 2); eff.setColor(QColor(0, 0, 0, 55))
+            for w in self._event_widgets:
+                if w is not block and getattr(w, "_stack", (0,))[0] > block._stack[0]:
+                    w.raise_()
+            if self._overlay:
+                self._overlay.raise_()
+        except RuntimeError:
+            pass
+        self._popped = None
 
     def set_hour_height(self, hour_height: int) -> None:
         """Rescale this column's timeline (called by WeekView when the window is resized)."""
@@ -488,6 +488,7 @@ class DayColumn(QWidget):
             self._overlay.raise_()
 
     def mousePressEvent(self, event):
+        self._unpop()
         self._press_y = event.pos().y()
 
     def mouseReleaseEvent(self, event):
