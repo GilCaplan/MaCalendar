@@ -118,6 +118,8 @@ struct DayView: View {
         // .sheet(item:) is safe: the sheet only opens when selected is
         // non-nil, so we can never get a blank grey sheet from a nil guard.
         .onReceive(timer) { d in now = d }
+        // Anything that changes events elsewhere (voice command, Mac edit, poll) lands here at once.
+        .onReceive(api.$refreshTick) { _ in load() }
         .sheet(item: $selected) { ev in
             EventDetailView(event: ev, onDismiss: load)
         }

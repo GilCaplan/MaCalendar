@@ -259,15 +259,19 @@ struct VoiceButton: View {
             }
             Task {
                 do {
-                    let response: VoiceResponse
-                    if settings.showThinking {
-                        response = try await api.sendAudioStreaming(audioData) { step in
-                            // Replace the placeholder "Sending" row with the first real step
+                    // Always stream: the Mac reports each stage as it happens, so the
+                    // calendar can refresh the moment an action executes (first version)
+                    // and again when the self-check has finished (fixed version).
+                    let response = try await api.sendAudioStreaming(audioData) { step in
+                        if settings.showThinking {
                             if steps.count == 1, steps[0].title == "Sending" { steps = [] }
                             steps.append(step)
                         }
-                    } else {
-                        response = try await api.sendAudio(audioData)
+                        if step.stage == "execute" && step.ok {
+                            api.burstRefresh()
+                            api.requestRefresh()
+                            onRefresh?("both")
+                        }
                     }
                     await handleResponse(response)
                 } catch {
