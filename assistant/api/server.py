@@ -1875,4 +1875,5 @@ def create_app() -> Flask:
         get_db().delete_calendar_source(source_id)
         return jsonify({"deleted": source_id})
 
+    app._normalise_intents = _normalise_intents   # exposed for tests
     return app
