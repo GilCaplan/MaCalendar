@@ -401,9 +401,11 @@ struct UnreviewedResponse: Codable { let examples: [MemoryExample]; let count: I
 /// What a voice command actually put in the calendar (server joins example → record).
 struct ResolvedRecord: Codable, Equatable {
     let type: String
+    var id: Int? = nil
     let action: String
     let title: String
     let date: String
     let startTime: String
-    enum CodingKeys: String, CodingKey { case type, action, title, date; case startTime = "start_time" }
+    var endTime: String? = nil
+    enum CodingKeys: String, CodingKey { case type, id, action, title, date; case startTime = "start_time", endTime = "end_time" }
 }

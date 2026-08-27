@@ -655,8 +655,10 @@ class APIClient: ObservableObject {
         return o["skipped"] as? Int
     }
 
-    func memoryFeedback(id: Int, feedback: String) async {
-        _ = try? await request("/memory/\(id)/feedback", method: "POST", body: ["feedback": feedback])
+    func memoryFeedback(id: Int, feedback: String, correction: [[String: Any]]? = nil, notes: String = "") async {
+        var body: [String: Any] = ["feedback": feedback, "notes": notes]
+        if let correction { body["correction"] = correction }
+        _ = try? await request("/memory/\(id)/feedback", method: "POST", body: body)
     }
 
     // MARK: - Timers & counters

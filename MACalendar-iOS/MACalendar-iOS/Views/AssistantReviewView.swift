@@ -13,6 +13,7 @@ struct AssistantReviewView: View {
     @State private var error: String?
     @State private var done = 0
     @State private var confirmSkip = false
+    @State private var fixing: MemoryExample?
 
     var body: some View {
         NavigationView {
@@ -33,7 +34,9 @@ struct AssistantReviewView: View {
                                 .font(.footnote).foregroundColor(.secondary)
                         }
                         ForEach(items) { ex in
-                            ReviewRow(example: ex) { verdict in Task { await send(ex, verdict) } }
+                            ReviewRow(example: ex,
+                                      onVerdict: { verdict in Task { await send(ex, verdict) } },
+                                      onFix: { fixing = ex })
                         }
                     }
                 }
@@ -55,6 +58,18 @@ struct AssistantReviewView: View {
             .overlay { if loading && items.isEmpty { ProgressView() } }
             .task { await load() }
             .refreshable { await load() }
+            .sheet(item: $fixing) { ex in
+                CorrectionSheet(example: ex) { correction, notes, patchedEvent in
+                    Task {
+                        if let (id, fields) = patchedEvent { try? await api.updateEvent(id: id, fields: fields) }
+                        await api.memoryFeedback(id: ex.id, feedback: correction == nil ? "rejected" : "corrected",
+                                                 correction: correction, notes: notes)
+                        withAnimation { items.removeAll { $0.id == ex.id } }
+                        done += 1
+                        api.requestRefresh()
+                    }
+                }
+            }
         }
     }
 
@@ -79,6 +94,7 @@ struct AssistantReviewView: View {
 private struct ReviewRow: View {
     let example: MemoryExample
     let onVerdict: (String) -> Void
+    let onFix: () -> Void
     @EnvironmentObject var settings: AppSettings
 
     private var summary: String {
@@ -131,10 +147,90 @@ private struct ReviewRow: View {
                         .overlay(alignment: .leading) { AssistantIcon(.thumbsDown).frame(width: 16, height: 16).offset(x: -22) }
                 }
                 .buttonStyle(.bordered).tint(.red)
+                Button { onFix() } label: { Text("Fix…").frame(minWidth: 50) }
+                    .buttonStyle(.bordered).tint(.orange)
                 Spacer()
             }
             .padding(.leading, 22)
         }
         .padding(.vertical, 4)
+    }
+}
+
+
+/// "What should it have done?" — edit the result (title / date / time) and say why.
+/// The real event is patched, and the corrected version is stored as the example
+/// the assistant learns from next time.
+private struct CorrectionSheet: View {
+    let example: MemoryExample
+    /// (correction actions or nil for plain reject, notes, (event id, fields) to patch)
+    let onDone: ([[String: Any]]?, String, (Int, [String: Any])?) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var title = ""
+    @State private var date = ""
+    @State private var start = ""
+    @State private var end = ""
+    @State private var notes = ""
+    @State private var eventID: Int?
+    @State private var isEvent = false
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section("You said") { Text("“\(example.transcript)”").font(.callout) }
+                if isEvent {
+                    Section("What it should have been") {
+                        TextField("Title", text: $title)
+                        TextField("Date (YYYY-MM-DD)", text: $date).keyboardType(.numbersAndPunctuation)
+                        HStack {
+                            TextField("Start (HH:MM)", text: $start).keyboardType(.numbersAndPunctuation)
+                            Text("–")
+                            TextField("End (HH:MM)", text: $end).keyboardType(.numbersAndPunctuation)
+                        }
+                    }
+                }
+                Section {
+                    TextField("e.g. it heard 'Aura' but I said 'Nurit'; should have been a task, not an event", text: $notes, axis: .vertical)
+                        .lineLimit(2...5)
+                } header: { Text("What went wrong?") } footer: {
+                    Text(isEvent ? "Saving fixes the event in your calendar and teaches the assistant the corrected version."
+                                 : "Stored with the command so the assistant can learn from it.")
+                }
+            }
+            .navigationTitle("Fix this")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { save() }.disabled(isEvent ? title.isEmpty : notes.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .onAppear(perform: prefill)
+        }
+    }
+
+    private func prefill() {
+        if let r = example.resolved?.first(where: { $0.type == "event" }) {
+            isEvent = true; eventID = r.id
+            title = r.title; date = r.date; start = r.startTime; end = r.endTime ?? ""
+        } else if let a = example.actions.first(where: { $0.action == "create_event" }) {
+            isEvent = true
+            title = a.parameters["title"]?.stringValue ?? ""
+            date = a.parameters["date"]?.stringValue ?? ""
+            start = a.parameters["start_time"]?.stringValue ?? ""
+            end = a.parameters["end_time"]?.stringValue ?? ""
+        }
+    }
+
+    private func save() {
+        guard isEvent else { onDone(nil, notes, nil); dismiss(); return }
+        var params: [String: Any] = ["title": title]
+        if !date.isEmpty { params["date"] = date }
+        if !start.isEmpty { params["start_time"] = start }
+        if !end.isEmpty { params["end_time"] = end }
+        let patch: (Int, [String: Any])? = eventID.map { ($0, params) }
+        onDone([["action": "create_event", "parameters": params]], notes, patch)
+        dismiss()
     }
 }

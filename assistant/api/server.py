@@ -1106,13 +1106,13 @@ def create_app() -> Flask:
                     if rec["record_type"] == "event":
                         ev = db.get_event(int(rec["record_id"]))
                         if ev:
-                            resolved.append({"type": "event", "action": rec["action"], "title": ev["title"],
-                                             "date": ev["date"], "start_time": ev["start_time"]})
+                            resolved.append({"type": "event", "id": ev["id"], "action": rec["action"], "title": ev["title"],
+                                             "date": ev["date"], "start_time": ev["start_time"], "end_time": ev.get("end_time", "")})
                     else:
                         td = db.get_todo(int(rec["record_id"]))
                         if td:
-                            resolved.append({"type": "todo", "action": rec["action"], "title": td["title"],
-                                             "date": td.get("due_date", ""), "start_time": ""})
+                            resolved.append({"type": "todo", "id": td["id"], "action": rec["action"], "title": td["title"],
+                                             "date": td.get("due_date", ""), "start_time": "", "end_time": ""})
                 except Exception:
                     pass
             r["resolved"] = resolved
