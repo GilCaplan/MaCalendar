@@ -43,7 +43,8 @@ def main() -> None:
     for group, items in groups.items():
         lines += [f"## /{group}", "", "| Method | Path | What it does |", "|---|---|---|"]
         for m, p, d in sorted(items, key=lambda x: (x[1], x[0])):
-            lines.append(f"| `{m}` | `{p}` | {d.replace('|', '\\|')} |")
+            safe = d.replace("|", "\\|")
+            lines.append(f"| `{m}` | `{p}` | {safe} |")
         lines.append("")
     with open(OUT, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
