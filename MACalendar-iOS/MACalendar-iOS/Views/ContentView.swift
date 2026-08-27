@@ -316,8 +316,12 @@ struct ContentView: View {
 
             // While the app is open, retry sync every 30 s so pending
             // changes upload as soon as the Mac comes back online.
+            var slept: TimeInterval = 0
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 30_000_000_000)
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                slept += 1
+                guard slept >= api.pollInterval else { continue }
+                slept = 0
                 guard scenePhase == .active else { continue }
                 if !api.isOnline { _ = try? await api.health() }   // flips isOnline (+refresh) when the Mac is back
                 _ = await api.syncPending()

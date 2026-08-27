@@ -99,6 +99,14 @@ class AppSettings: ObservableObject {
     @Published var stopWordsEnabled: Bool {
         didSet { UserDefaults.standard.set(stopWordsEnabled, forKey: "stopWordsEnabled") }
     }
+    /// After a recording stops, show Redo / Add more / Send for a few seconds.
+    @Published var reviewBeforeSend: Bool {
+        didSet { UserDefaults.standard.set(reviewBeforeSend, forKey: "reviewBeforeSend") }
+    }
+    /// Off = keep recording until the button is tapped or a stop word is said.
+    @Published var silenceStopEnabled: Bool {
+        didSet { UserDefaults.standard.set(silenceStopEnabled, forKey: "silenceStopEnabled") }
+    }
     @Published var silenceStopSeconds: Double {
         didSet { UserDefaults.standard.set(silenceStopSeconds, forKey: "silenceStopSeconds") }
     }
@@ -113,6 +121,10 @@ class AppSettings: ObservableObject {
             ? true : UserDefaults.standard.bool(forKey: "speakReplies")
         self.stopWordsEnabled = UserDefaults.standard.object(forKey: "stopWordsEnabled") == nil
             ? true : UserDefaults.standard.bool(forKey: "stopWordsEnabled")
+        self.reviewBeforeSend = UserDefaults.standard.object(forKey: "reviewBeforeSend") == nil
+            ? true : UserDefaults.standard.bool(forKey: "reviewBeforeSend")
+        self.silenceStopEnabled = UserDefaults.standard.object(forKey: "silenceStopEnabled") == nil
+            ? true : UserDefaults.standard.bool(forKey: "silenceStopEnabled")
         let sil = UserDefaults.standard.double(forKey: "silenceStopSeconds")
         self.silenceStopSeconds = sil == 0 ? 6 : sil
         self.vocabOnboardingDone = UserDefaults.standard.bool(forKey: "vocabOnboardingDone")

@@ -61,7 +61,12 @@ struct AssistantReviewView: View {
     private func load() async {
         loading = true; defer { loading = false }
         do { items = try await api.unreviewedCommands(); error = nil }
-        catch { self.error = "Couldn't reach the Mac: \(error.localizedDescription)" }
+        catch {
+            // A cancelled request (sheet closed / view refreshed mid-flight) is not an outage.
+            if error is CancellationError || (error as? URLError)?.code == .cancelled
+                || error.localizedDescription.lowercased().contains("cancel") { return }
+            self.error = "Couldn't reach the Mac: \(error.localizedDescription)"
+        }
     }
 
     private func send(_ ex: MemoryExample, _ verdict: String) async {

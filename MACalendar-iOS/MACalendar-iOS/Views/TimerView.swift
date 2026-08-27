@@ -136,8 +136,10 @@ struct TimerView: View {
             .refreshable { await load() }
             .onReceive(tick) { d in
                 now = d
-                // Poll every 30 s so a timer stopped on the Mac (or auto-stopped) updates here.
-                if Int(d.timeIntervalSince1970) % 30 == 0 { Task { await load() } }
+                // Keep in step with the Mac: every 3 s while any timer is running
+                // (start on one device, see it on the other), every 30 s otherwise.
+                let every = timers.contains { $0.running != nil } ? 3 : 30
+                if Int(d.timeIntervalSince1970) % every == 0 { Task { await load() } }
             }
             .onChange(of: showArchived) { _ in Task { await load() } }
             .onReceive(api.$refreshTick) { _ in Task { await load() } }
@@ -149,7 +151,10 @@ struct TimerView: View {
             async let t = api.timers(archived: showArchived)
             async let c = api.counters(archived: showArchived)
             timers = try await t; counters = try await c; error = nil
-        } catch { self.error = "Couldn't reach the Mac: \(error.localizedDescription)" }
+        } catch {
+            if error is CancellationError || (error as? URLError)?.code == .cancelled { return }
+            self.error = "Couldn't reach the Mac: \(error.localizedDescription)"
+        }
     }
 
     private func toggle(_ t: WorkTimer) async {

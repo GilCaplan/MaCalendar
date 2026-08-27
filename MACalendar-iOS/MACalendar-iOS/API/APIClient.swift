@@ -10,6 +10,12 @@ class APIClient: ObservableObject {
     @Published var refreshTick = 0
     func requestRefresh() { refreshTick &+= 1 }
 
+    /// While things are changing (a voice command just ran, an edit was saved) the
+    /// background poll drops to 1 s; it returns to 30 s once this window passes.
+    @Published var burstUntil = Date.distantPast
+    func burstRefresh(seconds: TimeInterval = 45) { burstUntil = max(burstUntil, Date().addingTimeInterval(seconds)) }
+    var pollInterval: TimeInterval { Date() < burstUntil ? 1 : 30 }
+
     private let settings: AppSettings
 
     init(settings: AppSettings) {
@@ -154,6 +160,7 @@ class APIClient: ObservableObject {
     }
 
     func createEvent(_ fields: [String: Any]) async throws -> Int {
+        burstRefresh(seconds: 10)
         do {
             let data = try await request("/events", method: "POST", body: fields)
             let obj  = try JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -166,6 +173,7 @@ class APIClient: ObservableObject {
     }
 
     func updateEvent(id: Int, fields: [String: Any]) async throws {
+        burstRefresh(seconds: 10)
         do {
             _ = try await request("/events/\(id)", method: "PATCH", body: fields)
         } catch APIError.offline, APIError.badURL {
@@ -175,6 +183,7 @@ class APIClient: ObservableObject {
     }
 
     func deleteEvent(id: Int) async throws {
+        burstRefresh(seconds: 10)
         LocalStore.shared.removeEvent(id)   // optimistic local remove
         do {
             _ = try await request("/events/\(id)", method: "DELETE")

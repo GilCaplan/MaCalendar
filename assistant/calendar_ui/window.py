@@ -819,6 +819,12 @@ class CalendarWindow(QMainWindow):
         if m != self._db_mtime:
             self._db_mtime = m
             self.refresh_todos()   # refreshes calendar views too
+            tv = getattr(self, "_timer_view", None)
+            if tv is not None:
+                try:
+                    tv.reload()    # timers started/stopped from the phone
+                except Exception:
+                    pass
 
     def refresh_calendar(self) -> None:
         """Reload events from DB in all calendar views."""

@@ -413,9 +413,14 @@ def _find_event(db, match_title: str, match_date: Optional[str], match_start_tim
             rows = conn.execute(query, tuple(params)).fetchall()
         return dict(rows[0]) if rows else None
 
+    # Score on the *distinctive* words only: "meeting" alone must not pick some
+    # random meeting — that is how "fix the event I just made" ended up editing
+    # the wrong event. Generic words still count when they are all we have.
+    score_words = meaningful_words or needle_words
+
     def _score(row_dict: dict) -> int:
         title_words = set(re.findall(r'\w+', row_dict["title"].lower()))
-        overlap = len(needle_words.intersection(title_words))
+        overlap = len(score_words.intersection(title_words))
 
         # Substring boost: normalise dashes/underscores before comparing
         clean_needle = re.sub(r'[-_]', '', match_title.lower())

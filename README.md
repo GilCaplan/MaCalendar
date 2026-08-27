@@ -163,7 +163,7 @@ For full deployment details and API reference, see [**SYSTEM_IPHONE.md**](DOCUME
 | GET | `/todos` | Todo list |
 | PATCH | `/todos/<id>/toggle` | Complete a task |
 
-Full API reference: [SYSTEM_IPHONE.md](DOCUMENTATION/SYSTEM_IPHONE.md)
+Full API reference: [DOCUMENTATION/API_REFERENCE.md](DOCUMENTATION/API_REFERENCE.md) (generated from the server code)
 
 ---
 

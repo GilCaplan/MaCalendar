@@ -1,5 +1,5 @@
 import Foundation
-import UserNotifications
+@preconcurrency import UserNotifications
 import UIKit
 
 /// Local-only JSON-file persistence for the Workout domain — a separate

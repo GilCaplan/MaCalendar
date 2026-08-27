@@ -23,7 +23,11 @@ struct VoiceButton: View {
     @State private var fixWord: String? = nil
     @State private var showFix = false
 
-    enum Status { case idle, recording, thinking, speaking }
+    enum Status { case idle, recording, review, thinking, speaking }
+    /// Audio captured but not yet sent — the user can Redo / Add more / Send.
+    @State private var pendingAudio: Data?
+    @State private var sendCountdown = 0
+    @State private var countdownTask: Task<Void, Never>?
 
     /// True while there is something worth reopening: work in flight, or a result
     /// from the last ~2 minutes.
@@ -33,8 +37,29 @@ struct VoiceButton: View {
     @State private var finishedAt = Date.distantPast
 
     var body: some View {
-        VStack(spacing: 8) {
-            if settings.showThinking && !showThinking && canReopen {
+        // The chip floats above the mic as an overlay so the mic never moves and
+        // stays level with the "+" button next to it.
+        micButton.overlay(alignment: .top) {
+            if status == .review {
+                HStack(spacing: 6) {
+                    Button { redo() } label: { Label("Redo", systemImage: "arrow.counterclockwise") }
+                    Button { addMore() } label: { Label("Add more", systemImage: "mic.badge.plus") }
+                    Button { sendPending() } label: {
+                        Label(sendCountdown > 0 ? "Send \(sendCountdown)" : "Send", systemImage: "paperplane.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .font(.caption.weight(.medium))
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .padding(6)
+                .background(.regularMaterial)
+                .clipShape(Capsule())
+                .shadow(radius: 2)
+                .fixedSize()
+                .offset(y: -44)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            } else if settings.showThinking && !showThinking && canReopen {
                 Button { showThinking = true } label: {
                     HStack(spacing: 6) {
                         if status == .thinking { ProgressView().scaleEffect(0.7) }
@@ -49,9 +74,10 @@ struct VoiceButton: View {
                     .shadow(radius: 2)
                 }
                 .buttonStyle(.plain)
+                .fixedSize()
+                .offset(y: -40)
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
-            micButton
         }
         .animation(.easeInOut(duration: 0.2), value: canReopen)
     }
@@ -126,6 +152,7 @@ struct VoiceButton: View {
         switch status {
         case .idle:      return settings.accentColor
         case .recording: return .red
+        case .review:    return .blue
         case .thinking:  return .orange
         case .speaking:  return .green
         }
@@ -139,6 +166,7 @@ struct VoiceButton: View {
         switch status {
         case .idle:      return "mic.fill"
         case .recording: return "stop.fill"
+        case .review:    return "paperplane.fill"
         case .thinking:  return "mic.fill"
         case .speaking:  return "speaker.wave.2.fill"
         }
@@ -160,7 +188,7 @@ struct VoiceButton: View {
                         _ = await VoiceRecorder.requestSpeechPermission()   // no-op once granted
                     }
                     recorder.stopWordsEnabled = settings.stopWordsEnabled
-                    recorder.silenceStopSeconds = settings.silenceStopSeconds
+                    recorder.silenceStopSeconds = settings.silenceStopEnabled ? settings.silenceStopSeconds : 0
                     recorder.onAutoStop = { [self] in finishRecording() }
                     status = .recording
                     recorder.start()
@@ -168,19 +196,57 @@ struct VoiceButton: View {
             }
         case .recording:
             finishRecording()
+        case .review:
+            sendPending()
         default:
             player.stop()
             status = .idle
         }
     }
 
-    /// Ends the recording (tap, stop word, or silence) and sends it to the Mac.
+    /// Ends the recording (tap, stop word, or silence). With "Ask before sending" on,
+    /// a Redo / Add more / Send bar appears for a few seconds; otherwise it sends at once.
     private func finishRecording() {
         guard status == .recording else { return }
         guard let audioData = recorder.stop(), !audioData.isEmpty else {
             status = .idle
             return
         }
+        guard settings.reviewBeforeSend else { send(audioData); return }
+        pendingAudio = audioData
+        status = .review
+        sendCountdown = 4
+        countdownTask?.cancel()
+        countdownTask = Task { @MainActor in
+            while sendCountdown > 0 {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if Task.isCancelled { return }
+                sendCountdown -= 1
+            }
+            sendPending()
+        }
+    }
+
+    private func redo() {
+        countdownTask?.cancel(); pendingAudio = nil
+        status = .recording
+        recorder.start()
+    }
+
+    private func addMore() {
+        countdownTask?.cancel(); pendingAudio = nil
+        status = .recording
+        recorder.start(resume: true)      // keeps what was already said
+    }
+
+    private func sendPending() {
+        countdownTask?.cancel()
+        guard status == .review, let audio = pendingAudio else { return }
+        pendingAudio = nil
+        send(audio)
+    }
+
+    private func send(_ audioData: Data) {
         do {   // one block so the placeholder row + upload read top-to-bottom
             status = .thinking
             steps = []
@@ -218,6 +284,7 @@ struct VoiceButton: View {
     }
 
     private func handleResponse(_ response: VoiceResponse) async {
+        api.burstRefresh()   // poll every second for a while so both devices settle together
         lastResponse = response
         if let t = response.trace, !t.isEmpty, steps.isEmpty || !settings.showThinking {
             steps = t

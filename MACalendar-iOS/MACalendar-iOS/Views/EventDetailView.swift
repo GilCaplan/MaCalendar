@@ -94,6 +94,7 @@ struct EventDetailView: View {
                     TextField("Attendees", text: $attendees)
                         .onSubmit { if !saving && !title.isEmpty { save() } }
                 }
+                GuestsSection(attendees: $attendees, title: title, date: date, startTime: startTime, endTime: endTime, location: location)
                 if !isNew && !isReadOnly {
                     Section {
                         Button(role: .destructive) { confirmDelete = true } label: {

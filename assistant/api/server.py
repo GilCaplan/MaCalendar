@@ -747,6 +747,21 @@ def create_app() -> Flask:
         rel = _relative_dates(transcript)
         ev_idx = 0
         for name, intent in parsed:
+            if name in ("update_event", "delete_event"):
+                # "the event I just made / the last one" → anaphor, never a title guess.
+                if _re.search(r"\b(just (made|created|added|set|scheduled)|last (event|one)|the one i just|you just)\b", tl) \
+                        and not getattr(intent, "match_date", None) and not getattr(intent, "match_start_time", None):
+                    if (getattr(intent, "match_title", "") or "").lower() != "it":
+                        fixes.append(f"match_title '{intent.match_title}'→'it' (refers to the last event)")
+                        intent.match_title = "it"
+                # A day named in the sentence but no match_date → pin the search to that day
+                # (the first date phrase is the event being referred to; a second one is the move-to date).
+                elif rel and not getattr(intent, "match_date", None):
+                    fixes.append(f"match_date →{rel[0]} (said in the sentence)")
+                    intent.match_date = rel[0]
+                    if name == "update_event" and len(rel) > 1 and not getattr(intent, "new_date", None):
+                        intent.new_date = rel[1]
+                out.append((name, intent)); continue
             if name == "create_event":
                 d = getattr(intent, "date", None)
                 # Deterministic relative dates beat the model's guess: one phrase → all

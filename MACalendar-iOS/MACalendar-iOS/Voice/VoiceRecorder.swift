@@ -1,4 +1,4 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 import Foundation
 import Speech
 
@@ -45,8 +45,9 @@ class VoiceRecorder: NSObject, ObservableObject {
 
     // MARK: - Start / stop
 
-    func start() {
-        pcm = Data(); liveText = ""; heardSpeech = false; stopping = false; lastVoiceAt = Date()
+    func start(resume: Bool = false) {
+        if !resume { pcm = Data(); liveText = "" }
+        heardSpeech = false; stopping = false; lastVoiceAt = Date()
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.record, mode: .measurement, options: [.duckOthers])
         try? session.setActive(true, options: .notifyOthersOnDeactivation)
@@ -89,7 +90,7 @@ class VoiceRecorder: NSObject, ObservableObject {
         silenceTimer?.invalidate()
         silenceTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                guard let self, self.isRecording, self.heardSpeech else { return }
+                guard let self, self.isRecording, self.heardSpeech, self.silenceStopSeconds > 0 else { return }
                 if Date().timeIntervalSince(self.lastVoiceAt) >= self.silenceStopSeconds {
                     self.autoStop()
                 }

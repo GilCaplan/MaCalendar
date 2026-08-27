@@ -4,6 +4,8 @@ SwiftUI native iOS app backed by a Flask REST API running on the same Mac. The M
 
 ---
 
+> **Complete endpoint list:** [API_REFERENCE.md](API_REFERENCE.md) is generated from the server code (`python -m scripts.gen_api_reference`) and is the authoritative list; the examples below cover the core calendar/task endpoints only.
+
 ## Architecture
 
 ```

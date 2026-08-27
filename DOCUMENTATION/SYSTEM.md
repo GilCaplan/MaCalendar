@@ -55,8 +55,24 @@ Voice command
 
 New endpoints: `GET/POST /vocab`, `POST /vocab/alias`, `DELETE /vocab/<word>[?alias=]`, `PATCH /vocab/settings`, `POST /vocab/preview`, `GET/POST /vocab/onboarding`, `GET /memory`, `GET /memory/similar?q=`, `POST /memory/<id>/feedback`, `DELETE /memory/<id>`, `GET /pending`, `POST /pending/<id>/retry`, `DELETE /pending/<id>`, `POST /voice/stream`. `/health` now reports `llm_status` (`ok` / `offline` / model not pulled).
 
-Speed: Ollama `keep_alive: -1` + startup warm-up of Whisper, spaCy and the LLM (`warm_up_components`) remove the cold-start cost that made the first phone command take 10–20 s.
+Speed: Ollama `keep_alive` (`-1` = keep loaded forever, or e.g. `"30m"`; `config.yaml` currently uses `30m`) + startup warm-up of Whisper, spaCy and the LLM (`warm_up_components`) remove the cold-start cost that made the first phone command take 10–20 s.
 
 ## Event categories & colours
 
 `assistant/actions/calendar/categories.py` tags every new event (Work, Study, Meeting, Social, Family, Prayer, Fitness, Health, Errand, Meal, Travel, Personal) from its title/attendees/location with a keyword classifier — "Personal" when unsure — and picks the category colour. If the event immediately before or after on the same day already has that colour, the category's alternate shade is used, so two adjacent events never look the same. A colour chosen by hand is never overridden. Users add/remove categories, change colours and keywords from iOS → Settings → *Event colours* (stored in `~/.assistant_tools/categories.json`, local only). API: `GET/POST /categories`, `DELETE /categories/<name>`, `POST /categories/classify`, `POST /categories/recolor[?force=1]` (backfills existing events).
+
+## Sync between Mac and phone
+
+Both apps read and write the same SQLite file (`~/.assistant_tools/calendar.db`) — the phone through the Mac's API. The Mac app polls the DB's modification time every 5 s and reloads calendar, tasks and the Timer tab when it changes. The phone polls every 30 s while idle, and drops to **1 s for 45 s after a voice command** (10 s after a manual edit) via `APIClient.burstRefresh`, so both sides settle together; the Timer tab polls every 3 s while any timer is running.
+
+## Guests and invitations
+
+`attendees` on an event is a comma-separated list of names (the voice assistant fills it from "meeting with Noa"). On the phone, Edit Event → Guests looks up each name in the phone's own Contacts (permission asked once; nothing stored or uploaded) and offers Messages (`sms:`), WhatsApp (`wa.me`), Mail (`mailto:`) or a share sheet with an `.ics` file. There is no server-side mail/SMS integration and no online dependency.
+
+## Recording controls (phone)
+
+Recording stops on tap, on a stop word ("execute", "done"…) or after silence (Settings → Voice; the silence auto-stop can be turned off). With "Ask before sending" on, a Redo / Add more / Send bar appears for 4 s — *Add more* resumes the same recording so a sentence cut off early can be finished.
+
+## Referring to events by voice
+
+`_normalise_intents` in `assistant/api/server.py` pins `update_event`/`delete_event` to what was said: "the event I just made / the last one" → the last created event; a weekday named in the sentence → `match_date`, so "fix the meeting on Sunday" cannot land on a different day's meeting. `_find_event` scores only distinctive title words (generic words like "meeting" never pick an arbitrary event).

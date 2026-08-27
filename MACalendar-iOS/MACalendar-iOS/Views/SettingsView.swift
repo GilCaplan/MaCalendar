@@ -200,12 +200,16 @@ struct SettingsView: View {
                                         .font(.caption).foregroundColor(.secondary)
                                 }
                             }
+                            Toggle("Ask before sending (Redo / Add more)", isOn: $settings.reviewBeforeSend)
+                            Text("After the recording stops you get 4 seconds to redo it or keep talking before it is sent.")
+                                .font(.caption).foregroundColor(.secondary)
+                            Toggle("Stop automatically after silence", isOn: $settings.silenceStopEnabled)
                             HStack {
                                 Text("Auto-stop after silence")
                                 Spacer()
                                 Text("\(Int(settings.silenceStopSeconds)) s").font(.caption.monospacedDigit()).foregroundColor(.secondary)
                             }
-                            Slider(value: $settings.silenceStopSeconds, in: 2...12, step: 1)
+                            Slider(value: $settings.silenceStopSeconds, in: 2...12, step: 1).disabled(!settings.silenceStopEnabled)
 
                             Toggle(isOn: $settings.showThinking) {
                                 VStack(alignment: .leading, spacing: 2) {
