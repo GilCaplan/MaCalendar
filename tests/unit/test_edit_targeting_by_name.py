@@ -85,3 +85,12 @@ def test_a_generic_title_still_falls_back_to_the_day(db):
     day = (dt.date.today() + dt.timedelta(days=2)).isoformat()
     found = _find_event(db, "the event", day)
     assert found is not None and found["title"] == "Meeting with Ima"
+
+
+def test_a_clock_time_in_the_title_is_not_a_name(db):
+    """"move my 1pm meeting tomorrow" describes when, not what it is called, so
+    the day still has to resolve it."""
+    from assistant.actions.calendar.action import _find_event
+    tomorrow = (dt.date.today() + dt.timedelta(days=1)).isoformat()
+    found = _find_event(db, "my 1pm meeting", tomorrow)
+    assert found is not None and found["title"] == "Meeting with Shaul"

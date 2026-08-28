@@ -88,3 +88,13 @@ def test_a_time_said_with_at_becomes_the_start_not_the_end(client):
     message = _create(client, "on thursday I have Shacharit at 6:30 am, "
                               "a lecture at 10 and dinner with Danny at 8 pm")["message"]
     assert "8 PM to 9 PM" in message, message
+
+
+def test_a_morning_event_is_not_dragged_into_the_afternoon(client):
+    """"Shacharit at 6:30" was booked at 18:30. The morning-word guard only ever
+    declined to add pm; it never took one away."""
+    message = _create(client, "tomorrow: Shacharit at 6:30, Haxaga TA at 12, "
+                              "dinner with Ezra at 8 pm")["message"]
+    assert "6:30 AM" in message, message
+    # and the other events in the same sentence keep their own times
+    assert "12 PM" in message and "8 PM" in message, message

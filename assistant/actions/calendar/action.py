@@ -398,7 +398,12 @@ def _find_event(db, match_title: str, match_date: Optional[str], match_start_tim
     # skip fuzzy title matching and use direct date+time lookup instead.
     # This handles both rule-parser cases ("the event at 6pm") and LLM cases
     # where match_title leaks date/day words ("the event on Sunday").
-    meaningful_words = needle_words - _GENERIC_TITLE_WORDS
+    # A clock time inside the title ("my 1pm meeting") describes *when*, not what
+    # the event is called, so it cannot stand in as a distinguishing name.
+    meaningful_words = {
+        w for w in needle_words - _GENERIC_TITLE_WORDS
+        if not re.fullmatch(r"\d{1,4}(?::\d{2})?(?:am|pm)?", w)
+    }
     if not meaningful_words and (match_date or match_start_time):
         with db._conn() as conn:
             query = "SELECT * FROM events WHERE 1=1"

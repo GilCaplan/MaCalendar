@@ -864,6 +864,29 @@ def create_app() -> Flask:
                     except ValueError:
                         pass
 
+                # A morning word next to the event's own name means morning, even
+                # when the model came back with an afternoon time: "Shacharit at
+                # 6:30" was booked at 18:30. The guard below only ever declined to
+                # ADD pm — it never took one away.
+                _title_l = (getattr(intent, "title", "") or "").lower()
+                # Scoped to this event's OWN title: one "Shacharit" in a sentence
+                # must not drag every other event in it back twelve hours.
+                _morning = re.search(r"\b(?:shacharit|breakfast|sunrise)\b", _title_l)
+                _st = getattr(intent, "start_time", None) or ""
+                if _morning and re.fullmatch(r"1[2-9]:\d{2}|2[0-3]:\d{2}", _st):
+                    _hh, _mm = map(int, _st.split(":"))
+                    _am = f"{_hh - 12:02d}:{_mm:02d}"
+                    if f"{_hh - 12}:{_mm:02d}" in transcript or str(_hh - 12) in transcript:
+                        intent.start_time = _am
+                        _end = getattr(intent, "end_time", None)
+                        if _end:
+                            try:
+                                _eh, _em = map(int, _end.split(":"))
+                                intent.end_time = f"{max(0, _eh - 12):02d}:{_em:02d}"
+                            except ValueError:
+                                pass
+                        fixes.append(f"{_st}→{_am} (a morning event)")
+
                 pm = _bare_hour_pm(transcript, getattr(intent, "start_time", None) or "")
                 if pm and not re.search(r"\b(?:morning|breakfast|shacharit|am)\b", tl):
                     old_s, old_e = intent.start_time, getattr(intent, "end_time", None)
