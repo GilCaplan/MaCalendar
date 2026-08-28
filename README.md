@@ -169,4 +169,6 @@ Full API reference: [DOCUMENTATION/API_REFERENCE.md](DOCUMENTATION/API_REFERENCE
 
 ## For Developers & AI Assistants
 
-If you are an AI assistant or a developer working on this codebase, please **read [SYSTEM.md](DOCUMENTATION/SYSTEM.md) first**. It contains the full project architecture, recent core enhancements (Streaming STT, Universal LLM Parser), and current state details to help you resume work without loss of context.
+Start with **[CLAUDE.md](CLAUDE.md)** for the workflow — how to keep tests out of
+your real vocabulary and command memory, how to measure a change to the
+assistant, and the things that have bitten before. Then **[SYSTEM.md](DOCUMENTATION/SYSTEM.md)**. It contains the full project architecture, recent core enhancements (Streaming STT, Universal LLM Parser), and current state details to help you resume work without loss of context.
