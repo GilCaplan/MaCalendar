@@ -400,6 +400,8 @@ class CalendarWindow(QMainWindow):
         self._thinking = ThinkingPanel(central, dark=self._dark)
         self._thinking.closed.connect(self._update_trace_chip)
         self._thinking.retry_requested.connect(self._on_retry_pending)
+        # Minimising changes its height, so re-anchor it to its corner.
+        self._thinking.resized.connect(self._position_thinking)
         self._position_thinking()
 
         self._update_title()
@@ -936,7 +938,7 @@ class CalendarWindow(QMainWindow):
                 self._thinking.add_step(step)
             self._thinking.finish(entry.get("result") or {})
             self._trace_finished_at = time.monotonic()
-            if self._show_thinking_enabled() and (
+            if self._show_thinking_enabled() and not self._thinking.minimised and (
                     self._config is None or getattr(self._config.ui, "thinking_auto_open", True)):
                 self._position_thinking()
                 self._thinking.reveal()
@@ -960,7 +962,9 @@ class CalendarWindow(QMainWindow):
                     self._thinking.begin(source="Mac")
                     self._trace_finished_at = 0.0
                     auto = self._config is None or getattr(self._config.ui, "thinking_auto_open", True)
-                    if self._show_thinking_enabled() and auto:
+                    # If it was minimised, leave it that way — the header still
+                    # counts the steps, which is the point of minimising it.
+                    if self._show_thinking_enabled() and auto and not self._thinking.minimised:
                         self._position_thinking()
                         self._thinking.reveal()
                 elif kind == "step":

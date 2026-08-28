@@ -516,6 +516,7 @@ class ThinkingPanel(QFrame):
 
     closed = pyqtSignal()
     retry_requested = pyqtSignal(int)
+    resized = pyqtSignal()          # so the window can re-anchor it to its corner
 
     def __init__(self, parent=None, dark: bool = True) -> None:
         super().__init__(parent)
@@ -523,6 +524,7 @@ class ThinkingPanel(QFrame):
         self._rows: list[_StepRow] = []
         self._result_card: _ResultCard | None = None
         self._source = "Mac"
+        self._minimised = False
         self._finished = True
         self.setFixedSize(PANEL_WIDTH, PANEL_HEIGHT)
 
@@ -549,6 +551,16 @@ class ThinkingPanel(QFrame):
         self._count = QLabel("")
         head.addWidget(self._count)
         head.addStretch(1)
+        # Minimise to the title bar. The header keeps showing the live step
+        # count, so a command still in flight is visible while it's out of the way.
+        self._min_btn = QPushButton("–")
+        self._min_btn.setFlat(True)
+        self._min_btn.setFixedSize(24, 24)
+        self._min_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._min_btn.setToolTip("Minimise")
+        self._min_btn.clicked.connect(self.toggle_minimised)
+        head.addWidget(self._min_btn)
+
         self._close_btn = QPushButton("×")
         self._close_btn.setFlat(True)
         self._close_btn.setFixedSize(24, 24)
@@ -556,6 +568,8 @@ class ThinkingPanel(QFrame):
         self._close_btn.clicked.connect(self._on_close)
         head.addWidget(self._close_btn)
         root.addWidget(self._header)
+
+        self._header.mouseDoubleClickEvent = lambda _e: self.toggle_minimised()
 
         self._rule = QFrame()
         self._rule.setFixedHeight(1)
@@ -678,6 +692,23 @@ class ThinkingPanel(QFrame):
 
     # ------------------------------------------------------------ presence
 
+    def toggle_minimised(self, minimised: bool | None = None) -> None:
+        """Collapse to the title bar, or restore."""
+        self._minimised = (not self._minimised) if minimised is None else minimised
+        self._scroll.setVisible(not self._minimised)
+        self._rule.setVisible(not self._minimised)
+        self._min_btn.setText("+" if self._minimised else "–")
+        self._min_btn.setToolTip("Restore" if self._minimised else "Minimise")
+        if self._minimised:
+            self.setFixedSize(PANEL_WIDTH, self._header.sizeHint().height() + 2)
+        else:
+            self.setFixedSize(PANEL_WIDTH, PANEL_HEIGHT)
+        self.resized.emit()
+
+    @property
+    def minimised(self) -> bool:
+        return self._minimised
+
     def reveal(self) -> None:
         self.show()
         self.raise_()
@@ -702,10 +733,11 @@ class ThinkingPanel(QFrame):
         self._header.setStyleSheet("background: transparent;")
         self._title.setStyleSheet(f"color: {theme.text}; background: transparent;")
         self._count.setStyleSheet(f"color: {theme.text2}; background: transparent; font-size: 11px;")
-        self._close_btn.setStyleSheet(
-            f"QPushButton {{ background: transparent; border: none; color: {theme.text2};"
-            f" font-size: 16px; }} QPushButton:hover {{ color: {theme.text}; }}"
-        )
+        for _btn, _size in ((self._min_btn, 18), (self._close_btn, 16)):
+            _btn.setStyleSheet(
+                f"QPushButton {{ background: transparent; border: none; color: {theme.text2};"
+                f" font-size: {_size}px; }} QPushButton:hover {{ color: {theme.text}; }}"
+            )
         self._rule.setStyleSheet(f"background-color: {theme.border}; border: none;")
         self._scroll.setStyleSheet(f"background-color: {theme.bg}; border: none;")
         self._body.setStyleSheet(f"background-color: {theme.bg};")
