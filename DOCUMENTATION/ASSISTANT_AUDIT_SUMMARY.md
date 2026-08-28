@@ -67,6 +67,43 @@ Five failures remain in the report:
 The self-check proposed a correction on 78 of 81 commands and fixed none: it remains
 pure cost (it is what makes "settled" ~21 s vs 6.7 s) and is correctly left advisory.
 
+## Should the self-check come back? — measured 2026-08-28
+
+The design is sound and is what is built: the rule path answers in 0.1 s, an LLM
+re-reads the result in the background and patches it. The question is only
+whether the checker is accurate enough to be trusted with the patch. Ran the
+full corpus with `verify_fast_path: true` **and** `self_check_apply: true`:
+
+| | self-check off | on, and applying |
+|---|---:|---:|
+| correct (quick answer) | 95% | 98% |
+| correct once settled | 95% | **95%** |
+| time to settled p50 | 7.2 s | 25.7 s |
+| time to settled p95 | 16.0 s | **72.9 s** |
+
+It proposed a correction on 78 of 81 commands, applied 29 of them, **fixed 0 and
+broke 2** — it takes correct answers and makes them wrong. The two it broke show
+why:
+
+- "meeting tomorrow at 2 **sorry not 2, 3 pm** with Adin" — the speaker corrected
+  themselves mid-sentence and the checker undid the correction, back to 2 pm.
+- "Kems tomorrow at 8 with Ravid and Ezra" — "Meeting time is 8am, not 8pm",
+  overriding the evening heuristic, which is right (Kems is a bar).
+
+Both are cases where the command was unambiguous and the checker second-guessed
+it. It has no way to tell "different from what I would have said" from "wrong".
+
+Note this is *worse* than the earlier runs, not better, and the reason matters:
+the deterministic layer improved a lot on 2026-08-28, so the checker is now
+mostly second-guessing rules that are already right. **The better the
+deterministic layer gets, the more damage a low-precision checker does.**
+
+Worth revisiting only with: verification limited to genuinely ambiguous commands
+(low rule confidence, a bare hour with no morning/evening signal, a placeholder
+title) rather than all of them; a requirement that any correction cite a token
+actually spoken; and a stronger model for the checker than the one doing the
+first pass.
+
 ## Remaining gaps (ranked, from the 2026-08-26 run)
 
 1. ~~**Rule parser splits multi-event sentences into one**~~ — fixed, see above. ("lunch with Tal on monday at noon and coffee with Ezra on friday at 9" → only lunch). It is confident (0.90), so the LLM never sees it. Fix: lower confidence when a span contains two time expressions, forcing hybrid.
