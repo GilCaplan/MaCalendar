@@ -57,6 +57,11 @@ claude:
 # 1 = simple yes/no before each action
 confirmation_level: 1
 
+# Background LLM re-check of every fast-path result. Off: four audit runs had it
+# proposing a correction on ~96% of commands and fixing none, while adding ~14 s
+# to each command. Set true to re-enable.
+verify_fast_path: false
+
 audio:
   sample_rate: 16000
   silence_threshold: 0.01      # RMS below this = silence
