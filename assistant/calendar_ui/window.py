@@ -5,11 +5,14 @@ from __future__ import annotations
 import datetime
 import queue
 import threading
+import time
 from typing import Optional
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QCloseEvent, QColor, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
+    QFrame,
+    QGraphicsDropShadowEffect,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -48,6 +51,7 @@ from assistant.pipeline import (
     STATUS_IDLE,
     STATUS_LISTENING,
     STATUS_PROCESSING,
+    STATUS_REVIEW,
 )
 
 STATUS_REFRESH = "refresh"
@@ -68,6 +72,7 @@ def _fmt_time(time_str: str) -> str:
 _MIC_ICONS = {
     STATUS_IDLE: "🎙",
     STATUS_LISTENING: "🔴",
+    STATUS_REVIEW: "📨",
     STATUS_PROCESSING: "⚙️",
     STATUS_DONE: "✅",
     STATUS_ERROR: "⚠️",
@@ -79,6 +84,7 @@ _MIC_ICONS = {
 _MIC_OBJ_NAMES = {
     STATUS_IDLE: "mic_idle",
     STATUS_LISTENING: "mic_listening",
+    STATUS_REVIEW: "mic_processing",
     STATUS_PROCESSING: "mic_processing",
     STATUS_DONE: "mic_idle",
     STATUS_ERROR: "mic_idle",
@@ -146,6 +152,96 @@ class ToastLabel(QLabel):
         self._timer.start(duration_ms)
 
 
+class ReviewBar(QFrame):
+    """Redo / Add more / Send, shown for a few seconds after a recording stops.
+
+    The Mac twin of the bar the iPhone floats above its mic. It never appears
+    when a spoken stop word ended the recording — saying "execute" already
+    settled it, so the pipeline sends without asking (see Pipeline._await_review).
+    """
+
+    chose = pyqtSignal(str)
+
+    def __init__(self, parent=None) -> None:
+        # QFrame, not QWidget: a plain QWidget subclass ignores a stylesheet
+        # background, which left the bar transparent over the calendar.
+        super().__init__(parent)
+        self._remaining = 0
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(20)
+        shadow.setOffset(0, 4)
+        shadow.setColor(QColor(0, 0, 0, 140))
+        self.setGraphicsEffect(shadow)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(10, 6, 10, 6)
+        lay.setSpacing(6)
+
+        self._heard = QLabel("")
+        self._heard.setMaximumWidth(320)
+        lay.addWidget(self._heard)
+
+        self._redo = QPushButton("Redo")
+        self._redo.setToolTip("Throw that away and record again")
+        self._more = QPushButton("Add more")
+        self._more.setToolTip("Keep what you said and carry on")
+        self._send = QPushButton("Send")
+        self._cancel = QPushButton("×")
+        self._cancel.setToolTip("Discard")
+        self._cancel.setFixedWidth(26)
+        for btn, choice in ((self._redo, "redo"), (self._more, "add"),
+                            (self._send, "send"), (self._cancel, "cancel")):
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFixedHeight(26)
+            btn.clicked.connect(lambda _=False, c=choice: self._answer(c))
+            lay.addWidget(btn)
+
+        self._timer = QTimer(self)
+        self._timer.setInterval(1000)
+        self._timer.timeout.connect(self._tick)
+        self.hide()
+
+    def start(self, seconds: int, heard: str) -> None:
+        self._remaining = seconds
+        self._heard.setText(f"“{heard}”" if heard else "")
+        self._heard.setVisible(bool(heard))
+        self._send.setText(f"Send {seconds}")
+        self.show()
+        self.adjustSize()          # after show(), so the label has its real width
+        self.raise_()
+        self._timer.start()
+
+    def stop(self) -> None:
+        self._timer.stop()
+        self.hide()
+
+    def _tick(self) -> None:
+        self._remaining -= 1
+        # The pipeline owns the real deadline; this just counts it down on screen.
+        self._send.setText(f"Send {self._remaining}" if self._remaining > 0 else "Send")
+
+    def _answer(self, choice: str) -> None:
+        self.stop()
+        self.chose.emit(choice)
+
+    def apply_theme(self, dark: bool) -> None:
+        bg = _styles.D_GRAY_BG if dark else _styles.GRAY_BG
+        border = _styles.D_GRAY_BORDER if dark else GRAY_BORDER
+        text2 = _styles.D_GRAY_TEXT if dark else GRAY_TEXT
+        accent = _styles.get_accent()
+        self.setStyleSheet(
+            f"ReviewBar {{ background-color: {bg}; border: 1px solid {border};"
+            f" border-radius: {_styles.RADIUS_LG}px; }}"
+            f"QLabel {{ color: {text2}; border: none; background: transparent; }}"
+        )
+        # Explicit inline styling — the app stylesheet's #primary rule has been
+        # seen to apply `color` without `background-color` on nested widgets.
+        self._send.setStyleSheet(
+            f"QPushButton {{ background-color: {accent}; color: {_styles.on_color(accent)};"
+            f" border: 1px solid {accent}; border-radius: {_styles.RADIUS_SM}px;"
+            f" padding: 3px 10px; font-weight: 700; }}"
+        )
+
+
 class CalendarWindow(QMainWindow):
     """
     Main Outlook-style calendar window.
@@ -162,6 +258,10 @@ class CalendarWindow(QMainWindow):
         self._current_date = datetime.date.today()
         self._view_mode = "month"  # "month" | "week" | "day" | "todo" | "timer" | "coursework" | "workout"
         self._undo_manager = UndoManager()
+        self._trace_finished_at = 0.0   # monotonic time the last voice run ended
+        # Only traces published from now on — not the backlog from earlier runs.
+        from assistant import trace_bus as _trace_bus
+        self._bus_offset = _trace_bus.size()
 
         self._dark = (config.theme == "dark") if config else False
 
@@ -288,6 +388,22 @@ class CalendarWindow(QMainWindow):
         self._toast = ToastLabel(central)
         self._toast.raise_()
 
+        # Redo / Add more / Send bar (overlaid) — the desktop twin of the chip
+        # the iPhone floats over its mic after a recording stops.
+        self._review_bar = ReviewBar(central)
+        self._review_bar.chose.connect(self._on_review_choice)
+        self._review_bar.hide()
+
+        # Assistant "thinking" panel (overlaid) — the desktop twin of the iOS
+        # timeline sheet. Hidden until a voice command runs.
+        from assistant.calendar_ui.thinking_panel import ThinkingPanel
+        self._thinking = ThinkingPanel(central, dark=self._dark)
+        self._thinking.closed.connect(self._update_trace_chip)
+        self._thinking.retry_requested.connect(self._on_retry_pending)
+        # Minimising changes its height, so re-anchor it to its corner.
+        self._thinking.resized.connect(self._position_thinking)
+        self._position_thinking()
+
         self._update_title()
 
     def _build_toolbar(self) -> QWidget:
@@ -348,8 +464,8 @@ class CalendarWindow(QMainWindow):
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setFixedHeight(30)
             btn.clicked.connect(lambda _, m=mode: self._set_view(m))
-            if mode == "coursework":
-                btn.setVisible(self._config.ui.show_coursework if self._config else True)
+            if self._config and mode in ("coursework", "timer", "workout"):
+                btn.setVisible(getattr(self._config.ui, f"show_{mode}", True))
             layout.addWidget(btn, alignment=v_center)
             setattr(self, f"_view_btn_{mode}", btn)
             # Styled by _apply_theme(), always called right after _build_ui()
@@ -400,6 +516,16 @@ class CalendarWindow(QMainWindow):
         self._update_theme_btn()
 
         layout.addSpacing(2)
+
+        # "Thinking… N steps" / "Show what it did" — mirrors the chip the
+        # iPhone floats above its mic button. Hidden when there's nothing to show.
+        self._trace_chip = QPushButton("")
+        self._trace_chip.setObjectName("flat")
+        self._trace_chip.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._trace_chip.setToolTip("Show what the assistant did, step by step")
+        self._trace_chip.clicked.connect(self._on_show_thinking)
+        self._trace_chip.hide()
+        layout.addWidget(self._trace_chip, alignment=v_center)
 
         self._mic_btn = QPushButton("🎙")
         self._mic_btn.setObjectName("mic_idle")
@@ -788,6 +914,133 @@ class CalendarWindow(QMainWindow):
                 self._handle_status(status, message)
         except queue.Empty:
             pass
+        self._poll_trace()
+        self._poll_phone_traces()
+
+    # -- Assistant thinking panel ---------------------------------------
+
+    def _poll_phone_traces(self) -> None:
+        """Show commands run from the phone in the Mac's thinking panel too.
+
+        The API server is a separate process, so it publishes finished traces to
+        a small file (assistant.trace_bus) that this window tails. Without it the
+        panel only ever showed commands spoken at the Mac, even though the Mac is
+        what executed the phone's as well.
+        """
+        from assistant import trace_bus
+        entries, self._bus_offset = trace_bus.read_since(self._bus_offset)
+        for entry in entries:
+            steps = entry.get("steps") or []
+            if not steps:
+                continue
+            self._thinking.begin(source="iPhone")
+            for step in steps:
+                self._thinking.add_step(step)
+            self._thinking.finish(entry.get("result") or {})
+            self._trace_finished_at = time.monotonic()
+            if self._show_thinking_enabled() and not self._thinking.minimised and (
+                    self._config is None or getattr(self._config.ui, "thinking_auto_open", True)):
+                self._position_thinking()
+                self._thinking.reveal()
+        if entries:
+            self._update_trace_chip()
+
+    def _show_thinking_enabled(self) -> bool:
+        return bool(getattr(self._config.ui, "show_thinking", True)) if self._config else True
+
+    def _poll_trace(self) -> None:
+        """Drain pipeline.trace_queue into the thinking panel."""
+        tq = getattr(self._pipeline, "trace_queue", None)
+        if tq is None:
+            return
+        changed = False
+        try:
+            while True:
+                item = tq.get_nowait()
+                kind = item.get("type")
+                if kind == "begin":
+                    self._thinking.begin(source="Mac")
+                    self._trace_finished_at = 0.0
+                    auto = self._config is None or getattr(self._config.ui, "thinking_auto_open", True)
+                    # If it was minimised, leave it that way — the header still
+                    # counts the steps, which is the point of minimising it.
+                    if self._show_thinking_enabled() and auto and not self._thinking.minimised:
+                        self._position_thinking()
+                        self._thinking.reveal()
+                elif kind == "step":
+                    self._thinking.add_step(item)
+                elif kind == "result":
+                    payload = {k: v for k, v in item.items() if k != "type"}
+                    self._thinking.finish(payload)
+                    self._trace_finished_at = time.monotonic()
+                changed = True
+        except queue.Empty:
+            pass
+        if changed or self._trace_chip.isVisible():
+            self._update_trace_chip()
+
+    def _update_trace_chip(self) -> None:
+        """Chip mirrors the iOS one: live step count, then a 2-minute window
+        to reopen the last run, then it disappears."""
+        if not self._show_thinking_enabled():
+            self._trace_chip.hide()
+            return
+        running = self._thinking.running
+        recent = (time.monotonic() - self._trace_finished_at) < 120
+        if self._thinking.isVisible() or not (running or (recent and self._thinking.step_count)):
+            self._trace_chip.hide()
+            return
+        n = self._thinking.step_count
+        if running:
+            self._trace_chip.setText(f"Thinking… {n} step{'' if n == 1 else 's'}")
+        else:
+            self._trace_chip.setText("Show what it did")
+        self._trace_chip.show()
+
+    def _on_review_choice(self, choice: str) -> None:
+        """Redo / Add more / Send / Cancel from the review bar."""
+        if self._pipeline is not None:
+            self._pipeline.review_choice(choice)
+
+    def _position_review_bar(self) -> None:
+        """Just above the mic button, right-aligned like the iPhone's chip."""
+        bar = getattr(self, "_review_bar", None)
+        if bar is None or not bar.isVisible():
+            return
+        parent = bar.parentWidget()
+        bar.adjustSize()
+        x = max(8, parent.width() - bar.width() - 16)
+        bar.move(x, 58)
+        bar.raise_()
+
+    def _on_retry_pending(self, pending_id: int) -> None:
+        """Run a queued command again (the assistant was offline when it was said)."""
+        if self._pipeline is None:
+            return
+        if not self._pipeline.retry_pending(pending_id):
+            self.show_toast("Couldn't retry that command right now")
+
+    def _on_show_thinking(self) -> None:
+        self._position_thinking()
+        self._thinking.reveal()
+        self._update_trace_chip()
+
+    def _position_thinking(self) -> None:
+        """Park the panel in the corner the user picked, clear of the toast."""
+        panel = getattr(self, "_thinking", None)
+        if panel is None:
+            return
+        parent = panel.parentWidget()
+        if parent is None:
+            return
+        corner = getattr(self._config.ui, "thinking_corner", "bottom-right") if self._config else "bottom-right"
+        margin = 20
+        right = max(8, parent.width() - panel.width() - margin)
+        bottom = max(8, parent.height() - panel.height() - margin)
+        top = 62 if "top" in corner else bottom      # clear of the 54px toolbar
+        x = margin if corner.endswith("left") else right
+        panel.move(x, top if "top" in corner else bottom)
+        panel.raise_()
 
     def _handle_status(self, status: str, message: str = "") -> None:
         icon = _MIC_ICONS.get(status, "🎙")
@@ -796,6 +1049,16 @@ class CalendarWindow(QMainWindow):
         self._mic_btn.setObjectName(obj_name)
         self._mic_btn.style().unpolish(self._mic_btn)
         self._mic_btn.style().polish(self._mic_btn)
+
+        if status == STATUS_REVIEW:
+            # The message is "<seconds>|<transcript snippet>" for the review bar,
+            # which shows the transcript itself — so no toast (it was leaking the
+            # raw "3|add lunch…" string across the bottom of the window).
+            secs, _, snippet = message.partition("|")
+            self._review_bar.start(int(secs or 3), snippet)
+            self._position_review_bar()
+            return
+        self._review_bar.stop()
 
         if message:
             self.show_toast(message)
@@ -852,6 +1115,10 @@ class CalendarWindow(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        if hasattr(self, "_thinking"):
+            self._position_thinking()
+        if hasattr(self, "_review_bar"):
+            self._position_review_bar()
         if hasattr(self, "_toast"):
             self._toast.adjustSize()
             x = (self.width() - self._toast.width()) // 2
@@ -881,6 +1148,10 @@ class CalendarWindow(QMainWindow):
             self._coursework_view.apply_theme(dark)
         if hasattr(self, "_workout_view"):
             self._workout_view.apply_theme(dark)
+        if hasattr(self, "_thinking"):
+            self._thinking.apply_theme(dark)
+        if hasattr(self, "_review_bar"):
+            self._review_bar.apply_theme(dark)
 
         # Re-style toolbar
         bg = _styles.D_GRAY_BG if dark else _styles.GRAY_BG
@@ -951,67 +1222,64 @@ class CalendarWindow(QMainWindow):
     def _on_settings_popup(self) -> None:
         if not self._pipeline:
             return
-            
+
+        from PyQt6.QtWidgets import QFormLayout, QFrame, QGroupBox, QScrollArea
+
         dialog = QDialog(self)
         dialog.setWindowTitle("Assistant Settings")
-        dialog.setMinimumSize(420, 440)
-        
-        layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(18, 18, 18, 18)
-        layout.setSpacing(8)
-        
-        # Compact check
-        compact_cb = QCheckBox("Compact Layout Density")
-        compact_cb.setChecked(self._config.ui.compact_ui)
-        layout.addWidget(compact_cb)
-        
-        def update_style(compact: bool):
-            if compact:
-                dialog.setFixedSize(420, 430)
-                layout.setSpacing(6)
-            else:
-                dialog.setMinimumSize(420, 440)
-                dialog.setMaximumHeight(800)
-                # Let stretches handle the "stretching"
-        
-        compact_cb.toggled.connect(update_style)
+        dialog.setMinimumSize(520, 560)
+        dialog.resize(560, 720)
 
-        # Coursework tab visibility
-        coursework_tab_cb = QCheckBox("Show Coursework Tab")
-        coursework_tab_cb.setChecked(self._config.ui.show_coursework)
-        layout.addWidget(coursework_tab_cb)
+        # Grouped into the same sections the iPhone's Settings screen uses
+        # (Appearance / Tabs / Hebrew Calendar / Voice / Assistant) and scrolled,
+        # with Test & Save pinned. It used to be one flat column of controls with
+        # stretches between them, which squeezed everything below "Hebrew
+        # Calendar" into overlapping slivers — the Font Sizes grid rendered at
+        # zero height and could not be reached at all.
+        outer = QVBoxLayout(dialog)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        content = QWidget()
+        scroll.setWidget(content)
+        outer.addWidget(scroll, 1)
 
-        # Auto-Approve check
-        auto_cb = QCheckBox("Auto-Approve Actions (No Confirmations)")
-        auto_cb.setChecked(self._pipeline._confirmer.level == 0)
-        layout.addWidget(auto_cb)
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(14)
 
-        # Personal vocabulary (STT auto-correct) + recent assistant commands
-        vocab_btn = QPushButton(icons.icon("vocab"), "Vocabulary & Assistant Log…")
-        vocab_btn.setToolTip("Teach the assistant names and words it mishears; review recent commands")
-        vocab_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        def section(title: str) -> QVBoxLayout:
+            """One titled group; returns the layout to put controls in."""
+            box = QGroupBox(title)
+            inner = QVBoxLayout(box)
+            inner.setContentsMargins(14, 12, 14, 12)
+            inner.setSpacing(8)
+            layout.addWidget(box)
+            return inner
 
-        def _open_vocab():
-            from assistant.calendar_ui.vocab_dialog import VocabDialog
-            VocabDialog(self).exec()
-        vocab_btn.clicked.connect(_open_vocab)
-        layout.addWidget(vocab_btn)
+        def hint(text: str) -> QLabel:
+            lbl = QLabel(text)
+            lbl.setWordWrap(True)
+            lbl.setObjectName("muted")
+            lbl.setStyleSheet(
+                f"color: {_styles.D_GRAY_TEXT if self._dark else GRAY_TEXT}; font-size: 11px;")
+            return lbl
 
-        layout.addStretch(1)
+        # ── Appearance ────────────────────────────────────────────────
+        appearance = section("Appearance")
+        appearance_form = QFormLayout()
+        appearance_form.setSpacing(8)
+        appearance_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
-        # Default Theme 
-        theme_layout = QHBoxLayout()
-        theme_layout.addWidget(QLabel("Default Theme (on startup):"))
         theme_combo = QComboBox()
         theme_combo.addItems(["Light", "Dark"])
         theme_combo.setCurrentText("Dark" if (self._config.theme == "dark") else "Light")
-        theme_layout.addWidget(theme_combo)
-        layout.addLayout(theme_layout)
+        theme_combo.setMaximumWidth(160)
+        appearance_form.addRow("Theme on startup:", theme_combo)
 
-        layout.addStretch(1)
-
-        # Accent Color
-        layout.addWidget(QLabel("Accent Color:"))
         accent_state = {"hex": self._config.ui.accent_color}
         swatch_row = QHBoxLayout()
         swatch_row.setSpacing(8)
@@ -1060,95 +1328,88 @@ class CalendarWindow(QMainWindow):
         custom_btn.clicked.connect(pick_custom)
         swatch_row.addWidget(custom_btn)
         swatch_row.addStretch(1)
-        layout.addLayout(swatch_row)
+        swatch_holder = QWidget()
+        swatch_holder.setLayout(swatch_row)
+        appearance_form.addRow("Accent colour:", swatch_holder)
+        appearance.addLayout(appearance_form)
 
-        layout.addStretch(1)
+        compact_cb = QCheckBox("Compact layout density")
+        compact_cb.setChecked(self._config.ui.compact_ui)
+        appearance.addWidget(compact_cb)
 
-        # Hebrew Calendar
-        layout.addWidget(QLabel("Hebrew Calendar:"))
-        hebrew_layout = QHBoxLayout()
-        hebrew_layout.addWidget(QLabel("Show dates as:"))
+        def update_style(compact: bool):
+            layout.setSpacing(10 if compact else 14)
+        compact_cb.toggled.connect(update_style)
+
+        appearance.addWidget(hint("Font sizes"))
+        font_grid = QGridLayout()
+        font_grid.setVerticalSpacing(6)
+        font_grid.setHorizontalSpacing(14)
+        font_spins: dict[str, QSpinBox] = {}
+        for i, (label, attr) in enumerate((("Month", "font_month"), ("Week", "font_week"),
+                                           ("Day", "font_day"), ("Tasks", "font_tasks"),
+                                           ("Coursework", "font_coursework"))):
+            spin = QSpinBox()
+            spin.setRange(8, 24)
+            spin.setValue(getattr(self._config.ui, attr))
+            font_spins[attr] = spin
+            row, col = divmod(i, 2)
+            font_grid.addWidget(QLabel(f"{label}:"), row, col * 2,
+                                alignment=Qt.AlignmentFlag.AlignRight)
+            font_grid.addWidget(spin, row, col * 2 + 1)
+        font_grid.setColumnStretch(4, 1)
+        appearance.addLayout(font_grid)
+        month_spin, week_spin = font_spins["font_month"], font_spins["font_week"]
+        day_spin, tasks_spin = font_spins["font_day"], font_spins["font_tasks"]
+        coursework_spin = font_spins["font_coursework"]
+
+        # ── Tabs ──────────────────────────────────────────────────────
+        tabs = section("Tabs")
+        coursework_tab_cb = QCheckBox("Show Coursework tab")
+        coursework_tab_cb.setChecked(self._config.ui.show_coursework)
+        workout_tab_cb = QCheckBox("Show Workout tab")
+        workout_tab_cb.setChecked(getattr(self._config.ui, "show_workout", True))
+        timer_tab_cb = QCheckBox("Show Timer tab")
+        timer_tab_cb.setChecked(getattr(self._config.ui, "show_timer", True))
+        for cb in (coursework_tab_cb, workout_tab_cb, timer_tab_cb):
+            tabs.addWidget(cb)
+
+        # ── Hebrew calendar ───────────────────────────────────────────
+        hebrew = section("Hebrew Calendar")
+        hebrew_form = QFormLayout()
+        hebrew_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         hebrew_mode_combo = QComboBox()
         hebrew_mode_combo.addItem("English only", "english")
         hebrew_mode_combo.addItem("Hebrew only", "hebrew")
         hebrew_mode_combo.addItem("Both", "both")
         idx = hebrew_mode_combo.findData(self._config.hebrew_calendar.display_mode)
         hebrew_mode_combo.setCurrentIndex(idx if idx >= 0 else 0)
-        hebrew_layout.addWidget(hebrew_mode_combo)
-        layout.addLayout(hebrew_layout)
-
+        hebrew_mode_combo.setMaximumWidth(180)
+        hebrew_form.addRow("Show dates as:", hebrew_mode_combo)
+        hebrew.addLayout(hebrew_form)
         hebrew_holidays_cb = QCheckBox("Show Jewish / Israeli holidays")
         hebrew_holidays_cb.setChecked(self._config.hebrew_calendar.show_holidays)
-        layout.addWidget(hebrew_holidays_cb)
-
+        hebrew.addWidget(hebrew_holidays_cb)
         hebrew_israel_cb = QCheckBox("Israel holiday schedule (uncheck for Diaspora)")
         hebrew_israel_cb.setChecked(self._config.hebrew_calendar.israel_holidays)
-        layout.addWidget(hebrew_israel_cb)
+        hebrew.addWidget(hebrew_israel_cb)
 
-        layout.addStretch(1)
-
-        # Font Sizes
-        layout.addWidget(QLabel("Font Sizes:"))
-        font_grid = QGridLayout()
-        font_grid.setVerticalSpacing(5)
-        font_grid.setHorizontalSpacing(15)
-        font_grid.setContentsMargins(0, 0, 0, 8)
-        
-        font_grid.addWidget(QLabel("Month:"), 0, 0)
-        month_spin = QSpinBox()
-        month_spin.setRange(8, 24)
-        month_spin.setValue(self._config.ui.font_month)
-        font_grid.addWidget(month_spin, 0, 1)
-        
-        font_grid.addWidget(QLabel("Week:"), 0, 2)
-        week_spin = QSpinBox()
-        week_spin.setRange(8, 24)
-        week_spin.setValue(self._config.ui.font_week)
-        font_grid.addWidget(week_spin, 0, 3)
-        
-        font_grid.addWidget(QLabel("Day:"), 1, 0)
-        day_spin = QSpinBox()
-        day_spin.setRange(8, 24)
-        day_spin.setValue(self._config.ui.font_day)
-        font_grid.addWidget(day_spin, 1, 1)
-        
-        font_grid.addWidget(QLabel("Coursework:"), 2, 0)
-        coursework_spin = QSpinBox()
-        coursework_spin.setRange(8, 24)
-        coursework_spin.setValue(self._config.ui.font_coursework)
-        font_grid.addWidget(coursework_spin, 2, 1)
-
-        font_grid.addWidget(QLabel("Tasks:"), 1, 2)
-        tasks_spin = QSpinBox()
-        tasks_spin.setRange(8, 24)
-        tasks_spin.setValue(self._config.ui.font_tasks)
-        font_grid.addWidget(tasks_spin, 1, 3)
-        
-        layout.addLayout(font_grid)
-
-        layout.addStretch(1)
-
-        # Mute check
-        mute_cb = QCheckBox("Mute Voice Output")
+        # ── Voice ─────────────────────────────────────────────────────
+        voice = section("Voice")
+        mute_cb = QCheckBox("Mute voice output")
         mute_cb.setChecked(self._pipeline._tts.mute)
-        layout.addWidget(mute_cb)
-        
-        layout.addStretch(1)
+        voice.addWidget(mute_cb)
 
-        # Speed 
-        speed_layout = QHBoxLayout()
-        speed_layout.addWidget(QLabel("Talking Speed:"))
+        voice_form = QFormLayout()
+        voice_form.setSpacing(8)
+        voice_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         speed_spin = QSpinBox()
         speed_spin.setRange(50, 400)
         speed_spin.setValue(self._pipeline._tts.rate)
-        speed_layout.addWidget(speed_spin)
-        layout.addLayout(speed_layout)
-        
-        layout.addStretch(1)
+        speed_spin.setSuffix(" wpm")
+        speed_spin.setMaximumWidth(120)
+        voice_form.addRow("Talking speed:", speed_spin)
 
-        # Voice Dropdown
-        voice_layout = QHBoxLayout()
-        voice_layout.addWidget(QLabel("Voice Type:"))
         voice_combo = QComboBox()
         import subprocess
         try:
@@ -1162,61 +1423,138 @@ class CalendarWindow(QMainWindow):
             voice_combo.addItems(voice_names)
         except Exception:
             voice_combo.addItems(["Samantha", "Daniel", "Alex", "Ava", "Zari"])
-            
         current_voice = self._pipeline._tts.voice
         if current_voice in [voice_combo.itemText(i) for i in range(voice_combo.count())]:
             voice_combo.setCurrentText(current_voice)
         else:
             voice_combo.addItem(current_voice)
             voice_combo.setCurrentText(current_voice)
-            
-        voice_layout.addWidget(voice_combo)
-        layout.addLayout(voice_layout)
-        
-        layout.addStretch(1)
+        voice_combo.setMaximumWidth(200)
+        voice_form.addRow("Voice:", voice_combo)
+        voice.addLayout(voice_form)
 
-        # Event Keywords (NLU keyword fast-path)
-        keywords_layout = QVBoxLayout()
-        keywords_layout.setSpacing(3)
-        keywords_lbl = QLabel("Event Keywords (comma-separated — instant create + LLM title fix):")
-        keywords_lbl.setWordWrap(True)
-        keywords_layout.addWidget(keywords_lbl)
-        keywords_edit = QLineEdit()
-        keywords_edit.setPlaceholderText("e.g. meeting, appointment, activity")
-        keywords_edit.setText(", ".join(self._config.nlu.event_keywords))
-        keywords_layout.addWidget(keywords_edit)
-        layout.addLayout(keywords_layout)
+        review_cb = QCheckBox("Ask before sending (Redo / Add more / Send)")
+        review_cb.setChecked(getattr(self._config.audio, "review_before_send", True))
+        voice.addWidget(review_cb)
 
-        layout.addStretch(1)
+        review_row = QHBoxLayout()
+        review_row.addSpacing(20)
+        review_row.addWidget(QLabel("Sends by itself after"))
+        review_spin = QSpinBox()
+        review_spin.setRange(1, 15)
+        review_spin.setSuffix(" s")
+        review_spin.setValue(getattr(self._config.audio, "review_seconds", 3))
+        review_spin.setMaximumWidth(80)
+        review_row.addWidget(review_spin)
+        review_row.addStretch(1)
+        voice.addLayout(review_row)
+        review_cb.toggled.connect(review_spin.setEnabled)
+        review_spin.setEnabled(review_cb.isChecked())
+        voice.addWidget(hint("A spoken stop word — “execute”, “done” — always sends straight "
+                             "away, with no wait."))
 
-        # Stop Phrases
-        stop_phrases_layout = QVBoxLayout()
-        stop_phrases_layout.setSpacing(3)
-        stop_phrases_lbl = QLabel("Stop Phrases (comma-separated, triggers early mic stop):")
-        stop_phrases_lbl.setWordWrap(True)
-        stop_phrases_layout.addWidget(stop_phrases_lbl)
+        phrase_form = QFormLayout()
+        phrase_form.setSpacing(8)
+        phrase_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         stop_phrases_edit = QLineEdit()
         stop_phrases_edit.setPlaceholderText("e.g. finish, that's all, stop recording")
         stop_phrases_edit.setText(", ".join(self._config.audio.stop_phrases))
-        stop_phrases_layout.addWidget(stop_phrases_edit)
-        layout.addLayout(stop_phrases_layout)
+        stop_phrases_edit.setToolTip("Extra words that stop the mic, on top of the built-in ones")
+        phrase_form.addRow("Stop phrases:", stop_phrases_edit)
+
+        sep_edit = QLineEdit()
+        sep_edit.setPlaceholderText('e.g. "next event" — blank to disable')
+        sep_edit.setText(self._config.audio.event_separator)
+        sep_edit.setToolTip('Say: "meeting at 10am next event lunch at noon"')
+        phrase_form.addRow("Event separator:", sep_edit)
+
+        keywords_edit = QLineEdit()
+        keywords_edit.setPlaceholderText("e.g. meeting, appointment, activity")
+        keywords_edit.setText(", ".join(self._config.nlu.event_keywords))
+        keywords_edit.setToolTip("Create instantly with this as a placeholder title, then let the LLM improve it")
+        phrase_form.addRow("Event keywords:", keywords_edit)
+        voice.addLayout(phrase_form)
+
+        # ── Assistant ─────────────────────────────────────────────────
+        assistant = section("Assistant")
+        auto_cb = QCheckBox("Auto-approve actions (no confirmations)")
+        auto_cb.setChecked(self._pipeline._confirmer.level == 0)
+        assistant.addWidget(auto_cb)
+
+        thinking_cb = QCheckBox("Show assistant thinking (live step-by-step panel)")
+        thinking_cb.setToolTip("A timeline of what the assistant heard, parsed and did")
+        thinking_cb.setChecked(getattr(self._config.ui, "show_thinking", True))
+        assistant.addWidget(thinking_cb)
+
+        thinking_row = QHBoxLayout()
+        thinking_row.addSpacing(20)
+        thinking_open_combo = QComboBox()
+        thinking_open_combo.addItem("Open the panel", True)
+        thinking_open_combo.addItem("Just show the chip", False)
+        thinking_open_combo.setCurrentIndex(
+            0 if getattr(self._config.ui, "thinking_auto_open", True) else 1)
+        thinking_row.addWidget(thinking_open_combo)
+        thinking_row.addWidget(QLabel("in the"))
+        thinking_corner_combo = QComboBox()
+        for _label, _value in (("bottom right", "bottom-right"), ("bottom left", "bottom-left"),
+                               ("top right", "top-right"), ("top left", "top-left")):
+            thinking_corner_combo.addItem(_label, _value)
+        _idx = thinking_corner_combo.findData(
+            getattr(self._config.ui, "thinking_corner", "bottom-right"))
+        thinking_corner_combo.setCurrentIndex(_idx if _idx >= 0 else 0)
+        thinking_row.addWidget(thinking_corner_combo)
+        thinking_row.addStretch(1)
+        assistant.addLayout(thinking_row)
+
+        def _thinking_toggled(on: bool) -> None:
+            thinking_open_combo.setEnabled(on)
+            thinking_corner_combo.setEnabled(on)
+        thinking_cb.toggled.connect(_thinking_toggled)
+        _thinking_toggled(thinking_cb.isChecked())
+
+        vocab_btn = QPushButton(icons.icon("vocab"), "Vocabulary && Assistant Log…")
+        vocab_btn.setToolTip("Teach the assistant names and words it mishears; review recent commands")
+        vocab_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        def _open_vocab():
+            from assistant.calendar_ui.vocab_dialog import VocabDialog
+            VocabDialog(self, pipeline=self._pipeline).exec()
+        vocab_btn.clicked.connect(_open_vocab)
+
+        review_btn = QPushButton(icons.icon("thumbs_up"), "Review Commands…")
+        review_btn.setToolTip("Say whether recent voice commands did the right thing — the assistant learns from it")
+        review_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        def _open_review():
+            from assistant.calendar_ui.review_dialog import ReviewDialog
+            ReviewDialog(self, dark=self._dark).exec()
+            _refresh_review_label()
+
+        def _refresh_review_label():
+            try:
+                from assistant.calendar_ui.review_dialog import unreviewed
+                n = len(unreviewed(limit=50))
+            except Exception:
+                n = 0
+            review_btn.setText(f"Review Commands… ({n})" if n else "Review Commands…")
+
+        review_btn.clicked.connect(_open_review)
+        _refresh_review_label()
+
+        colors_btn = QPushButton(icons.icon("corrected"), "Event Colours && Categories…")
+        colors_btn.setToolTip("Categories, their colours and the keywords that pick them")
+        colors_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        def _open_categories():
+            from assistant.calendar_ui.categories_dialog import CategoriesDialog
+            if CategoriesDialog(self, dark=self._dark).exec():
+                self.refresh_calendar()
+        colors_btn.clicked.connect(_open_categories)
+
+        for btn in (vocab_btn, review_btn, colors_btn):
+            assistant.addWidget(btn)
 
         layout.addStretch(1)
-
-        # Event Separator
-        sep_layout = QVBoxLayout()
-        sep_layout.setSpacing(3)
-        sep_lbl = QLabel("Event Separator (spoken keyword between multiple events — leave blank to disable):")
-        sep_lbl.setWordWrap(True)
-        sep_layout.addWidget(sep_lbl)
-        sep_edit = QLineEdit()
-        sep_edit.setPlaceholderText('e.g. "next event" — say: "meeting at 10am next event lunch at noon"')
-        sep_edit.setText(self._config.audio.event_separator)
-        sep_layout.addWidget(sep_edit)
-        layout.addLayout(sep_layout)
-
-        layout.addStretch(2)
-
         # Test & Save
         btn_layout = QHBoxLayout()
         test_btn = QPushButton("Test Audio")
@@ -1271,11 +1609,33 @@ class CalendarWindow(QMainWindow):
                         txt = re.sub(r'accent_color:\s*"[^"]*"', f'accent_color: "{accent_state["hex"]}"', txt, count=1)
                     else:
                         txt = re.sub(r"(compact_ui:\s*(?:true|false))", rf'\1\n  accent_color: "{accent_state["hex"]}"', txt, count=1)
-                    show_coursework_val = "true" if coursework_tab_cb.isChecked() else "false"
-                    if re.search(r"show_coursework:\s*(true|false)", txt):
-                        txt = re.sub(r"show_coursework:\s*(true|false)", f"show_coursework: {show_coursework_val}", txt, count=1)
-                    else:
-                        txt = re.sub(r'(accent_color:\s*"[^"]*")', rf'\1\n  show_coursework: {show_coursework_val}', txt, count=1)
+                    def _put(key: str, value, after: str) -> None:
+                        """Rewrite `key: value` in place, or add it under `after`.
+
+                        Keys added by later versions are missing from configs
+                        written by earlier ones, so every setting needs a place
+                        to land rather than being silently dropped.
+                        """
+                        nonlocal txt
+                        literal = ("true" if value else "false") if isinstance(value, bool) else (
+                            f'"{value}"' if isinstance(value, str) else str(value))
+                        pattern = rf"{key}:\s*(?:true|false|\d+|\"[^\"]*\")"
+                        if re.search(pattern, txt):
+                            txt = re.sub(pattern, f"{key}: {literal}", txt, count=1)
+                        else:
+                            txt = re.sub(rf"({after})", rf"\1\n  {key}: {literal}", txt, count=1)
+
+                    _ui_anchor = r'accent_color:\s*"[^"]*"'
+                    _put("show_coursework", coursework_tab_cb.isChecked(), _ui_anchor)
+                    _put("show_workout", workout_tab_cb.isChecked(), _ui_anchor)
+                    _put("show_timer", timer_tab_cb.isChecked(), _ui_anchor)
+                    _put("show_thinking", thinking_cb.isChecked(), _ui_anchor)
+                    _put("thinking_auto_open", bool(thinking_open_combo.currentData()), _ui_anchor)
+                    _put("thinking_corner", thinking_corner_combo.currentData(), _ui_anchor)
+
+                    _audio_anchor = r"max_recording_sec:\s*\d+"
+                    _put("review_before_send", review_cb.isChecked(), _audio_anchor)
+                    _put("review_seconds", review_spin.value(), _audio_anchor)
                     # Event keywords — write as YAML flow list
                     kw_yaml = _yaml.dump(raw_keywords, default_flow_style=True).strip()
                     txt = re.sub(r"event_keywords:\s*\[.*?\]", f"event_keywords: {kw_yaml}", txt, count=1)
@@ -1320,9 +1680,22 @@ class CalendarWindow(QMainWindow):
                     self._config.ui.compact_ui = compact_cb.isChecked()
                     self._config.ui.accent_color = accent_state["hex"]
                     self._config.ui.show_coursework = coursework_tab_cb.isChecked()
-                    self._view_btn_coursework.setVisible(self._config.ui.show_coursework)
-                    if not self._config.ui.show_coursework and self._view_mode == "coursework":
-                        self._set_view("month")
+                    self._config.ui.show_workout = workout_tab_cb.isChecked()
+                    self._config.ui.show_timer = timer_tab_cb.isChecked()
+                    self._config.ui.show_thinking = thinking_cb.isChecked()
+                    self._config.ui.thinking_auto_open = thinking_open_combo.currentData()
+                    self._config.ui.thinking_corner = thinking_corner_combo.currentData()
+                    self._config.audio.review_before_send = review_cb.isChecked()
+                    self._config.audio.review_seconds = review_spin.value()
+                    if not self._config.ui.show_thinking:
+                        self._thinking.hide()
+                    self._position_thinking()
+                    self._update_trace_chip()
+                    for _mode in ("coursework", "workout", "timer"):
+                        _visible = getattr(self._config.ui, f"show_{_mode}")
+                        getattr(self, f"_view_btn_{_mode}").setVisible(_visible)
+                        if not _visible and self._view_mode == _mode:
+                            self._set_view("month")
                     _styles.set_accent(accent_state["hex"])
                     self._apply_ui_config()
                     self._apply_theme(self._dark)
@@ -1336,7 +1709,8 @@ class CalendarWindow(QMainWindow):
             
         save_btn.clicked.connect(save_config)
         btn_layout.addWidget(save_btn)
-        layout.addLayout(btn_layout)
+        btn_layout.setContentsMargins(18, 10, 18, 14)
+        outer.addLayout(btn_layout)
         
         dialog.exec()
 

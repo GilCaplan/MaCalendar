@@ -86,7 +86,7 @@ Hotkey (Ctrl+J) or Mic Button
 |---------|--------------|
 | `llm_engine` | `ollama` (default), `openai`, `gemini`, `claude` |
 | `ollama.timeout_seconds` | `60` default; scales dynamically +15s per extra detected action |
-| `verify_fast_path` | `true` (default) — enables background LLM judgment of rule-parser results |
+| `verify_fast_path` | `false` (default) — background LLM judgment of rule-parser results. Turned off 2026-08-28: across four audit runs it proposed a correction on ~96% of commands and fixed none, while adding ~14 s to every command. |
 | `audio.silence_duration_sec` | `6.0` — stops 6s after speech ends (or on keyword) |
 | `whisper.beam_size` | `1` — greedy decode, ~4× faster than beam_size=5 |
 | `tts` | `voice`, `rate`, `mute` |

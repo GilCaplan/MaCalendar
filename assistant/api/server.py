@@ -227,6 +227,30 @@ def _hhmm(v) -> str:
     return f"{int(m.group(1)):02d}:{m.group(2)}" if m else ""
 
 
+def _at_times(text: str) -> set[str]:
+    """Times introduced by "at" — i.e. when something starts.
+
+    "dinner with Danny at 8 pm" states a start. The model sometimes reads such a
+    time as the END and invents an earlier start, booking 18:00–20:00 for an
+    8 pm dinner. Knowing which times were spoken as "at X" lets that be undone.
+    """
+    import re as _re
+    out: set[str] = set()
+    t = text.lower().replace(".", ":")
+    for m in _re.finditer(r"\bat\s+(?:around\s+|about\s+|roughly\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm|a:m|p:m)?\b", t):
+        h, mm, ap = int(m.group(1)), m.group(2) or "00", (m.group(3) or "").replace(":", "")
+        if h > 24:
+            continue
+        if ap == "pm" and h < 12:
+            h += 12
+        if ap == "am" and h == 12:
+            h = 0
+        out.add(f"{h % 24:02d}:{mm}")
+        if not ap and h <= 12:                      # bare hour: both readings
+            out.add(f"{(h + 12) % 24:02d}:{mm}")
+    return out
+
+
 def _spoken_times(text: str) -> set[str]:
     """All clock times a command mentions, as HH:MM (both 12h readings for bare hours)."""
     import re as _re
@@ -494,6 +518,11 @@ def create_app() -> Flask:
             except RuleParserSkip as e:
                 logger.debug("📱 Rule parser skipped: %s", e)
                 trace.step(RULE, "Rule parser", f"Skipped: {e}")
+            except Exception as e:
+                # Any other rule-parser failure is a bug in the fast path, not a
+                # reason to lose the command: hand it to the LLM instead.
+                logger.warning("📱 Rule parser error (falling back to the LLM): %s", e)
+                trace.step(RULE, "Rule parser", f"Failed, using the LLM: {e}", ok=False)
 
         if parsed is None:
             try:
@@ -654,6 +683,20 @@ def create_app() -> Flask:
             resp["memory_id"] = memory_id
         if verify_token:
             resp["verify_token"] = verify_token
+
+        # Let the Mac's own window show what the phone just did. The GUI is a
+        # separate process, so it can't see this Trace directly.
+        try:
+            from assistant import trace_bus
+            trace_bus.publish(trace.source, resp["trace"], {
+                "transcript": transcript,
+                "message": response_msg,
+                "actions": action_names,
+                "corrections": corrections,
+                "memory_id": memory_id,
+            })
+        except Exception:
+            pass
         return resp
 
     def _uncertain(transcript: str) -> list:
@@ -682,6 +725,11 @@ def create_app() -> Flask:
                           r"(?:next|this|coming)\s+(?:week\s+(?:on\s+)?)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)s?|"
                           r"(monday|tuesday|wednesday|thursday|friday|saturday|sunday)s?|"
                           r"(?:on\s+)?the\s+(\d{1,2})(?:st|nd|rd|th)\b)")
+        # "the 12th of August" / "August the 12th" name a month explicitly — the
+        # bare-ordinal branch below must not claim those and resolve them to the
+        # next 12th of *any* month, overriding what was said.
+        _MONTHS = ("january|february|march|april|may|june|july|august|september|"
+                   "october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec")
         for m in pat.finditer(t):
             full = m.group(1)
             if full == "day after tomorrow":
@@ -699,6 +747,9 @@ def create_app() -> Flask:
                 wd = _WD[m.group(3)]; days = (wd - today.weekday()) % 7
                 out.append((today + _dt.timedelta(days=days)).isoformat())
             elif m.group(4):                                   # the 19th → this month if not past, else next
+                around = t[max(0, m.start() - 18):m.end() + 18]
+                if _re.search(rf"\b(?:{_MONTHS})\b", around):
+                    continue                                   # a month was named — leave it to the parser
                 n = int(m.group(4)); d0 = today
                 for _ in range(3):
                     try:
@@ -744,8 +795,10 @@ def create_app() -> Flask:
         tl = transcript.lower()
         recur = next((v for pat, v in _RECUR_WORDS if _re.search(pat, tl)), None)
         n_events = sum(1 for n, _ in parsed if n == "create_event")
+        n_todos = sum(1 for n, _ in parsed if n == "create_todo")
         rel = _relative_dates(transcript)
         ev_idx = 0
+        td_idx = 0
         for name, intent in parsed:
             if name in ("update_event", "delete_event"):
                 # "the event I just made / the last one" → anaphor, never a title guess.
@@ -778,14 +831,64 @@ def create_app() -> Flask:
                     try:
                         dd = _dt.date.fromisoformat(d)
                         if dd < today:
-                            bump = dd
-                            while bump < today:
-                                bump += _dt.timedelta(days=7 if (today - dd).days <= 7 else 1)
+                            # Roll a past date forward without throwing away what was
+                            # actually said. Within a week back it's a weekday that has
+                            # just gone ("Monday" said on Wednesday) → same weekday next
+                            # week. Further back the speaker named a calendar day, so
+                            # keep that day and month and move to next year.
+                            # (This used to advance one day at a time, which always
+                            # landed on today: "August 12 2026" became today's date.)
+                            if (today - dd).days <= 7:
+                                bump = dd
+                                while bump < today:
+                                    bump += _dt.timedelta(days=7)
+                            else:
+                                try:
+                                    bump = dd.replace(year=dd.year + 1)
+                                except ValueError:              # 29 Feb → 28 Feb
+                                    bump = dd.replace(year=dd.year + 1, day=28)
                             intent.date = bump.isoformat(); fixes.append(f"date {d}→{intent.date} (was in the past)")
                     except ValueError:
                         pass
                 if recur and not getattr(intent, "recurrence", None):
                     intent.recurrence = recur; fixes.append(f"recurrence={recur}")
+                # A time the speaker introduced with "at" is when the thing
+                # STARTS. The model sometimes files it as the end and invents an
+                # earlier start — "dinner with Danny at 8 pm" came out 18:00–20:00.
+                _at = _at_times(transcript)
+                _s, _e = getattr(intent, "start_time", None), getattr(intent, "end_time", None)
+                if _e and _e in _at and _s and _s not in _at:
+                    try:
+                        _hh, _mm = map(int, _e.split(":"))
+                        intent.start_time = _e
+                        intent.end_time = f"{(_hh + 1) % 24:02d}:{_mm:02d}"
+                        fixes.append(f"start {_s}→{_e} ('at {_e}' is when it starts)")
+                    except ValueError:
+                        pass
+
+                # A morning word next to the event's own name means morning, even
+                # when the model came back with an afternoon time: "Shacharit at
+                # 6:30" was booked at 18:30. The guard below only ever declined to
+                # ADD pm — it never took one away.
+                _title_l = (getattr(intent, "title", "") or "").lower()
+                # Scoped to this event's OWN title: one "Shacharit" in a sentence
+                # must not drag every other event in it back twelve hours.
+                _morning = re.search(r"\b(?:shacharit|breakfast|sunrise)\b", _title_l)
+                _st = getattr(intent, "start_time", None) or ""
+                if _morning and re.fullmatch(r"1[2-9]:\d{2}|2[0-3]:\d{2}", _st):
+                    _hh, _mm = map(int, _st.split(":"))
+                    _am = f"{_hh - 12:02d}:{_mm:02d}"
+                    if f"{_hh - 12}:{_mm:02d}" in transcript or str(_hh - 12) in transcript:
+                        intent.start_time = _am
+                        _end = getattr(intent, "end_time", None)
+                        if _end:
+                            try:
+                                _eh, _em = map(int, _end.split(":"))
+                                intent.end_time = f"{max(0, _eh - 12):02d}:{_em:02d}"
+                            except ValueError:
+                                pass
+                        fixes.append(f"{_st}→{_am} (a morning event)")
+
                 pm = _bare_hour_pm(transcript, getattr(intent, "start_time", None) or "")
                 if pm and not re.search(r"\b(?:morning|breakfast|shacharit|am)\b", tl):
                     old_s, old_e = intent.start_time, getattr(intent, "end_time", None)
@@ -801,6 +904,23 @@ def create_app() -> Flask:
                 t = (getattr(intent, "title", "") or "").strip().lower()
                 if n_events > 0 and t in _JUNK_TITLES and any(n2 == "create_todo" for n2, _ in parsed):
                     fixes.append(f"dropped junk event '{t}'"); continue
+            elif name == "create_todo":
+                # Deadlines got no deterministic date resolution at all — only
+                # events did — so "due next monday" was left as whatever the
+                # model guessed, which was a Sunday. Same treatment as events:
+                # one date phrase applies to every task, N phrases for N tasks
+                # are positional.
+                due = getattr(intent, "due_date", None)
+                if rel and not recur:
+                    if len(set(rel)) == 1:
+                        want = rel[0]
+                    else:
+                        want = rel[td_idx] if td_idx < len(rel) and len(rel) == n_todos else None
+                    if want and due != want:
+                        fixes.append(f"due {due}→{want} ('{transcript[:30]}…' says so)")
+                        intent.due_date = want
+                td_idx += 1
+
             out.append((name, intent))
         return out, fixes
 
@@ -990,6 +1110,30 @@ def create_app() -> Flask:
             threshold=body.get("threshold"),
         )
         return jsonify(store.to_dict())
+
+    @app.get("/changes")
+    def changes_token():
+        """A cheap "has anything changed?" token for the phone to poll.
+
+        Refetching every list on a timer is expensive, so the phone did it only
+        every 30 s — meaning something added on the Mac could sit invisible on
+        the phone for half a minute. This returns a few bytes derived from the
+        database file, so the phone can ask every couple of seconds and only do
+        real work when the answer changes. The Mac's own window has always
+        watched the same mtime (CalendarWindow._auto_refresh_if_db_changed);
+        this is that signal, shared.
+
+        The database runs in rollback-journal mode, so every commit touches the
+        main file — mtime and size together move on any write.
+        """
+        import os as _os
+        path = get_db().path
+        try:
+            st = _os.stat(path)
+            token = f"{st.st_mtime:.6f}-{st.st_size}"
+        except OSError:
+            token = "0"
+        return jsonify({"token": token})
 
     @app.get("/vocab/onboarding")
     def vocab_onboarding_get():
@@ -1250,6 +1394,28 @@ def create_app() -> Flask:
     def timers_sessions(tid: int):
         return jsonify({"sessions": [_session_out(x) for x in reversed(get_db().get_timer_sessions(tid))]})
 
+    @app.post("/timers/<int:tid>/sessions")
+    def timers_session_create(tid: int):
+        """Log a session that already happened ("I forgot to start the timer").
+
+        The Mac's Timer tab has had this as "Log past time…" since the feature
+        landed; this is the same thing for the phone. `start_time` is required,
+        `end_time` optional (omit it to create a session that is still running).
+        """
+        b = request.get_json(silent=True) or {}
+        start = str(b.get("start_time") or "").strip()
+        if not start:
+            return jsonify({"error": "start_time is required", "code": 400}), 400
+        db = get_db()
+        sid = db.create_timer_session(tid, title=str(b.get("title") or ""), start_time=start)
+        end = str(b.get("end_time") or "").strip()
+        if end:
+            db.update_timer_session(sid, end_time=end)
+        session = next((x for x in db.get_timer_sessions(tid) if x["id"] == sid), None)
+        if session is None:
+            return jsonify({"error": "Not found", "code": 404}), 404
+        return jsonify(_session_out(session)), 201
+
     @app.patch("/timer_sessions/<int:sid>")
     def timer_session_update(sid: int):
         b = request.get_json(silent=True) or {}
@@ -1434,6 +1600,17 @@ def create_app() -> Flask:
             return jsonify({"error": "Event not found", "code": 404}), 404
         if db.is_event_locked(event):
             return jsonify({"error": "Event is read-only (synced source)", "code": 403}), 403
+
+        # Optional optimistic-concurrency check. A client that edited the event
+        # while disconnected sends the `updated_at` it was working from; if the
+        # event has moved on since (someone changed it on the Mac meanwhile),
+        # refuse rather than silently overwriting their work, and hand back what
+        # the event looks like now so the client can say so.
+        base = str(data.pop("base_updated_at", "") or "")
+        if base and str(event.get("updated_at") or "") not in ("", base):
+            return jsonify({"error": "Event changed on the Mac since you edited it",
+                            "code": 409, "current": event}), 409
+
         db.update_event(event_id, **data)
         if data.get("recurrence"):
             db.promote_to_series(event_id)
@@ -1494,8 +1671,18 @@ def create_app() -> Flask:
     def todo_update(todo_id: int):
         data = request.get_json(silent=True) or {}
         db = get_db()
-        if db.get_todo(todo_id) is None:
+        todo = db.get_todo(todo_id)
+        if todo is None:
             return jsonify({"error": "Todo not found", "code": 404}), 404
+
+        # Same optimistic-concurrency check as events: a client that edited this
+        # while disconnected quotes the version it worked from, and is told when
+        # the task has moved on rather than overwriting the newer change.
+        base = str(data.pop("base_updated_at", "") or "")
+        if base and str(todo.get("updated_at") or "") not in ("", base):
+            return jsonify({"error": "Task changed on the Mac since you edited it",
+                            "code": 409, "current": todo}), 409
+
         db.update_todo(todo_id, **data)
         return jsonify({"id": todo_id})
 

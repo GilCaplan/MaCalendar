@@ -502,8 +502,73 @@ def _normalize_time(value: str) -> str:
     return value
 
 
-def _pick_business_hour_time(values: list[dict]) -> str | None:
-    """Given multiple time values (AM/PM ambiguity), prefer PM for hours 1–7."""
+# "7am" / "7a.m." — an hour with the meridiem written against it. The datetime
+# recogniser sometimes hands back BOTH readings for these (it separates cleanly
+# on "7 am"), and preferring PM then turned an explicitly stated morning time
+# into an evening one.
+# "rename the meeting with Tal to robotics sync" — everything between the verb
+# and the final "to"/"as" is the event, the rest is its new name.
+# "the meeting with Ima", "lunch with Tal" — noun chunking stops at the noun and
+# drops the person, leaving a bare "meeting" that matches ANY meeting. Since the
+# name is the only thing distinguishing one from another, keep it.
+_WITH_WHOM_RE = re.compile(
+    r"\b{title}\s+(with\s+[A-Za-z][\w'’-]*(?:\s+(?:and|&)\s+[A-Za-z][\w'’-]*)?)",
+    re.IGNORECASE,
+)
+
+
+def _extend_title_with_whom(span_text: str, title: str) -> str:
+    """Append a trailing "with <name>" to a matched title, when one was said."""
+    if not title:
+        return title
+    pattern = _WITH_WHOM_RE.pattern.format(title=re.escape(title.strip()))
+    m = re.search(pattern, span_text, re.IGNORECASE)
+    if not m:
+        return title
+    return f"{title.strip()} {m.group(1).strip()}"
+
+
+# "with the dentist" / "with my mum" — the word after "with" is a determiner, so
+# the person's name never made it in. Half a phrase ("meeting with the") is a
+# worse needle than the bare word, so it does not count as naming anybody.
+_NOT_A_NAME_AFTER_WITH = frozenset({
+    "the", "a", "an", "my", "our", "your", "his", "her", "their", "its",
+    "this", "that", "these", "those", "some", "any", "each", "both",
+    "him", "them", "me", "us", "someone", "somebody", "everyone", "everybody",
+})
+
+
+def _title_with_person(span_text: str, title: str) -> tuple[str, bool]:
+    """Return the title plus any trailing "with <name>", and whether one was found.
+
+    The flag is what lets a caller tell "meeting with Ima" (identifies one
+    event) from a bare "meeting" (identifies any of them).
+    """
+    if not title:
+        return title, False
+    extended = _extend_title_with_whom(span_text, title)
+    if extended.strip().lower() == title.strip().lower():
+        return title, False
+    whom = extended[len(title.strip()):].split()      # ["with", "<name>", ...]
+    if len(whom) < 2 or whom[1].lower() in _NOT_A_NAME_AFTER_WITH:
+        return title, False
+    return extended, True
+
+
+_RENAME_RE = re.compile(
+    r"\b(?:rename|re-?name)\s+(?:the\s+|my\s+)?(.+?)\s+(?:to|as)\s+(.+?)\s*$",
+    re.IGNORECASE,
+)
+
+_SAID_MERIDIEM = re.compile(r"\b(\d{1,2})(?::(\d{2}))?\s*([ap])\.?\s?m\.?\b", re.I)
+
+
+def _pick_business_hour_time(values: list[dict], said: str = "") -> str | None:
+    """Given multiple time values (AM/PM ambiguity), prefer PM for hours 1–7.
+
+    `said` is the text the values came from: when it states am or pm outright
+    that wins, because there is no ambiguity left to resolve.
+    """
     if not values:
         return None
     times = [v.get("value", "") or v.get("timex", "") for v in values]
@@ -517,6 +582,15 @@ def _pick_business_hour_time(values: list[dict]) -> str | None:
             pass
     if not parsed:
         return None
+
+    # Honour an explicitly spoken meridiem before guessing.
+    for m in _SAID_MERIDIEM.finditer(said or ""):
+        hour12 = int(m.group(1)) % 12
+        wanted = hour12 + (12 if m.group(3).lower() == "p" else 0)
+        for h, t in parsed:
+            if h == wanted:
+                return t
+
     # Prefer PM (12-19) for business hours ambiguity; else just take highest hour
     pm_options = [(h, t) for h, t in parsed if 12 <= h <= 20]
     if pm_options:
@@ -549,7 +623,12 @@ def _extract_temporal(span_text: str, today: datetime.date) -> dict:
         for res in recognized:
             span = (res.start, res.end + 1)
             result["spans"].append(span)
-            for wren in res.resolution.get("values", []):
+            # The recogniser can return a match with no resolution at all —
+            # "from 9 to 10" is one — and dereferencing it raised an
+            # AttributeError that escaped the parser entirely, killing the
+            # command instead of falling back to the LLM.
+            resolution = getattr(res, "resolution", None) or {}
+            for wren in resolution.get("values", []):
                 timex_type = wren.get("type", "")
 
                 if timex_type == "datetime" and not result["date"]:
@@ -577,8 +656,8 @@ def _extract_temporal(span_text: str, today: datetime.date) -> dict:
 
                 elif timex_type == "time" and not result["start_time"]:
                     # May have multiple values (AM/PM ambiguity) — pick business hours
-                    all_time_vals = res.resolution.get("values", [])
-                    result["start_time"] = _pick_business_hour_time(all_time_vals)
+                    all_time_vals = (getattr(res, "resolution", None) or {}).get("values", [])
+                    result["start_time"] = _pick_business_hour_time(all_time_vals, span_text)
 
                 elif timex_type == "timerange":
                     start_v = wren.get("start", "")
@@ -601,14 +680,15 @@ def _extract_temporal(span_text: str, today: datetime.date) -> dict:
         if recognized:
             all_dt_vals = [
                 v for res in recognized
-                for v in res.resolution.get("values", [])
+                for v in (getattr(res, "resolution", None) or {}).get("values", [])
                 if v.get("type") == "datetime"
             ]
             if len(all_dt_vals) >= 2 and result["start_time"] is None:
                 # Re-pick based on business hours
                 result["start_time"] = _pick_business_hour_time(
                     [{"value": v.get("value", "").split(" ")[-1] if " " in v.get("value", "") else ""}
-                     for v in all_dt_vals]
+                     for v in all_dt_vals],
+                    span_text,
                 )
             if all_dt_vals and result["date"] is None:
                 raw = all_dt_vals[0].get("value", "")
@@ -689,12 +769,32 @@ def _extract_temporal(span_text: str, today: datetime.date) -> dict:
             result["start_time"] = f"{h:02d}:{mins}"
             result["_source"] = "regex_fallback"
 
+    # An end time before the start means the range crossed noon without saying so
+    # ("lunch from 12 to 1" → 12:00–01:00, a negative hour). Push the end into
+    # the afternoon, unless it was explicitly stated as a morning time.
+    if result["start_time"] and result["end_time"]:
+        try:
+            _sh, _sm = (int(x) for x in result["start_time"].split(":"))
+            _eh, _em = (int(x) for x in result["end_time"].split(":"))
+            _end_is_am = re.search(r"to\s+\d{1,2}(?::\d{2})?\s*a\.?\s?m\.?(?![a-z])",
+                                   span_text, re.IGNORECASE)
+            if (_eh * 60 + _em) <= (_sh * 60 + _sm) and _eh < 12 and not _end_is_am:
+                result["end_time"] = f"{_eh + 12:02d}:{_em:02d}"
+        except (ValueError, AttributeError):
+            pass
+
     # Post-process: business-hours PM heuristic for recognizer-extracted times.
     # "2 o'clock", "3 o'clock" etc. without explicit AM context are almost
     # always afternoon in a calendar/meeting context — convert 1–7 to PM.
     if result["start_time"]:
-        _has_am = re.search(
-            r"\b(am|a\.m\.|morning|midnight)\b", span_text, re.IGNORECASE
+        # "7am" has no word boundary between the digit and "am", and "a.m."
+        # doesn't end on one either — so the old \b(am|a\.m\.)\b test missed both
+        # and turned an explicitly stated 7am into 19:00. Match the meridiem
+        # against the digit instead, and treat morning words as morning.
+        _has_am = (
+            re.search(r"\d\s*a\.?\s?m\.?(?![a-z])", span_text, re.IGNORECASE)
+            or re.search(r"\b(morning|midnight|breakfast|shacharit|sunrise)\b",
+                         span_text, re.IGNORECASE)
         )
         if not _has_am:
             try:
@@ -1010,7 +1110,7 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
             #   "on D"  → match_date        (which day to look on)
             # Generic calendar words ("event", "appointment") are not real titles here.
             if title and title.lower() not in _CALENDAR_SIGNALS:
-                slots["match_title"] = title
+                slots["match_title"] = _extend_title_with_whom(span.text, title)
             if temporal.get("date"):
                 slots["match_date"] = temporal["date"]
             if temporal.get("start_time"):
@@ -1051,19 +1151,35 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
                         new_title_from_rename = _clean_title(pobj_chunks[0].text)
                         break
 
+            # The dependency route above is fragile: "rename gym to workout"
+            # yields nothing, and "with Tal" or a two-word name derails it
+            # ("… to robotics sync" came back as just "robotics"). When the
+            # sentence says "rename X to/as Y" outright, read it literally.
+            if not new_title_from_rename:
+                m = _RENAME_RE.search(span.text)
+                if m:
+                    old_name, new_name = m.group(1).strip(), m.group(2).strip()
+                    # "rename the meeting to 3pm" is a reschedule, not a rename.
+                    _probe = _extract_temporal(new_name, datetime.date.today())
+                    if new_name and not _probe.get("start_time"):
+                        new_title_from_rename = _clean_title(new_name)
+                        if old_name:
+                            slots["match_title"] = _extend_title_with_whom(span.text, _clean_title(old_name))
+
             if new_title_from_rename:
                 slots["new_title"] = new_title_from_rename
-                root_chunks = [
-                    c for c in span.noun_chunks
-                    if c.root.dep_ == "ROOT" and not any(_in_temporal(t, temporal_spans) for t in c)
-                ]
-                if root_chunks:
-                    slots["match_title"] = _clean_title(root_chunks[0].text)
-                elif title and title != new_title_from_rename:
-                    slots["match_title"] = title
+                if not slots.get("match_title"):
+                    root_chunks = [
+                        c for c in span.noun_chunks
+                        if c.root.dep_ == "ROOT" and not any(_in_temporal(t, temporal_spans) for t in c)
+                    ]
+                    if root_chunks:
+                        slots["match_title"] = _extend_title_with_whom(span.text, _clean_title(root_chunks[0].text))
+                    elif title and title != new_title_from_rename:
+                        slots["match_title"] = _extend_title_with_whom(span.text, title)
             else:
                 if title:
-                    slots["match_title"] = title
+                    slots["match_title"] = _extend_title_with_whom(span.text, title)
 
             if temporal.get("start_time"):
                 slots["new_start_time"] = temporal["start_time"]
@@ -1073,10 +1189,18 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
                 slots["new_date"] = temporal["date"]
 
     elif action_name == "delete_event":
-        # Only use title if it's a real event name, not a generic calendar word
-        # (e.g. "delete the event at 6pm" — "event" is a placeholder, not the title)
-        if title and title.lower() not in _CALENDAR_SIGNALS:
-            slots["match_title"] = title
+        # A bare calendar word is a placeholder rather than a name ("delete the
+        # event at 6pm"), and deleting on one could take any event — so it is
+        # dropped and the date/time has to identify the event instead.
+        #
+        # Noun chunking, though, reduces "the meeting with Ima" to that same bare
+        # "meeting", and there the person is the whole identity of the event.
+        # Keep such a title once the name is recovered, and only then: with no
+        # name to pin it down, empty slots (answered with "I couldn't find …")
+        # beat deleting somebody else's meeting.
+        titled, names_a_person = _title_with_person(span.text, title)
+        if titled and (names_a_person or titled.lower() not in _CALENDAR_SIGNALS):
+            slots["match_title"] = titled
         if temporal.get("date"):
             slots["match_date"] = temporal["date"]
         if temporal.get("start_time"):
@@ -1143,9 +1267,9 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
         if subject_chunks:
             candidate = _clean_title(subject_chunks[0].text)
             if candidate:
-                slots["match_title"] = candidate
+                slots["match_title"] = _extend_title_with_whom(span.text, candidate)
         elif title:
-            slots["match_title"] = title
+            slots["match_title"] = _extend_title_with_whom(span.text, title)
 
         if action_name == "update_todo":
             span_lower = span.text.lower()

@@ -99,6 +99,12 @@ class AudioConfig(BaseModel):
     # segment is parsed independently (faster — avoids LLM for multi-event).
     # Recommended: "next event"  e.g. "meeting at 10am next event lunch at noon"
     event_separator: str = ""
+    # After recording, show a Redo / Add more / Send bar for `review_seconds`
+    # before sending (the same bar the iPhone shows). A spoken stop word
+    # ("execute", "done", …) always sends immediately — saying it *is* the
+    # decision, so there's nothing left to wait for.
+    review_before_send: bool = True
+    review_seconds: int = 3
 
 
 class TTSConfig(BaseModel):
@@ -130,6 +136,16 @@ class UIConfig(BaseModel):
     compact_ui: bool = False
     accent_color: str = "#f5a524"  # hex; brand accent used app-wide (Settings → Accent Color)
     show_coursework: bool = True  # toggled off from Settings to hide the Coursework tab entirely
+    # Same per-tab switches the phone has (iOS Settings › Tabs)
+    show_workout: bool = True
+    show_timer: bool = True
+    # Show the assistant's stage-by-stage "thinking" panel while a voice
+    # command runs (the Mac twin of iOS Settings › Voice › Show assistant thinking)
+    show_thinking: bool = True
+    # How the thinking panel behaves when a command starts: True pops it open,
+    # False leaves it closed and just shows the "Thinking…" chip by the mic.
+    thinking_auto_open: bool = True
+    thinking_corner: Literal["bottom-right", "bottom-left", "top-right", "top-left"] = "bottom-right"
 
 
 class ApiConfig(BaseModel):
@@ -170,7 +186,12 @@ class AppConfig(BaseModel):
     claude: ClaudeConfig = ClaudeConfig()
     microsoft: Optional[MicrosoftConfig] = None
     confirmation_level: int = 1
-    verify_fast_path: bool = True   # background LLM check of rule-parser results
+    # Background LLM re-check of rule-parser results. OFF by default: across four
+    # audit runs it proposed a correction on ~96% of commands and fixed none
+    # (2026-08-28: 78 proposed of 81, 0 fixed, 0 broken). It is what turns a
+    # 6.7 s answer into a ~21 s settled one, for a second LLM call per command.
+    # Set true to bring it back — it still only advises unless self_check_apply.
+    verify_fast_path: bool = False
     # Apply the self-check's corrections automatically? The 2026-08-26 audit showed the
     # verifier proposes changes on ~98% of commands and fixes fewer than it breaks, so
     # by default it is ADVISORY: logged + shown in the trace, not applied.

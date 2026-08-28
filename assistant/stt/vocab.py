@@ -30,7 +30,10 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-VOCAB_PATH = os.path.expanduser("~/.assistant_tools/vocab.json")
+# MACALENDAR_VOCAB lets tests/audits point at a scratch file, the same way
+# MACALENDAR_DB and MACALENDAR_MEMORY_DB do — without it, anything that
+# exercised the pipeline wrote into the user's real personal vocabulary.
+VOCAB_PATH = os.environ.get("MACALENDAR_VOCAB") or os.path.expanduser("~/.assistant_tools/vocab.json")
 
 DEFAULT_THRESHOLD = 0.80   # difflib ratio; 1.0 = identical
 MIN_FUZZY_LEN = 3          # never fuzzy-match tokens shorter than this

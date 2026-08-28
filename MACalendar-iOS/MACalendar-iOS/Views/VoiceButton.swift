@@ -212,10 +212,15 @@ struct VoiceButton: View {
             status = .idle
             return
         }
-        guard settings.reviewBeforeSend else { send(audioData); return }
+        // A spoken stop word ("execute", "submit", …) is the decision itself —
+        // send at once rather than making the user wait out the countdown they
+        // just talked their way past. Silence or a mic tap still offers the bar.
+        guard settings.reviewBeforeSend, recorder.stopReason != .stopWord else {
+            send(audioData); return
+        }
         pendingAudio = audioData
         status = .review
-        sendCountdown = 4
+        sendCountdown = 3
         countdownTask?.cancel()
         countdownTask = Task { @MainActor in
             while sendCountdown > 0 {
@@ -257,7 +262,14 @@ struct VoiceButton: View {
                                    ms: 0, atMs: 0, ok: true)]
                 showThinking = true
             }
+            let sentAt = Date()
+            // Hold a background assertion for the whole command — leaving the app
+            // mid-command used to get the process suspended, which killed the
+            // stream and froze the timeline half-written.
+            let assertion = BackgroundAssertion()
+            assertion.begin("voice-command-ui")
             Task {
+                defer { assertion.end() }
                 do {
                     // Always stream: the Mac reports each stage as it happens, so the
                     // calendar can refresh the moment an action executes (first version)
@@ -275,16 +287,74 @@ struct VoiceButton: View {
                     }
                     await handleResponse(response)
                 } catch {
-                    if settings.showThinking {
-                        steps.append(TraceStep(stage: "error", title: "Couldn't reach the Mac",
-                                               detail: error.localizedDescription, ms: 0,
-                                               atMs: steps.last?.atMs ?? 0, ok: false))
-                        finished = true
-                    }
-                    status = .idle
+                    await recoverLostStream(error, sentAt: sentAt, audio: audioData)
                 }
             }
         }
+    }
+
+    /// The stream died before the result arrived — almost always because iOS
+    /// suspended the app after it went to the background. The Mac does the work
+    /// server-side, so the command itself usually completed: say so, refresh the
+    /// calendar, and wait for the record to show up in the command log rather
+    /// than reporting a failure that didn't happen.
+    @MainActor
+    private func recoverLostStream(_ error: Error, sentAt: Date, audio: Data) async {
+        // Never reached the Mac at all? Then nothing ran: keep the recording and
+        // replay it when the Mac is back, rather than polling for a result that
+        // cannot exist and then reporting a failure.
+        if (try? await api.health()) == nil {
+            LocalStore.shared.enqueueVoice(audio)
+            if settings.showThinking {
+                steps.append(TraceStep(stage: "verify", title: "Saved for later",
+                                       detail: "Your Mac isn't reachable. This command is queued and will "
+                                               + "run — and tell you what it did — as soon as it's back.",
+                                       ms: 0, atMs: steps.last?.atMs ?? 0, ok: true))
+            }
+            finished = true
+            finishedAt = Date()
+            status = .idle
+            return
+        }
+
+        if settings.showThinking {
+            steps.append(TraceStep(stage: "verify", title: "Lost the live connection",
+                                   detail: "The Mac keeps running the command — checking what it did…",
+                                   ms: 0, atMs: steps.last?.atMs ?? 0, ok: true))
+        }
+        api.burstRefresh()
+        api.requestRefresh()
+        onRefresh?("both")
+
+        // While the app is suspended this loop is suspended too, so in practice
+        // it resolves the moment the user comes back.
+        for attempt in 0..<12 {
+            if attempt > 0 { try? await Task.sleep(nanoseconds: 2_000_000_000) }
+            if let ran = await api.recentCommands(limit: 3)
+                .first(where: { $0.ts >= sentAt.timeIntervalSince1970 - 1 }) {
+                if settings.showThinking {
+                    steps.append(TraceStep(stage: "done", title: "Finished on the Mac",
+                                           detail: ran.result.isEmpty ? ran.transcript : ran.result,
+                                           ms: 0, atMs: steps.last?.atMs ?? 0, ok: true))
+                }
+                finished = true
+                finishedAt = Date()
+                api.burstRefresh()
+                api.requestRefresh()
+                onRefresh?("both")
+                status = .idle
+                return
+            }
+        }
+
+        if settings.showThinking {
+            steps.append(TraceStep(stage: "error", title: "Couldn't reach the Mac",
+                                   detail: error.localizedDescription, ms: 0,
+                                   atMs: steps.last?.atMs ?? 0, ok: false))
+        }
+        finished = true
+        finishedAt = Date()
+        status = .idle
     }
 
     private func handleResponse(_ response: VoiceResponse) async {

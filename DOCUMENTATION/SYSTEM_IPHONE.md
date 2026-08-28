@@ -24,7 +24,7 @@ iPhone offline mode:
     mc_pending.json  — queued writes to replay on reconnect
 ```
 
-The Mac app and iPhone API server run simultaneously. The iPhone never touches the DB directly — all reads/writes go through the API. When offline, reads serve from local cache and writes are queued; the queue is replayed automatically when the Mac is reachable (on app foreground).
+The Mac app and iPhone API server run simultaneously. The iPhone never touches the DB directly — all reads/writes go through the API. When offline, reads serve from local cache and writes are queued; the queue is replayed automatically when the Mac is reachable.
 
 ---
 
@@ -106,7 +106,11 @@ The app works fully without a Mac connection:
 
 An orange **"Offline — N changes pending sync"** banner appears at the top when the Mac is unreachable.
 
-**Auto-sync**: Every time the app comes to the foreground (`scenePhase == .active`), it calls `syncPending()` which replays all queued writes to the Mac in order and refreshes the local cache. Temp IDs are replaced by real server IDs on next refresh.
+**Auto-sync**: the queue is replayed when the app comes to the foreground, on the poll loop, and the moment a request first succeeds again after the Mac was away. Replaying a create rewrites any later queued entry that still refers to the row by the temporary negative id it was given offline, so "add a task offline, tick it off, reconnect" keeps the tick. An entry the Mac actively refuses (404 for a row that is gone, 409 for a stale edit) is dropped rather than left to block everything behind it.
+
+**Polling**: `GET /changes` returns a few bytes derived from the database file. The phone asks every 2 s and only refetches when the answer changes, with a full refresh every 30 s regardless — so a change made on the Mac reaches the phone in about two seconds.
+
+**Voice offline**: a command recorded while the Mac is unreachable is kept on the phone, shown in a banner and a Queued commands screen, replayed on reconnect, and its result delivered as a local notification.
 
 ---
 
@@ -132,7 +136,7 @@ Launched automatically alongside the Mac app via `Launch Calendar.command`.
 
 `parse` is `"rule"` / `"hybrid"` / `"llm"` / `"error"` — how the command was processed.
 
-`verify_token` is only present when `parse == "rule"`. iOS should poll `/voice/verify/<token>` every 4 s (up to ~40 s) to check if the background LLM verifier found a correction. Response:
+`verify_token` is only present when `parse == "rule"` **and** `verify_fast_path` is on — it is off by default since 2026-08-28 (it proposed a correction on ~96% of commands and fixed none), so in the shipped configuration no token is issued and there is nothing to poll. iOS should poll `/voice/verify/<token>` every 4 s (up to ~40 s) to check if the background LLM verifier found a correction. Response:
 - `{"pending": true}` — LLM still running, retry
 - `{"ok": true}` — rule parser was correct, no action needed
 - `{"ok": false, "severity": "minor", "patch": {...}, "speech": "...", "refresh": "..."}` — iOS patches the existing record via REST + plays `speech`

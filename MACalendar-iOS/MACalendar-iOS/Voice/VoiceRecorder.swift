@@ -20,6 +20,12 @@ class VoiceRecorder: NSObject, ObservableObject {
     /// Called on the main actor when a stop word or silence ends the recording.
     var onAutoStop: (() -> Void)?
 
+    /// Why the recording ended. A spoken stop word is an explicit "go", so the
+    /// caller sends immediately instead of showing the Redo / Add more / Send
+    /// countdown — saying "execute" and then waiting three seconds is silly.
+    enum StopReason { case manual, stopWord, silence }
+    private(set) var stopReason: StopReason = .manual
+
     private let engine = AVAudioEngine()
     private var pcm = Data()
     // Touched from the audio tap thread; the converter is created before the tap starts.
@@ -47,7 +53,7 @@ class VoiceRecorder: NSObject, ObservableObject {
 
     func start(resume: Bool = false) {
         if !resume { pcm = Data(); liveText = "" }
-        heardSpeech = false; stopping = false; lastVoiceAt = Date()
+        heardSpeech = false; stopping = false; lastVoiceAt = Date(); stopReason = .manual
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.record, mode: .measurement, options: [.duckOthers])
         try? session.setActive(true, options: .notifyOthersOnDeactivation)
@@ -59,10 +65,14 @@ class VoiceRecorder: NSObject, ObservableObject {
         // On-device stop-word listener (optional — recording works without it)
         if stopWordsEnabled, SFSpeechRecognizer.authorizationStatus() == .authorized {
             let rec = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
-            if let rec, rec.isAvailable {
+            // On-device only. Where the device can't recognise locally, skip the
+            // stop-word listener entirely rather than letting Apple's servers see
+            // the audio — the whole point is that the Mac is the only peer.
+            // Recording (and the stop button) work fine without it.
+            if let rec, rec.isAvailable, rec.supportsOnDeviceRecognition {
                 let req = SFSpeechAudioBufferRecognitionRequest()
                 req.shouldReportPartialResults = true
-                if rec.supportsOnDeviceRecognition { req.requiresOnDeviceRecognition = true }
+                req.requiresOnDeviceRecognition = true
                 req.taskHint = .dictation
                 recognizer = rec; request = req
                 task = rec.recognitionTask(with: req) { [weak self] result, _ in
@@ -92,7 +102,7 @@ class VoiceRecorder: NSObject, ObservableObject {
             Task { @MainActor in
                 guard let self, self.isRecording, self.heardSpeech, self.silenceStopSeconds > 0 else { return }
                 if Date().timeIntervalSince(self.lastVoiceAt) >= self.silenceStopSeconds {
-                    self.autoStop()
+                    self.autoStop(reason: .silence)
                 }
             }
         }
@@ -124,14 +134,15 @@ class VoiceRecorder: NSObject, ObservableObject {
         let strong = ["execute", "submit", "confirm"]
         if stopWords.contains(last) {
             if strong.contains(last) || Date().timeIntervalSince(lastVoiceAt) > 0.9 {
-                autoStop()
+                autoStop(reason: .stopWord)
             }
         }
     }
 
-    private func autoStop() {
+    private func autoStop(reason: StopReason) {
         guard isRecording, !stopping else { return }
         stopping = true
+        stopReason = reason
         onAutoStop?()
     }
 

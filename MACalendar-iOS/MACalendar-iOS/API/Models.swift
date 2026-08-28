@@ -2,7 +2,9 @@ import Foundation
 import UIKit
 
 struct CalendarEvent: Identifiable, Codable, Equatable {
-    let id: Int
+    // var, not let: a row created offline carries a temporary negative id
+    // that is rewritten to the Mac's real id once the create syncs.
+    var id: Int
     var title: String
     var date: String
     var startTime: String
@@ -19,6 +21,9 @@ struct CalendarEvent: Identifiable, Codable, Equatable {
     var source: String? = nil
     var externalSource: String? = nil
     var externalId: String? = nil
+    /// The Mac's version stamp. Quoted back on an edit so the Mac can refuse a
+    /// change made from a copy that has since been edited there.
+    var updatedAt: String? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, title, date, color, recurrence, attendees, location, description, source
@@ -27,6 +32,7 @@ struct CalendarEvent: Identifiable, Codable, Equatable {
         case recurrenceEnd  = "recurrence_end"
         case externalSource = "external_source"
         case externalId     = "external_id"
+        case updatedAt      = "updated_at"
     }
 
     var displayTime: String {
@@ -38,7 +44,9 @@ struct CalendarEvent: Identifiable, Codable, Equatable {
 }
 
 struct Todo: Identifiable, Codable, Equatable {
-    let id: Int
+    // var, not let: a row created offline carries a temporary negative id
+    // that is rewritten to the Mac's real id once the create syncs.
+    var id: Int
     var title: String
     var list: String
     var completed: Int
@@ -46,9 +54,14 @@ struct Todo: Identifiable, Codable, Equatable {
     var dueDate: String
     var tags: [String]
 
+    /// The Mac's version stamp, quoted back on an edit so a change made from a
+    /// stale copy is refused rather than silently overwriting a newer one.
+    var updatedAt: String? = nil
+
     enum CodingKeys: String, CodingKey {
         case id, title, list, completed, priority, tags
         case dueDate = "due_date"
+        case updatedAt = "updated_at"
     }
 
     init(id: Int, title: String, list: String, completed: Int,
@@ -397,6 +410,8 @@ struct MemoryExample: Codable, Identifiable {
 }
 
 struct UnreviewedResponse: Codable { let examples: [MemoryExample]; let count: Int }
+/// GET /memory — same rows, no `count` field.
+struct MemoryListResponse: Codable { let examples: [MemoryExample] }
 
 /// What a voice command actually put in the calendar (server joins example → record).
 struct ResolvedRecord: Codable, Equatable {

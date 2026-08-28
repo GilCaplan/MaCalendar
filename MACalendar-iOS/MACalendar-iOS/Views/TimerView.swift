@@ -89,6 +89,8 @@ struct TimerView: View {
     @State private var counters: [TallyCounter] = []
     @State private var showArchived = false
     @State private var showAdd = false
+    @State private var editingTimer: WorkTimer?
+    @State private var editingCounter: TallyCounter?
     @State private var error: String?
     @State private var now = Date()
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -107,6 +109,8 @@ struct TimerView: View {
                             Button { Task { await api.updateTimer(t.id, ["archived": t.archived == 1 ? 0 : 1]); await load() } } label: {
                                 Label(t.archived == 1 ? "Unarchive" : "Archive", systemImage: "archivebox")
                             }.tint(.orange)
+                            Button { editingTimer = t } label: { Label("Edit", systemImage: "pencil") }
+                                .tint(.blue)
                         }
                     }
                 }
@@ -120,6 +124,8 @@ struct TimerView: View {
                             Button { Task { await api.updateCounter(c.id, ["archived": c.archived == 1 ? 0 : 1]); await load() } } label: {
                                 Label(c.archived == 1 ? "Unarchive" : "Archive", systemImage: "archivebox")
                             }.tint(.orange)
+                            Button { editingCounter = c } label: { Label("Edit", systemImage: "pencil") }
+                                .tint(.blue)
                         }
                     }
                 }
@@ -132,6 +138,12 @@ struct TimerView: View {
             .navigationTitle("Timer")
             .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { showAdd = true } label: { Image(systemName: "plus") } } }
             .sheet(isPresented: $showAdd) { NewTimerSheet(onSaved: { await load() }) }
+            .sheet(item: $editingTimer) { t in
+                NewTimerSheet(onSaved: { await load() }, editingTimer: t)
+            }
+            .sheet(item: $editingCounter) { c in
+                NewTimerSheet(onSaved: { await load() }, editingCounter: c)
+            }
             .task { await load() }
             .refreshable { await load() }
             .onReceive(tick) { d in
@@ -253,6 +265,7 @@ struct TimerSessionsView: View {
     let timer: WorkTimer
     var onChange: () async -> Void
     @State private var sessions: [TimerSession] = []
+    @State private var showLog = false
 
     var body: some View {
         List {
@@ -263,6 +276,13 @@ struct TimerSessionsView: View {
                     LabeledContent("Rate", value: TimerFormat.money(timer.hourlyRate, timer.currency) + "/h")
                     LabeledContent("Earned", value: TimerFormat.money(timer.earnings, timer.currency))
                 }
+            }
+            Section {
+                Button { showLog = true } label: {
+                    Label("Log past time…", systemImage: "clock.badge.checkmark")
+                }
+            } footer: {
+                Text("For time you worked without starting the timer.")
             }
             Section("Sessions") {
                 ForEach(sessions) { s in
@@ -286,6 +306,9 @@ struct TimerSessionsView: View {
         .navigationTitle(timer.title)
         .task { await load() }
         .refreshable { await load() }
+        .sheet(isPresented: $showLog) {
+            LogPastTimeSheet(timer: timer) { await load(); await onChange() }
+        }
     }
 
     private func when(_ s: TimerSession) -> String {
@@ -306,6 +329,11 @@ private struct NewTimerSheet: View {
     @EnvironmentObject var settings: AppSettings
     @Environment(\.dismiss) private var dismiss
     var onSaved: () async -> Void
+    /// Set to edit an existing row instead of creating one. The Mac's Timer tab
+    /// has always had "Edit timer settings"; the phone could only create and
+    /// delete, so a wrong hourly rate meant starting over.
+    var editingTimer: WorkTimer? = nil
+    var editingCounter: TallyCounter? = nil
 
     @State private var kind = 0
     @State private var title = ""
@@ -315,10 +343,14 @@ private struct NewTimerSheet: View {
     @State private var color: Color = .blue
     @State private var saving = false
 
+    private var isEditing: Bool { editingTimer != nil || editingCounter != nil }
+
     var body: some View {
         NavigationView {
             Form {
-                Picker("Type", selection: $kind) { Text("Timer").tag(0); Text("Counter").tag(1) }.pickerStyle(.segmented)
+                if !isEditing {
+                    Picker("Type", selection: $kind) { Text("Timer").tag(0); Text("Counter").tag(1) }.pickerStyle(.segmented)
+                }
                 Section {
                     TextField(kind == 0 ? "e.g. Netivim" : "e.g. Pushups", text: $title)
                     HStack {
@@ -331,7 +363,8 @@ private struct NewTimerSheet: View {
                     ColorPicker("Colour", selection: $color, supportsOpacity: false)
                 }
             }
-            .navigationTitle(kind == 0 ? "New timer" : "New counter")
+            .navigationTitle(isEditing ? "Edit \(kind == 0 ? "timer" : "counter")"
+                                       : (kind == 0 ? "New timer" : "New counter"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
@@ -340,7 +373,26 @@ private struct NewTimerSheet: View {
                         .disabled(saving || title.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
-            .onAppear { color = settings.accentColor }
+            .onAppear(perform: prefill)
+        }
+    }
+
+    private func prefill() {
+        if let t = editingTimer {
+            kind = 0
+            title = t.title
+            rate = t.hourlyRate == 0 ? "" : String(t.hourlyRate)
+            currency = t.currency
+            maxMinutes = t.maxSessionMinutes == 0 ? "" : String(t.maxSessionMinutes)
+            color = Color(hex: t.color) ?? settings.accentColor
+        } else if let c = editingCounter {
+            kind = 1
+            title = c.title
+            rate = c.pricePerUnit == 0 ? "" : String(c.pricePerUnit)
+            currency = c.currency
+            color = Color(hex: c.color) ?? settings.accentColor
+        } else {
+            color = settings.accentColor
         }
     }
 
@@ -348,6 +400,16 @@ private struct NewTimerSheet: View {
         saving = true; defer { saving = false }
         let hex = color.hexString ?? settings.accentColorHex
         let r = Double(rate.replacingOccurrences(of: ",", with: ".")) ?? 0
+        if let t = editingTimer {
+            await api.updateTimer(t.id, ["title": title, "hourly_rate": r, "currency": currency,
+                                         "color": hex, "max_session_minutes": Int(maxMinutes) ?? 0])
+            await onSaved(); dismiss(); return
+        }
+        if let c = editingCounter {
+            await api.updateCounter(c.id, ["title": title, "price_per_unit": r,
+                                           "currency": currency, "color": hex])
+            await onSaved(); dismiss(); return
+        }
         let ok: Bool
         if kind == 0 {
             ok = await api.createTimer(["title": title, "hourly_rate": r, "currency": currency, "color": hex,
@@ -356,5 +418,72 @@ private struct NewTimerSheet: View {
             ok = await api.createCounter(["title": title, "price_per_unit": r, "currency": currency, "color": hex])
         }
         if ok { await onSaved(); dismiss() }
+    }
+}
+
+/// "I worked but forgot to start the timer" — the phone's version of the Mac's
+/// Log past time…. Pick the day and the two times; the Mac stores it as an
+/// ordinary finished session.
+private struct LogPastTimeSheet: View {
+    @EnvironmentObject var api: APIClient
+    @Environment(\.dismiss) private var dismiss
+    let timer: WorkTimer
+    var onSaved: () async -> Void
+
+    @State private var day = Date()
+    @State private var start = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
+    @State private var end = Calendar.current.date(bySettingHour: 10, minute: 0, second: 0, of: Date()) ?? Date()
+    @State private var title = ""
+    @State private var saving = false
+
+    /// The two times are read on the chosen day, so a session never lands on
+    /// today just because the pickers carry today's date component.
+    private func combine(_ time: Date) -> Date {
+        let cal = Calendar.current
+        let d = cal.dateComponents([.year, .month, .day], from: day)
+        let t = cal.dateComponents([.hour, .minute], from: time)
+        return cal.date(from: DateComponents(year: d.year, month: d.month, day: d.day,
+                                             hour: t.hour, minute: t.minute)) ?? time
+    }
+
+    private var seconds: Double { max(0, combine(end).timeIntervalSince(combine(start))) }
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section {
+                    DatePicker("Day", selection: $day, displayedComponents: .date)
+                    DatePicker("From", selection: $start, displayedComponents: .hourAndMinute)
+                    DatePicker("To", selection: $end, displayedComponents: .hourAndMinute)
+                    TextField("What were you doing? (optional)", text: $title)
+                } footer: {
+                    if seconds > 0 {
+                        Text(TimerFormat.duration(seconds)
+                             + (timer.hourlyRate > 0
+                                ? " · " + TimerFormat.money(seconds / 3600 * timer.hourlyRate, timer.currency)
+                                : ""))
+                    } else {
+                        Text("The end time has to be after the start time.").foregroundColor(.red)
+                    }
+                }
+            }
+            .navigationTitle("Log past time")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(saving ? "Saving…" : "Save") { Task { await save() } }
+                        .disabled(saving || seconds <= 0)
+                }
+            }
+        }
+    }
+
+    private func save() async {
+        saving = true; defer { saving = false }
+        if await api.logTimerSession(timer.id, start: combine(start), end: combine(end), title: title) {
+            await onSaved()
+            dismiss()
+        }
     }
 }
