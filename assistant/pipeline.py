@@ -11,6 +11,8 @@ import threading
 import time
 from typing import Callable, List, Optional
 
+import numpy as _np
+
 from assistant.actions import ActionRegistry
 from assistant.audio.capture import AudioCapture
 from assistant.config import AppConfig
@@ -42,6 +44,10 @@ STATUS_LISTENING = "listening"
 STATUS_PROCESSING = "processing"
 STATUS_DONE = "done"
 STATUS_ERROR = "error"
+# Recording finished, waiting on Redo / Add more / Send (mirrors the iPhone's
+# review bar). Skipped when a stop word ended the recording — saying "execute"
+# means go, not "go in three seconds".
+STATUS_REVIEW = "review"
 
 # Two button presses within this window while listening = cancel recording
 _DOUBLE_TAP_SEC = 0.4
@@ -82,6 +88,10 @@ class Pipeline:
         self._tts = Speaker(config.tts)
 
         self.status_queue: queue.Queue[str] = queue.Queue()
+        # Stage-by-stage "thinking" trace for the Mac ThinkingPanel — the same
+        # timeline the iPhone renders from /voice's `trace`. Items are dicts:
+        # {"type": "begin"} | {"type": "step", ...TraceStep} | {"type": "result", ...}
+        self.trace_queue: queue.Queue[dict] = queue.Queue()
         self._busy = threading.Event()
         self._trigger_lock = threading.Lock()
         self._phase = STATUS_IDLE  # tracks current stage for button re-press logic
@@ -89,6 +99,8 @@ class Pipeline:
         self._queued: Optional[str] = None
         self._last_transcript: str = ""  # retained for combine mode
         self._recording_cancelled = threading.Event()  # set to discard current recording
+        self._review_event = threading.Event()        # UI answered the review bar
+        self._review_choice: Optional[str] = None     # "send" | "redo" | "add" | "cancel"
         self._last_listen_press: float = 0.0  # monotonic time of last press during STATUS_LISTENING
 
         self.on_auth_expired: Optional[Callable[[], None]] = None
@@ -119,7 +131,11 @@ class Pipeline:
         """
         with self._trigger_lock:
             if self._busy.is_set():
-                if self._phase == STATUS_LISTENING:
+                if self._phase == STATUS_REVIEW:
+                    # Mic press while the Redo / Add more / Send bar is up means
+                    # "send it" — same as tapping the mic on the phone.
+                    self.review_choice("send")
+                elif self._phase == STATUS_LISTENING:
                     now = time.monotonic()
                     if now - self._last_listen_press < _DOUBLE_TAP_SEC:
                         # Double-tap: cancel recording, discard audio, go idle
@@ -148,9 +164,51 @@ class Pipeline:
             self._busy.set()
         threading.Thread(target=self._run, daemon=True).start()
 
+    def review_choice(self, choice: str) -> None:
+        """Answer the Redo / Add more / Send bar (called from the UI thread)."""
+        self._review_choice = choice
+        self._review_event.set()
+
     def stop_recording(self) -> None:
         """Stop the current recording immediately (button re-press or external call)."""
         self._audio.stop()
+
+    def retry_pending(self, pending_id: int) -> bool:
+        """Re-run a command that was parked because the LLM was unreachable.
+
+        The phone has had this via POST /pending/<id>/retry; this is the same
+        thing for the Mac's own queue. Returns False if the assistant is busy
+        or the id is unknown.
+        """
+        from assistant.intent.memory import get_memory
+        row = get_memory().get_pending(pending_id)
+        if row is None:
+            return False
+        with self._trigger_lock:
+            if self._busy.is_set():
+                self._set_status(STATUS_PROCESSING, "Busy — try the retry again in a moment")
+                return False
+            self._busy.set()
+
+        def _work() -> None:
+            try:
+                trace = self._trace_begin()
+                trace.step("memory", "Retrying", row["transcript"])
+                self._phase = STATUS_PROCESSING
+                self._set_status(STATUS_PROCESSING, "🔁 Retrying queued command…")
+                if self._process_transcript(row["transcript"], trace, time.perf_counter()):
+                    get_memory().resolve_pending(pending_id, "done")
+                else:
+                    get_memory().bump_pending(pending_id)   # still stuck — leave it queued
+            except Exception as exc:
+                logger.error("🖥️ Pending retry failed: %s", exc)
+                self._set_status(STATUS_ERROR, "⚠️ Retry failed")
+            finally:
+                self._phase = STATUS_IDLE
+                self._busy.clear()
+
+        threading.Thread(target=_work, daemon=True).start()
+        return True
 
     def health_check(self) -> dict:
         return {"ollama": self._parser.health_check()}
@@ -183,16 +241,22 @@ class Pipeline:
 
     def _run_pipeline(self, combine: bool = False) -> None:
         t_start = time.perf_counter()
+        from assistant.trace import STT, VOCAB, ERROR
+        trace = self._trace_begin()
 
         # 1. Listen
         self._recording_cancelled.clear()
         self._phase = STATUS_LISTENING
         listen_hint = "🔗 Listening to add on… (say 'done' or tap twice to cancel)" if combine else "🎙 Listening… (tap to stop & re-record, tap twice to cancel)"
         self._set_status(STATUS_LISTENING, listen_hint)
+        trace.step(STT, "Listening",
+                   "Adding on to the last command…" if combine
+                   else "Recording — say a stop word or tap the mic to finish.")
 
         # Stream-checker: transcribe growing buffer every 2.5 s to detect stop words.
         # Cache the last result so we can reuse it and skip the final full transcription.
         _last_partial: List[str] = ["", 0.0]  # [transcript, timestamp]
+        _stopped_early = [False]               # True when a stop word ended it
         _stream_stop_re = _build_stop_re(self.config.audio.stop_phrases)
 
         def stream_checker(audio_buffer) -> None:
@@ -204,6 +268,7 @@ class Pipeline:
                 _last_partial[1] = time.perf_counter()
                 if _stream_stop_re.search(partial):
                     logger.info("🖥️ Early termination detected in stream: %s", partial)
+                    _stopped_early[0] = True
                     self.stop_recording()
             except Exception as e:
                 logger.error("Stream checker error: %s", e)
@@ -222,6 +287,8 @@ class Pipeline:
                 self._tts.speak("Microphone error. Please check your audio settings.")
                 logger.error("🖥️ Audio capture error: %s", e)
                 self._set_status(STATUS_ERROR, "⚠️ Microphone error")
+            trace.step(ERROR, "Microphone error", msg, ok=False)
+            self._trace_result()
             return
 
         t_recorded = time.perf_counter()
@@ -231,41 +298,91 @@ class Pipeline:
         if self._recording_cancelled.is_set():
             self._recording_cancelled.clear()
             self._set_status(STATUS_IDLE, "")
+            trace.step(ERROR, "Cancelled", "Recording discarded — you tapped twice.", ok=False)
+            self._trace_result()
             return
 
-        # 2. Transcribe — reuse stream-checker result if it's fresh (within 3 s)
-        self._phase = STATUS_PROCESSING
-        partial_text, partial_ts = _last_partial
-        reuse = partial_text and (t_recorded - partial_ts) < 3.0
+        # 2. Transcribe, then (unless a stop word ended it) offer Redo / Add more
+        #    / Send — the same bar the iPhone shows. Transcribing first means the
+        #    bar can show what was actually heard, and that a spoken stop word is
+        #    detected reliably even for utterances shorter than one stream-checker
+        #    interval.
+        while True:
+            self._phase = STATUS_PROCESSING
+            partial_text, partial_ts = _last_partial
+            reuse = partial_text and (t_recorded - partial_ts) < 3.0
 
-        if reuse:
-            transcript = partial_text
-            logger.info("🖥️ ⏱ Transcription: reused stream-checker result (0.00s)")
-        else:
-            self._set_status(STATUS_PROCESSING, "⏳ Transcribing…")
-            try:
-                transcript = self._stt.transcribe(audio)
-            except AssistantError as e:
-                self._tts.speak("I couldn't understand that. Please try again.")
-                logger.error("🖥️ STT error: %s", e)
-                self._set_status(STATUS_ERROR, "⚠️ Transcription failed")
+            if reuse:
+                transcript = partial_text
+                logger.info("🖥️ ⏱ Transcription: reused stream-checker result (0.00s)")
+            else:
+                self._set_status(STATUS_PROCESSING, "⏳ Transcribing…")
+                try:
+                    transcript = self._stt.transcribe(audio)
+                except AssistantError as e:
+                    self._tts.speak("I couldn't understand that. Please try again.")
+                    logger.error("🖥️ STT error: %s", e)
+                    self._set_status(STATUS_ERROR, "⚠️ Transcription failed")
+                    trace.step(ERROR, "Transcription failed", str(e), ok=False)
+                    self._trace_result()
+                    return
+                logger.info("🖥️ ⏱ Transcription: %.2fs", time.perf_counter() - t_recorded)
+
+            if not transcript or len(transcript.strip()) < 3:
+                self._tts.speak("I didn't catch that.")
+                self._set_status(STATUS_IDLE, "")
+                trace.step(ERROR, "Nothing heard", "The recording was silent.", ok=False)
+                self._trace_result()
                 return
-            logger.info("🖥️ ⏱ Transcription: %.2fs", time.perf_counter() - t_recorded)
 
-        if not transcript or len(transcript.strip()) < 3:
-            self._tts.speak("I didn't catch that.")
-            self._set_status(STATUS_IDLE, "")
-            return
+            # A spoken stop word ("execute", "finish", …) is an explicit "go now":
+            # strip it and send without the review pause.
+            said_stop_word = bool(_stream_stop_re.search(transcript)) or _stopped_early[0]
+            transcript = _strip_stop_keyword(transcript, self.config.audio.stop_phrases)
 
-        # Strip stop keywords from the tail of the transcript
-        transcript = _strip_stop_keyword(transcript, self.config.audio.stop_phrases)
+            if combine or said_stop_word or not self.config.audio.review_before_send:
+                break
+
+            choice = self._await_review(transcript)
+            if choice == "send":
+                break
+            if choice == "cancel":
+                self._set_status(STATUS_IDLE, "❌ Cancelled")
+                trace.step(ERROR, "Cancelled", "You discarded the recording.", ok=False)
+                self._trace_result()
+                return
+
+            # Redo replaces the audio, Add more appends to it; either way we
+            # transcribe again from the top of this loop.
+            self._phase = STATUS_LISTENING
+            self._set_status(STATUS_LISTENING,
+                             "🎙 Listening again…" if choice == "redo" else "🎙 Go on…")
+            _last_partial[0], _last_partial[1] = "", 0.0
+            _stopped_early[0] = False
+            try:
+                more = self._audio.record_until_silence(
+                    streaming_callback=stream_checker, streaming_interval_sec=2.5)
+            except AudioCaptureError as e:
+                logger.error("🖥️ Audio capture error on %s: %s", choice, e)
+                self._set_status(STATUS_ERROR, "⚠️ Microphone error")
+                trace.step(ERROR, "Microphone error", str(e), ok=False)
+                self._trace_result()
+                return
+            audio = more if choice == "redo" else _np.concatenate([audio, more])
+            t_recorded = time.perf_counter()
+
+        _raw_transcript = transcript
+        trace.step(STT, "Heard", transcript)
 
         # Personal vocabulary auto-correct (names / non-English words)
         from assistant.stt.vocab import apply_vocab
         transcript, _vocab_fixes = apply_vocab(transcript, source="mac")
+        _corrections = [{"from": c.original, "to": c.replacement} for c in _vocab_fixes]
         if _vocab_fixes:
             self._set_status(STATUS_PROCESSING,
                              "Fixed: " + ", ".join(f"{c.original}→{c.replacement}" for c in _vocab_fixes))
+            trace.step(VOCAB, "Vocabulary",
+                       ", ".join(f"{c['from']} → {c['to']}" for c in _corrections))
 
         # Combine mode: prepend previous transcript so the LLM sees one unified request
         if combine and self._last_transcript:
@@ -283,6 +400,25 @@ class Pipeline:
         snippet = transcript[:60] + ("…" if len(transcript) > 60 else "")
         self._set_status(STATUS_PROCESSING, f'💭 "{snippet}"')
 
+        self._process_transcript(transcript, trace, t_start,
+                                 raw_transcript=_raw_transcript, corrections=_corrections)
+
+    def _process_transcript(self, transcript: str, trace, t_start: float, *,
+                            raw_transcript: str = "", corrections: list | None = None) -> bool:
+        """Parse → confirm → execute → remember, for an already-known transcript.
+
+        Returns True when at least one action actually executed.
+
+        Split out of _run_pipeline so the same path serves both a fresh
+        recording and a retry of a command that was parked while the LLM
+        was offline (the phone has had that retry since the API server
+        gained /pending/<id>/retry).
+        """
+        from assistant.trace import (
+            RULE, LLM, VALIDATE, EXECUTE, DONE, ERROR,
+        )
+        _raw_transcript = raw_transcript or transcript
+        _corrections = corrections or []
         # 3. Parse intent(s)
         t_llm = time.perf_counter()
         action_list = None
@@ -296,6 +432,8 @@ class Pipeline:
             segments = [s.strip() for s in raw_segs if s.strip()]
             if len(segments) > 1:
                 logger.info("🖥️ Separator %r split transcript into %d segments", separator, len(segments))
+                trace.step(RULE, "Split into segments",
+                           f"{len(segments)} commands separated by “{separator}”")
                 all_actions: list[tuple[str, object]] = []
                 for seg in segments:
                     seg_actions = self._parse_segment(seg)
@@ -325,44 +463,78 @@ class Pipeline:
                         [n for n, _ in action_list],
                         time.perf_counter() - t_llm,
                     )
+                    trace.step(RULE, "Rule parser",
+                               f"Matched {', '.join(n for n, _ in action_list)} "
+                               f"— confidence {rule_result.confidence:.0%}, no LLM needed")
                 else:
                     _parse_method = "hybrid"
                     logger.info(
                         "🖥️ Rule partial handoff: confidence=%.2f missing=%s",
                         rule_result.confidence, rule_result.missing_slots,
                     )
+                    trace.step(RULE, "Rule parser",
+                               f"Confidence {rule_result.confidence:.0%}"
+                               + (f", missing {', '.join(rule_result.missing_slots)}"
+                                  if rule_result.missing_slots else "")
+                               + " — handing the gaps to the LLM")
                     self._set_status(STATUS_PROCESSING, "💭 Clarifying with AI…")
                     try:
                         action_list = self._parser.parse_with_context(transcript, rule_result)
+                        trace.step(LLM, f"LLM ({self.config.llm_engine})",
+                                   "Filled in what the rules couldn't")
                     except (LLMUnavailableError, OllamaUnavailableError):
                         pass  # handled below
             except RuleParserSkip as e:
                 logger.debug("🖥️ Rule parser skipped: %s", e)
+                trace.step(RULE, "Rule parser", f"Skipped: {e}")
+            except Exception as e:
+                # Any other rule-parser failure is a bug in the fast path, not a
+                # reason to lose the command: hand it to the LLM instead.
+                logger.warning("🖥️ Rule parser error (falling back to the LLM): %s", e)
+                trace.step(RULE, "Rule parser", f"Failed, using the LLM: {e}", ok=False)
 
         if action_list is None:
             _parse_method = "llm"
             self._set_status(STATUS_PROCESSING, "💭 Thinking…")
             try:
                 action_list = self._parser.parse(transcript)
+                trace.step(LLM, f"LLM ({self.config.llm_engine})",
+                           f"Parsed {', '.join(n for n, _ in action_list) or 'nothing'} "
+                           f"in {getattr(self._parser, 'last_llm_ms', 0)} ms")
             except (LLMUnavailableError, OllamaUnavailableError):
                 engine = self.config.llm_engine
                 self._tts.speak(f"The {engine} assistant is offline. Please check your connection and try again.")
                 self._set_status(STATUS_ERROR, f"⚠️ {engine.title()} offline")
-                return
+                pending_id = self._queue_pending(transcript, f"{engine} offline")
+                trace.step(ERROR, f"{engine.title()} offline",
+                           "Couldn't reach the language model — saved to retry later.", ok=False)
+                self._trace_result(transcript=transcript, corrections=_corrections,
+                                   pending_id=pending_id,
+                                   uncertain_words=self._uncertain_words(transcript))
+                return False
             except (LLMTimeoutError, OllamaTimeoutError):
                 engine = self.config.llm_engine
                 self._tts.speak(f"The {engine} assistant is taking too long to respond.")
                 self._set_status(STATUS_ERROR, f"⚠️ {engine.title()} timeout")
-                return
+                pending_id = self._queue_pending(transcript, f"{engine} timeout")
+                trace.step(ERROR, f"{engine.title()} timeout",
+                           "The language model didn't answer in time — saved to retry later.", ok=False)
+                self._trace_result(transcript=transcript, corrections=_corrections,
+                                   pending_id=pending_id,
+                                   uncertain_words=self._uncertain_words(transcript))
+                return False
             except ParseError as e:
                 self._tts.speak("I couldn't understand that request.")
                 logger.error("🖥️ Parse error: %s", e)
                 self._set_status(STATUS_ERROR, "⚠️ Couldn't parse request")
+                trace.step(ERROR, "Parse failed", str(e), ok=False)
+                self._trace_result(transcript=transcript, corrections=_corrections,
+                                   uncertain_words=self._uncertain_words(transcript))
                 self._append_scenario_bug(transcript, issue_type="parse_error", details=str(e))
                 threading.Thread(target=self._append_nlu_log, args=(
                     transcript, _parse_method, False, [], [], False, f"parse_error: {e}",
                 ), daemon=True).start()
-                return
+                return False
 
         logger.info("🖥️ ⏱ Parse total: %.2fs", time.perf_counter() - t_llm)
 
@@ -373,12 +545,20 @@ class Pipeline:
         if not valid:
             self._tts.speak("I'm not sure what you'd like me to do.")
             self._set_status(STATUS_IDLE, "")
+            trace.step(EXECUTE, "Unknown intent",
+                       "Nothing recognisable came back from the parser.", ok=False)
+            self._trace_result(transcript=transcript, corrections=_corrections,
+                               message="I'm not sure what you'd like me to do.",
+                               uncertain_words=self._uncertain_words(transcript))
             self._append_scenario_bug(transcript, issue_type="unknown_intent",
                                       details="LLM returned no recognisable action.")
             threading.Thread(target=self._append_nlu_log, args=(
                 transcript, _parse_method, False, [], [], False, "unknown_intent",
             ), daemon=True).start()
-            return
+            return False
+
+        trace.step(VALIDATE, "Validated",
+                   f"{len(valid)} action(s): " + ", ".join(n for n, _ in valid))
 
         # 4. Confirm + execute each action
         t_exec = time.perf_counter()
@@ -392,11 +572,14 @@ class Pipeline:
             elif not self._confirmer.check(action_name, intent):
                 self._tts.speak("Cancelled.")
                 self._set_status(STATUS_IDLE, "")
-                return
+                trace.step(ERROR, "Cancelled", f"You declined {action_name.replace('_', ' ')}.", ok=False)
+                self._trace_result(transcript=transcript, corrections=_corrections, message="Cancelled.")
+                return False
 
             action_cls = self.registry.get(action_name)
             if action_cls is None:
                 logger.warning("🖥️ Unknown action '%s'", action_name)
+                trace.step(EXECUTE, action_name, "No such action registered", ok=False)
                 continue
 
             try:
@@ -408,18 +591,24 @@ class Pipeline:
                     _memory_records.append(("event", _ctx_mem.last_event_id, action_name))
                 if _ctx_mem.last_todo_id != _td_before and _ctx_mem.last_todo_id is not None:
                     _memory_records.append(("todo", _ctx_mem.last_todo_id, action_name))
+                trace.step(EXECUTE, action_name.replace("_", " ").title(), result_text or "done")
                 logger.info("🖥️ Action '%s' complete: %s", action_name, result_text)
             except AuthExpiredError as e:
                 self._tts.speak("Microsoft login expired. Use Re-authenticate in the menu.")
                 logger.error("🖥️ Auth expired: %s", e)
                 self._set_status(STATUS_ERROR, "⚠️ Auth expired")
+                trace.step(ERROR, "Microsoft login expired",
+                           "Use Re-authenticate in the menu.", ok=False)
+                self._trace_result(transcript=transcript, corrections=_corrections)
                 if self.on_auth_expired:
                     self.on_auth_expired()
-                return
+                return False
             except AssistantError as e:
                 self._tts.speak("Something went wrong. Check the logs for details.")
                 logger.error("🖥️ Action error: %s", e)
                 self._set_status(STATUS_ERROR, "⚠️ Action failed")
+                trace.step(EXECUTE, action_name.replace("_", " ").title(), f"Failed: {e}", ok=False)
+                self._trace_result(transcript=transcript, corrections=_corrections)
                 self._append_scenario_bug(transcript, issue_type="action_failed",
                                           details=f"Action {action_name!r} raised: {e}",
                                           extra={"Intent": str(intent)})
@@ -427,7 +616,7 @@ class Pipeline:
                     transcript, _parse_method, _fast_path_rule_result is not None,
                     [action_name], [], False, f"action_failed: {e}",
                 ), daemon=True).start()
-                return
+                return False
         logger.info("🖥️ ⏱ Execute: %.2fs", time.perf_counter() - t_exec)
 
         if results:
@@ -435,9 +624,11 @@ class Pipeline:
             # Clarify-only responses don't touch the calendar — go straight to idle
             is_clarify = all(name == "clarify" for name, _ in valid)
             if is_clarify:
+                trace.step(DONE, "Answered", f"{_parse_method} path · {trace.total_ms} ms total")
+                self._trace_result(transcript=transcript, corrections=_corrections, message=summary)
                 self._tts.speak_sync(summary)
                 self._set_status(STATUS_IDLE, "")
-                return
+                return True   # a clarification answer is a handled command
             # Check if any executed action requested a UI view switch
             view_switch = next(
                 (getattr(self.registry.get(n), "view_switch", None) for n, _ in valid
@@ -492,11 +683,13 @@ class Pipeline:
             ).start()
 
         # Command memory (few-shot personalisation + feedback linking)
+        _memory_id = None
         if valid and results and getattr(self.config.nlu, "memory_enabled", True):
             try:
                 from assistant.intent.memory import get_memory
-                get_memory().record(
-                    transcript=transcript, source="mac", parse_path=_parse_method,
+                _memory_id = get_memory().record(
+                    transcript=transcript, raw_transcript=_raw_transcript,
+                    source="mac", parse_path=_parse_method,
                     actions=valid, result=" ".join(results), success=True,
                     llm_ms=getattr(self._parser, "last_llm_ms", 0),
                     total_ms=int((time.perf_counter() - t_start) * 1000),
@@ -505,9 +698,17 @@ class Pipeline:
             except Exception as e:
                 logger.warning("🖥️ Memory record failed: %s", e)
 
+        trace.step(DONE, "Done", f"{_parse_method} path · {trace.total_ms} ms total")
+        self._trace_result(
+            transcript=transcript, corrections=_corrections,
+            message=" ".join(results) if results else "",
+            actions=[n for n, _ in valid], memory_id=_memory_id,
+            uncertain_words=self._uncertain_words(transcript),
+        )
         logger.info("🖥️ ⏱ Total pipeline: %.2fs", time.perf_counter() - t_start)
         self._phase = STATUS_IDLE
         self._set_status(STATUS_IDLE, "")
+        return True
 
     def _background_fix_title(self, transcript: str, event_id: int, keyword: str) -> None:
         """Daemon thread: ask the LLM for a proper title and patch the event if improved.
@@ -529,6 +730,7 @@ class Pipeline:
                 return  # user already edited it — respect their change
             db.update_event(event_id, title=better_title)
             logger.info("🖥️ Keyword title fix: %r → %r (event_id=%d)", keyword, better_title, event_id)
+            self._trace_late_step("verify", "Better title", f"“{keyword}” → “{better_title}”")
             self._set_status("refresh", "")
         except Exception as exc:
             logger.debug("🖥️ Background title fix failed: %s", exc)
@@ -637,6 +839,9 @@ class Pipeline:
                 return
             if applied:
                 logger.info("🖥️ Background verify: minor patch applied %s", patch)
+                self._trace_late_step(
+                    "verify", "Self-check",
+                    speech or "Corrected " + ", ".join(f"{k} → {v}" for k, v in patch.items()))
                 self._set_status("refresh", speech[:80] if speech else "")
                 if speech:
                     self._tts.speak(speech)
@@ -720,6 +925,8 @@ class Pipeline:
         try:
             result_text = action_cls().execute(intent, self.config)
             logger.info("🖥️ Background verify: major correction executed → %s", result_text)
+            self._trace_late_step("verify", "Self-check",
+                                  f"Redid it as {corrected_action.replace('_', ' ')}: {result_text}")
             combined = f"{speech} {result_text}".strip() if speech else result_text
             self._set_status("refresh", combined[:80])
             self._tts.speak(combined)
@@ -876,6 +1083,62 @@ class Pipeline:
                 f.writelines(lines)
         except Exception as exc:
             logger.warning("🖥️ Could not append NLU log: %s", exc)
+
+    def _await_review(self, transcript: str) -> str:
+        """Block on the Redo / Add more / Send bar; auto-sends when it times out.
+
+        Returns "send" | "redo" | "add" | "cancel".
+        """
+        seconds = max(1, int(getattr(self.config.audio, "review_seconds", 3)))
+        self._phase = STATUS_REVIEW
+        self._review_choice = None
+        self._review_event.clear()
+        snippet = transcript[:60] + ("…" if len(transcript) > 60 else "")
+        self._set_status(STATUS_REVIEW, f"{seconds}|{snippet}")
+        answered = self._review_event.wait(timeout=seconds)
+        choice = self._review_choice if answered else "send"
+        self._review_choice = None
+        return choice or "send"
+
+    def _trace_begin(self):
+        """Start a trace whose steps stream to the UI as they happen."""
+        from assistant.trace import Trace
+        trace = Trace(source="mac")
+        trace.on_step(lambda st: self.trace_queue.put({"type": "step", **st.to_dict()}))
+        self.trace_queue.put({"type": "begin"})
+        return trace
+
+    @staticmethod
+    def _queue_pending(transcript: str, reason: str) -> "int | None":
+        """Park a command the LLM couldn't take, so it can be retried later.
+
+        The API server does this for phone commands; without it a command
+        spoken to the Mac while Ollama was down was simply lost.
+        """
+        try:
+            from assistant.intent.memory import get_memory
+            return get_memory().add_pending(transcript, reason, source="mac")
+        except Exception as exc:
+            logger.warning("🖥️ Could not queue pending command: %s", exc)
+            return None
+
+    @staticmethod
+    def _uncertain_words(transcript: str) -> list:
+        """Words the vocabulary isn't sure it heard right (same helper the phone uses)."""
+        try:
+            from assistant.stt.vocab import get_vocab
+            return get_vocab().suggestions(transcript)
+        except Exception:
+            return []
+
+    def _trace_late_step(self, stage: str, title: str, detail: str = "", ok: bool = True) -> None:
+        """Append a step after the run finished (background self-check)."""
+        self.trace_queue.put({"type": "step", "stage": stage, "title": title,
+                              "detail": detail, "ms": 0, "at_ms": 0, "ok": ok})
+
+    def _trace_result(self, **fields) -> None:
+        """Close the trace with the result card payload (may be empty)."""
+        self.trace_queue.put({"type": "result", **fields})
 
     def _set_status(self, status: str, message: str = "") -> None:
         """Push (status, message) to the queue. Message is shown as a UI toast."""

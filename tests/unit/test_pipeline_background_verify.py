@@ -70,10 +70,12 @@ class _FakePipeline:
         self._parser = parser
         self._tts = MagicMock()
         self.status_queue: "queue.Queue" = queue.Queue()
+        self.trace_queue: "queue.Queue" = queue.Queue()
 
     def _set_status(self, status: str, message: str = "") -> None:
         self.status_queue.put((status, message))
 
+    _trace_late_step = Pipeline._trace_late_step
     _detect_user_change = staticmethod(Pipeline._detect_user_change)
     _background_verify = Pipeline._background_verify
     _background_fix_title = Pipeline._background_fix_title

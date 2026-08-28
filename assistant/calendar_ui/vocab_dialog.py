@@ -52,8 +52,9 @@ def _row_widget(*parts) -> QWidget:
 
 
 class VocabDialog(QDialog):
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent=None, pipeline=None) -> None:
         super().__init__(parent)
+        self._pipeline = pipeline
         self.setWindowTitle("Vocabulary & Assistant Log")
         self.setMinimumSize(620, 520)
         from assistant.stt.vocab import get_vocab
@@ -311,15 +312,11 @@ class VocabDialog(QDialog):
         summary.setObjectName("muted")
         lay.addWidget(summary)
 
-        pending = self._memory.pending()
-        if pending:
-            p_row = QHBoxLayout()
-            p_row.addWidget(_icon_label("pending"), 0, Qt.AlignmentFlag.AlignTop)
-            p_text = QLabel(f"{len(pending)} command(s) queued for retry (LLM was offline): "
-                            + "; ".join(r["transcript"][:50] for r in pending[:3]))
-            p_text.setWordWrap(True)
-            p_row.addWidget(p_text, 1)
-            lay.addLayout(p_row)
+        # Commands parked because the LLM was unreachable. The phone can retry
+        # these via /pending/<id>/retry; these buttons are the Mac's equivalent.
+        self._pending_box = QVBoxLayout()
+        lay.addLayout(self._pending_box)
+        self._refresh_pending()
 
         self._log = QListWidget()
         self._log.itemClicked.connect(self._show_example)
@@ -345,6 +342,49 @@ class VocabDialog(QDialog):
             self._log.addItem(item)
             self._log.setItemWidget(item, row)
         return w
+
+    def _refresh_pending(self) -> None:
+        while self._pending_box.count():
+            item = self._pending_box.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+            elif item.layout() is not None:
+                while item.layout().count():
+                    sub_item = item.layout().takeAt(0)
+                    if sub_item.widget() is not None:
+                        sub_item.widget().deleteLater()
+        for row in self._memory.pending():
+            line = QHBoxLayout()
+            line.addWidget(_icon_label("pending"), 0, Qt.AlignmentFlag.AlignVCenter)
+            label = QLabel(f"Queued ({row.get('reason', 'LLM offline')}): {row['transcript'][:60]}")
+            label.setWordWrap(True)
+            line.addWidget(label, 1)
+            retry_btn = QPushButton("Retry")
+            retry_btn.setEnabled(self._pipeline is not None)
+            retry_btn.setToolTip("Run this command now" if self._pipeline is not None
+                                 else "Available while the voice assistant is running")
+            retry_btn.clicked.connect(lambda _=False, pid=int(row["id"]): self._retry_pending(pid))
+            line.addWidget(retry_btn)
+            dismiss_btn = QPushButton("Dismiss")
+            dismiss_btn.clicked.connect(lambda _=False, pid=int(row["id"]): self._dismiss_pending(pid))
+            line.addWidget(dismiss_btn)
+            self._pending_box.addLayout(line)
+
+    def _retry_pending(self, pending_id: int) -> None:
+        if self._pipeline is None:
+            return
+        if self._pipeline.retry_pending(pending_id):
+            QMessageBox.information(self, "Queued command",
+                                    "Running it now — watch the thinking panel.")
+            self.accept()
+        else:
+            QMessageBox.information(self, "Queued command",
+                                    "The assistant is busy — try again in a moment.")
+
+    def _dismiss_pending(self, pending_id: int) -> None:
+        self._memory.resolve_pending(pending_id, "dismissed")
+        self._refresh_pending()
 
     def _show_example(self, item: QListWidgetItem) -> None:
         ex = item.data(Qt.ItemDataRole.UserRole)
