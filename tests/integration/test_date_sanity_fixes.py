@@ -76,3 +76,15 @@ def test_a_bare_ordinal_still_resolves_within_the_month(client):
     day = 28 if today.day < 28 else 2
     message = _create(client, f"add gym on the {day}th at 6pm")["message"]
     assert str(day) in message, message
+
+
+# ---------------------------------------------------------------------------
+# "at X" is a start time
+# ---------------------------------------------------------------------------
+
+def test_a_time_said_with_at_becomes_the_start_not_the_end(client):
+    """"dinner with Danny at 8 pm" was booked 18:00–20:00 — the stated time
+    filed as the end, with an invented start two hours earlier."""
+    message = _create(client, "on thursday I have Shacharit at 6:30 am, "
+                              "a lecture at 10 and dinner with Danny at 8 pm")["message"]
+    assert "8 PM to 9 PM" in message, message

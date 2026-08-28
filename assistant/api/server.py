@@ -227,6 +227,30 @@ def _hhmm(v) -> str:
     return f"{int(m.group(1)):02d}:{m.group(2)}" if m else ""
 
 
+def _at_times(text: str) -> set[str]:
+    """Times introduced by "at" — i.e. when something starts.
+
+    "dinner with Danny at 8 pm" states a start. The model sometimes reads such a
+    time as the END and invents an earlier start, booking 18:00–20:00 for an
+    8 pm dinner. Knowing which times were spoken as "at X" lets that be undone.
+    """
+    import re as _re
+    out: set[str] = set()
+    t = text.lower().replace(".", ":")
+    for m in _re.finditer(r"\bat\s+(?:around\s+|about\s+|roughly\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm|a:m|p:m)?\b", t):
+        h, mm, ap = int(m.group(1)), m.group(2) or "00", (m.group(3) or "").replace(":", "")
+        if h > 24:
+            continue
+        if ap == "pm" and h < 12:
+            h += 12
+        if ap == "am" and h == 12:
+            h = 0
+        out.add(f"{h % 24:02d}:{mm}")
+        if not ap and h <= 12:                      # bare hour: both readings
+            out.add(f"{(h + 12) % 24:02d}:{mm}")
+    return out
+
+
 def _spoken_times(text: str) -> set[str]:
     """All clock times a command mentions, as HH:MM (both 12h readings for bare hours)."""
     import re as _re
@@ -826,6 +850,20 @@ def create_app() -> Flask:
                         pass
                 if recur and not getattr(intent, "recurrence", None):
                     intent.recurrence = recur; fixes.append(f"recurrence={recur}")
+                # A time the speaker introduced with "at" is when the thing
+                # STARTS. The model sometimes files it as the end and invents an
+                # earlier start — "dinner with Danny at 8 pm" came out 18:00–20:00.
+                _at = _at_times(transcript)
+                _s, _e = getattr(intent, "start_time", None), getattr(intent, "end_time", None)
+                if _e and _e in _at and _s and _s not in _at:
+                    try:
+                        _hh, _mm = map(int, _e.split(":"))
+                        intent.start_time = _e
+                        intent.end_time = f"{(_hh + 1) % 24:02d}:{_mm:02d}"
+                        fixes.append(f"start {_s}→{_e} ('at {_e}' is when it starts)")
+                    except ValueError:
+                        pass
+
                 pm = _bare_hour_pm(transcript, getattr(intent, "start_time", None) or "")
                 if pm and not re.search(r"\b(?:morning|breakfast|shacharit|am)\b", tl):
                     old_s, old_e = intent.start_time, getattr(intent, "end_time", None)
