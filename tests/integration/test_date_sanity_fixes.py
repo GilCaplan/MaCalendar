@@ -19,6 +19,22 @@ from __future__ import annotations
 import datetime as dt
 
 import pytest
+import requests
+
+
+def _ollama_running() -> bool:
+    try:
+        return requests.get("http://localhost:11434/api/tags", timeout=3).status_code == 200
+    except Exception:
+        return False
+
+
+# These drive the real parser end to end, which needs the model. Without it they
+# would fail rather than skip, and CI has no Ollama.
+pytestmark = pytest.mark.skipif(
+    not _ollama_running(),
+    reason="Ollama not running at localhost:11434 — skipping integration tests",
+)
 
 
 @pytest.fixture
