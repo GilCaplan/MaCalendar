@@ -13,6 +13,15 @@ from __future__ import annotations
 import os as _os
 import tempfile as _tempfile
 
+# torch, numpy/scipy and spaCy's BLAS each bring their own threading runtime.
+# With another process already holding them — the audit harness, or a second
+# pytest — the suite segfaults partway through (SIGSEGV, ~1 run in 4), which
+# would eventually be mistaken for a real failure. Nothing here needs threaded
+# BLAS, and pinning it to one thread makes the crash go away.
+for _threads in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS",
+                 "BLIS_NUM_THREADS", "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
+    _os.environ.setdefault(_threads, "1")
+
 _SCRATCH = _tempfile.mkdtemp(prefix="macalendar-tests-")
 for _var, _name in (("MACALENDAR_DB", "calendar.db"),
                     ("MACALENDAR_MEMORY_DB", "nlu_memory.db"),
