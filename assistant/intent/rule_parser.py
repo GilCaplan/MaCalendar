@@ -528,6 +528,33 @@ def _extend_title_with_whom(span_text: str, title: str) -> str:
     return f"{title.strip()} {m.group(1).strip()}"
 
 
+# "with the dentist" / "with my mum" — the word after "with" is a determiner, so
+# the person's name never made it in. Half a phrase ("meeting with the") is a
+# worse needle than the bare word, so it does not count as naming anybody.
+_NOT_A_NAME_AFTER_WITH = frozenset({
+    "the", "a", "an", "my", "our", "your", "his", "her", "their", "its",
+    "this", "that", "these", "those", "some", "any", "each", "both",
+    "him", "them", "me", "us", "someone", "somebody", "everyone", "everybody",
+})
+
+
+def _title_with_person(span_text: str, title: str) -> tuple[str, bool]:
+    """Return the title plus any trailing "with <name>", and whether one was found.
+
+    The flag is what lets a caller tell "meeting with Ima" (identifies one
+    event) from a bare "meeting" (identifies any of them).
+    """
+    if not title:
+        return title, False
+    extended = _extend_title_with_whom(span_text, title)
+    if extended.strip().lower() == title.strip().lower():
+        return title, False
+    whom = extended[len(title.strip()):].split()      # ["with", "<name>", ...]
+    if len(whom) < 2 or whom[1].lower() in _NOT_A_NAME_AFTER_WITH:
+        return title, False
+    return extended, True
+
+
 _RENAME_RE = re.compile(
     r"\b(?:rename|re-?name)\s+(?:the\s+|my\s+)?(.+?)\s+(?:to|as)\s+(.+?)\s*$",
     re.IGNORECASE,
@@ -1162,10 +1189,18 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
                 slots["new_date"] = temporal["date"]
 
     elif action_name == "delete_event":
-        # Only use title if it's a real event name, not a generic calendar word
-        # (e.g. "delete the event at 6pm" — "event" is a placeholder, not the title)
-        if title and title.lower() not in _CALENDAR_SIGNALS:
-            slots["match_title"] = _extend_title_with_whom(span.text, title)
+        # A bare calendar word is a placeholder rather than a name ("delete the
+        # event at 6pm"), and deleting on one could take any event — so it is
+        # dropped and the date/time has to identify the event instead.
+        #
+        # Noun chunking, though, reduces "the meeting with Ima" to that same bare
+        # "meeting", and there the person is the whole identity of the event.
+        # Keep such a title once the name is recovered, and only then: with no
+        # name to pin it down, empty slots (answered with "I couldn't find …")
+        # beat deleting somebody else's meeting.
+        titled, names_a_person = _title_with_person(span.text, title)
+        if titled and (names_a_person or titled.lower() not in _CALENDAR_SIGNALS):
+            slots["match_title"] = titled
         if temporal.get("date"):
             slots["match_date"] = temporal["date"]
         if temporal.get("start_time"):
