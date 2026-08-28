@@ -98,3 +98,20 @@ def test_a_morning_event_is_not_dragged_into_the_afternoon(client):
     assert "6:30 AM" in message, message
     # and the other events in the same sentence keep their own times
     assert "12 PM" in message and "8 PM" in message, message
+
+
+def test_task_deadlines_get_the_same_date_resolution_as_events(client):
+    """Only events had deterministic relative-date resolution, so "due next
+    monday" was left as whatever the model guessed — a Sunday."""
+    import datetime as _dt
+    client.post("/voice/text", json={
+        "transcript": "add buy a gift for Tamar due thursday "
+                      "and book the driving test due next monday"})
+    todos = client.get("/todos").get_json()
+    rows = todos if isinstance(todos, list) else todos.get("todos", [])
+    days = {t["title"].lower(): t.get("due_date", "") for t in rows}
+    for title, due in days.items():
+        if not due:
+            continue
+        weekday = _dt.date.fromisoformat(due).strftime("%A").lower()
+        assert weekday in ("thursday", "monday"), f"{title} due on a {weekday}"

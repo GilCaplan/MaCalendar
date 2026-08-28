@@ -795,8 +795,10 @@ def create_app() -> Flask:
         tl = transcript.lower()
         recur = next((v for pat, v in _RECUR_WORDS if _re.search(pat, tl)), None)
         n_events = sum(1 for n, _ in parsed if n == "create_event")
+        n_todos = sum(1 for n, _ in parsed if n == "create_todo")
         rel = _relative_dates(transcript)
         ev_idx = 0
+        td_idx = 0
         for name, intent in parsed:
             if name in ("update_event", "delete_event"):
                 # "the event I just made / the last one" → anaphor, never a title guess.
@@ -902,6 +904,23 @@ def create_app() -> Flask:
                 t = (getattr(intent, "title", "") or "").strip().lower()
                 if n_events > 0 and t in _JUNK_TITLES and any(n2 == "create_todo" for n2, _ in parsed):
                     fixes.append(f"dropped junk event '{t}'"); continue
+            elif name == "create_todo":
+                # Deadlines got no deterministic date resolution at all — only
+                # events did — so "due next monday" was left as whatever the
+                # model guessed, which was a Sunday. Same treatment as events:
+                # one date phrase applies to every task, N phrases for N tasks
+                # are positional.
+                due = getattr(intent, "due_date", None)
+                if rel and not recur:
+                    if len(set(rel)) == 1:
+                        want = rel[0]
+                    else:
+                        want = rel[td_idx] if td_idx < len(rel) and len(rel) == n_todos else None
+                    if want and due != want:
+                        fixes.append(f"due {due}→{want} ('{transcript[:30]}…' says so)")
+                        intent.due_date = want
+                td_idx += 1
+
             out.append((name, intent))
         return out, fixes
 
