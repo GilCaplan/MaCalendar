@@ -465,8 +465,12 @@ def _find_event(db, match_title: str, match_date: Optional[str], match_start_tim
             best_score = s
             best_match = row_dict
 
-    # When title search finds nothing but a date was given, return first event on that date
-    if best_match is None and match_date:
+    # When the title search finds nothing but a date was given, fall back to the
+    # first event on that date — but ONLY if nothing distinctive was named.
+    # "move the gym on Sunday" used to take this path when there was no gym on
+    # Sunday and silently moved whatever else was there. Naming something we
+    # cannot find has to mean "not found", not "near enough".
+    if best_match is None and match_date and not meaningful_words:
         with db._conn() as conn:
             rows = conn.execute(
                 "SELECT * FROM events WHERE date = ? ORDER BY start_time",
