@@ -181,7 +181,16 @@ class IntentParser:
             lines.append(
                 f"Required slots still missing: {', '.join(partial.missing_slots)}"
             )
-        if any(a == "create_todo" for a in partial.raw_slots):
+        # "due thursday" with no clock time is a deadline, not an appointment.
+        # The rule parser sometimes reads such a sentence as create_event, and
+        # then this hint never fired: "book the driving test due next monday"
+        # came back as a 9 AM event.
+        _text = getattr(partial, "transcript", "") or ""
+        _says_due = re.search(r"\bdue\b", _text, re.IGNORECASE)
+        _says_a_clock_time = re.search(
+            r"\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b|\bat\s+\d{1,2}\b|\bnoon\b|\bmidnight\b",
+            _text, re.IGNORECASE)
+        if any(a == "create_todo" for a in partial.raw_slots) or (_says_due and not _says_a_clock_time):
             lines.append("This is a TASK command: return create_todo action(s) only — do NOT add a create_event.")
         if getattr(partial, "dropped_spans", 0):
             lines.append(f"NOTE: the rule parser could only interpret part of the command ({partial.dropped_spans} clause(s) were skipped). "
