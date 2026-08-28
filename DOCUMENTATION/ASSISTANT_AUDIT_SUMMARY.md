@@ -31,9 +31,45 @@ By path: **rule fast path 91 % correct at 0.1 s**; LLM path 88 % at ~10 s; hybri
 - The trace makes every failure diagnosable from the phone; the harness reproduces them in minutes.
 - Vocabulary + Whisper prompt: names that appear in the vocab come out right in audio tests (Ravid, Tal, Golda, Technion).
 
-## Remaining gaps (ranked)
+## Re-checked 2026-08-28
 
-1. **Rule parser splits multi-event sentences into one** ("lunch with Tal on monday at noon and coffee with Ezra on friday at 9" → only lunch). It is confident (0.90), so the LLM never sees it. Fix: lower confidence when a span contains two time expressions, forcing hybrid.
+- Gap 1 **no longer reproduces**: "lunch with Tal on monday at noon and coffee with Ezra on friday at 9"
+  and similar now raise `RuleParserSkip` or land at 0.59 confidence, so they reach the LLM instead of
+  fast-pathing as a single event.
+- Gap 2 is fixed for the evening cases (Kems/dinner/gym at a bare hour all resolve PM), but re-testing it
+  surfaced a worse bug in the other direction: **an explicitly spoken "7am" was booked at 7 PM**, because
+  the morning exemption tested `\b(am|a.m.)\b` and neither "7am" nor "a.m." carries the word boundary it
+  needs. Morning words were not consulted at all, so "shacharit at 7" was also PM. Fixed, with regression
+  tests in `tests/unit/test_rule_parser_meridiem.py`.
+- The harness itself was writing the transcripts it replays, and any aliases the auto-corrector learned
+  from them, into the real `~/.assistant_tools/vocab.json`. It now copies the vocabulary and works from
+  the copy, so a run measures the real word list without changing it.
+
+## Run 4 — 2026-08-28 (84 commands)
+
+**94% correct** (was 88%), 0 parse errors. First result p50 6.7 s / p95 15.6 s.
+By area: query/adversarial/mixed 100%, events 97%, from-chats 93%, update-delete 86%, tasks 83%.
+By path: rule 94% at 0.1 s, llm 98%, hybrid 78%.
+
+Bugs found by re-testing and fixed in this run: the `7am`→19:00 meridiem hole, the
+`from 9 to 10` parser crash, `12 to 1` ending before it starts, and rename. See TASKS 41–45.
+
+Five failures remain in the report:
+
+| Failure | Real? | Note |
+|---|---|---|
+| `update/rename` — "rename the meeting with Tal to robotics sync" | **was real** | fixed after this run; re-run to confirm |
+| `tasks · multi/different-due-dates` — "book the driving test due next monday" became an event | **real** | gap 3 below: the hybrid prompt still allows `create_event` when the rule parser said `create_todo` |
+| `events · multi/same-day-3` — "dinner with Danny at 8 pm" booked 18:00–20:00 | **real** | the LLM read "at 8 pm" as the end; a sanity fix could pin a stated "at" time to the start |
+| `tasks · multi/same-due-date` | harness | two `create_todo` actions vs one with two titles — same result for the user |
+| `from-chats · chat-phrasing` — "moved from 9:30 to 9" | harness | the event to update was never seeded (`in DB []`) |
+
+The self-check proposed a correction on 78 of 81 commands and fixed none: it remains
+pure cost (it is what makes "settled" ~21 s vs 6.7 s) and is correctly left advisory.
+
+## Remaining gaps (ranked, from the 2026-08-26 run)
+
+1. ~~**Rule parser splits multi-event sentences into one**~~ — fixed, see above. ("lunch with Tal on monday at noon and coffee with Ezra on friday at 9" → only lunch). It is confident (0.90), so the LLM never sees it. Fix: lower confidence when a span contains two time expressions, forcing hybrid.
 2. **Ambiguous bare hours** ("Kems tomorrow at 8" → 8 AM). Fix: heuristic — evening-ish venues/words (dinner, Kems, drinks, pregame) or hours 1–6 without am/pm → PM; ask when truly ambiguous.
 3. **Hybrid over-creation** for task lists with due dates ("two tasks due tomorrow…" adds an event; "buy a gift due thursday" becomes events). Fix: when the rule parser identified create_todo, forbid create_event in the hybrid prompt.
 4. **update_event rename / "moved from 9:30 to 9"** — rename not supported by the rule slots; "moved from…to…" needs match_start_time=9:30, new_start_time=9:00.

@@ -37,6 +37,19 @@ _TMP = tempfile.mkdtemp(prefix="macal_audit_")
 os.environ["MACALENDAR_DB"] = os.path.join(_TMP, "calendar.db")
 os.environ["MACALENDAR_MEMORY_DB"] = os.path.join(_TMP, "memory.db")
 os.environ["MACALENDAR_NO_WARMUP"] = "1"
+
+# The audit is meant to run against the REAL vocabulary — that's part of what's
+# being measured — but running it must not change it. Work from a copy: the
+# same words go in, while the transcripts it replays and any aliases the
+# auto-corrector learns from them stay out of the user's personal file.
+import shutil as _shutil
+for _var, _real, _name in (
+        ("MACALENDAR_VOCAB", os.path.expanduser("~/.assistant_tools/vocab.json"), "vocab.json"),
+        ("MACALENDAR_CATEGORIES", os.path.expanduser("~/.assistant_tools/categories.json"), "categories.json")):
+    _copy = os.path.join(_TMP, _name)
+    if os.path.exists(_real):
+        _shutil.copyfile(_real, _copy)
+    os.environ[_var] = _copy
 os.chdir(ROOT)
 
 TODAY = dt.date.today()

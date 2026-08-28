@@ -21,7 +21,8 @@ import re
 import threading
 from typing import Any
 
-CATEGORIES_PATH = os.path.expanduser("~/.assistant_tools/categories.json")
+# MACALENDAR_CATEGORIES: scratch override for tests (see MACALENDAR_DB).
+CATEGORIES_PATH = os.environ.get("MACALENDAR_CATEGORIES") or os.path.expanduser("~/.assistant_tools/categories.json")
 
 # name, primary colour, alternate shade, keywords (lower-case, substring match on word boundaries)
 DEFAULTS: list[dict[str, Any]] = [

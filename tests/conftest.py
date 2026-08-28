@@ -2,7 +2,26 @@
 
 from __future__ import annotations
 
+# Point every personal store at a throwaway directory BEFORE importing anything
+# from `assistant`. The calendar DB, command memory, vocabulary and event
+# categories all live in ~/.assistant_tools, and their paths are read at import
+# time (they're default arguments and module constants), so a fixture would run
+# too late. Without this the integration tests replayed "buy milk" and
+# "asdkjhaskjdh unrelated gibberish" straight into the user's real command
+# memory and vocabulary, where they became few-shot examples the assistant
+# learns from.
+import os as _os
+import tempfile as _tempfile
+
+_SCRATCH = _tempfile.mkdtemp(prefix="macalendar-tests-")
+for _var, _name in (("MACALENDAR_DB", "calendar.db"),
+                    ("MACALENDAR_MEMORY_DB", "nlu_memory.db"),
+                    ("MACALENDAR_VOCAB", "vocab.json"),
+                    ("MACALENDAR_CATEGORIES", "categories.json")):
+    _os.environ.setdefault(_var, _os.path.join(_SCRATCH, _name))
+
 import json
+import os
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -41,6 +60,16 @@ def reset_context_memory():
 # Registry isolation — MUST run before each test to prevent pollution
 # ---------------------------------------------------------------------------
 
+# Every real action, captured once at import — before any test empties the
+# shared registry. `@register` fires on a module's FIRST import only, so a
+# fixture that re-imports the module registers nothing the second time round.
+import assistant.actions.calendar   # noqa: E402,F401
+import assistant.actions.todo       # noqa: E402,F401
+import assistant.actions.clarify    # noqa: E402,F401
+
+_REAL_ACTIONS = dict(global_registry._actions)
+
+
 @pytest.fixture(autouse=True)
 def isolated_registry():
     """Reset the global ActionRegistry before each test."""
@@ -55,6 +84,14 @@ def isolated_registry():
 def registry_with_calendar(isolated_registry):
     """Registry with the real calendar action registered."""
     import assistant.actions.calendar  # noqa: F401 — triggers @register
+    isolated_registry._actions.update(_REAL_ACTIONS)
+    return isolated_registry
+
+
+@pytest.fixture
+def registry_with_real_actions(isolated_registry):
+    """Every real action, for tests that drive the API server end to end."""
+    isolated_registry._actions.update(_REAL_ACTIONS)
     return isolated_registry
 
 

@@ -33,6 +33,12 @@ All endpoints are served by the Mac at `http://<tailscale-ip>:8080`; the iOS app
 | `POST` | `/vocab/preview` | Dry-run: what would the corrector do to this text? (no learning) |
 | `PATCH` | `/vocab/settings` |  |
 
+## /changes
+
+| Method | Path | What it does |
+|---|---|---|
+| `GET` | `/changes` | A cheap "has anything changed?" token for the phone to poll. |
+
 ## /pending
 
 | Method | Path | What it does |
@@ -61,6 +67,7 @@ All endpoints are served by the Mac at `http://<tailscale-ip>:8080`; the iOS app
 | `DELETE` | `/timers/<int:tid>` |  |
 | `PATCH` | `/timers/<int:tid>` |  |
 | `GET` | `/timers/<int:tid>/sessions` |  |
+| `POST` | `/timers/<int:tid>/sessions` | Log a session that already happened ("I forgot to start the timer"). |
 | `POST` | `/timers/<int:tid>/start` |  |
 | `POST` | `/timers/<int:tid>/stop` |  |
 
