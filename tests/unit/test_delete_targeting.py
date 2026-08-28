@@ -86,7 +86,9 @@ def test_a_time_alone_can_still_pick_the_event(parser):
 def db(tmp_path, monkeypatch):
     monkeypatch.setenv("MACALENDAR_DB", str(tmp_path / "cal.db"))
     import assistant.db as _db
-    _db._db = None
+    # The singleton is _db_instance; assigning _db._db just made a stray
+    # attribute and left get_db() handing back the session-wide database.
+    monkeypatch.setattr(_db, "_db_instance", None)
     from assistant.actions.calendar.intent import CalendarIntent
     database = _db.get_db()
     today = dt.date.today()

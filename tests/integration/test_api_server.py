@@ -130,8 +130,11 @@ def test_voice_text_create_todo_rule_fast_path(app_client):
     assert any("milk" in t["title"].lower() for t in todos)
 
 
-def test_voice_text_create_event_rule_fast_path(app_client):
+def test_voice_text_create_event_rule_fast_path(app_client, sample_config):
     client, db = app_client
+    # The verify token is what this asserts, so ask for it explicitly rather than
+    # relying on the default — the background self-check ships off.
+    sample_config.verify_fast_path = True
     resp = client.post("/voice/text", json={"transcript": "schedule a meeting tomorrow at 3pm"})
     assert resp.status_code == 200
     data = resp.get_json()
@@ -183,11 +186,12 @@ def test_voice_verify_unknown_token_returns_404(app_client):
     assert resp.status_code == 404
 
 
-def test_voice_verify_pending_before_ready(app_client):
+def test_voice_verify_pending_before_ready(app_client, sample_config):
     """Immediately after a rule-path response, the verify token exists but the
     background thread almost certainly hasn't finished — poll returns pending.
     """
     client, _ = app_client
+    sample_config.verify_fast_path = True      # the flow under test; ships off
     resp = client.post("/voice/text", json={"transcript": "buy milk"})
     token = resp.get_json().get("verify_token")
     assert token is not None

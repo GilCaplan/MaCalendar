@@ -15,7 +15,9 @@ import pytest
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("MACALENDAR_DB", str(tmp_path / "cal.db"))
     import assistant.db as _db
-    _db._db = None                      # drop any singleton from another test
+    # The singleton is _db_instance; assigning _db._db just made a stray
+    # attribute and left get_db() handing back the session-wide database.
+    monkeypatch.setattr(_db, "_db_instance", None)
     from assistant.api.server import create_app
     app = create_app()
     app.config.update(TESTING=True)
