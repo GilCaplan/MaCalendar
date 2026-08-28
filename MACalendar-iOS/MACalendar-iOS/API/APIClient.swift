@@ -1,4 +1,29 @@
 import Foundation
+import UIKit
+@preconcurrency import UserNotifications
+
+/// Keeps the app alive for the ~30 s iOS grants after it's backgrounded, so a
+/// voice command that's mid-flight finishes instead of being suspended with
+/// its stream half-read. Without this, walking away from the app right after
+/// speaking dropped the thinking timeline (the Mac still ran the command —
+/// the phone just stopped hearing about it).
+@MainActor
+final class BackgroundAssertion {
+    private var id: UIBackgroundTaskIdentifier = .invalid
+
+    func begin(_ name: String) {
+        guard id == .invalid else { return }
+        id = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
+            self?.end()          // expiration handler — iOS is out of patience
+        }
+    }
+
+    func end() {
+        guard id != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(id)
+        id = .invalid
+    }
+}
 
 @MainActor
 class APIClient: ObservableObject {
@@ -12,6 +37,7 @@ class APIClient: ObservableObject {
 
     /// While things are changing (a voice command just ran, an edit was saved) the
     /// background poll drops to 1 s; it returns to 30 s once this window passes.
+    private var isFlushingVoice = false
     @Published var burstUntil = Date.distantPast
     func burstRefresh(seconds: TimeInterval = 45) { burstUntil = max(burstUntil, Date().addingTimeInterval(seconds)) }
     var pollInterval: TimeInterval { Date() < burstUntil ? 1 : 30 }
@@ -62,14 +88,29 @@ class APIClient: ObservableObject {
                 let msg = String(data: data, encoding: .utf8) ?? "Unknown error"
                 throw APIError.serverError(msg)
             }
-            if !isOnline { isOnline = true; requestRefresh() } else { isOnline = true }
+            // Only assign when it actually changes: these are @Published, so a
+            // redundant write still republishes and re-renders every subscriber.
+            // With /changes polled every 2 s, blind assignment meant a full
+            // re-render twice a second-and-a-half for as long as the Mac was away.
+            if !isOnline {
+                isOnline = true
+                requestRefresh()
+                // The Mac just came back. Flush anything parked while it was away
+                // now, rather than on the next 30 s tick — a command you spoke
+                // minutes ago should run the moment it can, not up to a minute later.
+                Task { [weak self] in
+                    _ = await self?.syncPending()
+                    await self?.syncPendingVoice()
+                }
+            }
             return data
         } catch let err as APIError {
             throw err
         } catch {
             // URLError / network unreachable — keep the real reason for Settings › Test Connection
-            isOnline = false
-            lastError = "\(url.absoluteString): \(error.localizedDescription)"
+            if isOnline { isOnline = false }
+            let reason = "\(url.absoluteString): \(error.localizedDescription)"
+            if lastError != reason { lastError = reason }
             throw APIError.offline(error.localizedDescription)
         }
     }
@@ -84,23 +125,120 @@ class APIClient: ObservableObject {
     /// Returns true if anything was synced (caller should refresh UI).
     @discardableResult
     func syncPending() async -> Bool {
-        let all = LocalStore.shared.allPending()
-        guard !all.isEmpty else { return false }
+        guard !LocalStore.shared.allPending().isEmpty else { return false }
         var synced = 0
-        for change in all {
+        // Re-read the queue each pass: replaying a create rewrites the paths of
+        // later entries that still point at its temporary offline id.
+        while let change = LocalStore.shared.allPending().first {
             do {
                 var body: [String: Any]? = nil
                 if let data = change.bodyJSON {
                     body = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
                 }
-                _ = try await request(change.path, method: change.method, body: body)
+                let data = try await request(change.path, method: change.method, body: body)
+
+                // A create comes back with the row the Mac actually stored. Point
+                // anything still queued against the placeholder id at the real one,
+                // otherwise "add a task offline, tick it off, reconnect" loses the tick.
+                if change.method == "POST", let temp = temporaryID(in: change),
+                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let realID = obj["id"] as? Int {
+                    LocalStore.shared.remapTemporaryID(temp, to: realID)
+                }
+
                 LocalStore.shared.removePending(change.id)
                 synced += 1
+            } catch APIError.offline {
+                break        // the Mac is away again — keep the rest for later
+            } catch APIError.serverError(let detail) where detail.contains("\"code\": 409")
+                                                        || detail.contains("\"code\":409") {
+                // The same event was changed on the Mac while we were away. The
+                // Mac's version stands — say so rather than losing an edit in
+                // silence, on whichever side it happened.
+                LocalStore.shared.removePending(change.id)
+                Self.notify(title: "One edit didn't apply",
+                            body: "That event had already been changed on your Mac, so its version was kept.")
+                requestRefresh()
             } catch {
-                break   // server still unreachable — stop, keep remainder queued
+                // The Mac answered and refused it (404 for a row that no longer
+                // exists, 400 for something malformed). Retrying cannot help, and
+                // leaving it at the head of the queue blocked every later change
+                // forever. Drop it and carry on.
+                LocalStore.shared.removePending(change.id)
             }
         }
         return synced > 0
+    }
+
+    /// Replay voice commands recorded while the Mac was away.
+    ///
+    /// The recording is uploaded exactly as it would have been live, and the
+    /// result is reported with a local notification — the command may well run
+    /// while the user is in another app, and silently changing their calendar
+    /// without telling them would be worse than not running it at all.
+    @discardableResult
+    func syncPendingVoice() async -> Int {
+        // Several things can ask for a flush at once (reconnect, foreground, the
+        // poll loop, opening the queue screen); replaying the same audio twice
+        // would create the event twice.
+        guard !isFlushingVoice else { return 0 }
+        let queued = LocalStore.shared.pendingVoice.filter { $0.status == .queued || $0.status == .failed }
+        guard !queued.isEmpty else { return 0 }
+        isFlushingVoice = true
+        defer { isFlushingVoice = false }
+        var ran = 0
+        for cmd in queued {
+            guard let audio = LocalStore.shared.voiceAudio(cmd) else {
+                LocalStore.shared.removeVoice(cmd.id)
+                continue
+            }
+            LocalStore.shared.updateVoice(cmd.id, status: .running)
+            do {
+                let response = try await sendAudio(audio)
+                LocalStore.shared.updateVoice(cmd.id, status: .done,
+                                              result: response.message.isEmpty ? "Done" : response.message)
+                Self.notify(title: "Ran your queued command", body: response.message)
+                ran += 1
+                burstRefresh()
+                requestRefresh()
+            } catch APIError.offline {
+                LocalStore.shared.updateVoice(cmd.id, status: .queued)   // still away — try again later
+                break
+            } catch {
+                LocalStore.shared.updateVoice(cmd.id, status: .failed,
+                                              result: error.localizedDescription)
+                Self.notify(title: "A queued command didn't run",
+                            body: error.localizedDescription)
+            }
+        }
+        return ran
+    }
+
+    /// Local notification — the same pattern the workout rest timer uses.
+    nonisolated static func notify(title: String, body: String) {
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus != .denied else { return }
+            if settings.authorizationStatus == .notDetermined {
+                center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+            }
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body.isEmpty ? "Tap to see what changed." : body
+            content.sound = .default
+            center.add(UNNotificationRequest(identifier: UUID().uuidString,
+                                             content: content, trigger: nil))
+        }
+    }
+
+    /// The temporary offline id a create was made under, if it had one.
+    /// LocalStore hands out negative ids for rows created while disconnected.
+    private func temporaryID(in change: PendingChange) -> Int? {
+        guard let data = change.bodyJSON,
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let temp = obj["_temp_id"] as? Int, temp < 0
+        else { return nil }
+        return temp
     }
 
     // MARK: - Health
@@ -167,7 +305,10 @@ class APIClient: ObservableObject {
             return obj?["id"] as? Int ?? 0
         } catch APIError.offline, APIError.badURL {
             let local = LocalStore.shared.insertEvent(fields)
-            LocalStore.shared.enqueue(method: "POST", path: "/events", body: fields)
+            // Carry the placeholder id so syncPending can repoint anything queued
+            // against it once the Mac assigns the real one. The server ignores it.
+            LocalStore.shared.enqueue(method: "POST", path: "/events",
+                                      body: fields.merging(["_temp_id": local.id]) { a, _ in a })
             return local.id
         }
     }
@@ -178,7 +319,14 @@ class APIClient: ObservableObject {
             _ = try await request("/events/\(id)", method: "PATCH", body: fields)
         } catch APIError.offline, APIError.badURL {
             LocalStore.shared.patchEvent(id, fields: fields)   // keep local cache current
-            LocalStore.shared.enqueue(method: "PATCH", path: "/events/\(id)", body: fields)
+            // Record which version this edit was made from. If the same event is
+            // changed on the Mac before we reconnect, the Mac refuses the replay
+            // (409) instead of quietly discarding whichever edit came second.
+            var queued = fields
+            if let base = LocalStore.shared.event(id)?.updatedAt {
+                queued["base_updated_at"] = base
+            }
+            LocalStore.shared.enqueue(method: "PATCH", path: "/events/\(id)", body: queued)
         }
     }
 
@@ -216,7 +364,8 @@ class APIClient: ObservableObject {
             return obj?["id"] as? Int ?? 0
         } catch APIError.offline, APIError.badURL {
             let local = LocalStore.shared.insertTodo(title: title, list: list, tags: tags)
-            LocalStore.shared.enqueue(method: "POST", path: "/todos", body: body)
+            LocalStore.shared.enqueue(method: "POST", path: "/todos",
+                                      body: body.merging(["_temp_id": local.id]) { a, _ in a })
             return local.id
         }
     }
@@ -294,7 +443,11 @@ class APIClient: ObservableObject {
             _ = try await request("/todos/\(id)", method: "PATCH", body: fields)
         } catch APIError.offline, APIError.badURL {
             LocalStore.shared.patchTodo(id, fields: fields)   // keep local cache current
-            LocalStore.shared.enqueue(method: "PATCH", path: "/todos/\(id)", body: fields)
+            var queued = fields
+            if let base = LocalStore.shared.todo(id)?.updatedAt {
+                queued["base_updated_at"] = base
+            }
+            LocalStore.shared.enqueue(method: "PATCH", path: "/todos/\(id)", body: queued)
         }
     }
 
@@ -495,6 +648,16 @@ class APIClient: ObservableObject {
         }
     }
 
+    /// The last few commands the Mac ran (either device). Used to recover the
+    /// outcome when a stream is cut short — the Mac finished the work, the
+    /// phone just lost the connection.
+    func recentCommands(limit: Int = 3) async -> [MemoryExample] {
+        guard let data = try? await request("/memory?limit=\(limit)"),
+              let list = try? JSONDecoder().decode(MemoryListResponse.self, from: data)
+        else { return [] }
+        return list.examples
+    }
+
     func sendText(_ transcript: String) async throws -> VoiceResponse {
         let data = try await request("/voice/text", method: "POST",
                                      body: ["transcript": transcript])
@@ -554,6 +717,9 @@ class APIClient: ObservableObject {
         req.httpBody = body
 
         let decoder = JSONDecoder()
+        let assertion = BackgroundAssertion()
+        assertion.begin("voice-command")
+        defer { assertion.end() }
         do {
             let (bytes, resp) = try await URLSession.shared.bytes(for: req)
             guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
@@ -676,6 +842,15 @@ class APIClient: ObservableObject {
     }
     func deleteTimerSession(_ id: Int) async { _ = try? await request("/timer_sessions/\(id)", method: "DELETE") }
 
+    /// Log time you forgot to start the timer for — the Mac's "Log past time…".
+    /// `end` omitted creates a session that is still running.
+    func logTimerSession(_ id: Int, start: Date, end: Date?, title: String = "") async -> Bool {
+        let f = ISO8601DateFormatter()
+        var body: [String: Any] = ["start_time": f.string(from: start), "title": title]
+        if let end { body["end_time"] = f.string(from: end) }
+        return (try? await request("/timers/\(id)/sessions", method: "POST", body: body)) != nil
+    }
+
     func counters(archived: Bool = false) async throws -> [TallyCounter] {
         try decode(CountersResponse.self, from: try await request("/counters" + (archived ? "?archived=1" : ""))).counters
     }
@@ -684,6 +859,28 @@ class APIClient: ObservableObject {
     func deleteCounter(_ id: Int) async { _ = try? await request("/counters/\(id)", method: "DELETE") }
     func pressCounter(_ id: Int, delta: Int) async { _ = try? await request("/counters/\(id)/press", method: "POST", body: ["delta": delta]) }
     func cashOutCounter(_ id: Int) async { _ = try? await request("/counters/\(id)/cashout", method: "POST", body: [:]) }
+
+    /// A few bytes that change whenever anything in the Mac's database does.
+    /// Polling this is cheap enough to do every couple of seconds, so a change
+    /// made on the Mac shows up almost at once instead of on the next 30 s
+    /// full refresh. Returns nil if the Mac can't be reached.
+    func changeToken() async -> String? {
+        guard let data = try? await request("/changes"),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+        return obj["token"] as? String
+    }
+
+    /// Pull calendar events into the task list — the Mac's "Sync Today" button.
+    /// `list` is "today" or "general".
+    @discardableResult
+    func syncTodosFromCalendar(list: String = "today") async -> Int {
+        guard let data = try? await request("/todos/sync", method: "POST", body: ["list_name": list]),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let n = obj["synced"] as? Int
+        else { return 0 }
+        return n
+    }
 
     // MARK: - Event categories
 

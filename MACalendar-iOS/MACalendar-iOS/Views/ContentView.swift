@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @EnvironmentObject var api: APIClient
@@ -15,6 +16,7 @@ struct ContentView: View {
     @State private var loadingMonth = false
     @State private var showCreateSheet = false
     @State private var showVocabOnboarding = false
+    @State private var showVoiceQueue = false
     @ObservedObject private var importInbox = ImportInbox.shared
     @State private var sharedImportText: String? = nil
     @State private var unreviewed = 0
@@ -39,6 +41,24 @@ struct ContentView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
                 .background(Color.orange)
+            }
+
+            // Voice commands parked because the Mac was away. Shown whether or
+            // not we're online: while offline so you know it was kept, and after
+            // reconnecting so you can see what it went on to do.
+            if !store.pendingVoice.isEmpty {
+                Button { showVoiceQueue = true } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: voiceQueueIcon)
+                        Text(voiceQueueSummary).font(.footnote.weight(.medium))
+                        Spacer()
+                        Text("Show").font(.footnote.weight(.semibold))
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+                    .background(Color.orange.opacity(0.20))
+                    .foregroundColor(.primary)
+                }
+                .buttonStyle(.plain)
             }
 
             if unreviewed >= 5 {
@@ -278,6 +298,7 @@ struct ContentView: View {
             if phase == .active {
                 Task {
                     _ = await api.syncPending()
+                    await api.syncPendingVoice()
                     // Always re-fetch on foreground: the Mac app may have changed things.
                     await loadMonth()
                     await refreshWorkoutIfNeeded()
@@ -287,6 +308,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showVocabOnboarding) {
             VocabOnboardingView()
+        }
+        .sheet(isPresented: $showVoiceQueue) {
+            VoiceQueueView()
         }
         .sheet(isPresented: $showReview, onDismiss: { Task { unreviewed = await api.unreviewedCount() } }) {
             AssistantReviewView()
@@ -317,14 +341,46 @@ struct ContentView: View {
             // While the app is open, retry sync every 30 s so pending
             // changes upload as soon as the Mac comes back online.
             var slept: TimeInterval = 0
+            var sinceTokenCheck: TimeInterval = 0
+            var lastToken: String? = nil
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 slept += 1
+                sinceTokenCheck += 1
+
+                // Between full refreshes, ask the Mac the cheap question: has
+                // anything changed? A few bytes every 2 s beats waiting up to
+                // 30 s to notice an event added on the other device.
+                if sinceTokenCheck >= 2, slept < api.pollInterval,
+                   UIApplication.shared.applicationState == .active {
+                    sinceTokenCheck = 0
+                    if let token = await api.changeToken() {
+                        if let previous = lastToken, previous != token {
+                            lastToken = token
+                            slept = 0
+                            await loadMonth()
+                            api.requestRefresh()
+                            continue
+                        }
+                        lastToken = token
+                    }
+                }
+
                 guard slept >= api.pollInterval else { continue }
                 slept = 0
-                guard scenePhase == .active else { continue }
+                sinceTokenCheck = 0
+                lastToken = await api.changeToken() ?? lastToken
+                // Read the live application state, NOT the `scenePhase` environment
+                // value: `.task` captures the View struct, so `scenePhase` here is
+                // frozen at whatever it was when the task started — `.inactive`,
+                // because the scene has not finished activating during the first
+                // render. Guarding on that captured copy silently disabled this
+                // whole loop, so nothing changed on the Mac ever reached the phone
+                // until the app was backgrounded and reopened.
+                guard UIApplication.shared.applicationState == .active else { continue }
                 if !api.isOnline { _ = try? await api.health() }   // flips isOnline (+refresh) when the Mac is back
                 _ = await api.syncPending()
+                await api.syncPendingVoice()
                 // Poll: keep the phone in step with whatever was changed on the Mac.
                 await loadMonth()
                 api.requestRefresh()
@@ -377,6 +433,24 @@ struct ContentView: View {
         Task { await loadMonth() }
     }
 
+    private var voiceQueueIcon: String {
+        if store.pendingVoice.contains(where: { $0.status == .running }) { return "waveform" }
+        if store.pendingVoice.allSatisfy({ $0.status == .done }) { return "checkmark.circle" }
+        return "mic.badge.plus"
+    }
+
+    private var voiceQueueSummary: String {
+        let waiting = store.pendingVoice.filter { $0.status == .queued }.count
+        let running = store.pendingVoice.filter { $0.status == .running }.count
+        let failed  = store.pendingVoice.filter { $0.status == .failed }.count
+        if running > 0 { return "Running a command you spoke while offline…" }
+        if waiting > 0 {
+            return "\(waiting) command\(waiting == 1 ? "" : "s") waiting for your Mac"
+        }
+        if failed > 0 { return "\(failed) queued command\(failed == 1 ? "" : "s") didn't run" }
+        return "Your queued command\(store.pendingVoice.count == 1 ? "" : "s") ran"
+    }
+
     private func loadMonth() async {
         let year  = Calendar.current.component(.year,  from: viewedDate)
         let month = Calendar.current.component(.month, from: viewedDate)
@@ -414,5 +488,77 @@ struct ContentView: View {
         _ = try? await api.workoutExercises()
         _ = try? await api.workoutTemplates(includeDrafts: false)
         _ = try? await api.workoutSessions(limit: 50)
+    }
+}
+
+/// Voice commands recorded while the Mac was unreachable, and what became of
+/// them. The Mac does the thinking, so nothing can run until it's back — this
+/// is the "so where did my command go?" answer, alongside the notification that
+/// fires when one finally runs.
+struct VoiceQueueView: View {
+    @ObservedObject private var store = LocalStore.shared
+    @EnvironmentObject var api: APIClient
+    @EnvironmentObject var settings: AppSettings
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            List {
+                Section {
+                    Text(api.isOnline
+                         ? "Your Mac is reachable — anything still waiting runs within a few seconds."
+                         : "Your Mac isn't reachable. These are kept on this phone and run as soon as it is.")
+                        .font(.footnote).foregroundColor(.secondary)
+                }
+                ForEach(store.pendingVoice) { cmd in
+                    HStack(alignment: .top, spacing: 12) {
+                        icon(for: cmd.status)
+                            .frame(width: 22)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(label(for: cmd.status)).font(.subheadline.weight(.medium))
+                            Text(cmd.recordedAt.formatted(date: .abbreviated, time: .shortened))
+                                .font(.caption).foregroundColor(.secondary)
+                            if !cmd.result.isEmpty {
+                                Text(cmd.result).font(.footnote).foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .onDelete { idx in
+                    for i in idx { store.removeVoice(store.pendingVoice[i].id) }
+                }
+            }
+            .navigationTitle("Queued commands")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if store.pendingVoice.contains(where: { $0.status == .done || $0.status == .failed }) {
+                        Button("Clear finished") { store.clearFinishedVoice() }
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) { Button("Done") { dismiss() } }
+            }
+            .task { await api.syncPendingVoice() }
+        }
+    }
+
+    @ViewBuilder
+    private func icon(for status: PendingVoiceCommand.Status) -> some View {
+        switch status {
+        case .queued:  Image(systemName: "clock").foregroundColor(.orange)
+        case .running: ProgressView()
+        case .done:    Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+        case .failed:  Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.red)
+        }
+    }
+
+    private func label(for status: PendingVoiceCommand.Status) -> String {
+        switch status {
+        case .queued:  return "Waiting for your Mac"
+        case .running: return "Running now…"
+        case .done:    return "Done"
+        case .failed:  return "Didn't run"
+        }
     }
 }

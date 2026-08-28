@@ -9,6 +9,8 @@ struct TasksView: View {
     @State private var newTaskTitle = ""
     @State private var newTaskList = "today"
     @State private var loading = false
+    @State private var syncing = false
+    @State private var syncMessage: String?
     @State private var errorMsg: String?
     @State private var editMode: EditMode = .inactive
     @State private var showManageTags = false
@@ -162,14 +164,29 @@ struct TasksView: View {
                     Button(action: { withAnimation { editMode = editMode == .active ? .inactive : .active } }) {
                         Text(editMode == .active ? "Done" : "Edit")
                     }
-                    Button(action: load) {
-                        Image(systemName: "arrow.clockwise")
+                    Menu {
+                        // The Mac's Tasks tab has had these two since the sync
+                        // landed; the endpoint existed but the phone never called it.
+                        Button {
+                            Task { await syncFromCalendar("today") }
+                        } label: { Label("Sync today's events here", systemImage: "calendar.badge.plus") }
+                        Button {
+                            Task { await syncFromCalendar("general") }
+                        } label: { Label("Sync the coming week to General", systemImage: "calendar") }
+                        Divider()
+                        Button(action: load) { Label("Refresh", systemImage: "arrow.clockwise") }
+                    } label: {
+                        Image(systemName: syncing ? "arrow.triangle.2.circlepath" : "arrow.clockwise")
                     }
                 }
             }
             .overlay {
                 if loading { ProgressView() }
             }
+            .alert("Synced", isPresented: Binding(get: { syncMessage != nil },
+                                                  set: { if !$0 { syncMessage = nil } })) {
+                Button("OK", role: .cancel) { syncMessage = nil }
+            } message: { Text(syncMessage ?? "") }
             .safeAreaInset(edge: .bottom) {
                 // Reserve space so the floating VoiceButton doesn't cover list items
                 Color.clear.frame(height: 100)
@@ -471,6 +488,17 @@ struct TasksView: View {
             todos[i].tags     = newTags
         }
         Task { try? await api.updateTodo(id: todo.id, title: title, priority: priority, dueDate: dueDate, tags: newTags) }
+    }
+
+    /// Pull calendar events into the task list (the Mac's "Sync Today" button).
+    @MainActor
+    private func syncFromCalendar(_ list: String) async {
+        syncing = true
+        defer { syncing = false }
+        let n = await api.syncTodosFromCalendar(list: list)
+        syncMessage = n == 0 ? "Nothing new to bring over."
+                             : "\(n) event\(n == 1 ? "" : "s") added as task\(n == 1 ? "" : "s")."
+        load()
     }
 
     private func clearCompleted() {

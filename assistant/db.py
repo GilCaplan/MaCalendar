@@ -41,6 +41,9 @@ _TODO_MIGRATIONS = [
     "ALTER TABLE todos ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]'",
     "ALTER TABLE events ADD COLUMN category TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE todos ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'",
+    # Version stamp, so a client that edited a task while disconnected can say
+    # which version it was working from (see PATCH /todos/<id>).
+    "ALTER TABLE todos ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''",
 ]
 
 # Known tag names (so user-created tags persist even when no todo uses them).
@@ -577,8 +580,8 @@ class CalendarDB:
                 """
                 INSERT INTO events
                     (title, date, start_time, end_time, attendees, location, description,
-                     color, created_at, series_id, recurrence, recurrence_end, category)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     color, created_at, updated_at, series_id, recurrence, recurrence_end, category)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     intent.title,
@@ -590,6 +593,9 @@ class CalendarDB:
                     intent.description or "",
                     color,
                     datetime.datetime.now().isoformat(),
+                    # Stamped at creation, not only on the first edit, so a client
+                    # can quote it back for the conflict check on PATCH.
+                    _utcnow_iso(),
                     None,       # series_id set below if recurring
                     recurrence,
                     recur_until,
@@ -672,8 +678,8 @@ class CalendarDB:
                 """
                 INSERT INTO events
                     (title, date, start_time, end_time, attendees, location, description,
-                     color, created_at, series_id, recurrence, recurrence_end, category)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     color, created_at, updated_at, series_id, recurrence, recurrence_end, category)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     data["title"],
@@ -685,6 +691,7 @@ class CalendarDB:
                     data.get("description", ""),
                     color,
                     datetime.datetime.now().isoformat(),
+                    _utcnow_iso(),      # so clients have a version to quote back
                     None,
                     recurrence,
                     recur_until,
@@ -1047,8 +1054,8 @@ class CalendarDB:
                 """
                 INSERT INTO todos
                     (title, list, completed, priority, due_date, notes,
-                     source, source_event_id, created_at, completed_at, position, tags)
-                VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, '', ?, ?)
+                     source, source_event_id, created_at, updated_at, completed_at, position, tags)
+                VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?, '', ?, ?)
                 """,
                 (
                     title,
@@ -1059,6 +1066,7 @@ class CalendarDB:
                     source,
                     source_event_id,
                     datetime.datetime.now().isoformat(),
+                    _utcnow_iso(),      # a version for clients to quote back
                     max_pos + 1,
                     tags_json,
                 ),
@@ -1138,9 +1146,9 @@ class CalendarDB:
         if not updates:
             return
         set_clause = ", ".join(f"{k} = ?" for k in updates)
-        values = list(updates.values()) + [todo_id]
+        values = list(updates.values()) + [_utcnow_iso(), todo_id]
         with self._conn() as conn:
-            conn.execute(f"UPDATE todos SET {set_clause} WHERE id = ?", values)
+            conn.execute(f"UPDATE todos SET {set_clause}, updated_at = ? WHERE id = ?", values)
 
     def toggle_todo_complete(self, todo_id: int) -> bool:
         """Flip completed flag; update completed_at. Returns new completed state."""
