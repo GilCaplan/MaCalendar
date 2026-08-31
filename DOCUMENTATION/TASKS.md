@@ -51,6 +51,8 @@ Running list of user-reported issues and feature requests, with status. Update w
 | 45 | "rename X to Y" answered "No changes specified" — even "rename gym to workout". Read literally now, with a guard so "rename the meeting to 3pm" stays a reschedule | done 2026-08-28 | `_RENAME_RE` in `rule_parser._fill_slots` |
 | 46 | **Voice edits hit the wrong event.** "the meeting with Ima" reached the matcher as just "meeting", so it scored a generic word and took the nearest meeting (Shaul's) | done 2026-08-28 | `_extend_title_with_whom` keeps the person in `match_title` |
 | 47 | **Naming an event that isn't on the day given edited whatever else was.** "move the gym on Sunday" moved "Meeting with Ima". A named-but-missing event now reports not-found; the day fallback only applies to a generic title ("the event on Sunday") | done 2026-08-28 | `_find_event` gates the date fallback on `meaningful_words` |
+| 48 | **A multi-item task command made one task.** "buy chicken and rice" became one task — the LLM merged it (sometimes into an invented "buy groceries"), the rule path kept the verb only on the first. One task per item now, verb shared out, tag inferred from each title | done 2026-08-31 | `assistant/intent/list_split.py`, `assistant/actions/todo/tagging.py` |
+| 49 | **The trace was only visible if you were looking at the calendar** — which you are not when you speak to the assistant from your phone. It is its own always-on-top app now: never takes focus, translucent until hovered, works with the calendar closed | done 2026-08-31 | `assistant/thinking_hud.py`, streaming `assistant/trace_bus.py` |
 
 Working agreements
 - Everything on the phone is local: no third-party services; the only network peer is the Mac over Tailscale.

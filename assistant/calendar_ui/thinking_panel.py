@@ -4,12 +4,14 @@ The iPhone renders each pipeline stage (STT → vocab → rule/LLM → validate 
 execute → verify) as a timeline with icons, per-stage timings and a result
 card. The Mac used to surface the same run as a single emoji on the mic
 button plus a 3-second toast, so there was no way to see *why* it did what
-it did. This panel renders the identical trace, in the app's own
-"moody dev-tool" language: a floating card in the corner of the window that
-fills in live while a command runs.
+it did. This renders the identical trace, in the app's own "moody dev-tool"
+language: a card that fills in live while a command runs.
 
-Fed by `VoicePipeline.trace_queue` (drained on the main thread by
-CalendarWindow._poll_status).
+The widget itself is just the card. It used to live inside the calendar
+window; it is now the whole content of `assistant.thinking_hud`, a separate
+always-on-top app, so a command spoken from the phone while you are in another
+application is still visible — and still visible with the calendar closed. The
+HUD feeds it from `assistant.trace_bus`.
 """
 
 from __future__ import annotations
@@ -709,6 +711,12 @@ class ThinkingPanel(QFrame):
     def minimised(self) -> bool:
         return self._minimised
 
+    @property
+    def header_widget(self) -> QWidget:
+        """The title bar. The HUD makes it the drag handle for its frameless
+        window — a card with no title bar has to be movable by something."""
+        return self._header
+
     def reveal(self) -> None:
         self.show()
         self.raise_()
@@ -739,7 +747,22 @@ class ThinkingPanel(QFrame):
                 f" font-size: {_size}px; }} QPushButton:hover {{ color: {theme.text}; }}"
             )
         self._rule.setStyleSheet(f"background-color: {theme.border}; border: none;")
-        self._scroll.setStyleSheet(f"background-color: {theme.bg}; border: none;")
+        # The card carries its own scrollbar style. Inside the calendar app it
+        # inherited one from the application stylesheet; as its own window
+        # (assistant.thinking_hud) there is no application stylesheet to
+        # inherit, and the native scrollbar's arrow buttons drew outside the
+        # card's rounded corners.
+        self._scroll.setStyleSheet(
+            f"QScrollArea {{ background-color: {theme.bg}; border: none; }}"
+            f"QScrollBar:vertical {{ background: transparent; width: 8px;"
+            f" border: none; margin: 4px 2px 4px 2px; }}"
+            f"QScrollBar::handle:vertical {{ background: {theme.border};"
+            f" border-radius: 4px; min-height: 30px; }}"
+            f"QScrollBar::handle:vertical:hover {{ background: {theme.text2}; }}"
+            f"QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}"
+            f"QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}"
+            f"QScrollBar:horizontal {{ height: 0; }}"
+        )
         self._body.setStyleSheet(f"background-color: {theme.bg};")
         self._working.setStyleSheet("background: transparent;")
         self._working_lbl.setStyleSheet(f"color: {theme.text2}; background: transparent;")

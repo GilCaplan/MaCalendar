@@ -258,10 +258,6 @@ class CalendarWindow(QMainWindow):
         self._current_date = datetime.date.today()
         self._view_mode = "month"  # "month" | "week" | "day" | "todo" | "timer" | "coursework" | "workout"
         self._undo_manager = UndoManager()
-        self._trace_finished_at = 0.0   # monotonic time the last voice run ended
-        # Only traces published from now on — not the backlog from earlier runs.
-        from assistant import trace_bus as _trace_bus
-        self._bus_offset = _trace_bus.size()
 
         self._dark = (config.theme == "dark") if config else False
 
@@ -394,16 +390,6 @@ class CalendarWindow(QMainWindow):
         self._review_bar.chose.connect(self._on_review_choice)
         self._review_bar.hide()
 
-        # Assistant "thinking" panel (overlaid) — the desktop twin of the iOS
-        # timeline sheet. Hidden until a voice command runs.
-        from assistant.calendar_ui.thinking_panel import ThinkingPanel
-        self._thinking = ThinkingPanel(central, dark=self._dark)
-        self._thinking.closed.connect(self._update_trace_chip)
-        self._thinking.retry_requested.connect(self._on_retry_pending)
-        # Minimising changes its height, so re-anchor it to its corner.
-        self._thinking.resized.connect(self._position_thinking)
-        self._position_thinking()
-
         self._update_title()
 
     def _build_toolbar(self) -> QWidget:
@@ -516,16 +502,6 @@ class CalendarWindow(QMainWindow):
         self._update_theme_btn()
 
         layout.addSpacing(2)
-
-        # "Thinking… N steps" / "Show what it did" — mirrors the chip the
-        # iPhone floats above its mic button. Hidden when there's nothing to show.
-        self._trace_chip = QPushButton("")
-        self._trace_chip.setObjectName("flat")
-        self._trace_chip.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._trace_chip.setToolTip("Show what the assistant did, step by step")
-        self._trace_chip.clicked.connect(self._on_show_thinking)
-        self._trace_chip.hide()
-        layout.addWidget(self._trace_chip, alignment=v_center)
 
         self._mic_btn = QPushButton("🎙")
         self._mic_btn.setObjectName("mic_idle")
@@ -914,88 +890,6 @@ class CalendarWindow(QMainWindow):
                 self._handle_status(status, message)
         except queue.Empty:
             pass
-        self._poll_trace()
-        self._poll_phone_traces()
-
-    # -- Assistant thinking panel ---------------------------------------
-
-    def _poll_phone_traces(self) -> None:
-        """Show commands run from the phone in the Mac's thinking panel too.
-
-        The API server is a separate process, so it publishes finished traces to
-        a small file (assistant.trace_bus) that this window tails. Without it the
-        panel only ever showed commands spoken at the Mac, even though the Mac is
-        what executed the phone's as well.
-        """
-        from assistant import trace_bus
-        entries, self._bus_offset = trace_bus.read_since(self._bus_offset)
-        for entry in entries:
-            steps = entry.get("steps") or []
-            if not steps:
-                continue
-            self._thinking.begin(source="iPhone")
-            for step in steps:
-                self._thinking.add_step(step)
-            self._thinking.finish(entry.get("result") or {})
-            self._trace_finished_at = time.monotonic()
-            if self._show_thinking_enabled() and not self._thinking.minimised and (
-                    self._config is None or getattr(self._config.ui, "thinking_auto_open", True)):
-                self._position_thinking()
-                self._thinking.reveal()
-        if entries:
-            self._update_trace_chip()
-
-    def _show_thinking_enabled(self) -> bool:
-        return bool(getattr(self._config.ui, "show_thinking", True)) if self._config else True
-
-    def _poll_trace(self) -> None:
-        """Drain pipeline.trace_queue into the thinking panel."""
-        tq = getattr(self._pipeline, "trace_queue", None)
-        if tq is None:
-            return
-        changed = False
-        try:
-            while True:
-                item = tq.get_nowait()
-                kind = item.get("type")
-                if kind == "begin":
-                    self._thinking.begin(source="Mac")
-                    self._trace_finished_at = 0.0
-                    auto = self._config is None or getattr(self._config.ui, "thinking_auto_open", True)
-                    # If it was minimised, leave it that way — the header still
-                    # counts the steps, which is the point of minimising it.
-                    if self._show_thinking_enabled() and auto and not self._thinking.minimised:
-                        self._position_thinking()
-                        self._thinking.reveal()
-                elif kind == "step":
-                    self._thinking.add_step(item)
-                elif kind == "result":
-                    payload = {k: v for k, v in item.items() if k != "type"}
-                    self._thinking.finish(payload)
-                    self._trace_finished_at = time.monotonic()
-                changed = True
-        except queue.Empty:
-            pass
-        if changed or self._trace_chip.isVisible():
-            self._update_trace_chip()
-
-    def _update_trace_chip(self) -> None:
-        """Chip mirrors the iOS one: live step count, then a 2-minute window
-        to reopen the last run, then it disappears."""
-        if not self._show_thinking_enabled():
-            self._trace_chip.hide()
-            return
-        running = self._thinking.running
-        recent = (time.monotonic() - self._trace_finished_at) < 120
-        if self._thinking.isVisible() or not (running or (recent and self._thinking.step_count)):
-            self._trace_chip.hide()
-            return
-        n = self._thinking.step_count
-        if running:
-            self._trace_chip.setText(f"Thinking… {n} step{'' if n == 1 else 's'}")
-        else:
-            self._trace_chip.setText("Show what it did")
-        self._trace_chip.show()
 
     def _on_review_choice(self, choice: str) -> None:
         """Redo / Add more / Send / Cancel from the review bar."""
@@ -1012,35 +906,6 @@ class CalendarWindow(QMainWindow):
         x = max(8, parent.width() - bar.width() - 16)
         bar.move(x, 58)
         bar.raise_()
-
-    def _on_retry_pending(self, pending_id: int) -> None:
-        """Run a queued command again (the assistant was offline when it was said)."""
-        if self._pipeline is None:
-            return
-        if not self._pipeline.retry_pending(pending_id):
-            self.show_toast("Couldn't retry that command right now")
-
-    def _on_show_thinking(self) -> None:
-        self._position_thinking()
-        self._thinking.reveal()
-        self._update_trace_chip()
-
-    def _position_thinking(self) -> None:
-        """Park the panel in the corner the user picked, clear of the toast."""
-        panel = getattr(self, "_thinking", None)
-        if panel is None:
-            return
-        parent = panel.parentWidget()
-        if parent is None:
-            return
-        corner = getattr(self._config.ui, "thinking_corner", "bottom-right") if self._config else "bottom-right"
-        margin = 20
-        right = max(8, parent.width() - panel.width() - margin)
-        bottom = max(8, parent.height() - panel.height() - margin)
-        top = 62 if "top" in corner else bottom      # clear of the 54px toolbar
-        x = margin if corner.endswith("left") else right
-        panel.move(x, top if "top" in corner else bottom)
-        panel.raise_()
 
     def _handle_status(self, status: str, message: str = "") -> None:
         icon = _MIC_ICONS.get(status, "🎙")
@@ -1115,8 +980,6 @@ class CalendarWindow(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if hasattr(self, "_thinking"):
-            self._position_thinking()
         if hasattr(self, "_review_bar"):
             self._position_review_bar()
         if hasattr(self, "_toast"):
@@ -1148,8 +1011,6 @@ class CalendarWindow(QMainWindow):
             self._coursework_view.apply_theme(dark)
         if hasattr(self, "_workout_view"):
             self._workout_view.apply_theme(dark)
-        if hasattr(self, "_thinking"):
-            self._thinking.apply_theme(dark)
         if hasattr(self, "_review_bar"):
             self._review_bar.apply_theme(dark)
 
@@ -1481,20 +1342,17 @@ class CalendarWindow(QMainWindow):
         auto_cb.setChecked(self._pipeline._confirmer.level == 0)
         assistant.addWidget(auto_cb)
 
-        thinking_cb = QCheckBox("Show assistant thinking (live step-by-step panel)")
-        thinking_cb.setToolTip("A timeline of what the assistant heard, parsed and did")
+        thinking_cb = QCheckBox("Show assistant thinking (floating step-by-step HUD)")
+        thinking_cb.setToolTip(
+            "A timeline of what the assistant heard, parsed and did.\n"
+            "It is its own always-on-top window, so it shows commands you gave\n"
+            "from your phone while you were in another app.")
         thinking_cb.setChecked(getattr(self._config.ui, "show_thinking", True))
         assistant.addWidget(thinking_cb)
 
         thinking_row = QHBoxLayout()
         thinking_row.addSpacing(20)
-        thinking_open_combo = QComboBox()
-        thinking_open_combo.addItem("Open the panel", True)
-        thinking_open_combo.addItem("Just show the chip", False)
-        thinking_open_combo.setCurrentIndex(
-            0 if getattr(self._config.ui, "thinking_auto_open", True) else 1)
-        thinking_row.addWidget(thinking_open_combo)
-        thinking_row.addWidget(QLabel("in the"))
+        thinking_row.addWidget(QLabel("Park it in the"))
         thinking_corner_combo = QComboBox()
         for _label, _value in (("bottom right", "bottom-right"), ("bottom left", "bottom-left"),
                                ("top right", "top-right"), ("top left", "top-left")):
@@ -1503,11 +1361,11 @@ class CalendarWindow(QMainWindow):
             getattr(self._config.ui, "thinking_corner", "bottom-right"))
         thinking_corner_combo.setCurrentIndex(_idx if _idx >= 0 else 0)
         thinking_row.addWidget(thinking_corner_combo)
+        thinking_row.addWidget(QLabel("of the screen"))
         thinking_row.addStretch(1)
         assistant.addLayout(thinking_row)
 
         def _thinking_toggled(on: bool) -> None:
-            thinking_open_combo.setEnabled(on)
             thinking_corner_combo.setEnabled(on)
         thinking_cb.toggled.connect(_thinking_toggled)
         _thinking_toggled(thinking_cb.isChecked())
@@ -1630,7 +1488,6 @@ class CalendarWindow(QMainWindow):
                     _put("show_workout", workout_tab_cb.isChecked(), _ui_anchor)
                     _put("show_timer", timer_tab_cb.isChecked(), _ui_anchor)
                     _put("show_thinking", thinking_cb.isChecked(), _ui_anchor)
-                    _put("thinking_auto_open", bool(thinking_open_combo.currentData()), _ui_anchor)
                     _put("thinking_corner", thinking_corner_combo.currentData(), _ui_anchor)
 
                     _audio_anchor = r"max_recording_sec:\s*\d+"
@@ -1682,15 +1539,12 @@ class CalendarWindow(QMainWindow):
                     self._config.ui.show_coursework = coursework_tab_cb.isChecked()
                     self._config.ui.show_workout = workout_tab_cb.isChecked()
                     self._config.ui.show_timer = timer_tab_cb.isChecked()
+                    # The HUD is a separate process; it notices config.yaml
+                    # changing and re-reads these itself.
                     self._config.ui.show_thinking = thinking_cb.isChecked()
-                    self._config.ui.thinking_auto_open = thinking_open_combo.currentData()
                     self._config.ui.thinking_corner = thinking_corner_combo.currentData()
                     self._config.audio.review_before_send = review_cb.isChecked()
                     self._config.audio.review_seconds = review_spin.value()
-                    if not self._config.ui.show_thinking:
-                        self._thinking.hide()
-                    self._position_thinking()
-                    self._update_trace_chip()
                     for _mode in ("coursework", "workout", "timer"):
                         _visible = getattr(self._config.ui, f"show_{_mode}")
                         getattr(self, f"_view_btn_{_mode}").setVisible(_visible)

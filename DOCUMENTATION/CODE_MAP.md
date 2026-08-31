@@ -99,6 +99,30 @@
 
 ---
 
+## Assistant trace — `assistant/trace_bus.py` + `assistant/thinking_hud.py`
+
+The card showing what the assistant did is its own process. Producers publish
+to an append-only JSONL file; the HUD tails it. Two line shapes: a whole run at
+once (`kind: "trace"` — what the API server publishes for the phone) or a run
+streaming as it happens (`begin` / `step` … / `result` — what the Mac pipeline
+publishes, so the card fills in live).
+
+| What | Location |
+|------|----------|
+| `publish()` — one finished run | `trace_bus.py` L66 |
+| `publish_begin()` / `publish_step()` / `publish_result()` — a streaming run | `trace_bus.py` L75–88 |
+| `_trim()` — only ever runs at a run's start, so no run is cut in half | `trace_bus.py` L91 |
+| `Pipeline._trace_begin()` — where the Mac's run is opened | `pipeline.py` L1106 |
+| `ThinkingHUD` — frameless, always-on-top, never focused | `thinking_hud.py` L98 |
+| `ThinkingHUD.apply_entry()` — renders one bus line | `thinking_hud.py` L201 |
+| `_BusReader.poll()` — tails the bus and notices config.yaml changing | `thinking_hud.py` L323 |
+
+Gotcha: the window is `Qt.Window`, **not** `Qt.Tool`. macOS hides a tool window
+whenever its application is not active, and this app is never active (accessory,
+no Dock icon), so `Qt.Tool` made it invisible in exactly the case it exists for.
+
+---
+
 ## Multi-item splitting — `assistant/intent/list_split.py`
 
 One phrase → the several things it asks for. "buy chicken and rice" is two

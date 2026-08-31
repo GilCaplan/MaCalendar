@@ -142,17 +142,19 @@ class UIConfig(BaseModel):
     # Same per-tab switches the phone has (iOS Settings › Tabs)
     show_workout: bool = True
     show_timer: bool = True
-    # Show the assistant's stage-by-stage "thinking" panel while a voice
-    # command runs (the Mac twin of iOS Settings › Voice › Show assistant thinking)
+    # Show the assistant's stage-by-stage thinking HUD while a voice command
+    # runs (the Mac twin of iOS Settings › Voice › Show assistant thinking).
+    # The HUD is its own app — assistant.thinking_hud — and re-reads this.
     show_thinking: bool = True
-    # How the thinking panel behaves when a command starts: True pops it open,
-    # False leaves it closed and just shows the "Thinking…" chip by the mic.
-    thinking_auto_open: bool = True
+    # Which screen corner the thinking HUD parks itself in (until you drag it).
     thinking_corner: Literal["bottom-right", "bottom-left", "top-right", "top-left"] = "bottom-right"
 
 
 class ApiConfig(BaseModel):
     key: Optional[str] = None   # X-API-Key header value; null = no auth required
+    # Where the phone API listens. The launcher passes --port; this is what
+    # other local processes (the thinking HUD) use to reach it.
+    port: int = 8080
 
 
 class HebrewCalendarConfig(BaseModel):

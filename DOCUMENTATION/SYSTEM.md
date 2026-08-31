@@ -19,6 +19,7 @@ Before fixing a bug or adding a feature, **read `CODE_MAP.md`** — it has preci
 - **GitHub**: `https://github.com/GilCaplan/MACalendar`
 - **Mac launch**: `python -m assistant.main` or `Launch Calendar.command`
 - **iPhone API**: `python -m assistant.api --tailscale` (auto-started by `Launch Calendar.command`)
+- **Thinking HUD**: `python -m assistant.thinking_hud` (auto-started too) — an always-on-top card, deliberately its own app rather than part of the calendar window, so a command given from the phone is visible in whatever you were actually working in. Fed by `assistant/trace_bus.py`; never takes focus
 - **LLM engine**: configured via `config.yaml` → `llm_engine` (ollama/openai/gemini/claude)
 - **NLU Tracking**: `DOCUMENTATION/NLU_TRACKING.md` — auto-appended after every action (success + failure) from both Mac and iOS, labelled by parse method and source
 - **Scenario Bugs**: `DOCUMENTATION/SCENARIO_BUG.md` — auto-appended on failures (parse errors, unknown intents, action errors) for regression review

@@ -88,10 +88,13 @@ class Pipeline:
         self._tts = Speaker(config.tts)
 
         self.status_queue: queue.Queue[str] = queue.Queue()
-        # Stage-by-stage "thinking" trace for the Mac ThinkingPanel — the same
-        # timeline the iPhone renders from /voice's `trace`. Items are dicts:
-        # {"type": "begin"} | {"type": "step", ...TraceStep} | {"type": "result", ...}
-        self.trace_queue: queue.Queue[dict] = queue.Queue()
+        # Stage-by-stage "thinking" trace — the same timeline the iPhone renders
+        # from /voice's `trace`. It goes out over assistant.trace_bus rather than
+        # staying in this process: the panel that draws it is its own app now
+        # (assistant.thinking_hud), so that it can float over whatever you are
+        # actually looking at, and show the phone's commands with the calendar
+        # app closed. `_trace_run` is the id tying one run's lines together.
+        self._trace_run: str | None = None
         self._busy = threading.Event()
         self._trigger_lock = threading.Lock()
         self._phase = STATUS_IDLE  # tracks current stage for button re-press logic
@@ -1101,11 +1104,12 @@ class Pipeline:
         return choice or "send"
 
     def _trace_begin(self):
-        """Start a trace whose steps stream to the UI as they happen."""
+        """Start a trace whose steps stream to the HUD as they happen."""
+        from assistant import trace_bus
         from assistant.trace import Trace
         trace = Trace(source="mac")
-        trace.on_step(lambda st: self.trace_queue.put({"type": "step", **st.to_dict()}))
-        self.trace_queue.put({"type": "begin"})
+        self._trace_run = trace_bus.publish_begin("Mac")
+        trace.on_step(lambda st: trace_bus.publish_step(self._trace_run, st.to_dict()))
         return trace
 
     @staticmethod
@@ -1133,12 +1137,18 @@ class Pipeline:
 
     def _trace_late_step(self, stage: str, title: str, detail: str = "", ok: bool = True) -> None:
         """Append a step after the run finished (background self-check)."""
-        self.trace_queue.put({"type": "step", "stage": stage, "title": title,
-                              "detail": detail, "ms": 0, "at_ms": 0, "ok": ok})
+        if self._trace_run is None:
+            return
+        from assistant import trace_bus
+        trace_bus.publish_step(self._trace_run, {"stage": stage, "title": title,
+                                                 "detail": detail, "ms": 0, "at_ms": 0, "ok": ok})
 
     def _trace_result(self, **fields) -> None:
         """Close the trace with the result card payload (may be empty)."""
-        self.trace_queue.put({"type": "result", **fields})
+        if self._trace_run is None:
+            return
+        from assistant import trace_bus
+        trace_bus.publish_result(self._trace_run, fields)
 
     def _set_status(self, status: str, message: str = "") -> None:
         """Push (status, message) to the queue. Message is shown as a UI toast."""

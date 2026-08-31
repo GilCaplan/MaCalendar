@@ -81,6 +81,7 @@ tts:
 api:
   key: null            # optional secret — set a string to require X-API-Key header on all requests
                        # recommended when using --tailscale or --lan
+  port: 8080           # where the phone API listens; the thinking HUD uses this to reach it
 
 # Hebrew calendar + Jewish/Israeli holidays (all computed offline via pyluach)
 hebrew_calendar:
@@ -98,9 +99,11 @@ ui:
   font_coursework: 13
   compact_ui: false
   accent_color: "#f5a524"   # hex; brand accent used app-wide (also editable from Settings → Accent Color)
-  show_thinking: true       # show the assistant's stage-by-stage thinking panel while a command runs
-  thinking_auto_open: true  # false = leave it closed, just show the chip by the mic
-  thinking_corner: "bottom-right"   # bottom-right | bottom-left | top-right | top-left
+  show_thinking: true       # show the assistant's stage-by-stage thinking HUD while a command runs.
+                            # The HUD is a separate always-on-top app (assistant.thinking_hud),
+                            # started by Launch Calendar.command; it re-reads this while running.
+  thinking_corner: "bottom-right"   # which screen corner it parks in until you drag it:
+                            # bottom-right | bottom-left | top-right | top-left
 
 
 todo:

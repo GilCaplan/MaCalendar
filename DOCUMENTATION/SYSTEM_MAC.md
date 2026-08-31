@@ -71,7 +71,9 @@ Hotkey (Ctrl+J) or Mic Button
 | `assistant/actions/todo/action.py` | 5 todo actions (create/complete/delete/update/query). Multi-task create via `titles: List[str]`. |
 | `assistant/actions/__init__.py` | `ActionRegistry` Borg singleton. Builds system prompt for LLM. |
 | `assistant/db.py` | Thread-safe SQLite. `get_db()` singleton. Indexes on `events(date)`, `events(series_id)`, `todos(list, completed)`. |
-| `assistant/calendar_ui/window.py` | Main PyQt6 window. Six-view stack: Month/Week/Day/Tasks/Timer/Coursework. |
+| `assistant/calendar_ui/window.py` | Main PyQt6 window. Six-view stack: Month/Week/Day/Tasks/Timer/Coursework. Note it draws **no** assistant trace: that moved out to `assistant/thinking_hud.py`. |
+| `assistant/thinking_hud.py` | The assistant's thinking card, as its own process — always on top, never focused, translucent until you hover it. It is separate on purpose: a command given from the phone arrives while you are working in something else, and the calendar app may not even be open. Started by `Launch Calendar.command`; tails `assistant/trace_bus.py`. Settings › Assistant (`ui.show_thinking`, `ui.thinking_corner`) still control it — it re-reads `config.yaml` when the mtime changes. **Not `Qt.Tool`**: macOS hides tool windows whenever their app is inactive, and this one never is. |
+| `assistant/calendar_ui/thinking_panel.py` | The card itself (step rows, result card, tap-a-word fix, 👍/👎). Just a widget; the HUD is what hosts it. |
 | `assistant/calendar_ui/day_view.py` | Hourly timeline, resize handles (8px top/bottom), drag-to-move. |
 | `assistant/calendar_ui/week_view.py` | 7-column week grid, resize handles, drag-to-move. |
 | `assistant/calendar_ui/month_view.py` | Month grid, shades Sun/Tue/Thu/Sat columns. |
