@@ -160,6 +160,14 @@ def _fmt_duration(total_seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 
+def _fmt_minutes(minutes: int) -> str:
+    """45 → '45 min'; 120 → '2 h'; 150 → '2 h 30 min'."""
+    if minutes < 60:
+        return f"{minutes} min"
+    hours, mins = divmod(minutes, 60)
+    return f"{hours} h" if not mins else f"{hours} h {mins} min"
+
+
 def _fmt_earnings(total_seconds: float, hourly_rate: float, currency: str = "ILS") -> str:
     if hourly_rate <= 0:
         return ""
@@ -1545,18 +1553,62 @@ class TimerCard(QWidget):
                 self._sessions_panel.reload()
             self.changed.emit()
 
+    # Presets for the auto-stop submenu. The point of the setting is the timer
+    # you forgot to stop, so the useful values are "a working session" long.
+    _AUTO_STOP_PRESETS = [
+        ("No limit", 0), ("30 minutes", 30), ("1 hour", 60), ("2 hours", 120),
+        ("4 hours", 240), ("8 hours", 480),
+    ]
+
+    def _auto_stop_menu(self, parent_menu):
+        """Set auto-stop without opening the settings dialog.
+
+        It used to live only inside "Edit timer settings", as a spin box called
+        "Max session:" — so the one thing you want the moment you notice a timer
+        has been running for thirteen hours took a modal dialog to reach.
+        """
+        current = self._timer.get("max_session_minutes", 0) or 0
+        label = "Auto-stop: off" if not current else f"Auto-stop: {_fmt_minutes(current)}"
+        sub = parent_menu.addMenu(label)
+        acts = {}
+        for text, minutes in self._AUTO_STOP_PRESETS:
+            act = sub.addAction(text)
+            act.setCheckable(True)
+            act.setChecked(minutes == current)
+            acts[act] = minutes
+        sub.addSeparator()
+        acts[sub.addAction("Custom…")] = None
+        return acts
+
+    def _set_auto_stop(self, minutes: "int | None") -> None:
+        if minutes is None:
+            from PyQt6.QtWidgets import QInputDialog
+            minutes, ok = QInputDialog.getInt(
+                self, "Auto-stop after",
+                "Stop a running session automatically after how many minutes?\n(0 = no limit)",
+                self._timer.get("max_session_minutes", 0) or 0, 0, 1440, 15,
+            )
+            if not ok:
+                return
+        self._db.update_timer(self._timer["id"], max_session_minutes=int(minutes))
+        self.reload_timer()
+        self.changed.emit()
+
     def _on_more(self) -> None:
         from PyQt6.QtWidgets import QMenu
         menu = QMenu(self)
         log_act = menu.addAction("Log past time…")
         menu.addSeparator()
+        auto_stop_acts = self._auto_stop_menu(menu)
         edit_act = menu.addAction("Edit timer settings")
         archive_act = menu.addAction("Archive timer")
         menu.addSeparator()
         del_act = menu.addAction("Delete timer…")
 
         action = menu.exec(self._action_btn.mapToGlobal(self._action_btn.rect().bottomLeft()))
-        if action == log_act:
+        if action in auto_stop_acts:
+            self._set_auto_stop(auto_stop_acts[action])
+        elif action == log_act:
             self._on_log_time()
         elif action == edit_act:
             self._on_edit()

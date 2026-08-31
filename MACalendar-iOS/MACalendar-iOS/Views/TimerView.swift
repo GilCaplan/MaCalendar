@@ -112,6 +112,31 @@ struct TimerView: View {
                             Button { editingTimer = t } label: { Label("Edit", systemImage: "pencil") }
                                 .tint(.blue)
                         }
+                        // Auto-stop was reachable only through the edit sheet, as a
+                        // text field called "Max session length". The moment you
+                        // want it is when you notice a timer has run all night, so
+                        // it is one long-press away now.
+                        .contextMenu {
+                            Menu {
+                                ForEach(AutoStop.presets, id: \.minutes) { preset in
+                                    Button {
+                                        Task {
+                                            await api.updateTimer(t.id, ["max_session_minutes": preset.minutes])
+                                            await load()
+                                        }
+                                    } label: {
+                                        if preset.minutes == t.maxSessionMinutes {
+                                            Label(preset.label, systemImage: "checkmark")
+                                        } else {
+                                            Text(preset.label)
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Label(AutoStop.menuTitle(t.maxSessionMinutes), systemImage: "clock.badge.exclamationmark")
+                            }
+                            Button { editingTimer = t } label: { Label("Edit timer", systemImage: "pencil") }
+                        }
                     }
                 }
                 Section(counters.isEmpty ? "Counters — none yet" : "Counters") {
@@ -172,6 +197,37 @@ struct TimerView: View {
     private func toggle(_ t: WorkTimer) async {
         if t.running != nil { await api.stopTimer(t.id) } else { await api.startTimer(t.id) }
         await load()
+    }
+}
+
+// MARK: - Auto-stop
+
+/// The "stop a session that has been running too long" presets, shared by the
+/// row's long-press menu and the edit sheet so both offer the same choices.
+/// Mirrors `_AUTO_STOP_PRESETS` in the Mac's timer_view.py.
+enum AutoStop {
+    struct Preset { let label: String; let minutes: Int }
+
+    static let customTag = -1
+
+    static let presets: [Preset] = [
+        Preset(label: "No limit", minutes: 0),
+        Preset(label: "30 minutes", minutes: 30),
+        Preset(label: "1 hour", minutes: 60),
+        Preset(label: "2 hours", minutes: 120),
+        Preset(label: "4 hours", minutes: 240),
+        Preset(label: "8 hours", minutes: 480),
+    ]
+
+    /// "45 min", "2 h", "2 h 30 min" — matches the Mac's `_fmt_minutes`.
+    static func format(_ minutes: Int) -> String {
+        if minutes < 60 { return "\(minutes) min" }
+        let (h, m) = (minutes / 60, minutes % 60)
+        return m == 0 ? "\(h) h" : "\(h) h \(m) min"
+    }
+
+    static func menuTitle(_ minutes: Int) -> String {
+        minutes == 0 ? "Auto-stop: off" : "Auto-stop: \(format(minutes))"
     }
 }
 
@@ -340,6 +396,7 @@ private struct NewTimerSheet: View {
     @State private var rate = ""
     @State private var currency = "ILS"
     @State private var maxMinutes = ""
+    @State private var maxMinutesChoice = 0
     @State private var color: Color = .blue
     @State private var saving = false
 
@@ -358,7 +415,13 @@ private struct NewTimerSheet: View {
                         Picker("", selection: $currency) { ForEach(["ILS", "USD", "EUR", "GBP"], id: \.self) { Text($0) } }.labelsHidden()
                     }
                     if kind == 0 {
-                        TextField("Max session length (minutes, 0 = none)", text: $maxMinutes).keyboardType(.numberPad)
+                        Picker("Auto-stop after", selection: $maxMinutesChoice) {
+                            ForEach(AutoStop.presets, id: \.minutes) { Text($0.label).tag($0.minutes) }
+                            Text("Custom…").tag(AutoStop.customTag)
+                        }
+                        if maxMinutesChoice == AutoStop.customTag {
+                            TextField("Minutes", text: $maxMinutes).keyboardType(.numberPad)
+                        }
                     }
                     ColorPicker("Colour", selection: $color, supportsOpacity: false)
                 }
@@ -377,6 +440,11 @@ private struct NewTimerSheet: View {
         }
     }
 
+    /// The picker's value, or the typed one when it says Custom.
+    private var resolvedMaxMinutes: Int {
+        maxMinutesChoice == AutoStop.customTag ? (Int(maxMinutes) ?? 0) : maxMinutesChoice
+    }
+
     private func prefill() {
         if let t = editingTimer {
             kind = 0
@@ -384,6 +452,9 @@ private struct NewTimerSheet: View {
             rate = t.hourlyRate == 0 ? "" : String(t.hourlyRate)
             currency = t.currency
             maxMinutes = t.maxSessionMinutes == 0 ? "" : String(t.maxSessionMinutes)
+            // A value that isn't one of the presets still has to survive editing.
+            maxMinutesChoice = AutoStop.presets.contains { $0.minutes == t.maxSessionMinutes }
+                ? t.maxSessionMinutes : AutoStop.customTag
             color = Color(hex: t.color) ?? settings.accentColor
         } else if let c = editingCounter {
             kind = 1
@@ -402,7 +473,7 @@ private struct NewTimerSheet: View {
         let r = Double(rate.replacingOccurrences(of: ",", with: ".")) ?? 0
         if let t = editingTimer {
             await api.updateTimer(t.id, ["title": title, "hourly_rate": r, "currency": currency,
-                                         "color": hex, "max_session_minutes": Int(maxMinutes) ?? 0])
+                                         "color": hex, "max_session_minutes": resolvedMaxMinutes])
             await onSaved(); dismiss(); return
         }
         if let c = editingCounter {
@@ -413,7 +484,7 @@ private struct NewTimerSheet: View {
         let ok: Bool
         if kind == 0 {
             ok = await api.createTimer(["title": title, "hourly_rate": r, "currency": currency, "color": hex,
-                                        "max_session_minutes": Int(maxMinutes) ?? 0])
+                                        "max_session_minutes": resolvedMaxMinutes])
         } else {
             ok = await api.createCounter(["title": title, "price_per_unit": r, "currency": currency, "color": hex])
         }
