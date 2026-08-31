@@ -70,7 +70,9 @@ class _FakePipeline:
         self._parser = parser
         self._tts = MagicMock()
         self.status_queue: "queue.Queue" = queue.Queue()
-        self.trace_queue: "queue.Queue" = queue.Queue()
+        # Trace steps go out over assistant.trace_bus now; None means "no run
+        # open", which _trace_late_step treats as nothing to append to.
+        self._trace_run = None
 
     def _set_status(self, status: str, message: str = "") -> None:
         self.status_queue.put((status, message))

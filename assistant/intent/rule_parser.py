@@ -29,6 +29,8 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from assistant.intent.list_split import lead_verb, split_items
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -988,7 +990,7 @@ _TODO_TRAIL = re.compile(
 
 def _todo_titles_from_text(text: str, temporal_spans, span) -> list[str]:
     """'remind me tomorrow to send the syllabus to Guri' → ['send the syllabus to Guri'];
-    'add buy milk, eggs and bread to my list' → ['buy milk', 'eggs', 'bread']."""
+    'add buy milk, eggs and bread to my list' → ['buy milk', 'buy eggs', 'buy bread']."""
     t = text.strip().rstrip(".!?")
     m = _TODO_LEAD.match(t)
     if not m:
@@ -1003,11 +1005,32 @@ def _todo_titles_from_text(text: str, temporal_spans, span) -> list[str]:
     body = re.sub(r"\s+(?:due|by)\s+.*$", "", body, flags=re.IGNORECASE).strip(" ,;:")
     if not body:
         return []
-    # split lists: commas / semicolons / " and " (but keep "X and Y" when it's a 2-word object)
-    parts = re.split(r"\s*[,;]\s*|\s+and\s+(?=\w)", body)
-    parts = [p.strip(" .") for p in parts if p.strip(" .")]
-    parts = [p for p in parts if p.lower() not in _PRONOUN_TITLES]
-    return parts[:10]
+    return split_items(body, drop=_PRONOUN_TITLES)[:10]
+
+
+# "put it on the groceries list" / "tag it as coursework" — the user naming a
+# tag outright. Resolved against the real palette by CreateTodoAction; a word
+# that isn't a tag is dropped there.
+_TODO_TAG_PATTERNS = (
+    re.compile(r"\b(?:on|to)\s+(?:my|the)\s+([\w-]+)\s+list\b", re.IGNORECASE),
+    re.compile(r"\btag(?:ged)?\s+(?:it\s+)?(?:as|with)\s+([\w-]+)", re.IGNORECASE),
+    re.compile(r"\bunder\s+([\w-]+)\s*$", re.IGNORECASE),
+)
+# List names, not tags.
+_NOT_TAG_WORDS = frozenset({"today", "general", "todo", "to-do", "task", "tasks",
+                            "my", "the", "this", "that", "shopping"})
+
+
+def _todo_tags_from_text(text: str) -> list[str]:
+    """Tag names the user said out loud, if any."""
+    tags: list[str] = []
+    for pattern in _TODO_TAG_PATTERNS:
+        m = pattern.search(text)
+        if m:
+            word = m.group(1).strip().lower()
+            if word and word not in _NOT_TAG_WORDS and word not in tags:
+                tags.append(word)
+    return tags
 
 
 def _extract_title(span, temporal_spans: list[tuple[int, int]]) -> str | None:
@@ -1241,6 +1264,12 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
         if phrase_titles:
             slots["titles"] = phrase_titles
         elif title and title.lower() not in _PRONOUN_TITLES:
+            # The noun-chunk fallback keeps only the object: "call the dentist"
+            # became a task called "dentist". Put the verb back so the task says
+            # what to do rather than what it is about.
+            verb = lead_verb(span.text.strip())
+            if verb and not title.lower().startswith(verb.lower()):
+                title = f"{verb} {title}"
             slots["titles"] = [title]
         if temporal.get("date"):
             slots["due_date"] = temporal["date"]
@@ -1255,6 +1284,9 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
             if pattern.search(span_lower):
                 slots["priority"] = level
                 break
+        tags = _todo_tags_from_text(span.text)
+        if tags:
+            slots["tags"] = tags
 
     elif action_name in ("delete_todo", "complete_todo", "update_todo"):
         # For complete/update/delete, also try extracting the subject noun

@@ -90,8 +90,9 @@ def test_two_todos_correct_titles(parser):
     result = parser.analyze("buy milk and call mom", current_view="month")
     action_names = [name for name, _ in result.intents]
     assert action_names == ["create_todo", "create_todo"]
+    # The verb stays on the title: a task called "milk" doesn't say what to do.
     titles = [intent.titles[0].lower() for _, intent in result.intents]
-    assert titles == ["milk", "mom"]
+    assert titles == ["buy milk", "call mom"]
 
 
 # ---------------------------------------------------------------------------

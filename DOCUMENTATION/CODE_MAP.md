@@ -99,6 +99,74 @@
 
 ---
 
+## Assistant trace — `assistant/trace_bus.py` + `assistant/thinking_hud.py`
+
+The card showing what the assistant did is its own process. Producers publish
+to an append-only JSONL file; the HUD tails it. Two line shapes: a whole run at
+once (`kind: "trace"` — what the API server publishes for the phone) or a run
+streaming as it happens (`begin` / `step` … / `result` — what the Mac pipeline
+publishes, so the card fills in live).
+
+| What | Location |
+|------|----------|
+| `publish()` — one finished run | `trace_bus.py` L66 |
+| `publish_begin()` / `publish_step()` / `publish_result()` — a streaming run | `trace_bus.py` L75–88 |
+| `_trim()` — only ever runs at a run's start, so no run is cut in half | `trace_bus.py` L91 |
+| `Pipeline._trace_begin()` — where the Mac's run is opened | `pipeline.py` L1106 |
+| `ThinkingHUD` — frameless, always-on-top, never focused | `thinking_hud.py` L98 |
+| `ThinkingHUD.apply_entry()` — renders one bus line | `thinking_hud.py` L201 |
+| `_BusReader.poll()` — tails the bus and notices config.yaml changing | `thinking_hud.py` L323 |
+
+Three ways this window has already managed to be invisible while insisting it
+was fine (`isVisible()` true, right size, right place):
+
+- It is `Qt.Window`, **not** `Qt.Tool`. macOS hides a tool window whenever its
+  application is not active, and this app is never active (accessory, no Dock
+  icon) — so `Qt.Tool` hid it in exactly the case it exists for.
+- `_follow_every_space()` sets the Cocoa collection behaviour. Without it the
+  card belongs to the Space it was created on, so switching to a full-screen app
+  left it behind. It is re-applied on every show, and skipped unless
+  `QApplication.platformName() == "cocoa"` — handing an offscreen-platform
+  `winId()` to pyobjc **segfaults the interpreter**, which took the test suite
+  down with it.
+- `_park()` clamps a restored position into the current screen. A stale
+  `~/.assistant_tools/hud_position.json` from a screen that no longer exists put
+  it just below the usable area, drawn but off the edge.
+
+Debugging one of these from the outside: probe the real NSWindow
+(`objc.objc_object(c_void_p=...int(self.winId())).window()`) for `isVisible()`,
+`collectionBehavior()`, `level()` and `alphaValue()` — Qt's own view of the
+window says everything is fine in all three cases.
+
+---
+
+## Multi-item splitting — `assistant/intent/list_split.py`
+
+One phrase → the several things it asks for. "buy chicken and rice" is two
+tasks and the verb is shared out ("buy rice", not "rice"); an "and" after a
+preposition ("a gift for mom and dad") or inside a name ("fish and chips") is
+not a separator. Pure strings, no spaCy.
+
+| What | Location |
+|------|----------|
+| `ACTION_VERBS` / `ACTION_PHRASES` — verbs a title can start with | L26 / L37 |
+| `split_on_and()` — the separator-vs-internal "and" decision | L70 |
+| `distribute_lead_verb()` — hands the verb to conjuncts without one | L89 |
+| `split_items()` — the whole thing; used by the rule parser and the todo actions | L106 |
+
+## Task tags — `assistant/actions/todo/tagging.py`
+
+Keyword classifier over a task title, same shape as the event categories.
+Returns a tag only when the palette has it, and nothing when unsure.
+
+| What | Location |
+|------|----------|
+| `KEYWORDS` — per-tag word lists | L22 |
+| `infer_tag()` | L85 |
+| `suggest_tags()` / `resolve_tags()` — palette-aware wrappers | L119 / L131 |
+
+---
+
 ## LLM Intent Parser — `assistant/intent/parser.py`
 
 | What | Location |

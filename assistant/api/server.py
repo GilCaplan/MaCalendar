@@ -1651,12 +1651,16 @@ def create_app() -> Flask:
         if not title:
             return jsonify({"error": "Missing 'title' field", "code": 400}), 400
         db = get_db()
-        if "tags" in data:
-            tags = data.get("tags") or []
-        else:
-            # Client didn't say — fall back to the server-side "tag mode".
-            auto_tag = load_config().todo.auto_tag
-            tags = [auto_tag] if auto_tag else []
+        tags = data.get("tags") or []
+        if not tags:
+            # Client didn't say — server-side "tag mode", else infer from the
+            # title, the same order of precedence voice creation uses.
+            todo_cfg = load_config().todo
+            if todo_cfg.auto_tag:
+                tags = [todo_cfg.auto_tag]
+            elif getattr(todo_cfg, "auto_tag_infer", True):
+                from assistant.actions.todo.tagging import suggest_tags
+                tags = suggest_tags(title, [r["name"] for r in db.get_tags()])
         todo_id = db.create_todo(
             title=title,
             list_name=data.get("list_name", "today"),

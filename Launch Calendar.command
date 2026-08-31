@@ -85,8 +85,16 @@ PORT=8080
 python -m assistant.api --tailscale --port $PORT &
 API_PID=$!
 
+# Start the thinking HUD — its own always-on-top window, deliberately not part
+# of the calendar app: a command given from the phone usually arrives while you
+# are working in something else, and the HUD has to be visible there. It reads
+# the trace bus, so it keeps working whichever process ran the command.
+MACALENDAR_API_PORT=$PORT python -m assistant.thinking_hud &
+HUD_PID=$!
+
 echo "--------------------------------------------------------"
 echo "📱 iPhone API started (PID $API_PID)"
+echo "🪟 Thinking HUD started (PID $HUD_PID)"
 echo "   1. Ensure Tailscale is UP on both Mac and iPhone."
 echo "   2. In the iOS app, set Server URL to the Tailscale IP + :$PORT"
 echo "   3. (Optional) Open Xcode to deploy: open MACalendar-iOS/MACalendar-iOS.xcodeproj"
@@ -98,8 +106,9 @@ echo "--------------------------------------------------------"
 # Start the Mac calendar app (foreground — closing this window stops everything)
 python -m assistant.main
 
-# When the Mac app exits, shut down the API server too
+# When the Mac app exits, shut down the API server and the HUD too
 kill $API_PID 2>/dev/null
+kill $HUD_PID 2>/dev/null
 if [ ! -z "$OLLAMA_PID" ]; then
     kill $OLLAMA_PID 2>/dev/null
 fi

@@ -1290,6 +1290,7 @@ class TodoListWidget(QWidget):
         self._sort_mode: str = "manual"  # "manual" | "priority" | "due_date"
         self._tag_filter: list[str] = []  # any of: tag names | UNTAGGED_KEY (empty = all)
         self._auto_tag: str = ""         # "tag mode": tag every new task with this
+        self._auto_tag_infer: bool = True   # else: infer a tag from the title
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -1342,8 +1343,9 @@ class TodoListWidget(QWidget):
                 return True
         return False
 
-    def set_auto_tag(self, tag: str) -> None:
+    def set_auto_tag(self, tag: str, infer: bool = True) -> None:
         self._auto_tag = tag or ""
+        self._auto_tag_infer = bool(infer)
 
     def _update_drag_enabled(self) -> None:
         # Manual reorder only makes sense when every row is visible.
@@ -1351,12 +1353,17 @@ class TodoListWidget(QWidget):
         self._list_widget.setDragEnabled(drag_on)
         self._list_widget.setAcceptDrops(drag_on)
 
-    def _new_task_tags(self) -> list[str]:
+    def _new_task_tags(self, title: str = "") -> list[str]:
         """Tag mode wins; otherwise inherit the active filter tag so the new
-        task doesn't vanish from the list the user is looking at."""
+        task doesn't vanish from the list the user is looking at; failing both,
+        infer one from the title, the same way voice and the phone do."""
         if self._auto_tag:
             return [self._auto_tag]
-        return [t for t in self._tag_filter if t != UNTAGGED_KEY]
+        inherited = [t for t in self._tag_filter if t != UNTAGGED_KEY]
+        if inherited or UNTAGGED_KEY in self._tag_filter or not self._auto_tag_infer:
+            return inherited        # looking at Untagged means untagged is the point
+        from assistant.actions.todo.tagging import suggest_tags
+        return suggest_tags(title)
 
     def _sorted_todos(self, todos: list) -> list:
         if self._sort_mode == "priority":
@@ -1462,7 +1469,7 @@ class TodoListWidget(QWidget):
             self._plus_label.show()
             if title:
                 self._db.create_todo(
-                    title=title, list_name=self._list_name, tags=self._new_task_tags()
+                    title=title, list_name=self._list_name, tags=self._new_task_tags(title)
                 )
                 QTimer.singleShot(0, self.todo_changed.emit)
 
@@ -2011,6 +2018,7 @@ class TodoView(QWidget):
         self._show_completed = config.todo.show_completed if config else False
         self._sync_mode = config.todo.sync.mode if config else "off"
         self._auto_tag = getattr(config.todo, "auto_tag", "") if config else ""
+        self._auto_tag_infer = getattr(config.todo, "auto_tag_infer", True) if config else True
         self._ui_config = config.ui if config else None
         self._build_ui()
 
@@ -2057,7 +2065,7 @@ class TodoView(QWidget):
         self._content_layout.addWidget(self._today_header)
 
         self._today_list = TodoListWidget(self._db, "today", dark=self._dark)
-        self._today_list.set_auto_tag(self._auto_tag)
+        self._today_list.set_auto_tag(self._auto_tag, self._auto_tag_infer)
         self._today_list.todo_changed.connect(self.refresh)
         self._today_list.count_changed.connect(self._today_header.set_count)
         self._content_layout.addWidget(self._today_list)
@@ -2075,7 +2083,7 @@ class TodoView(QWidget):
         self._content_layout.addWidget(self._general_header)
 
         self._general_list = TodoListWidget(self._db, "general", dark=self._dark)
-        self._general_list.set_auto_tag(self._auto_tag)
+        self._general_list.set_auto_tag(self._auto_tag, self._auto_tag_infer)
         self._general_list.todo_changed.connect(self.refresh)
         self._general_list.count_changed.connect(self._general_header.set_count)
         self._content_layout.addWidget(self._general_list)
@@ -2136,8 +2144,8 @@ class TodoView(QWidget):
 
     def _on_auto_tag_changed(self, tag: str) -> None:
         self._auto_tag = tag
-        self._today_list.set_auto_tag(tag)
-        self._general_list.set_auto_tag(tag)
+        self._today_list.set_auto_tag(tag, self._auto_tag_infer)
+        self._general_list.set_auto_tag(tag, self._auto_tag_infer)
         if self._config is not None:
             self._config.todo.auto_tag = tag
             self._write_todo_config_key("auto_tag", tag)

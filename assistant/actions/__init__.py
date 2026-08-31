@@ -114,6 +114,8 @@ class ActionRegistry:
             "",
             "Rules for tasks vs events:",
             "  - 'remind me to <do something>', 'add a task', 'I need to …', 'put X on my list' → create_todo. Use the 'titles' array; split 'A, B and C' into separate titles; a due date ('due friday', 'by tomorrow') goes in due_date, not in the title.",
+            "  - ONE thing per title, and repeat the shared verb: 'buy chicken and rice' → titles ['buy chicken', 'buy rice']; 'call mom and dad' → ['call mom', 'call dad']. Never summarise a list of items into an invented title — 'chicken and rice' is two tasks, NOT one task called 'buy groceries'. Keep the user's own words.",
+            "  - But an 'and' that follows a preposition (for / to / with / from) is NOT a split — it joins that preposition's object: 'buy a gift for mom and dad' is ONE task, 'send the syllabus to Guri and Ravid' is ONE task. Nor is an 'and' inside the name of one thing: 'fish and chips' is ONE task.",
             "  - 'remind me about <thing> at <clock time>' or anything with a specific clock time → create_event.",
             "  - Do not add an extra create_event for a command that is only about tasks.",
             "",

@@ -104,6 +104,40 @@ title) rather than all of them; a requirement that any correction cite a token
 actually spoken; and a stronger model for the checker than the one doing the
 first pass.
 
+## Run 5 — 2026-08-31 (89 commands)
+
+**93% correct**, 0 parse errors. First result p50 5.5 s / p95 13.9 s.
+By area: query/adversarial/mixed/update-delete 100%, events 95%, from-chats 87%,
+**tasks 88% (was 83%)**. By path: rule 97% at 0.1 s, llm 93%, hybrid 78%.
+
+The headline is inside run-to-run noise of run 4's 94%: the one extra failure is
+`from-chats` "sadna on sunday the 15th at 9 am then driving lesson at 8 am",
+which returned one event instead of two. Re-run four times either side of this
+change it returns two every time — an LLM-path flake, not a regression.
+
+What this run was measuring: **a multi-item task command produced one task.**
+"I want to buy chicken and rice" gave a single task — on the LLM path a merged
+"Buy chicken and rice" (and, as reported, sometimes an invented "buy
+groceries"), on the rule path "buy chicken" plus a task called "rice". Now it is
+one task per item with the verb shared out, and a tag inferred from each title.
+
+Six cases were added to the corpus for it — `multi/shared-verb`,
+`multi/shared-verb-3`, `multi/shared-verb-people`, `single/internal-and`,
+`single/inferred-tag`, plus row counts on the existing multi cases — and all six
+pass on the rule path at ~30 ms.
+
+The checker could not have caught this before: `titles_contain: ["chicken",
+"rice"]` is satisfied by one task called "buy chicken and rice" just as well as
+by two. It now also checks `todo_count` and `tags_contain`.
+
+The two remaining task failures are the same two as run 4 (gap 3, hybrid
+over-creation on task lists with due dates), unchanged by this work.
+
+One thing the 8B model still gets wrong on the LLM path, and did before this
+change too: it splits "buy a birthday gift for mom and dad" into two tasks, in
+spite of an explicit prompt rule not to. The rule parser gets it right and
+handles that phrasing at 0.95 confidence, so the model rarely sees it.
+
 ## Remaining gaps (ranked, from the 2026-08-26 run)
 
 1. ~~**Rule parser splits multi-event sentences into one**~~ — fixed, see above. ("lunch with Tal on monday at noon and coffee with Ezra on friday at 9" → only lunch). It is confident (0.90), so the LLM never sees it. Fix: lower confidence when a span contains two time expressions, forcing hybrid.

@@ -14,8 +14,12 @@ class CreateTodoIntent(BaseIntent):
     list_name: str = "today"   # 'today' | 'general'
     priority: str = "none"     # 'none' | 'low' | 'medium' | 'high'
     due_date: Optional[str] = None
+    # Tag names the user said out loud ("put it on the groceries list"). Only
+    # names that exist in the palette survive — CreateTodoAction resolves them,
+    # and falls back to inferring a tag from the title when none were given.
+    tags: List[str] = []
 
-    @field_validator("titles", mode="before")
+    @field_validator("titles", "tags", mode="before")
     @classmethod
     def coerce_titles(cls, v):
         if isinstance(v, str):
