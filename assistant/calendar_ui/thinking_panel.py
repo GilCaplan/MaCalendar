@@ -44,6 +44,21 @@ def _fmt_ms(ms: int) -> str:
     return f"{ms / 1000:.1f} s" if ms >= 1000 else f"{ms} ms"
 
 
+# What the producers call themselves → what to call it on screen. The API
+# server publishes `Trace.source`, which is "ios"; the calendar window used to
+# hardcode "iPhone" on its way past, and nothing did once the HUD started
+# reading the source off the bus itself.
+_SOURCE_LABELS = {
+    "mac": "Mac", "macos": "Mac", "desktop": "Mac", "laptop": "Mac",
+    "ios": "iPhone", "iphone": "iPhone", "phone": "iPhone", "ipad": "iPad",
+    "watch": "Apple Watch", "watchos": "Apple Watch",
+}
+
+
+def _source_label(source: str) -> str:
+    return _SOURCE_LABELS.get((source or "").strip().lower(), source or "Mac")
+
+
 class _Theme:
     """Resolved colors for one theme pass — passed down to every child."""
 
@@ -621,10 +636,11 @@ class ThinkingPanel(QFrame):
 
         `source` says which device it came from: the Mac runs the phone's
         commands too, so the panel labels them rather than leaving you to guess
-        why a timeline appeared while you weren't talking to it.
+        why a timeline appeared while you weren't talking to it. A command you
+        spoke at the Mac is just "Thinking" — you know where it came from.
         """
-        self._source = source
-        self._title.setText("Thinking" if source == "Mac" else f"Thinking · from your {source}")
+        self._source = label = _source_label(source)
+        self._title.setText("Thinking" if label == "Mac" else f"Thinking · from your {label}")
         for row in self._rows:
             row.setParent(None)
             row.deleteLater()

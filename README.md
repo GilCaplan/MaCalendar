@@ -10,7 +10,24 @@ A privacy-focused, voice-driven calendar assistant for macOS. This tool uses loc
 
 ![MACalendar assistant architecture](DOCUMENTATION/img/assistant-architecture.svg)
 
-A spoken command goes: **Whisper (MLX, on the Apple GPU)** → **personal vocabulary auto-correct** → **rule parser** (spaCy + date recognizer; answers ~40% of commands in ~100 ms with no LLM) → **local LLM** (Ollama, llama3.1:8b) only when the rule parser is unsure, with your most similar past commands injected as examples → validation → actions → SQLite. Every command is remembered; your edits, deletes and approve/reject become feedback that improves the next parse. A live stage-by-stage trace streams to the phone. Details: [DOCUMENTATION/SYSTEM.md](DOCUMENTATION/SYSTEM.md), audit: [DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md](DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md).
+A spoken command goes: **Whisper (MLX, on the Apple GPU)** → **personal vocabulary auto-correct** → **rule parser** (spaCy + date recognizer; answers ~40% of commands in ~100 ms with no LLM) → **local LLM** (Ollama, llama3.1:8b) only when the rule parser is unsure, with your most similar past commands injected as examples → validation → actions → SQLite. Every command is remembered; your edits, deletes and approve/reject become feedback that improves the next parse. Details: [DOCUMENTATION/SYSTEM.md](DOCUMENTATION/SYSTEM.md), audit: [DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md](DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md).
+
+### Seeing what it did — the thinking HUD
+
+Every stage of that pipeline streams live to a small always-on-top card: what
+it heard, which parse path answered, what it changed, and how long each step
+took. Tap a misheard word to teach it; 👍/👎 feeds the command memory.
+
+It is **its own application**, not part of the calendar window, because a
+command given from your phone arrives while you are working in something else —
+and the calendar app may not even be open. So it floats over whatever you are
+actually in, never takes keyboard focus, and sits slightly translucent until
+you hover it. Drag it by its header to move it; right-click for Hide / Reset
+position / Quit.
+
+`Launch Calendar.command` starts it. On its own: `python -m assistant.thinking_hud`.
+Turn it off in **Settings › Assistant** (`ui.show_thinking`), or move it with
+`ui.thinking_corner`.
 
 ## Prerequisites
 
@@ -60,12 +77,27 @@ cp config.example.yaml config.yaml
   - `voice`: Preferred system voice (e.g., `"Ava"`, `"Zari"`, `"Samantha"`). Run `say -v \?` in your terminal to see all options.
   - `rate`: Talking speed.
   - `mute`: Set to `true` for a silent assistant.
+- **`ui.show_thinking`** / **`ui.thinking_corner`**: whether the thinking HUD appears,
+  and which screen corner it parks in until you drag it somewhere else.
+- **`todo.auto_tag`** / **`todo.auto_tag_infer`**: `auto_tag` is "tag mode" — every new
+  task gets that one tag. With it empty, a tag is inferred from the title instead
+  ("buy chicken" → Groceries), and only tags that already exist are ever used.
+- **`api.port`**: where the iPhone API listens (default `8080`); the HUD uses it too.
 
 ## Usage
 
 ### Starting the App
-- **The easy way:** Double-click `Launch Calendar.command` in the Finder.
-- **The terminal way:** Run `python -m assistant.main`.
+- **The easy way:** Double-click `Launch Calendar.command` in the Finder. It starts
+  everything: Ollama (if it isn't already up), the iPhone API server, the thinking
+  HUD, and the calendar window. Closing the calendar window stops the rest.
+- **The terminal way:** three processes, in any order —
+  ```bash
+  python -m assistant.main            # the calendar window
+  python -m assistant.api --tailscale # the API the iPhone talks to
+  python -m assistant.thinking_hud    # the always-on-top trace card
+  ```
+  They share no memory: the calendar DB is the source of truth, and traces travel
+  between them through `~/.assistant_tools/trace_bus.jsonl`.
 
 ### Views
 - **Month / Week / Day** — Switch between views using the toolbar buttons.
@@ -89,14 +121,26 @@ Switch to **Tasks** in the toolbar to manage your todo list with two sections:
 
 **Calendar sync:** The **Sync Today** button in the Today header pulls all of today's calendar events into your Today list as tasks. The gear icon offers additional sync options (upcoming week → General list, or clear synced tasks).
 
+**Tags:** every task can carry tags (Coursework, Groceries, Errands, Work, Personal,
+plus any you add). Filter by them with the chips above the list. A task created
+without one gets a tag inferred from its title — *"buy chicken"* → Groceries — and
+nothing at all when it isn't sure, since a wrong tag has to be undone by hand.
+Turn that off with `todo.auto_tag_infer`, or force one tag onto everything new with
+"tag mode" (`todo.auto_tag`).
+
 **Voice commands (Tasks mode):**
 When the Tasks tab is active, the mic button enters *Tasks mode* — voice commands are automatically biased towards task actions:
 - *"Add task buy groceries"* — adds a single task
 - *"Add tasks: buy milk, call dentist, walk the dog"* — adds multiple tasks at once
+- *"Buy chicken and rice"* — **one task per item**, sharing the verb: *buy chicken* and
+  *buy rice*, both tagged Groceries. Same for *"call mom and dad"*. An "and" that
+  belongs to one errand is left alone, so *"buy a gift for mom and dad"* stays a
+  single task, and so does *"fish and chips"*.
 - *"Mark buy milk done"* / *"Check off call dentist"* — complete a task
 - *"Delete buy groceries"* / *"Remove it"* — delete by title or by anaphoric "it"
 - *"Rename buy milk to buy oat milk"* — update a task
 - *"Move call dentist to general list"* — change list
+- *"Put milk and bananas on the groceries list"* — tag as you add
 - *"What tasks do I have today?"* — read out the list (switches to Tasks view)
 
 > [!TIP]
@@ -132,6 +176,18 @@ python tests/test_todo_parser.py
 # Full unit test suite
 pytest tests/
 ```
+
+Don't judge a change to the assistant by trying a couple of phrasings — run the
+audit harness, which puts a corpus of ~90 real commands through the whole path
+and reports accuracy by area and by parse path:
+
+```bash
+python -m scripts.audit_assistant              # full, ~10 min
+python -m scripts.audit_assistant --area tasks # one area
+```
+
+It writes [DOCUMENTATION/ASSISTANT_AUDIT.md](DOCUMENTATION/ASSISTANT_AUDIT.md); the
+standing conclusions live in [ASSISTANT_AUDIT_SUMMARY.md](DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md).
 
 ## iPhone App
 

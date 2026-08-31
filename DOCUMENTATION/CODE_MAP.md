@@ -117,9 +117,26 @@ publishes, so the card fills in live).
 | `ThinkingHUD.apply_entry()` — renders one bus line | `thinking_hud.py` L201 |
 | `_BusReader.poll()` — tails the bus and notices config.yaml changing | `thinking_hud.py` L323 |
 
-Gotcha: the window is `Qt.Window`, **not** `Qt.Tool`. macOS hides a tool window
-whenever its application is not active, and this app is never active (accessory,
-no Dock icon), so `Qt.Tool` made it invisible in exactly the case it exists for.
+Three ways this window has already managed to be invisible while insisting it
+was fine (`isVisible()` true, right size, right place):
+
+- It is `Qt.Window`, **not** `Qt.Tool`. macOS hides a tool window whenever its
+  application is not active, and this app is never active (accessory, no Dock
+  icon) — so `Qt.Tool` hid it in exactly the case it exists for.
+- `_follow_every_space()` sets the Cocoa collection behaviour. Without it the
+  card belongs to the Space it was created on, so switching to a full-screen app
+  left it behind. It is re-applied on every show, and skipped unless
+  `QApplication.platformName() == "cocoa"` — handing an offscreen-platform
+  `winId()` to pyobjc **segfaults the interpreter**, which took the test suite
+  down with it.
+- `_park()` clamps a restored position into the current screen. A stale
+  `~/.assistant_tools/hud_position.json` from a screen that no longer exists put
+  it just below the usable area, drawn but off the edge.
+
+Debugging one of these from the outside: probe the real NSWindow
+(`objc.objc_object(c_void_p=...int(self.winId())).window()`) for `isVisible()`,
+`collectionBehavior()`, `level()` and `alphaValue()` — Qt's own view of the
+window says everything is fine in all three cases.
 
 ---
 

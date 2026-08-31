@@ -256,3 +256,81 @@ def test_it_never_takes_the_keyboard(hud):
     # …and not Qt.Tool, which macOS hides whenever the owning app is inactive —
     # which, for a Dock-less accessory app, is always.
     assert not (widget.windowFlags() & Qt.WindowType.Tool == Qt.WindowType.Tool)
+
+
+# ---------------------------------------------------------------------------
+# Which device it says the command came from
+# ---------------------------------------------------------------------------
+
+def test_a_command_spoken_at_the_mac_is_not_labelled_as_the_phone(hud, bus):
+    widget, reader, _ = hud
+    # A phone run first, so a stale label would be visible if it didn't reset.
+    bus.publish("ios", [_step()], {})
+    reader.poll()
+    assert "iPhone" in widget.panel._title.text()
+
+    run = bus.publish_begin("Mac")
+    bus.publish_step(run, _step())
+    reader.poll()
+    assert widget.panel._title.text() == "Thinking"
+
+
+@pytest.mark.parametrize("published,shown", [
+    ("ios", "Thinking · from your iPhone"),     # what the API server publishes
+    ("iPhone", "Thinking · from your iPhone"),
+    ("mac", "Thinking"),                        # what Pipeline._trace_begin publishes
+    ("Mac", "Thinking"),
+    ("ipad", "Thinking · from your iPad"),
+])
+def test_the_source_is_named_the_way_a_person_would(hud, bus, published, shown):
+    widget, reader, _ = hud
+    bus.publish(published, [_step()], {})
+    reader.poll()
+    assert widget.panel._title.text() == shown
+
+
+# ---------------------------------------------------------------------------
+# Where it puts itself
+# ---------------------------------------------------------------------------
+
+def test_a_saved_position_off_the_current_screen_is_pulled_back_on(hud):
+    """A position saved against a screen you no longer have must not hide it.
+
+    This is how the HUD went missing: a stale `hud_position.json` put it a few
+    pixels below the usable area, so it was drawn — on screen, right size, full
+    opacity — with only its top edge showing, and nothing said why.
+    """
+    widget, _, app = hud
+    import assistant.thinking_hud as hud_mod
+
+    area = app.primaryScreen().availableGeometry()
+    hud_mod._save_position(area.left() + 40, area.bottom() + 500)   # way off the bottom
+    widget.mark_moved()
+    widget._park()
+
+    assert area.contains(widget.geometry())
+
+
+def test_a_click_on_the_header_is_not_a_drag(hud):
+    """Pressing and releasing without moving must not pin the card.
+
+    It used to save a position and mark it moved, which silently opted out of
+    corner parking for good — on the next launch it reappeared wherever that
+    stray click happened to leave it.
+    """
+    from PyQt6.QtCore import QEvent, QPointF, Qt
+    from PyQt6.QtGui import QMouseEvent
+    widget, _, _ = hud
+    import assistant.thinking_hud as hud_mod
+
+    def _mouse(kind, x, y):
+        return QMouseEvent(kind, QPointF(x, y), QPointF(x, y), QPointF(x, y),
+                           Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
+                           Qt.KeyboardModifier.NoModifier)
+
+    drag = widget._drag
+    drag.eventFilter(None, _mouse(QEvent.Type.MouseButtonPress, 100, 100))
+    drag.eventFilter(None, _mouse(QEvent.Type.MouseButtonRelease, 101, 100))   # 1px
+
+    assert not widget._moved
+    assert not os.path.exists(hud_mod.STATE_PATH)

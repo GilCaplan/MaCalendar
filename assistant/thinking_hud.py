@@ -74,6 +74,10 @@ def _save_position(x: int, y: int) -> None:
         pass
 
 
+# A press that wanders less than this is a click, not a drag.
+DRAG_SLOP = 4
+
+
 class _DragFilter(QObject):
     """Drag the frameless window by its header, the way a title bar would."""
 
@@ -81,17 +85,23 @@ class _DragFilter(QObject):
         super().__init__(window)
         self._window = window
         self._grab: QPoint | None = None
+        self._origin: QPoint | None = None
 
     def eventFilter(self, obj, event) -> bool:
         if event.type() == QEvent.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton:
-            self._grab = event.globalPosition().toPoint() - self._window.frameGeometry().topLeft()
+            self._origin = event.globalPosition().toPoint()
+            self._grab = self._origin - self._window.frameGeometry().topLeft()
         elif event.type() == QEvent.Type.MouseMove and self._grab is not None:
             self._window.move(event.globalPosition().toPoint() - self._grab)
         elif event.type() == QEvent.Type.MouseButtonRelease and self._grab is not None:
-            self._grab = None
-            pos = self._window.pos()
-            _save_position(pos.x(), pos.y())
-            self._window.mark_moved()
+            moved = (event.globalPosition().toPoint() - self._origin).manhattanLength()
+            self._grab = self._origin = None
+            # Only a real drag pins the card. A stray click on the header used
+            # to save a position and silently opt out of corner parking for good.
+            if moved >= DRAG_SLOP:
+                pos = self._window.pos()
+                _save_position(pos.x(), pos.y())
+                self._window.mark_moved()
         return False
 
 
@@ -151,6 +161,41 @@ class ThinkingHUD(QWidget):
 
     # ------------------------------------------------------------- presence
 
+    def _follow_every_space(self) -> None:
+        """Show on every Space, including over another app's full-screen window.
+
+        Without this the card belongs to the Space it was created on: switch to
+        a full-screen app — which is exactly when you are working in something
+        else and want to see what the assistant did — and it is simply not
+        there. Cocoa-only, so it is best effort; without pyobjc the HUD still
+        works, it just stays on its own Space.
+        """
+        # winId() is a real NSView pointer only under the Cocoa platform. Under
+        # the offscreen platform the tests use there is no NSWindow behind it,
+        # and handing that pointer to pyobjc segfaults the interpreter.
+        if QApplication.platformName() != "cocoa":
+            return
+        try:
+            import ctypes
+
+            import objc
+            from AppKit import (
+                NSWindowCollectionBehaviorCanJoinAllSpaces,
+                NSWindowCollectionBehaviorFullScreenAuxiliary,
+                NSWindowCollectionBehaviorStationary,
+            )
+            view = objc.objc_object(c_void_p=ctypes.c_void_p(int(self.winId())))
+            window = view.window()
+            if window is None:
+                return
+            window.setCollectionBehavior_(
+                NSWindowCollectionBehaviorCanJoinAllSpaces
+                | NSWindowCollectionBehaviorFullScreenAuxiliary
+                | NSWindowCollectionBehaviorStationary
+            )
+        except Exception as exc:
+            logger.debug("Could not make the HUD span Spaces: %s", exc)
+
     def _fade_to(self, opacity: float) -> None:
         self._fade.stop()
         self._fade.setStartValue(self.windowOpacity())
@@ -170,6 +215,10 @@ class ThinkingHUD(QWidget):
     def mark_moved(self) -> None:
         self._moved = True
 
+    def _fits(self, pos: tuple[int, int], area) -> bool:
+        """Is there room for the card anywhere near where it was left?"""
+        return area.width() >= self.width() and area.height() >= self.height()
+
     def _fit(self) -> None:
         self.setFixedSize(self.panel.width() + 2 * SHADOW_MARGIN,
                           self.panel.height() + 2 * SHADOW_MARGIN)
@@ -177,16 +226,22 @@ class ThinkingHUD(QWidget):
 
     def _park(self) -> None:
         """Sit in the configured screen corner — unless the user moved it,
-        in which case leave it exactly where they put it."""
-        if self._moved:
-            saved = _load_position()
-            if saved:
-                self.move(*saved)
-            return
+        in which case leave it where they put it, as far as the screen allows."""
         screen = QApplication.primaryScreen()
         if screen is None:
             return
         area = screen.availableGeometry()
+        if self._moved:
+            saved = _load_position()
+            if saved and self._fits(saved, area):
+                # Clamped, not trusted: a position saved against a screen you no
+                # longer have — an unplugged monitor, a resolution change — left
+                # the card drawn off the edge, invisible, with nothing to say so.
+                x = min(max(saved[0], area.left()), area.right() + 1 - self.width())
+                y = min(max(saved[1], area.top()), area.bottom() + 1 - self.height())
+                self.move(int(x), int(y))
+                return
+            self._moved = False        # it cannot fit at all — back to the corner
         corner = getattr(getattr(self._config, "ui", None), "thinking_corner", "bottom-right")
         # The shadow margin is already transparent padding inside the window, so
         # it counts toward the gap from the edge — but never let it push the
@@ -230,6 +285,9 @@ class ThinkingHUD(QWidget):
         self._park()
         self.setWindowOpacity(0.0)
         self.show()
+        # The NSWindow only exists once shown, and macOS resets the behaviour
+        # when a window is re-shown, so this is re-applied on every appearance.
+        self._follow_every_space()
         self.raise_()
         self.panel.show()
         # Under the pointer already? Then the user is looking at it; otherwise
