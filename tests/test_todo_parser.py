@@ -16,6 +16,12 @@ import tempfile
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+# This script already pointed the calendar DB at a temp file, but the command
+# memory, vocabulary and categories were still the real ones.
+from tests.isolation import isolate, assert_isolated  # noqa: E402
+isolate("macalendar-todo-parser-")
+assert_isolated()
+
 import assistant.actions.calendar  # noqa: F401
 import assistant.actions.todo      # noqa: F401
 
@@ -160,7 +166,10 @@ def run_direct_tests():
         expected_count=3,
         test_name="Multi-Task Creation (3 tasks in one voice command)",
     )
-    assert "3 tasks" in results[0], f"Expected '3 tasks' in result, got: {results[0]}"
+    # Up to three tasks are named back rather than counted — after a multi-item
+    # command "Added 3 tasks" doesn't tell you whether it understood you.
+    for _title in ("buy groceries", "call dentist", "walk the dog"):
+        assert _title in results[0], f"Expected '{_title}' in result, got: {results[0]}"
 
     # SCENARIO 3: Create then complete via fuzzy match
     todos, results = run_test_direct(
@@ -458,12 +467,12 @@ def main():
                         help="Run only direct tests (no LLM required)")
     args = parser.parse_args()
 
-    # Use a temporary DB so we don't touch the real one
-    import tempfile
-    tmpdir = tempfile.mkdtemp()
-    _TMP_DB_PATH = os.path.join(tmpdir, "test_todos.db")
+    # The scratch DB isolate() already chose, so this script and the actions it
+    # calls agree on one database. They used to disagree: this patched
+    # `db_mod.DB_PATH` while the actions resolve MACALENDAR_DB first, so with
+    # that variable set the writes and the assertions went to different files.
+    _TMP_DB_PATH = os.environ["MACALENDAR_DB"]
 
-    # Patch DB path
     import assistant.db as db_mod
     original_path = db_mod.DB_PATH
     db_mod.DB_PATH = _TMP_DB_PATH

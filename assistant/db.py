@@ -425,11 +425,30 @@ def auto_category_and_color(conn: sqlite3.Connection, title: str, date: str, sta
 class CalendarDB:
     """Thread-safe SQLite calendar event store."""
 
+    @staticmethod
+    def _guard_real_db(path: str) -> None:
+        """Never open the real database from a test run.
+
+        A test script with no isolation once emptied the real calendar — 657
+        events — because `CalendarDB()` with no path quietly means "the user's
+        own data". Under pytest that is never what is wanted, so it is refused
+        outright rather than left to each script to remember.
+        """
+        if not (os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("PYTEST_VERSION")):
+            return
+        if os.path.realpath(path) == os.path.realpath(DB_PATH):
+            raise RuntimeError(
+                f"Refusing to open the real calendar database ({DB_PATH}) from a test. "
+                "Set MACALENDAR_DB, or call tests.isolation.isolate() before importing "
+                "anything from `assistant`."
+            )
+
     def __init__(self, path: str | None = None) -> None:
         # MACALENDAR_DB lets tests/audits point at a scratch database.
         if path is None:
             path = os.environ.get("MACALENDAR_DB") or None
         self.path = path if path is not None else DB_PATH
+        self._guard_real_db(self.path)
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
         with self._conn() as conn:
             conn.execute(_CREATE_TABLE)

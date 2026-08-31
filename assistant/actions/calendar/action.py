@@ -128,6 +128,20 @@ class UpdateEventAction(BaseAction):
         if intent.new_location:   updates["location"] = intent.new_location
         if intent.new_description: updates["description"] = intent.new_description
 
+        # An end time that isn't after the start is not an end time. The model
+        # answers "move my 8am appointment to 9am" with new_start_time AND
+        # new_end_time both 09:00, which slipped past the duration-preserving
+        # branch below and left a zero-length event on the calendar.
+        if "end_time" in updates:
+            try:
+                eff_start = updates.get("start_time", event["start_time"])
+                sh, sm = map(int, eff_start.split(":"))
+                eh, em = map(int, updates["end_time"].split(":"))
+                if eh * 60 + em <= sh * 60 + sm:
+                    updates.pop("end_time")
+            except Exception:
+                pass
+
         # Preserve original duration when only the start time changes
         if "start_time" in updates and "end_time" not in updates:
             try:

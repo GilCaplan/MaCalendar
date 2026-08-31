@@ -6,6 +6,12 @@ import sys
 # Ensure assistant is in path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# Scratch stores BEFORE importing anything from `assistant` — the paths are read
+# at import time. This script had no isolation, and `clear_db()` below (DELETE
+# FROM events, once per scenario) emptied the real calendar.
+from tests.isolation import isolate, assert_isolated  # noqa: E402
+isolate("macalendar-ollama-parser-")
+
 from assistant.actions import ActionRegistry
 from assistant.actions.calendar.action import CreateEventAction, DeleteEventAction, UpdateEventAction
 from assistant.config import OllamaConfig, AppConfig, load_config
@@ -13,7 +19,8 @@ from assistant.intent.parser import IntentParser
 from assistant.db import CalendarDB
 
 def clear_db():
-    print("🧹 Clearing calendar DB for tests...")
+    print("🧹 Clearing scratch calendar DB for tests...")
+    assert_isolated()          # never, ever the real one
     db = CalendarDB()
     with db._conn() as conn:
         conn.execute("DELETE FROM events")

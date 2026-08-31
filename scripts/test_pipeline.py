@@ -16,6 +16,11 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+
+# Scratch stores before anything from `assistant` is imported — the store
+# paths are read at import time. See tests/isolation.py for why.
+from tests.isolation import isolate  # noqa: E402
+isolate("macalendar-pipeline-")
 import assistant.actions.calendar  # noqa
 
 from assistant.actions import registry
