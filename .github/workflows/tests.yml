@@ -17,8 +17,13 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Install PortAudio (native lib required by sounddevice)
-        run: sudo apt-get update && sudo apt-get install -y portaudio19-dev
+      - name: Install native libs (PortAudio for sounddevice, EGL/xcb for PyQt6)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y portaudio19-dev \
+            libegl1 libgl1 libxkbcommon-x11-0 libdbus-1-3 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0
 
       - name: Install dependencies
         run: |
@@ -27,4 +32,6 @@ jobs:
           python -m spacy download en_core_web_sm
 
       - name: Run test suite
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: python -m pytest tests/ -v

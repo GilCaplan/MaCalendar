@@ -575,7 +575,10 @@ class ThinkingPanel(QFrame):
         self._min_btn.setFixedSize(24, 24)
         self._min_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._min_btn.setToolTip("Minimise")
-        self._min_btn.clicked.connect(self.toggle_minimised)
+        # `clicked` carries the checked state — a bool, False here — and
+        # toggle_minimised's first parameter would swallow it as an explicit
+        # "restore", so the button did nothing at all. Drop the argument.
+        self._min_btn.clicked.connect(lambda: self.toggle_minimised())
         head.addWidget(self._min_btn)
 
         self._close_btn = QPushButton("×")

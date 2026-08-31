@@ -108,7 +108,9 @@ def test_a_trim_never_lands_inside_a_run(bus, monkeypatch):
 
 @pytest.fixture
 def hud(bus, tmp_path, monkeypatch):
-    pytest.importorskip("PyQt6")
+    # PyQt6 itself imports fine without the system GL libraries; QtWidgets is
+    # what raises (libEGL.so.1 on a bare CI runner), so that is what to probe.
+    pytest.importorskip("PyQt6.QtWidgets")
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("MACALENDAR_HUD_STATE", str(tmp_path / "pos.json"))
     from PyQt6.QtWidgets import QApplication
@@ -334,3 +336,45 @@ def test_a_click_on_the_header_is_not_a_drag(hud):
 
     assert not widget._moved
     assert not os.path.exists(hud_mod.STATE_PATH)
+
+
+def test_minimising_collapses_the_card_and_the_window_with_it(hud, bus):
+    """The – button did nothing at all.
+
+    `clicked` carries the checked state, so connecting it straight to
+    `toggle_minimised` passed a bool into that method's `minimised` parameter —
+    always False, always "restore", never a toggle.
+    """
+    widget, reader, app = hud
+    bus.publish("mac", [_step()], {"message": "ok"})
+    reader.poll()
+    panel = widget.panel
+    open_height = widget.height()
+
+    panel._min_btn.click()
+    app.processEvents()
+    assert panel.minimised
+    assert not panel._scroll.isVisible()          # body hidden, header still there
+    assert panel._min_btn.text() == "+"
+    assert widget.height() < open_height          # the window shrank with it
+
+    panel._min_btn.click()
+    app.processEvents()
+    assert not panel.minimised
+    assert panel._scroll.isVisible()
+    assert panel._min_btn.text() == "–"
+    assert widget.height() == open_height
+
+
+def test_a_minimised_card_stays_minimised_for_the_next_command(hud, bus):
+    # Minimising it means "keep it out of my way"; the header goes on counting.
+    widget, reader, app = hud
+    bus.publish("mac", [_step()], {})
+    reader.poll()
+    widget.panel._min_btn.click()
+    app.processEvents()
+
+    bus.publish("mac", [_step(), _step("execute", "Create Todo")], {})
+    reader.poll()
+    assert widget.panel.minimised
+    assert widget.panel.step_count == 2

@@ -7,7 +7,7 @@ import pytest
 import requests
 
 from assistant.actions.calendar.intent import CalendarIntent
-from assistant.config import OllamaConfig, AppConfig
+from assistant.config import OllamaConfig
 from assistant.intent.parser import IntentParser, UnknownIntent
 
 
@@ -26,10 +26,12 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.fixture
-def parser(registry_with_calendar):
-    config = AppConfig()
-    config.ollama = OllamaConfig(model="llama3.1:8b", temperature=0.0, timeout_seconds=60)
-    return IntentParser(config, registry_with_calendar)
+def parser(registry_with_calendar, sample_config):
+    # `AppConfig()` cannot be built bare — `hotkey` is required, and has been
+    # since it was added — so this errored out (not failed, not skipped) on any
+    # machine with Ollama running. conftest's sample_config is a complete one.
+    sample_config.ollama = OllamaConfig(model="llama3.1:8b", temperature=0.0, timeout_seconds=60)
+    return IntentParser(sample_config, registry_with_calendar)
 
 
 def test_calendar_phrase_produces_create_event(parser):

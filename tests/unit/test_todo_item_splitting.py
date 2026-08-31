@@ -270,7 +270,7 @@ def test_post_todos_leaves_an_explicit_tag_alone(client):
 # ---------------------------------------------------------------------------
 
 def test_mac_panel_tag_precedence(db):
-    pytest.importorskip("PyQt6")
+    pytest.importorskip("PyQt6.QtWidgets")   # QtGui/QtWidgets need system GL libs
     from assistant.calendar_ui.todo_view import TodoListWidget, UNTAGGED_KEY
 
     class Panel:            # only the three attributes _new_task_tags reads

@@ -22,6 +22,10 @@ for _threads in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS",
                  "BLIS_NUM_THREADS", "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
     _os.environ.setdefault(_threads, "1")
 
+# No test may open a real window: the Qt widgets under test are constructed
+# headless, and on a CI runner there is no display to open one on.
+_os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
 _SCRATCH = _tempfile.mkdtemp(prefix="macalendar-tests-")
 for _var, _name in (("MACALENDAR_DB", "calendar.db"),
                     ("MACALENDAR_MEMORY_DB", "nlu_memory.db"),
