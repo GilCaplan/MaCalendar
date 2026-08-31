@@ -125,6 +125,9 @@ class TodoConfig(BaseModel):
     # "Tag mode": every newly created task (Mac UI, voice, API without explicit
     # tags) automatically gets this tag. Empty = off.
     auto_tag: str = ""
+    # When no tag was said and tag mode is off, infer one from the title
+    # ("buy chicken" → Groceries). Only tags already in the palette are used.
+    auto_tag_infer: bool = True
 
 
 class UIConfig(BaseModel):

@@ -99,6 +99,33 @@
 
 ---
 
+## Multi-item splitting — `assistant/intent/list_split.py`
+
+One phrase → the several things it asks for. "buy chicken and rice" is two
+tasks and the verb is shared out ("buy rice", not "rice"); an "and" after a
+preposition ("a gift for mom and dad") or inside a name ("fish and chips") is
+not a separator. Pure strings, no spaCy.
+
+| What | Location |
+|------|----------|
+| `ACTION_VERBS` / `ACTION_PHRASES` — verbs a title can start with | L26 / L37 |
+| `split_on_and()` — the separator-vs-internal "and" decision | L70 |
+| `distribute_lead_verb()` — hands the verb to conjuncts without one | L89 |
+| `split_items()` — the whole thing; used by the rule parser and the todo actions | L106 |
+
+## Task tags — `assistant/actions/todo/tagging.py`
+
+Keyword classifier over a task title, same shape as the event categories.
+Returns a tag only when the palette has it, and nothing when unsure.
+
+| What | Location |
+|------|----------|
+| `KEYWORDS` — per-tag word lists | L22 |
+| `infer_tag()` | L85 |
+| `suggest_tags()` / `resolve_tags()` — palette-aware wrappers | L119 / L131 |
+
+---
+
 ## LLM Intent Parser — `assistant/intent/parser.py`
 
 | What | Location |

@@ -157,7 +157,7 @@ Launched automatically alongside the Mac app via `Launch Calendar.command`.
 | Method | Path | Query / Body |
 |--------|------|------|
 | GET | `/todos` | `?list=today\|general\|all&include_completed=true&tag=<name\|__untagged__>` |
-| POST | `/todos` | `{title, list_name, priority, due_date, tags:[…]}` — omit `tags` to inherit the server's `todo.auto_tag` |
+| POST | `/todos` | `{title, list_name, priority, due_date, tags:[…]}` — send no tags (omitted or empty) to inherit the server's `todo.auto_tag`, or, with tag mode off, a tag inferred from the title (`todo.auto_tag_infer`) |
 | PATCH | `/todos/<id>` | any subset of todo fields |
 | PATCH | `/todos/<id>/toggle` | — (toggles completed) |
 | DELETE | `/todos/<id>` | — |

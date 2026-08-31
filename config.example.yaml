@@ -110,6 +110,8 @@ todo:
   show_completed: false       # show completed tasks in the list
   default_list: "today"       # which list new voice-created tasks go to by default
   auto_tag: ""                # "tag mode": every new task gets this tag (e.g. "Groceries"); "" = off
+  auto_tag_infer: true        # with no tag said and tag mode off, infer one from the title
+                              # ("buy chicken" → Groceries); only existing tags are used
 
 nlu:
   event_keywords: [meeting, appointment, activity]

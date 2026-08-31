@@ -17,7 +17,9 @@ from assistant.actions.todo.intent import (
     QueryTodoIntent,
     UpdateTodoIntent,
 )
+from assistant.actions.todo.tagging import resolve_tags, suggest_tags
 from assistant.intent.context import context_memory
+from assistant.intent.list_split import split_items
 
 _ANAPHORS = {"it", "that", "this", "the task", "that task", "the last one", "the last task"}
 
@@ -88,6 +90,8 @@ class CreateTodoAction(BaseAction):
         "'add to my list: X and Y', 'create a todo for X'. "
         "IMPORTANT: for multi-task phrases like 'add tasks: wash dishes, buy groceries', "
         "extract ALL tasks into the 'titles' array. "
+        "One item per title: 'buy chicken and rice' is ['buy chicken', 'buy rice'] — "
+        "repeat the shared verb, and NEVER summarise several items into one title. "
         "Supports priority ('high priority', 'urgent') and due date ('due Friday', 'by April 20')."
     )
     intent_model: ClassVar[Type[BaseIntent]] = CreateTodoIntent
@@ -98,8 +102,13 @@ class CreateTodoAction(BaseAction):
                 "type": "array",
                 "items": {"type": "string"},
                 "description": (
-                    "One or more task titles. Always use an array. "
-                    "E.g. ['wash dishes'] or ['task A', 'task B', 'task C']."
+                    "One or more task titles — one per thing the user has to do. "
+                    "Always use an array. E.g. ['wash dishes'] or ['task A', 'task B']. "
+                    "Split coordinated objects and repeat the verb: "
+                    "'buy chicken and rice' → ['buy chicken', 'buy rice']; "
+                    "'call mom and dad' → ['call mom', 'call dad']. "
+                    "Never invent a summary title for a list of items "
+                    "(chicken and rice is NOT 'buy groceries')."
                 ),
             },
             "list_name": {
@@ -127,6 +136,15 @@ class CreateTodoAction(BaseAction):
                     "Omit if no date mentioned."
                 ),
             },
+            "tags": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Tag names the user named explicitly ('put it on the groceries list', "
+                    "'tag it as coursework'). Omit otherwise — a tag is inferred from the "
+                    "title. Names that aren't real tags are ignored."
+                ),
+            },
         },
         "required": ["titles"],
     }
@@ -135,12 +153,26 @@ class CreateTodoAction(BaseAction):
         from assistant.db import get_db
         db = get_db()
 
+        todo_cfg = getattr(_config, "todo", None)
         # "Tag mode": auto-apply the configured tag to every voice-created task.
-        auto_tag = getattr(getattr(_config, "todo", None), "auto_tag", "") or ""
-        tags = [auto_tag] if auto_tag else []
+        auto_tag = getattr(todo_cfg, "auto_tag", "") or ""
+        infer = getattr(todo_cfg, "auto_tag_infer", True)
+
+        palette = [row["name"] for row in db.get_tags()]
+        # Precedence: what the user said > tag mode > what the title looks like.
+        said = resolve_tags(intent.tags, palette)
 
         created = []
+        applied: list[list[str]] = []
         for title in intent.titles:
+            if said:
+                tags = list(said)
+            elif auto_tag:
+                tags = [auto_tag]
+            elif infer:
+                tags = suggest_tags(title, palette)
+            else:
+                tags = []
             todo_id = db.create_todo(
                 title=title,
                 list_name=intent.list_name,
@@ -150,12 +182,21 @@ class CreateTodoAction(BaseAction):
             )
             context_memory.update_todo(todo_id, title)
             created.append(title)
+            applied.append(tags)
 
         list_label = "Today" if intent.list_name == "today" else "General"
         priority_label = "" if intent.priority == "none" else f" ({intent.priority} priority)"
+        # Name the tasks back when there are few: after "buy chicken and rice"
+        # the useful confirmation is which two tasks exist, not that there are two.
         if len(created) == 1:
-            return f"Added '{created[0]}'{priority_label} to {list_label}."
-        return f"Added {len(created)} tasks to {list_label}."
+            what = f"'{created[0]}'"
+        elif len(created) <= 3:
+            what = ", ".join(f"'{t}'" for t in created[:-1]) + f" and '{created[-1]}'"
+        else:
+            what = f"{len(created)} tasks"
+        shared = applied[0] if applied and all(t == applied[0] for t in applied) else []
+        tag_label = f" tagged {shared[0]}" if len(shared) == 1 else ""
+        return f"Added {what}{priority_label} to {list_label}{tag_label}."
 
 
 # ---------------------------------------------------------------------------
@@ -362,7 +403,11 @@ class AddSubtaskAction(BaseAction):
             },
             "subtask_title": {
                 "type": "string",
-                "description": "Title of the new subtask to add.",
+                "description": (
+                    "Title of the new subtask. Several steps in one breath "
+                    "('add steps chicken and rice') stay in this one string — "
+                    "they are split into a subtask each."
+                ),
             },
         },
         "required": ["parent_title", "subtask_title"],
@@ -376,9 +421,14 @@ class AddSubtaskAction(BaseAction):
         if parent is None:
             return f"I couldn't find a task matching '{intent.parent_title}'."
 
-        db.create_subtask(parent["id"], intent.subtask_title)
+        # Same rule as the task list itself: "chicken and rice" is two steps.
+        titles = split_items(intent.subtask_title) or [intent.subtask_title]
+        for title in titles:
+            db.create_subtask(parent["id"], title)
         context_memory.update_todo(parent["id"], parent["title"])
-        return f"Added subtask '{intent.subtask_title}' to '{parent['title']}'."
+        if len(titles) == 1:
+            return f"Added subtask '{titles[0]}' to '{parent['title']}'."
+        return f"Added {len(titles)} subtasks to '{parent['title']}': " + ", ".join(titles) + "."
 
 
 # ---------------------------------------------------------------------------

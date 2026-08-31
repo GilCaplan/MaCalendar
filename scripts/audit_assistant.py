@@ -72,7 +72,8 @@ WD_NAMES = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", 
 # ------------------------------------------------------------------ corpus
 # Each case: {"area", "shape", "text", "expect": [(action, {field: value})], "seed": [...events]}
 # Field checks: date/start_time/end_time exact; title_contains (case-insens);
-# recurrence; titles_contain (todo, list of substrings); list_name.
+# recurrence; titles_contain (todo, list of substrings); list_name;
+# todo_count (how many task rows the command should leave); tags_contain.
 
 def build_corpus(seed: int = 7) -> list[dict]:
     rnd = random.Random(seed)
@@ -144,7 +145,19 @@ def build_corpus(seed: int = 7) -> list[dict]:
         C.append({"area": "tasks", "shape": shape, "text": text, "expect": expect})
     td("remind me to buy milk", [("create_todo", {"titles_contain": ["milk"]})], "single")
     td("add a task to call the dentist", [("create_todo", {"titles_contain": ["dentist"]})], "single")
-    td("add buy milk, eggs and bread to my list", [("create_todo", {"titles_contain": ["milk", "eggs", "bread"]})], "multi/same-list")
+    td("add buy milk, eggs and bread to my list", [("create_todo", {"titles_contain": ["milk", "eggs", "bread"], "todo_count": 3})], "multi/same-list")
+    # One command, several things to buy: one task each, not a summary task.
+    td("i want to buy chicken and rice",
+       [("create_todo", {"titles_contain": ["chicken", "rice"], "todo_count": 2, "tags_contain": "Groceries"})], "multi/shared-verb")
+    td("remind me to buy chicken, rice and olive oil",
+       [("create_todo", {"titles_contain": ["chicken", "rice", "olive oil"], "todo_count": 3})], "multi/shared-verb-3")
+    td("remind me to call mom and dad",
+       [("create_todo", {"titles_contain": ["mom", "dad"], "todo_count": 2})], "multi/shared-verb-people")
+    # …but an "and" inside one errand is not a separator.
+    td("remind me to buy a birthday gift for mom and dad",
+       [("create_todo", {"titles_contain": ["gift"], "todo_count": 1})], "single/internal-and")
+    td("add a task to submit the NLP homework",
+       [("create_todo", {"titles_contain": ["NLP"], "tags_contain": "Coursework"})], "single/inferred-tag")
     td("I need to finish the robotics report and email Alon", [("create_todo", {"titles_contain": ["report", "Alon"]})], "multi/same-list")
     td("add tasks: submit the Haxaga grades, prepare Netivim slides, pay rent",
        [("create_todo", {"titles_contain": ["grades", "slides", "rent"]})], "multi/same-list-3")
@@ -154,7 +167,8 @@ def build_corpus(seed: int = 7) -> list[dict]:
        [("create_todo", {"titles_contain": ["groceries", "library"], "due_date": d(1)})], "multi/same-due-date")
     td("add buy a gift for Tamar due thursday and book the driving test due next monday",
        [("create_todo", {"titles_contain": ["gift"], "due_date": next_wd(3)}), ("create_todo", {"titles_contain": ["driving"], "due_date": next_wd(0)})], "multi/different-due-dates")
-    td("put milk and bananas on the groceries list", [("create_todo", {"titles_contain": ["milk", "bananas"]})], "multi/tagged")
+    td("put milk and bananas on the groceries list",
+       [("create_todo", {"titles_contain": ["milk", "bananas"], "todo_count": 2, "tags_contain": "Groceries"})], "multi/tagged")
     td("add to my general list: renew passport", [("create_todo", {"titles_contain": ["passport"], "list_name": "general"})], "single/general-list")
     td("remind me to call Ima", [("create_todo", {"titles_contain": ["Ima"]})], "single/hebrew-name")
 
@@ -269,6 +283,11 @@ def _check(case: dict, resp: dict, db) -> tuple[bool, list[str]]:
             else:
                 used_ev.add(cands[0]["id"])
         elif name.startswith("create_todo"):
+            # How many rows: "buy chicken and rice" is two tasks, and
+            # titles_contain alone can't tell that from one task named
+            # "buy chicken and rice".
+            if f.get("todo_count") is not None and len(todos) != f["todo_count"]:
+                problems.append(f"expected {f['todo_count']} todos, got {len(todos)}: {[t['title'] for t in todos]}")
             for sub in f.get("titles_contain", []):
                 m = [t for t in todos if sub.lower() in t["title"].lower()]
                 if not m:
@@ -278,6 +297,9 @@ def _check(case: dict, resp: dict, db) -> tuple[bool, list[str]]:
                         problems.append(f"todo '{m[0]['title']}' due {m[0].get('due_date')} != {f['due_date']}")
                     if f.get("list_name") and (m[0].get("list_name") or m[0].get("list")) != f["list_name"]:
                         problems.append(f"todo '{m[0]['title']}' list {m[0].get('list_name')} != {f['list_name']}")
+                    if f.get("tags_contain") and not any(
+                            x.lower() == f["tags_contain"].lower() for x in (m[0].get("tags") or [])):
+                        problems.append(f"todo '{m[0]['title']}' tags {m[0].get('tags')} missing {f['tags_contain']}")
         elif "db_event_start" in f:
             title, t = f["db_event_start"]
             if not any(title.lower() in e["title"].lower() and e["start_time"] == t for e in events):
