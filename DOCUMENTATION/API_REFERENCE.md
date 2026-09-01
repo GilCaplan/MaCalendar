@@ -165,6 +165,11 @@ All endpoints are served by the Mac at `http://<tailscale-ip>:8080`; the iOS app
 |---|---|---|
 | `GET` | `/workout/exercises` |  |
 | `POST` | `/workout/exercises` |  |
+| `GET` | `/workout/plan-items` | Scheduled sessions in a date range — what the phone's day view asks for. |
+| `PATCH` | `/workout/plan-items/<item_id>` |  |
+| `GET` | `/workout/plans` |  |
+| `DELETE` | `/workout/plans/<plan_id>` |  |
+| `GET` | `/workout/plans/<plan_id>` |  |
 | `GET` | `/workout/sessions` |  |
 | `POST` | `/workout/sessions` |  |
 | `DELETE` | `/workout/sessions/<session_id>` |  |
@@ -174,6 +179,12 @@ All endpoints are served by the Mac at `http://<tailscale-ip>:8080`; the iOS app
 | `DELETE` | `/workout/templates/<template_id>` |  |
 | `PATCH` | `/workout/templates/<template_id>` |  |
 | `PATCH` | `/workout/templates/<template_id>/approve` |  |
+
+## /observance
+
+| Method | Path | What it does |
+|---|---|---|
+| `GET` | `/observance` | Training availability per day: what is blocked, and which windows remain. |
 
 ## /config
 

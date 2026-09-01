@@ -77,3 +77,25 @@ Recording stops on tap, on a stop word ("execute", "done"…) or after silence (
 ## Referring to events by voice
 
 `_normalise_intents` in `assistant/api/server.py` pins `update_event`/`delete_event` to what was said: "the event I just made / the last one" → the last created event; a weekday named in the sentence → `match_date`, so "fix the meeting on Sunday" cannot land on a different day's meeting. `_find_event` scores only distinctive title words (generic words like "meeting" never pick an arbitrary event).
+
+## Training plans around Shabbat and the chagim (added 2026-09-01)
+
+| Piece | File | What it does |
+|---|---|---|
+| Observance rules | `assistant/observance.py` | Answers "may I train on this day, and when?" — distinct from `hebrew_calendar.py`, which answers "what is this day called?" for display. Classifies Shabbat, yom tov, chol hamoed and fasts, and returns the run-able `TimeWindow`s for a date. Sunset/nightfall via `astral` (pure Python, offline); location and buffers from `config.yaml › observance`. |
+| Scheduler | `assistant/workout_plan.py` | Places `SessionSpec`s on legal dates and materialises them into calendar events. Holds *training policy* (the arguable half) as distinct from observance (the computed half). |
+| Program content | `assistant/programs/` | Session content with *preferred* dates only. `autumn_5k.py` is the 2 Sep – 17 Oct 2026 base block ending in a 5K time trial. |
+| AI entry point | `assistant/actions/schedule_workout/` | "add an easy 8k Thursday morning", "plan four more weeks". The LLM proposes dated sessions; every date is re-placed by the scheduler before it reaches the calendar. |
+| Seeding | `scripts/seed_running_plan.py` | Previews a block by default; `--commit` writes it, `--replace` re-seeds without duplicating. |
+
+**The distinction that makes this work.** `hebrew_calendar.enumerate_holidays()` collapses consecutive days sharing a name into one span, so Sukkot 2026 comes back as a single block from 25 Sep to 2 Oct. Scheduling against that would blank out all of chol hamoed — the freest training week of the autumn. `observance.py` instead uses `HebrewDate.festival(israel=True, include_working_days=False)`, which names a day only when work is forbidden and returns `None` on chol hamoed, Chanukah and Purim.
+
+**The evening belongs to the next day.** A civil date is modelled as two independently governed slots: its daylight, governed by itself, and its evening, governed by the *following* date. That is why motzei Shabbat is available on Sat 3 Oct 2026 (Shmini Atzeret ends) but not on Sat 12 Sep 2026 (Rosh Hashanah II follows).
+
+**Yom Kippur is both a festival and a fast.** pyluach files it under `festival()` and returns `None` from `fast_day()`; `observance.fast_day_name()` normalises it back so either question gets a true answer. Tisha B'Av is spelled `"9 of Av"`.
+
+**Observance is computed, policy is arguable.** Only halacha lives in `observance.py`. "A minor fast is a full rest day", "motzei Shabbat is a last resort", "48 hours between hard sessions", "no heavy legs the day before a long run" are all `SchedulePolicy` in `workout_plan.py`, configurable and overridable. Keeping the line sharp is what lets the scheduler trust the observance answers absolutely — an LLM may propose dates, but placement is deterministic and re-validated.
+
+**Running sessions.** `workout_template_sets` gained `distance_m` and `target_pace_sec_per_km` (set `type` `'distance'`), so an interval session reuses the existing block/set/session/log machinery — and the follow-along that rides on it — rather than duplicating it. The iOS Swift models do not yet carry these fields; running templates are Mac/backend-only until they do.
+
+New endpoints: `GET /workout/plans`, `GET/DELETE /workout/plans/<id>`, `GET /workout/plan-items`, `PATCH /workout/plan-items/<id>`, `GET /observance?start_date=&end_date=` (per-day availability, so a client can show *why* a day is blocked without reimplementing the Hebrew calendar).

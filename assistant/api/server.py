@@ -61,6 +61,7 @@ def _get_registry() -> ActionRegistry:
         import assistant.actions.todo             # noqa: F401
         import assistant.actions.clarify          # noqa: F401
         import assistant.actions.workout_routine  # noqa: F401
+        import assistant.actions.schedule_workout  # noqa: F401
         _registry = ActionRegistry()
     return _registry
 
@@ -1955,6 +1956,96 @@ def create_app() -> Flask:
             return jsonify({"error": "Session not found", "code": 404}), 404
         db.delete_workout_session(session_id)
         return jsonify({"deleted": session_id})
+
+    # ------------------------------------------------------------------
+    # Workout: Plans + the observance calendar behind them
+    # ------------------------------------------------------------------
+
+    @app.get("/workout/plans")
+    def workout_plans_list():
+        status = request.args.get("status", "")
+        return jsonify(get_db().get_workout_plans(status=status or None))
+
+    @app.get("/workout/plans/<plan_id>")
+    def workout_plan_get(plan_id: str):
+        plan = get_db().get_workout_plan(plan_id)
+        if plan is None:
+            return jsonify({"error": "Plan not found", "code": 404}), 404
+        return jsonify(plan)
+
+    @app.delete("/workout/plans/<plan_id>")
+    def workout_plan_delete(plan_id: str):
+        db = get_db()
+        if db.get_workout_plan(plan_id) is None:
+            return jsonify({"error": "Plan not found", "code": 404}), 404
+        keep = request.args.get("keep_events", "").lower() in ("1", "true", "yes")
+        removed = db.delete_workout_plan(plan_id, delete_events=not keep)
+        return jsonify({"deleted": plan_id, "events_removed": removed})
+
+    @app.get("/workout/plan-items")
+    def workout_plan_items_list():
+        """Scheduled sessions in a date range — what the phone's day view asks for."""
+        return jsonify(get_db().get_workout_plan_items(
+            start_date=request.args.get("start_date", ""),
+            end_date=request.args.get("end_date", ""),
+            plan_id=request.args.get("plan_id", ""),
+        ))
+
+    @app.patch("/workout/plan-items/<item_id>")
+    def workout_plan_item_update(item_id: str):
+        db = get_db()
+        if db.get_workout_plan_item(item_id) is None:
+            return jsonify({"error": "Plan item not found", "code": 404}), 404
+        db.update_workout_plan_item(item_id, **(request.get_json(silent=True) or {}))
+        return jsonify(db.get_workout_plan_item(item_id))
+
+    @app.get("/observance")
+    def observance_range():
+        """Training availability per day: what is blocked, and which windows remain.
+
+        Lets a client show *why* a day is unavailable without reimplementing
+        the Hebrew calendar — the phone renders what the Mac decided.
+        """
+        from assistant import observance as ob
+        from assistant.actions.schedule_workout.action import observance_settings
+
+        try:
+            start = datetime.date.fromisoformat(request.args["start_date"])
+            end = datetime.date.fromisoformat(request.args["end_date"])
+        except (KeyError, ValueError):
+            return jsonify({
+                "error": "start_date and end_date are required (YYYY-MM-DD)",
+                "code": 400,
+            }), 400
+        if end < start:
+            return jsonify({"error": "end_date precedes start_date", "code": 400}), 400
+        if (end - start).days > 400:
+            return jsonify({"error": "range must be 400 days or fewer", "code": 400}), 400
+
+        settings = observance_settings(load_config())
+        out = []
+        cur = start
+        while cur <= end:
+            av = ob.availability(cur, settings)
+            out.append({
+                "date": cur.isoformat(),
+                "status": av.status,
+                "reason": av.reason,
+                "holiday": av.holiday_name,
+                "is_chol_hamoed": ob.is_chol_hamoed(cur),
+                "is_fast_day": ob.is_fast_day(cur),
+                "windows": [
+                    {
+                        "start": w.start.strftime("%H:%M"),
+                        "end": w.end.strftime("%H:%M"),
+                        "label": w.label,
+                        "fallback": w.fallback,
+                    }
+                    for w in av.windows
+                ],
+            })
+            cur += datetime.timedelta(days=1)
+        return jsonify(out)
 
     # ------------------------------------------------------------------
     # Config

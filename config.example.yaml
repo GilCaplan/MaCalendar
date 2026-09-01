@@ -84,6 +84,22 @@ api:
   port: 8080           # where the phone API listens; the thinking HUD uses this to reach it
 
 # Hebrew calendar + Jewish/Israeli holidays (all computed offline via pyluach)
+# Workout scheduling around Shabbat and the chagim (assistant/observance.py).
+# Sundown is computed locally with `astral` — no network calls.
+observance:
+  latitude: 31.7683              # Jerusalem
+  longitude: 35.2137
+  timezone: "Asia/Jerusalem"
+  city: "Jerusalem"
+  tzeit_depression: 8.5          # nightfall; 8.5 deg = common Israeli practice
+  candle_lighting_minutes: 18
+  erev_buffer_minutes: 90        # finish this long before candle lighting
+  motzei_buffer_minutes: 30      # wait this long after nightfall
+  earliest_hour: 5
+  latest_evening: "22:30"
+  minor_fast_is_rest_day: true   # Tzom Gedalia etc. = full rest, not a late run
+  allow_motzei_fallback: true    # Saturday night only to save a lost session
+
 hebrew_calendar:
   display_mode: "both"      # "english" | "hebrew" | "both" — Hebrew dates use gematria letters, never numerals
   show_holidays: true        # overlay Jewish/Israeli holidays on Month/Week/Day views
