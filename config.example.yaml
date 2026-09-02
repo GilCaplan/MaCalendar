@@ -74,6 +74,15 @@ confirmation_level: 1
 # author. Set false to go back to trusting the rules unchecked.
 verify_fast_path: true
 
+# Let the self-check actually change the record instead of only saying what it
+# thinks. It was advisory because the verifier proposed changes on ~98% of
+# commands and fixed fewer than it broke — it was judging the rule parser's raw
+# slots, so every create_event looked like it was missing an end time. It now
+# judges what reached the database, and the replacement is authored by the full
+# parser rather than the verifier, whose inline suggestions were unreliable.
+# A correction the parser disagrees with is discarded.
+self_check_apply: true
+
 audio:
   sample_rate: 16000
   silence_threshold: 0.01      # RMS below this = silence

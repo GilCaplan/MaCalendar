@@ -86,6 +86,19 @@ class Pipeline:
             RuleBasedParser(registry) if _RULE_PARSER_AVAILABLE else None
         )
         self._confirmer = ConfirmationHandler(config.confirmation_level)
+        # Confirmation dialogs ran between parse and execute, both of which now
+        # happen in the API process — which cannot put a window on this screen.
+        # Rather than drop the setting silently, say so: a user who set this to
+        # 2 expects to be asked before anything is written, and finding out by
+        # noticing events appearing unannounced is not acceptable.
+        if config.confirmation_level > 0:
+            logger.warning(
+                "🖥️ confirmation_level=%d is not in effect: parsing and execution now "
+                "happen in the assistant API process, which cannot show a dialog here. "
+                "Commands run without confirmation. Set confirmation_level: 0 to silence "
+                "this, or file the dry-run endpoint work if you want the prompts back.",
+                config.confirmation_level,
+            )
         self._tts = Speaker(config.tts)
 
         self.status_queue: queue.Queue[str] = queue.Queue()
@@ -378,15 +391,13 @@ class Pipeline:
         _raw_transcript = transcript
         trace.step(STT, "Heard", transcript)
 
-        # Personal vocabulary auto-correct (names / non-English words)
-        from assistant.stt.vocab import apply_vocab
-        transcript, _vocab_fixes = apply_vocab(transcript, source="mac")
-        _corrections = [{"from": c.original, "to": c.replacement} for c in _vocab_fixes]
-        if _vocab_fixes:
-            self._set_status(STATUS_PROCESSING,
-                             "Fixed: " + ", ".join(f"{c.original}→{c.replacement}" for c in _vocab_fixes))
-            trace.step(VOCAB, "Vocabulary",
-                       ", ".join(f"{c['from']} → {c['to']}" for c in _corrections))
+        # Vocabulary auto-correct used to happen here, against source="mac".
+        # It now runs inside _run_transcript for both surfaces, so that a name
+        # the phone learns is a name the Mac hears too, and the "Vocabulary"
+        # step in the panel comes from the same code either way. Applying it
+        # here as well would correct an already-corrected transcript and report
+        # every fix twice.
+        _corrections: list = []
 
         # Combine mode: prepend previous transcript so the LLM sees one unified request
         if combine and self._last_transcript:
@@ -409,338 +420,111 @@ class Pipeline:
 
     def _process_transcript(self, transcript: str, trace, t_start: float, *,
                             raw_transcript: str = "", corrections: list | None = None) -> bool:
-        """Parse → confirm → execute → remember, for an already-known transcript.
+        """Hand the transcript to the brain and render the answer.
 
-        Returns True when at least one action actually executed.
+        The Mac used to parse and execute here, in this process, with its own
+        copy of the sequence the API server runs for the phone. Keeping two
+        implementations of one behaviour cost real bugs: the phone had a sanity
+        pass that turned an LLM's past date into the next occurrence and the
+        Mac did not, so the same sentence produced a different event depending
+        on which microphone heard it. Worse, a fix applied to one was simply
+        absent from the other — twice in one afternoon.
 
-        Split out of _run_pipeline so the same path serves both a fresh
-        recording and a retry of a command that was parked while the LLM
-        was offline (the phone has had that retry since the API server
-        gained /pending/<id>/retry).
+        So there is one brain now, and it is the API server. Both surfaces post
+        here; `source` is the only thing that differs, and it only labels the
+        trace, the vocabulary corrections and the command memory.
+
+        The transcript goes over unmodified — vocabulary correction and view
+        context happen server-side, so both surfaces get them identically.
+        Steps stream back into the run this process already opened, so the HUD
+        draws one timeline rather than two.
+
+        Returns True when at least one action executed.
         """
-        from assistant.trace import (
-            RULE, LLM, VALIDATE, EXECUTE, DONE, ERROR,
+        import json as _json
+        import urllib.error
+        import urllib.request
+
+        from assistant.trace import ERROR
+
+        if corrections:
+            # Already-applied corrections only reach here from the pending
+            # queue, whose transcript was corrected when it was parked.
+            logger.debug("🖥️ %d correction(s) carried from the pending queue", len(corrections))
+
+        port = getattr(self.config.api, "port", 8080)
+        payload = {
+            "transcript": transcript,
+            "source": "mac",
+            "current_view": self.current_view,
+        }
+        if self._trace_run:
+            payload["trace_run"] = self._trace_run
+
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{port}/voice/text",
+            data=_json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
         )
-        _raw_transcript = raw_transcript or transcript
-        _corrections = corrections or []
-        # 3. Parse intent(s)
-        t_llm = time.perf_counter()
-        action_list = None
-        _fast_path_rule_result = None  # set when fast-path executes, used for background verify
+        key = getattr(self.config.api, "key", None)
+        if key:
+            req.add_header("X-API-Key", key)
 
-        # Event separator: split transcript into independent segments so each
-        # short, single-event command can hit the rule fast-path instead of LLM.
-        separator = self.config.audio.event_separator.strip()
-        if separator:
-            raw_segs = re.split(re.escape(separator), transcript, flags=re.IGNORECASE)
-            segments = [s.strip() for s in raw_segs if s.strip()]
-            if len(segments) > 1:
-                logger.info("🖥️ Separator %r split transcript into %d segments", separator, len(segments))
-                trace.step(RULE, "Split into segments",
-                           f"{len(segments)} commands separated by “{separator}”")
-                all_actions: list[tuple[str, object]] = []
-                for seg in segments:
-                    seg_actions = self._parse_segment(seg)
-                    if seg_actions:
-                        all_actions.extend(seg_actions)
-                action_list = all_actions if all_actions else None
-
-        _parse_method = "separator" if action_list is not None else "llm"
-        _keyword_title: "str | None" = None  # set when fast-path title is a keyword placeholder
-
-        if action_list is None and self._rule_parser is not None:
-            try:
-                rule_result = self._rule_parser.analyze(transcript, current_view=self.current_view)
-                if rule_result.confidence >= RULE_THRESHOLD and not rule_result.missing_slots:
-                    action_list = rule_result.intents
-                    _fast_path_rule_result = rule_result
-                    _parse_method = "rule"
-                    # Detect keyword placeholder titles (e.g. "meeting", "appointment")
-                    _event_kw_set = {k.lower() for k in self.config.nlu.event_keywords}
-                    if "create_event" in rule_result.raw_slots:
-                        _raw_title = (rule_result.raw_slots["create_event"].get("title") or "").lower()
-                        if _raw_title in _event_kw_set:
-                            _keyword_title = _raw_title
-                    logger.info(
-                        "🖥️ Rule fast-path: confidence=%.2f actions=%s (%.3fs)",
-                        rule_result.confidence,
-                        [n for n, _ in action_list],
-                        time.perf_counter() - t_llm,
-                    )
-                    trace.step(RULE, "Rule parser",
-                               f"Matched {', '.join(n for n, _ in action_list)} "
-                               f"— confidence {rule_result.confidence:.0%}, no LLM needed")
-                else:
-                    _parse_method = "hybrid"
-                    logger.info(
-                        "🖥️ Rule partial handoff: confidence=%.2f missing=%s",
-                        rule_result.confidence, rule_result.missing_slots,
-                    )
-                    trace.step(RULE, "Rule parser",
-                               f"Confidence {rule_result.confidence:.0%}"
-                               + (f", missing {', '.join(rule_result.missing_slots)}"
-                                  if rule_result.missing_slots else "")
-                               + " — handing the gaps to the LLM")
-                    self._set_status(STATUS_PROCESSING, "💭 Clarifying with AI…")
-                    try:
-                        action_list = self._parser.parse_with_context(transcript, rule_result)
-                        trace.step(LLM, f"LLM ({self.config.llm_engine})",
-                                   "Filled in what the rules couldn't")
-                    except (LLMUnavailableError, OllamaUnavailableError):
-                        pass  # handled below
-            except RuleParserSkip as e:
-                logger.debug("🖥️ Rule parser skipped: %s", e)
-                trace.step(RULE, "Rule parser", f"Skipped: {e}")
-            except Exception as e:
-                # Any other rule-parser failure is a bug in the fast path, not a
-                # reason to lose the command: hand it to the LLM instead.
-                logger.warning("🖥️ Rule parser error (falling back to the LLM): %s", e)
-                trace.step(RULE, "Rule parser", f"Failed, using the LLM: {e}", ok=False)
-
-        if action_list is None:
-            _parse_method = "llm"
-            self._set_status(STATUS_PROCESSING, "💭 Thinking…")
-            try:
-                action_list = self._parser.parse(transcript)
-                trace.step(LLM, f"LLM ({self.config.llm_engine})",
-                           f"Parsed {', '.join(n for n, _ in action_list) or 'nothing'} "
-                           f"in {getattr(self._parser, 'last_llm_ms', 0)} ms")
-            except (LLMUnavailableError, OllamaUnavailableError):
-                engine = self.config.llm_engine
-                self._tts.speak(f"The {engine} assistant is offline. Please check your connection and try again.")
-                self._set_status(STATUS_ERROR, f"⚠️ {engine.title()} offline")
-                pending_id = self._queue_pending(transcript, f"{engine} offline")
-                trace.step(ERROR, f"{engine.title()} offline",
-                           "Couldn't reach the language model — saved to retry later.", ok=False)
-                self._trace_result(transcript=transcript, corrections=_corrections,
-                                   pending_id=pending_id,
-                                   uncertain_words=self._uncertain_words(transcript))
-                return False
-            except (LLMTimeoutError, OllamaTimeoutError):
-                engine = self.config.llm_engine
-                self._tts.speak(f"The {engine} assistant is taking too long to respond.")
-                self._set_status(STATUS_ERROR, f"⚠️ {engine.title()} timeout")
-                pending_id = self._queue_pending(transcript, f"{engine} timeout")
-                trace.step(ERROR, f"{engine.title()} timeout",
-                           "The language model didn't answer in time — saved to retry later.", ok=False)
-                self._trace_result(transcript=transcript, corrections=_corrections,
-                                   pending_id=pending_id,
-                                   uncertain_words=self._uncertain_words(transcript))
-                return False
-            except ParseError as e:
-                self._tts.speak("I couldn't understand that request.")
-                logger.error("🖥️ Parse error: %s", e)
-                self._set_status(STATUS_ERROR, "⚠️ Couldn't parse request")
-                trace.step(ERROR, "Parse failed", str(e), ok=False)
-                self._trace_result(transcript=transcript, corrections=_corrections,
-                                   uncertain_words=self._uncertain_words(transcript))
-                self._append_scenario_bug(transcript, issue_type="parse_error", details=str(e))
-                threading.Thread(target=self._append_nlu_log, args=(
-                    transcript, _parse_method, False, [], [], False, f"parse_error: {e}",
-                ), daemon=True).start()
-                return False
-
-        logger.info("🖥️ ⏱ Parse total: %.2fs", time.perf_counter() - t_llm)
-
-        # Filter unknowns
-        valid = [(name, intent) for name, intent in action_list
-                 if name != "unknown" and not isinstance(intent, UnknownIntent)]
-
-        if not valid:
-            self._tts.speak("I'm not sure what you'd like me to do.")
-            self._set_status(STATUS_IDLE, "")
-            trace.step(EXECUTE, "Unknown intent",
-                       "Nothing recognisable came back from the parser.", ok=False)
-            self._trace_result(transcript=transcript, corrections=_corrections,
-                               message="I'm not sure what you'd like me to do.",
-                               uncertain_words=self._uncertain_words(transcript))
-            self._append_scenario_bug(transcript, issue_type="unknown_intent",
-                                      details="LLM returned no recognisable action.")
-            threading.Thread(target=self._append_nlu_log, args=(
-                transcript, _parse_method, False, [], [], False, "unknown_intent",
-            ), daemon=True).start()
+        try:
+            with urllib.request.urlopen(req, timeout=180) as r:
+                data = _json.loads(r.read().decode())
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            # The launcher starts both processes, so this means the API died or
+            # never came up. Say so plainly rather than failing silently — the
+            # GUI cannot do the work itself any more, and pretending otherwise
+            # is how you get two implementations again.
+            logger.error("🖥️ Cannot reach the assistant API on port %d: %s", port, e)
+            msg = ("I can't reach the assistant service. "
+                   "Restart it with Launch Calendar.command.")
+            self._tts.speak(msg)
+            self._set_status(STATUS_ERROR, "⚠️ Assistant service unreachable")
+            trace.step(ERROR, "Service unreachable", f"port {port}: {e}", ok=False)
+            self._trace_result(transcript=transcript, message=msg)
+            self._phase = STATUS_IDLE
             return False
 
-        trace.step(VALIDATE, "Validated",
-                   f"{len(valid)} action(s): " + ", ".join(n for n, _ in valid))
+        message = data.get("message") or ""
+        actions = data.get("actions") or []
+        pending_id = data.get("pending_id")
 
-        # 4. Confirm + execute each action
-        t_exec = time.perf_counter()
-        results: List[str] = []
-        from assistant.intent.context import ContextMemory as _CM
-        _ctx_mem = _CM()
-        _memory_records: list = []
-        for action_name, intent in valid:
-            if action_name == "clarify":
-                pass  # never prompt confirmation for a clarification question
-            elif not self._confirmer.check(action_name, intent):
-                self._tts.speak("Cancelled.")
-                self._set_status(STATUS_IDLE, "")
-                trace.step(ERROR, "Cancelled", f"You declined {action_name.replace('_', ' ')}.", ok=False)
-                self._trace_result(transcript=transcript, corrections=_corrections, message="Cancelled.")
-                return False
+        if data.get("parse") == "error" and not actions:
+            self._tts.speak(message or "I couldn't understand that request.")
+            self._set_status(STATUS_ERROR, "⚠️ Couldn't parse request")
+            self._trace_result(transcript=transcript, message=message,
+                               pending_id=pending_id,
+                               uncertain_words=data.get("uncertain_words") or [])
+            self._phase = STATUS_IDLE
+            return False
 
-            action_cls = self.registry.get(action_name)
-            if action_cls is None:
-                logger.warning("🖥️ Unknown action '%s'", action_name)
-                trace.step(EXECUTE, action_name, "No such action registered", ok=False)
-                continue
-
-            try:
-                self._set_status(STATUS_PROCESSING, f"⚙️ Executing {action_name.replace('_', ' ')}…")
-                _ev_before, _td_before = _ctx_mem.last_event_id, _ctx_mem.last_todo_id
-                try:
-                    result_text = action_cls().execute(intent, self.config)
-                except TargetNotFound as nf:
-                    # The rules were confident enough to skip the LLM, filled
-                    # every slot, and then matched nothing. That combination
-                    # usually means the *action* was wrong rather than the
-                    # target missing — "Walk Mark Stalk at 2:30" parsed as
-                    # complete_todo because "mark" is a completion verb. The
-                    # rule parser has no way to notice; only running it does.
-                    # So spend the LLM call now that we know the cheap path
-                    # produced nothing.
-                    retry = self._retry_after_no_match(
-                        transcript, trace,
-                        eligible=(_parse_method == "rule" and len(valid) == 1 and not results),
-                        failed_action=action_name, message=nf.message,
-                    )
-                    if retry is None:
-                        results.append(nf.message)
-                        trace.step(EXECUTE, action_name.replace("_", " ").title(),
-                                   nf.message, ok=False)
-                        continue
-                    valid = retry
-                    _parse_method = "rule→llm"
-                    action_name, intent = valid[0]
-                    action_cls = self.registry.get(action_name)
-                    if action_cls is None:
-                        results.append(nf.message)
-                        continue
-                    result_text = action_cls().execute(intent, self.config)
-                results.append(result_text)
-                if _ctx_mem.last_event_id != _ev_before and _ctx_mem.last_event_id is not None:
-                    _memory_records.append(("event", _ctx_mem.last_event_id, action_name))
-                if _ctx_mem.last_todo_id != _td_before and _ctx_mem.last_todo_id is not None:
-                    _memory_records.append(("todo", _ctx_mem.last_todo_id, action_name))
-                trace.step(EXECUTE, action_name.replace("_", " ").title(), result_text or "done")
-                logger.info("🖥️ Action '%s' complete: %s", action_name, result_text)
-            except AuthExpiredError as e:
-                self._tts.speak("Microsoft login expired. Use Re-authenticate in the menu.")
-                logger.error("🖥️ Auth expired: %s", e)
-                self._set_status(STATUS_ERROR, "⚠️ Auth expired")
-                trace.step(ERROR, "Microsoft login expired",
-                           "Use Re-authenticate in the menu.", ok=False)
-                self._trace_result(transcript=transcript, corrections=_corrections)
-                if self.on_auth_expired:
-                    self.on_auth_expired()
-                return False
-            except AssistantError as e:
-                self._tts.speak("Something went wrong. Check the logs for details.")
-                logger.error("🖥️ Action error: %s", e)
-                self._set_status(STATUS_ERROR, "⚠️ Action failed")
-                trace.step(EXECUTE, action_name.replace("_", " ").title(), f"Failed: {e}", ok=False)
-                self._trace_result(transcript=transcript, corrections=_corrections)
-                self._append_scenario_bug(transcript, issue_type="action_failed",
-                                          details=f"Action {action_name!r} raised: {e}",
-                                          extra={"Intent": str(intent)})
-                threading.Thread(target=self._append_nlu_log, args=(
-                    transcript, _parse_method, _fast_path_rule_result is not None,
-                    [action_name], [], False, f"action_failed: {e}",
-                ), daemon=True).start()
-                return False
-        logger.info("🖥️ ⏱ Execute: %.2fs", time.perf_counter() - t_exec)
-
-        if results:
-            summary = " ".join(results)
-            # Clarify-only responses don't touch the calendar — go straight to idle
-            is_clarify = all(name == "clarify" for name, _ in valid)
-            if is_clarify:
-                trace.step(DONE, "Answered", f"{_parse_method} path · {trace.total_ms} ms total")
-                self._trace_result(transcript=transcript, corrections=_corrections, message=summary)
-                self._tts.speak_sync(summary)
-                self._set_status(STATUS_IDLE, "")
-                return True   # a clarification answer is a handled command
-            # Check if any executed action requested a UI view switch
-            view_switch = next(
-                (getattr(self.registry.get(n), "view_switch", None) for n, _ in valid
-                 if getattr(self.registry.get(n), "view_switch", None)),
-                None,
-            )
-            ui_status = view_switch if view_switch else "refresh"
-            self._set_status(ui_status, results[0][:80])
-            self._tts.speak(summary)
-            time.sleep(0.3)  # brief pause for UI toast to render before going idle
-
-            # Background processing of fast-path results (does not block user)
-            from assistant.intent.context import context_memory
-            if _keyword_title and not is_clarify:
-                # Keyword placeholder title: always ask LLM to fix just the title.
-                # This replaces the standard verify for these events — we already
-                # know the action/time are correct; only the title needs improvement.
-                _event_id_for_fix = context_memory.last_event_id
-                if _event_id_for_fix:
-                    threading.Thread(
-                        target=self._background_fix_title,
-                        args=(transcript, _event_id_for_fix, _keyword_title),
-                        daemon=True,
-                    ).start()
-            elif (
-                _fast_path_rule_result is not None
-                and self.config.verify_fast_path
-                and not is_clarify
-            ):
-                # Standard fast-path verify: full LLM severity judgment.
-                verify_snapshot = {
-                    "actions": [(name, type(intent).__name__) for name, intent in valid],
-                    "event_id": context_memory.last_event_id,
-                    "event_title": context_memory.last_event_title,
-                    "event_date": context_memory.last_event_date,
-                    "todo_id": context_memory.last_todo_id,
-                    "todo_title": context_memory.last_todo_title,
-                }
-                threading.Thread(
-                    target=self._background_verify,
-                    args=(transcript, _fast_path_rule_result, verify_snapshot),
-                    daemon=True,
-                ).start()
-
-        # NLU tracking — log all successful actions
-        if valid and results:
-            threading.Thread(
-                target=self._append_nlu_log,
-                args=(transcript, _parse_method, _fast_path_rule_result is not None,
-                      [n for n, _ in valid], results),
-                daemon=True,
-            ).start()
-
-        # Command memory (few-shot personalisation + feedback linking)
-        _memory_id = None
-        if valid and results and getattr(self.config.nlu, "memory_enabled", True):
-            try:
-                from assistant.intent.memory import get_memory
-                _memory_id = get_memory().record(
-                    transcript=transcript, raw_transcript=_raw_transcript,
-                    source="mac", parse_path=_parse_method,
-                    actions=valid, result=" ".join(results), success=True,
-                    llm_ms=getattr(self._parser, "last_llm_ms", 0),
-                    total_ms=int((time.perf_counter() - t_start) * 1000),
-                    records=_memory_records,
-                )
-            except Exception as e:
-                logger.warning("🖥️ Memory record failed: %s", e)
-
-        trace.step(DONE, "Done", f"{_parse_method} path · {trace.total_ms} ms total")
-        self._trace_result(
-            transcript=transcript, corrections=_corrections,
-            message=" ".join(results) if results else "",
-            actions=[n for n, _ in valid], memory_id=_memory_id,
-            uncertain_words=self._uncertain_words(transcript),
+        # A view-switching action (e.g. show me my tasks) still has to move the
+        # window, which only this process can do.
+        view_switch = next(
+            (getattr(self.registry.get(n), "view_switch", None) for n in actions
+             if getattr(self.registry.get(n), "view_switch", None)),
+            None,
         )
+        if view_switch:
+            self._set_status("view", view_switch)
+        if data.get("refresh"):
+            self._set_status("refresh", "")
+
+        if message:
+            self._tts.speak_sync(message)
+
         logger.info("🖥️ ⏱ Total pipeline: %.2fs", time.perf_counter() - t_start)
+        self._trace_result(transcript=transcript, message=message,
+                           pending_id=pending_id,
+                           uncertain_words=data.get("uncertain_words") or [])
         self._phase = STATUS_IDLE
         self._set_status(STATUS_IDLE, "")
-        return True
+        return bool(actions)
+
 
     def _background_fix_title(self, transcript: str, event_id: int, keyword: str) -> None:
         """Daemon thread: ask the LLM for a proper title and patch the event if improved.
@@ -1110,30 +894,6 @@ class Pipeline:
         except Exception as exc:
             logger.warning("🖥️ Could not append scenario bug: %s", exc)
 
-    def _parse_segment(self, segment: str) -> "list[tuple[str, object]] | None":
-        """Parse a single transcript segment using rule fast-path then LLM fallback.
-
-        Used when the event separator splits the transcript into multiple parts.
-        Returns a list of (action_name, intent) tuples, or None on failure.
-        """
-        if self._rule_parser is not None:
-            try:
-                rule_result = self._rule_parser.analyze(segment, current_view=self.current_view)
-                if rule_result.confidence >= RULE_THRESHOLD and not rule_result.missing_slots:
-                    logger.info("🖥️ Segment rule fast-path: %r → %s", segment[:50], [n for n, _ in rule_result.intents])
-                    return rule_result.intents
-                try:
-                    return self._parser.parse_with_context(segment, rule_result)
-                except Exception:
-                    pass
-            except RuleParserSkip:
-                pass
-        try:
-            return self._parser.parse(segment)
-        except Exception as exc:
-            logger.warning("🖥️ Segment parse failed for %r: %s", segment[:50], exc)
-            return None
-
     @staticmethod
     def _append_nlu_log(
         transcript: str,
@@ -1216,7 +976,6 @@ class Pipeline:
         trace.on_step(lambda st: trace_bus.publish_step(self._trace_run, st.to_dict()))
         return trace
 
-    @staticmethod
     def _queue_pending(transcript: str, reason: str) -> "int | None":
         """Park a command the LLM couldn't take, so it can be retried later.
 

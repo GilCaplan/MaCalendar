@@ -159,10 +159,28 @@ def _run_server_verify(token: str, transcript: str, rule_result, executed=None,
                             db.update_todo(rid, **{k: v for k, v in patch.items() if k in ("title", "list_name")})
                             refresh = "todos"; applied = True
                 else:
-                    action = correction.get("action", "")
-                    params = correction.get("parameters") or {}
-                    action_cls = _get_registry().get(action)
                     executed_names = [n for n, _ in (executed or [])]
+                    # The verdict decides *whether* to change something; the
+                    # parser decides *what to*. Asked to author the replacement
+                    # itself the verifier proposed create_todo for "Walk Mark's
+                    # dog today at 2:30PM" — which states a time and is an
+                    # event — and wanted to redo a correct complete_todo as
+                    # update_todo. Re-reading the sentence with the full parser
+                    # gets both right, and its agreement with what already ran
+                    # is the signal that the verdict was a false alarm.
+                    _re_parsed = [(n, i) for n, i in (parser.parse(transcript) or [])
+                                  if n != "unknown"]
+                    if not _re_parsed:
+                        raise ValueError("re-parse produced nothing usable")
+                    if len(_re_parsed) > 1:
+                        raise ValueError("re-parse ambiguous — refusing to undo and redo")
+                    if [n for n, _ in _re_parsed] == executed_names:
+                        raise ValueError("parser agrees with what ran — false alarm")
+
+                    action, _authored = _re_parsed[0]
+                    params = (_authored.model_dump(exclude_none=True)
+                              if hasattr(_authored, "model_dump") else {})
+                    action_cls = _get_registry().get(action)
                     if action == "create_event" and "create_todo" in executed_names and not _spoken_times(transcript):
                         raise ValueError("refusing task→event flip without a spoken time")
                     if action in executed_names:
@@ -440,7 +458,9 @@ def create_app() -> Flask:
     # Voice endpoints
     # ------------------------------------------------------------------
 
-    def _run_transcript(transcript: str, trace: "Trace | None" = None) -> dict[str, Any]:
+    def _run_transcript(transcript: str, trace: "Trace | None" = None,
+                        source: str = "ios", current_view: str = "month",
+                        trace_run: str | None = None) -> dict[str, Any]:
         """Parse and execute a transcript; return the API response dict.
 
         Builds a stage-by-stage ``trace`` (the "thinking log" shown on the
@@ -453,7 +473,14 @@ def create_app() -> Flask:
         from assistant.trace import (
             Trace, VOCAB, RULE, MEMORY, LLM, VALIDATE, EXECUTE, DONE, ERROR,
         )
-        trace = trace or Trace(source="ios")
+        trace = trace or Trace(source=source)
+        # A caller that has already opened a run on the bus (the Mac GUI does,
+        # so its HUD shows steps as they happen) passes its id in. Stream into
+        # that run instead of publishing a second one at the end, which would
+        # draw the same command twice.
+        if trace_run:
+            from assistant import trace_bus as _tb
+            trace.on_step(lambda st: _tb.publish_step(trace_run, st.to_dict()))
         parser = _get_parser()
         rule_parser = _get_rule_parser()
         cfg = load_config()
@@ -462,7 +489,7 @@ def create_app() -> Flask:
         # Parity with the Mac pipeline: drop trailing "execute"/"done"/… stop words
         transcript = _strip_stop_keyword(transcript, cfg.audio.stop_phrases)
         # Personal vocabulary auto-correct
-        transcript, vocab_fixes = apply_vocab(transcript, source="ios")
+        transcript, vocab_fixes = apply_vocab(transcript, source=source)
         corrections = [c.to_dict() for c in vocab_fixes]
         trace.step(VOCAB, "Vocabulary",
                    ("Fixed " + ", ".join(f"{c.original}→{c.replacement}" for c in vocab_fixes))
@@ -474,6 +501,30 @@ def create_app() -> Flask:
         rule_result = None
         llm_ms = 0
 
+        def _parse_one(segment: str, rule_parser, parser):
+            """Parse one separated segment: rules first, then the LLM.
+
+            Same order the whole-transcript path uses; a segment is short
+            enough that the rules usually settle it without an LLM call, which
+            is the entire point of splitting.
+            """
+            if rule_parser is not None:
+                try:
+                    rr = rule_parser.analyze(segment, current_view=current_view)
+                    if rr.confidence >= RULE_THRESHOLD and not rr.missing_slots:
+                        return rr.intents
+                    try:
+                        return parser.parse_with_context(segment, rr)
+                    except Exception:
+                        pass
+                except RuleParserSkip:
+                    pass
+            try:
+                return parser.parse(segment)
+            except Exception as exc:
+                logger.warning("Segment parse failed for %r: %s", segment[:50], exc)
+                return None
+
         def _llm_step(title: str) -> None:
             nonlocal llm_ms
             llm_ms += parser.last_llm_ms
@@ -483,9 +534,32 @@ def create_app() -> Flask:
                        raw=(parser.last_raw_response or "")[:1500] or None,
                        examples=parser.last_examples_used)
 
-        if rule_parser is not None:
+        # Event separator: split one recording into independent commands so
+        # each short single-event half can hit the rule fast-path instead of
+        # asking the LLM to untangle both at once. This was Mac-only while the
+        # GUI had its own pipeline; it belongs here now that this is the only
+        # brain, and the phone gains it by moving.
+        separator = (cfg.audio.event_separator or "").strip()
+        if separator:
+            _segs = [s.strip() for s in
+                     re.split(re.escape(separator), transcript, flags=re.IGNORECASE)
+                     if s.strip()]
+            if len(_segs) > 1:
+                logger.info("Separator %r split transcript into %d segments", separator, len(_segs))
+                trace.step(RULE, "Split into segments",
+                           f"{len(_segs)} commands separated by “{separator}”")
+                _all: list = []
+                for _seg in _segs:
+                    _got = _parse_one(_seg, rule_parser, parser)
+                    if _got:
+                        _all.extend(_got)
+                if _all:
+                    parsed = _all
+                    parse_path = "separator"
+
+        if parsed is None and rule_parser is not None:
             try:
-                rule_result = rule_parser.analyze(transcript)
+                rule_result = rule_parser.analyze(transcript, current_view=current_view)
                 if rule_result.confidence >= RULE_THRESHOLD and not rule_result.missing_slots:
                     parsed = rule_result.intents
                     parse_path = "rule"
@@ -543,7 +617,7 @@ def create_app() -> Flask:
                 if retryable:
                     try:
                         from assistant.intent.memory import get_memory
-                        pending_id = get_memory().add_pending(transcript, msg, source="ios")
+                        pending_id = get_memory().add_pending(transcript, msg, source=source)
                     except Exception as pe:
                         logger.warning("📱 Could not queue command: %s", pe)
                 if "offline" in msg.lower():
@@ -553,7 +627,8 @@ def create_app() -> Flask:
                     msg = "The model took too long. I saved this command — tap Retry to try again."
                 trace.step(ERROR, "Parse failed", str(e)
                            + (" — queued for retry" if pending_id else ""), ok=False)
-                _record_memory(cfg, raw_transcript, transcript, "llm", [], msg, False, llm_ms, trace, [])
+                _record_memory(cfg, raw_transcript, transcript, "llm", [], msg, False, llm_ms, trace, [],
+                               source=source)
                 resp = {"message": msg, "actions": [], "refresh": "", "parse": "error",
                         "transcript": transcript, "original_transcript": raw_transcript,
                         "corrections": corrections, "trace": trace.to_list(),
@@ -692,7 +767,8 @@ def create_app() -> Flask:
         trace.step(DONE, "Done", f"{parse_path} path · {trace.total_ms} ms total", path=parse_path)
         memory_id = _record_memory(cfg, raw_transcript, transcript, parse_path,
                                    [(n, i) for n, i in parsed if n != "unknown"],
-                                   response_msg, _success, llm_ms, trace, records)
+                                   response_msg, _success, llm_ms, trace, records,
+                                   source=source)
 
         # Background self-check (any parse path): LLM re-reasons over the
         # transcript + what ran + the user's history, and fixes itself if needed.
@@ -733,6 +809,15 @@ def create_app() -> Flask:
         # separate process, so it can't see this Trace directly.
         try:
             from assistant import trace_bus
+            if trace_run:
+                trace_bus.publish_result(trace_run, {
+                    "transcript": transcript,
+                    "message": response_msg,
+                    "actions": action_names,
+                    "corrections": corrections,
+                    "memory_id": memory_id,
+                })
+                return resp
             trace_bus.publish(trace.source, resp["trace"], {
                 "transcript": transcript,
                 "message": response_msg,
@@ -976,13 +1061,13 @@ def create_app() -> Flask:
             return {}
 
     def _record_memory(cfg, raw, transcript, parse_path, actions, result, success,
-                       llm_ms, trace, records) -> int | None:
+                       llm_ms, trace, records, *, source: str = "ios") -> int | None:
         if not getattr(cfg.nlu, "memory_enabled", True):
             return None
         try:
             from assistant.intent.memory import get_memory
             return get_memory().record(
-                transcript=transcript, raw_transcript=raw, source="ios",
+                transcript=transcript, raw_transcript=raw, source=source,
                 parse_path=parse_path, actions=actions, result=result,
                 success=success, llm_ms=llm_ms, total_ms=trace.total_ms, records=records,
             )
@@ -1099,8 +1184,17 @@ def create_app() -> Flask:
         transcript = body.get("transcript", "").strip()
         if not transcript:
             return jsonify({"error": "Missing 'transcript' field", "code": 400}), 400
-        logger.info("📱 Text command: %s", transcript)
-        return jsonify(_run_transcript(transcript))
+        # `source` is the only thing that differs between the two surfaces: it
+        # labels the trace, the vocabulary corrections and the command memory.
+        # The Mac GUI posts here too — this route is the brain for both.
+        src = (body.get("source") or "ios").strip().lower()
+        if src not in ("ios", "mac"):
+            src = "ios"
+        view = (body.get("current_view") or "month").strip().lower()
+        logger.info("%s Text command: %s", "🖥️" if src == "mac" else "📱", transcript)
+        run = (body.get("trace_run") or "").strip() or None
+        return jsonify(_run_transcript(transcript, source=src, current_view=view,
+                                       trace_run=run))
 
     # ------------------------------------------------------------------
     # Personal vocabulary (STT auto-correct)
