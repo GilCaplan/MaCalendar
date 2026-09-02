@@ -60,10 +60,14 @@ def test_a_week_query_carries_no_date(parser):
     assert _slots(parser, "what do I have this week").get("date") is None
 
 
-def test_a_named_day_beats_scope(registry_with_real_actions, tmp_path, monkeypatch):
-    """scope defaults to "today" and is always present, so date has to win."""
+def test_a_named_day_beats_scope(registry_with_real_actions, sample_config,
+                                 tmp_path, monkeypatch):
+    """scope defaults to "today" and is always present, so date has to win.
+
+    Takes sample_config rather than load_config(): config.yaml is gitignored,
+    so calling it fails on CI for reasons that have nothing to do with dates.
+    """
     monkeypatch.setenv("MACALENDAR_DB", str(tmp_path / "c.db"))
-    from assistant.config import load_config
     from assistant.db import get_db
 
     db = get_db()
@@ -75,7 +79,7 @@ def test_a_named_day_beats_scope(registry_with_real_actions, tmp_path, monkeypat
 
     action = registry_with_real_actions.get("query_schedule")()
     said_friday = action.execute(
-        QueryScheduleIntent(scope="today", date=friday.isoformat()), load_config())
+        QueryScheduleIntent(scope="today", date=friday.isoformat()), sample_config)
 
     assert "Threshold 9 km" in said_friday
     assert "Something today" not in said_friday

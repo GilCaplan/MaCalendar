@@ -92,11 +92,18 @@ def test_the_guard_still_allows_loopback(no_network):
 # ---------------------------------------------------------------------------
 
 def test_config_loads_offline(no_network):
+    """Reads config.example.yaml, not config.yaml.
+
+    config.yaml is gitignored, so CI has none and load_config() raises there —
+    which is how this test went red on a machine that was otherwise fine. The
+    example is the checked-in one, and it is what the assertion is really
+    about: the shipped default points the LLM at this machine.
+    """
     from assistant.config import load_config
-    cfg = load_config()
+    cfg = load_config("config.example.yaml")
     assert cfg.ollama.base_url.startswith("http://localhost") or \
            cfg.ollama.base_url.startswith("http://127.0.0.1"), \
-        "the LLM must be reachable without leaving this machine"
+        "the shipped default must reach the LLM without leaving this machine"
 
 
 def test_the_rule_parser_works_offline(no_network, registry_with_real_actions):
