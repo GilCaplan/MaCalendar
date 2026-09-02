@@ -141,3 +141,39 @@ def test_nothing_is_applied_while_the_check_is_advisory(monkeypatch, fake_db, ap
     assert result["ok"] is False and result["applied"] is False
     fake_db.delete_event.assert_not_called()
     fake_db.delete_todo.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# The check now runs on every command, which means on commands with no record
+# ---------------------------------------------------------------------------
+
+def test_a_query_the_verifier_dislikes_never_creates_anything(monkeypatch, fake_db):
+    """"What do I have Thursday?" must not leave an event behind.
+
+    Queries used to be excluded from the self-check entirely. They are checked
+    now — a schedule read off the wrong day is still wrong — but there is no
+    record to replace, and a major verdict must report rather than write.
+    Creating something the user never asked for is worse than a poor answer.
+    """
+    parser = _parser(_MAJOR, reparse=[("create_event", CalendarIntent(
+        title="Thursday thing", date="2026-09-03",
+        start_time="10:00", end_time="11:00"))])
+    result = _run(monkeypatch, parser,
+                  executed=[("query_schedule", None)],
+                  records=())          # a query creates no record
+
+    assert result["applied"] is False
+    fake_db.delete_event.assert_not_called()
+
+
+def test_a_failed_command_is_still_checked(monkeypatch, fake_db):
+    """Failing is when a second opinion is most likely to help, not least."""
+    parser = _parser(_MAJOR, reparse=[("create_event", CalendarIntent(
+        title="x", date="2026-09-02", start_time="10:00", end_time="11:00"))])
+    result = _run(monkeypatch, parser, executed=[], records=())
+
+    # It formed an opinion rather than skipping, and still wrote nothing.
+    assert result["ok"] is False
+    assert result["applied"] is False
+    fake_db.delete_event.assert_not_called()
+    fake_db.delete_todo.assert_not_called()

@@ -185,10 +185,21 @@ def _run_server_verify(token: str, transcript: str, rule_result, executed=None,
                         raise ValueError("refusing task→event flip without a spoken time")
                     if action in executed_names:
                         raise ValueError("major correction proposes the same action")
+                    # Undo-and-redo means *replacing* a record. Now that the
+                    # check also runs on queries, clarifications and commands
+                    # that failed, there may be no record to replace — and
+                    # "what do I have Thursday?" must never leave a new event
+                    # behind because the verifier decided it sounded like one.
+                    # Creating something the user never asked to create is a
+                    # worse failure than answering a question imperfectly.
+                    _undoable = [r for r in recs if r[2].startswith("create_")]
+                    if not _undoable:
+                        raise ValueError(
+                            "nothing was created to replace — reporting the disagreement "
+                            "instead of writing a new record")
                     if action_cls is not None and action.startswith(("create_",)):
-                        for rtype, rid, act in recs:
-                            if act.startswith("create_"):
-                                (db.delete_event if rtype == "event" else db.delete_todo)(rid)
+                        for rtype, rid, act in _undoable:
+                            (db.delete_event if rtype == "event" else db.delete_todo)(rid)
                         intent = action_cls.intent_model(**params)
                         action_cls().execute(intent, load_config())
                         refresh = "events" if "event" in action else "todos" if "todo" in action else ""
@@ -770,11 +781,28 @@ def create_app() -> Flask:
                                    response_msg, _success, llm_ms, trace, records,
                                    source=source)
 
-        # Background self-check (any parse path): LLM re-reasons over the
-        # transcript + what ran + the user's history, and fixes itself if needed.
+        # Background self-check: the LLM re-reasons over the transcript, what
+        # ran, and this user's history, and fixes the record if it disagrees.
+        #
+        # It runs on EVERY command. It used to be skipped in three places, and
+        # each gap was a command the rules decided alone with nothing ever
+        # looking at it again:
+        #
+        #   • queries and clarifications were excluded as "nothing to correct".
+        #     There is no record to patch, true — but "what do I have Thursday"
+        #     answered from the wrong day is still wrong, and the check is what
+        #     notices.
+        #   • a command that failed got no check at all, which is backwards:
+        #     failing is when a second opinion is most likely to help.
+        #   • only actions the rules had matched were passed along.
+        #
+        # A read-only or failed command can still be judged; what changes is
+        # that there is nothing to undo, which _run_server_verify already
+        # handles — a correction with no record to apply to reports
+        # applied=False rather than touching anything.
         verify_token: str | None = None
-        checkable = [(n, i) for n, i in parsed if n in action_names and n not in ("clarify", "query_schedule", "query_todos")]
-        if _success and checkable and cfg.verify_fast_path:
+        checkable = [(n, i) for n, i in parsed if n != "unknown"]
+        if cfg.verify_fast_path and (checkable or transcript.strip()):
             import uuid
             verify_token = str(uuid.uuid4())
             with _verify_lock:
