@@ -201,3 +201,134 @@ def test_the_two_views_are_never_both_visible(qapp, bus):
         assert not hud.panel._hist_scroll.isVisible()
     finally:
         hud.close()
+
+
+# ------------------------------------------------------------ search + filters
+
+def _open_history(qapp, bus, n=6):
+    from assistant.thinking_hud import ThinkingHUD
+    _write(bus, n)
+    hud = ThinkingHUD()
+    hud.show()
+    qapp.processEvents()
+    hud.panel.toggle_history(True)
+    qapp.processEvents()
+    return hud
+
+
+def _visible(panel):
+    return [r for r in panel._hist_rows if r.isVisible()]
+
+
+def test_typing_narrows_the_list(qapp, bus):
+    """Driven through the widget, because the last two bugs here were both
+    wiring the model never touches."""
+    from PyQt6.QtTest import QTest
+    hud = _open_history(qapp, bus)
+    try:
+        p = hud.panel
+        assert len(_visible(p)) == 6
+        QTest.keyClicks(p._hist_search, "number 3")
+        qapp.processEvents()
+        assert len(_visible(p)) == 1
+        assert "3" in _visible(p)[0]._said.text()
+    finally:
+        hud.close()
+
+
+def test_search_matches_the_answer_too_not_just_the_question(qapp, bus):
+    from PyQt6.QtTest import QTest
+    hud = _open_history(qapp, bus)
+    try:
+        p = hud.panel
+        QTest.keyClicks(p._hist_search, "did 4")
+        qapp.processEvents()
+        assert len(_visible(p)) == 1
+    finally:
+        hud.close()
+
+
+def test_clearing_the_search_restores_everything(qapp, bus):
+    from PyQt6.QtTest import QTest
+    hud = _open_history(qapp, bus)
+    try:
+        p = hud.panel
+        QTest.keyClicks(p._hist_search, "number 3")
+        qapp.processEvents()
+        p._hist_search.clear()
+        qapp.processEvents()
+        assert len(_visible(p)) == 6
+    finally:
+        hud.close()
+
+
+def test_a_source_chip_filters_by_device(qapp, bus):
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtTest import QTest
+    hud = _open_history(qapp, bus)          # _write alternates mac / ios
+    try:
+        p = hud.panel
+        QTest.mouseClick(p._hist_chips["ios"], Qt.MouseButton.LeftButton)
+        qapp.processEvents()
+        assert _visible(p), "the iPhone chip hid everything"
+        assert all((r.entry.get("source") == "ios") for r in _visible(p))
+    finally:
+        hud.close()
+
+
+def test_chips_combine_with_the_search(qapp, bus):
+    """A chip and a search term are both constraints, not alternatives."""
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtTest import QTest
+    hud = _open_history(qapp, bus)
+    try:
+        p = hud.panel
+        QTest.mouseClick(p._hist_chips["ios"], Qt.MouseButton.LeftButton)
+        QTest.keyClicks(p._hist_search, "number 1")
+        qapp.processEvents()
+        for r in _visible(p):
+            assert r.entry.get("source") == "ios"
+            assert "number 1" in r._said.text()
+    finally:
+        hud.close()
+
+
+def test_no_matches_says_so(qapp, bus):
+    from PyQt6.QtTest import QTest
+    hud = _open_history(qapp, bus)
+    try:
+        p = hud.panel
+        QTest.keyClicks(p._hist_search, "zzzzz nothing like this")
+        qapp.processEvents()
+        assert _visible(p) == []
+        assert p._hist_empty.isVisible()
+        assert "match" in p._hist_empty.text().lower()
+    finally:
+        hud.close()
+
+
+def test_the_count_reports_the_filtering(qapp, bus):
+    from PyQt6.QtTest import QTest
+    hud = _open_history(qapp, bus)
+    try:
+        p = hud.panel
+        assert p._hist_count.text() == "6 commands"
+        QTest.keyClicks(p._hist_search, "number 3")
+        qapp.processEvents()
+        assert p._hist_count.text() == "1 of 6"
+    finally:
+        hud.close()
+
+
+def test_the_tools_hide_with_the_list(qapp, bus):
+    hud = _open_history(qapp, bus)
+    try:
+        p = hud.panel
+        assert p._hist_tools.isVisible()
+        p.toggle_history(False)
+        assert not p._hist_tools.isVisible()
+        p.toggle_history(True)
+        p.toggle_minimised(True)
+        assert not p._hist_tools.isVisible()
+    finally:
+        hud.close()

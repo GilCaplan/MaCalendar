@@ -746,6 +746,49 @@ class ThinkingPanel(QFrame):
         # The history list is its own scroll area rather than more rows in the
         # timeline: 300 past commands as step rows would be unreadable, and the
         # question "what has it done" is a different one from "what is it doing".
+        # Search and filters live above the list, in their own widget so the
+        # whole lot can be hidden with it.
+        self._hist_tools = QWidget()
+        tools = QVBoxLayout(self._hist_tools)
+        tools.setContentsMargins(8, 6, 8, 4)
+        tools.setSpacing(4)
+
+        self._hist_search = QLineEdit()
+        self._hist_search.setPlaceholderText("Search what you said, or what it did…")
+        self._hist_search.setClearButtonEnabled(True)
+        self._hist_search.textChanged.connect(self._apply_history_filter)
+        tools.addWidget(self._hist_search)
+
+        chips = QHBoxLayout()
+        chips.setContentsMargins(0, 0, 0, 0)
+        chips.setSpacing(4)
+        # Kept to five, and each one answers a question actually worth asking of
+        # a command log: where did it come from, what kind of thing was it, and
+        # did it go wrong. Anything more is a query builder.
+        self._hist_chips: dict[str, QPushButton] = {}
+        for key, text in (("mac", "Mac"), ("ios", "iPhone"), ("events", "Events"),
+                          ("tasks", "Tasks"), ("failed", "Failed")):
+            b = QPushButton(text)
+            b.setCheckable(True)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setFixedHeight(20)
+            # Through a lambda: clicked emits `checked`, which would bind to the
+            # first positional argument of the slot. Same trap as the History
+            # button, which shipped broken for exactly this reason.
+            b.clicked.connect(lambda _=False: self._apply_history_filter())
+            self._hist_chips[key] = b
+            chips.addWidget(b)
+        chips.addStretch(1)
+        tools.addLayout(chips)
+
+        self._hist_count = QLabel("")
+        f = self._hist_count.font(); f.setPointSize(max(9, f.pointSize() - 2))
+        self._hist_count.setFont(f)
+        tools.addWidget(self._hist_count)
+
+        self._hist_tools.hide()
+        root.addWidget(self._hist_tools)
+
         self._hist_scroll = QScrollArea()
         self._hist_scroll.setWidgetResizable(True)
         self._hist_scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -863,6 +906,7 @@ class ThinkingPanel(QFrame):
             self._load_history()
         self._scroll.setVisible(not self._showing_history and not self._minimised)
         self._hist_scroll.setVisible(self._showing_history and not self._minimised)
+        self._hist_tools.setVisible(self._showing_history and not self._minimised)
         self._hist_btn.setText("Back" if self._showing_history else "History")
         self._hist_btn.setToolTip("Back to the current command" if self._showing_history
                                   else "Every command the assistant has run")
@@ -891,6 +935,53 @@ class ThinkingPanel(QFrame):
             row.clicked.connect(lambda _=False, e=entry: self._open_history_entry(e))
             self._hist_rows.append(row)
             self._hist_lay.insertWidget(len(self._hist_rows) - 1, row)
+        self._apply_history_filter()
+
+    def _apply_history_filter(self) -> None:
+        """Show only the rows that match the search box and the active chips.
+
+        Rows are hidden rather than rebuilt: retyping a search should not cost
+        two hundred widget constructions per keystroke.
+
+        Chips are OR within a group and AND across groups — Mac+Events means
+        "from the Mac, and about an event", which is what anyone would expect
+        of two filters both switched on.
+        """
+        needle = self._hist_search.text().strip().lower()
+        on = {k for k, b in self._hist_chips.items() if b.isChecked()}
+        sources = {k for k in ("mac", "ios") if k in on}
+        kinds = {k for k in ("events", "tasks") if k in on}
+
+        shown = 0
+        for row in self._hist_rows:
+            entry = row.entry
+            result = entry.get("result") or {}
+            haystack = f"{result.get('transcript', '')} {result.get('message', '')}".lower()
+            actions = [str(a) for a in (result.get("actions") or [])]
+
+            ok = (not needle) or needle in haystack
+            if ok and sources:
+                ok = (entry.get("source") or "mac").lower() in sources
+            if ok and kinds:
+                is_event = any("event" in a for a in actions)
+                is_task = any("todo" in a for a in actions)
+                ok = (("events" in kinds and is_event) or ("tasks" in kinds and is_task))
+            if ok and "failed" in on:
+                # No action taken, or an answer that says it could not.
+                msg = str(result.get("message", "")).lower()
+                ok = (not actions) or "couldn't" in msg or "could not" in msg or "error" in msg
+            row.setVisible(ok)
+            shown += ok
+
+        total = len(self._hist_rows)
+        self._hist_count.setText(
+            f"{total} command{'' if total == 1 else 's'}" if shown == total
+            else f"{shown} of {total}")
+        self._hist_empty.setVisible(total > 0 and shown == 0)
+        if total and not shown:
+            self._hist_empty.setText("Nothing matches that.")
+        elif not total:
+            self._hist_empty.setText("Nothing yet — commands show up here once you use it.")
 
     def _open_history_entry(self, entry: dict) -> None:
         """Show one past command in the timeline, as it looked when it ran."""
@@ -925,6 +1016,7 @@ class ThinkingPanel(QFrame):
         self._minimised = (not self._minimised) if minimised is None else minimised
         self._scroll.setVisible(not self._minimised and not self._showing_history)
         self._hist_scroll.setVisible(not self._minimised and self._showing_history)
+        self._hist_tools.setVisible(not self._minimised and self._showing_history)
         self._rule.setVisible(not self._minimised)
         self._min_btn.setText("+" if self._minimised else "–")
         self._min_btn.setToolTip("Restore" if self._minimised else "Minimise")
@@ -979,6 +1071,21 @@ class ThinkingPanel(QFrame):
             f"QPushButton:hover {{ color: {theme.text}; }}"
         )
         self._rule.setStyleSheet(f"background-color: {theme.border}; border: none;")
+        self._hist_tools.setStyleSheet("background: transparent;")
+        self._hist_count.setStyleSheet(f"color: {theme.text2}; background: transparent;")
+        self._hist_search.setStyleSheet(
+            f"QLineEdit {{ background: {theme.surface}; border: 1px solid {theme.border};"
+            f" border-radius: 6px; padding: 3px 6px; color: {theme.text}; }}"
+            f"QLineEdit:focus {{ border-color: {theme.accent}; }}"
+        )
+        for _chip in self._hist_chips.values():
+            _chip.setStyleSheet(
+                f"QPushButton {{ background: transparent; border: 1px solid {theme.border};"
+                f" border-radius: 10px; padding: 0 8px; font-size: 11px; color: {theme.text2}; }}"
+                f"QPushButton:hover {{ color: {theme.text}; }}"
+                f"QPushButton:checked {{ background: {theme.accent};"
+                f" border-color: {theme.accent}; color: {theme.on_accent}; }}"
+            )
         # The card carries its own scrollbar style. Inside the calendar app it
         # inherited one from the application stylesheet; as its own window
         # (assistant.thinking_hud) there is no application stylesheet to
