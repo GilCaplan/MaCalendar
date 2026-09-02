@@ -41,7 +41,13 @@ _STAGE_ICONS = {
 
 
 def _fmt_ms(ms: int) -> str:
-    return f"{ms / 1000:.1f} s" if ms >= 1000 else f"{ms} ms"
+    """Always seconds. Two decimals under a second so a fast step still reads
+    as a duration rather than flattening to "0.0 s"; one decimal above, where
+    a hundredth is noise."""
+    secs = ms / 1000
+    # Branch on the rounded value, or 999 ms prints "1.00 s" while 1000 ms
+    # prints "1.0 s" right next to it.
+    return f"{secs:.2f} s" if round(secs, 2) < 1 else f"{secs:.1f} s"
 
 
 # What the producers call themselves → what to call it on screen. The API

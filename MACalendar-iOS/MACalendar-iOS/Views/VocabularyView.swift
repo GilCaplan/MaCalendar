@@ -400,7 +400,12 @@ struct ThinkingView: View {
                 HStack {
                     Text(step.title).font(.subheadline.weight(.semibold))
                     Spacer()
-                    Text(step.ms >= 1000 ? String(format: "%.1f s", Double(step.ms) / 1000) : "\(step.ms) ms")
+                    // Always seconds, matching the Mac panel. Two decimals
+                    // under a second so a fast step still reads as a duration
+                    // instead of flattening to "0.0 s".
+                    Text(step.ms >= 999
+                         ? String(format: "%.1f s", Double(step.ms) / 1000)
+                         : String(format: "%.2f s", Double(step.ms) / 1000))
                         .font(.caption2.monospacedDigit()).foregroundColor(.secondary)
                 }
                 if !step.detail.isEmpty {

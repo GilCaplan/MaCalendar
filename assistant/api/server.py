@@ -545,13 +545,45 @@ def create_app() -> Flask:
                        raw=(parser.last_raw_response or "")[:1500] or None,
                        examples=parser.last_examples_used)
 
+        # Batched commands: "[gym tomorrow at 7am] [lunch with Tal at noon]".
+        #
+        # A client with several commands in hand sends them as one request with
+        # each wrapped in brackets. They are split back apart here and parsed
+        # independently, which is what makes this cheaper rather than more
+        # expensive: a short single command usually settles on the rule path
+        # for no LLM call at all, where the joined sentence would have needed
+        # one to untangle it. What is actually saved is the review — the
+        # self-check runs once per request, so three batched commands cost one
+        # LLM call instead of three.
+        #
+        # Brackets rather than "and" because a delimiter has to be something
+        # that cannot occur inside a command, and "and" very much can:
+        # "meeting with Tal and Ravid" is one event, not two.
+        _bracketed = re.findall(r"\[([^\[\]]+)\]", transcript)
+        if len(_bracketed) > 1:
+            _segs = [s.strip() for s in _bracketed if s.strip()]
+            logger.info("Batched request: %d bracketed commands", len(_segs))
+            trace.step(RULE, "Split into commands",
+                       f"{len(_segs)} batched: " + " · ".join(s[:40] for s in _segs))
+            _all: list = []
+            for _seg in _segs:
+                _got = _parse_one(_seg, rule_parser, parser)
+                if _got:
+                    _all.extend(_got)
+            if _all:
+                parsed = _all
+                parse_path = "batch"
+            # Whatever happens, the brackets must not reach the parser or the
+            # stored title — an event called "[gym]" helps nobody.
+            transcript = " ".join(_segs)
+
         # Event separator: split one recording into independent commands so
         # each short single-event half can hit the rule fast-path instead of
         # asking the LLM to untangle both at once. This was Mac-only while the
         # GUI had its own pipeline; it belongs here now that this is the only
         # brain, and the phone gains it by moving.
         separator = (cfg.audio.event_separator or "").strip()
-        if separator:
+        if parsed is None and separator:
             _segs = [s.strip() for s in
                      re.split(re.escape(separator), transcript, flags=re.IGNORECASE)
                      if s.strip()]
@@ -775,7 +807,7 @@ def create_app() -> Flask:
                     if ev and ev["title"].strip().lower() in keywords:
                         _threading.Thread(target=_fix_title_bg, args=(transcript, rid, ev["title"]), daemon=True).start()
 
-        trace.step(DONE, "Done", f"{parse_path} path · {trace.total_ms} ms total", path=parse_path)
+        trace.step(DONE, "Done", f"{parse_path} path · {trace.total_ms / 1000:.1f} s total", path=parse_path)
         memory_id = _record_memory(cfg, raw_transcript, transcript, parse_path,
                                    [(n, i) for n, i in parsed if n != "unknown"],
                                    response_msg, _success, llm_ms, trace, records,

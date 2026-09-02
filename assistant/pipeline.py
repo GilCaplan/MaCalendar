@@ -370,9 +370,16 @@ class Pipeline:
         # every fix twice.
         _corrections: list = []
 
-        # Combine mode: prepend previous transcript so the LLM sees one unified request
+        # Combine mode: send the previous command and this one as one request.
+        #
+        # Joined with brackets rather than a comma. A comma made them a single
+        # run-on sentence the LLM had to untangle — the expensive path, and the
+        # one it is worst at. Bracketed, the server splits them and parses each
+        # on its own, where a short command usually settles on the rules for no
+        # LLM call at all. The review then runs once for the pair instead of
+        # twice, which is the actual saving.
         if combine and self._last_transcript:
-            transcript = self._last_transcript + ", " + transcript
+            transcript = f"[{self._last_transcript}] [{transcript}]"
             logger.info("🖥️ Combined transcript: %s", transcript)
 
         # Save clean transcript for potential future combine session
