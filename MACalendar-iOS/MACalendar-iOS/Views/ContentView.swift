@@ -369,7 +369,19 @@ struct ContentView: View {
                 guard slept >= api.pollInterval else { continue }
                 slept = 0
                 sinceTokenCheck = 0
-                lastToken = await api.changeToken() ?? lastToken
+
+                // Refresh only when the Mac says something moved. This used to
+                // fetch the token and then refresh regardless, which was merely
+                // wasteful at the 30 s interval and pathological during a burst:
+                // burst sets pollInterval to 1, so the six list endpoints were
+                // refetched every second for 45 seconds — and the cheap token
+                // check above is skipped entirely while bursting, because its
+                // guard is `slept < pollInterval` and `slept < 1` is never true.
+                // Burst is supposed to mean "ask the cheap question often", not
+                // "reload everything constantly".
+                let token = await api.changeToken()
+                let unchanged = token != nil && token == lastToken
+                lastToken = token ?? lastToken
                 // Read the live application state, NOT the `scenePhase` environment
                 // value: `.task` captures the View struct, so `scenePhase` here is
                 // frozen at whatever it was when the task started — `.inactive`,
@@ -381,6 +393,13 @@ struct ContentView: View {
                 if !api.isOnline { _ = try? await api.health() }   // flips isOnline (+refresh) when the Mac is back
                 _ = await api.syncPending()
                 await api.syncPendingVoice()
+
+                // Nothing changed on the Mac and nothing of ours was waiting to
+                // go up: there is nothing to fetch. Anything this device just
+                // did writes to the Mac and moves the token, so a local change
+                // still refreshes on the next tick.
+                if unchanged { continue }
+
                 // Poll: keep the phone in step with whatever was changed on the Mac.
                 await loadMonth()
                 api.requestRefresh()

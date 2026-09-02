@@ -57,6 +57,38 @@ struct TallyCounter: Codable, Identifiable, Equatable {
     }
 }
 
+/// One tap on a counter. The Mac has shown these since counters existed; the
+/// phone could add to the history but never read it back.
+struct CounterPress: Codable, Identifiable, Equatable {
+    var id: Int
+    var delta: Int
+    var label: String
+    var pressedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, delta, label
+        case pressedAt = "pressed_at"
+    }
+}
+
+/// A cash-out: the count and amount at the moment the cycle was closed.
+struct CounterPayout: Codable, Identifiable, Equatable {
+    var id: Int
+    var amount: Double
+    var count: Int
+    var currency: String
+    var note: String
+    var payoutAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, amount, count, currency, note
+        case payoutAt = "payout_at"
+    }
+}
+
+struct CounterPressesResponse: Codable { let presses: [CounterPress] }
+struct CounterPayoutsResponse: Codable { let payouts: [CounterPayout] }
+
 struct TimersResponse: Codable { let timers: [WorkTimer] }
 struct TimerSessionsResponse: Codable { let sessions: [TimerSession] }
 struct CountersResponse: Codable { let counters: [TallyCounter] }
@@ -91,6 +123,7 @@ struct TimerView: View {
     @State private var showAdd = false
     @State private var editingTimer: WorkTimer?
     @State private var editingCounter: TallyCounter?
+    @State private var detailCounter: TallyCounter?
     @State private var error: String?
     @State private var now = Date()
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -143,7 +176,8 @@ struct TimerView: View {
                     ForEach(counters) { c in
                         CounterRow(counter: c,
                                    onPress: { d in Task { await api.pressCounter(c.id, delta: d); await load() } },
-                                   onCashOut: { Task { await api.cashOutCounter(c.id); await load() } })
+                                   onCashOut: { Task { await api.cashOutCounter(c.id); await load() } },
+                                   onOpen: { detailCounter = c })
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) { Task { await api.deleteCounter(c.id); await load() } } label: { Label("Delete", systemImage: "trash") }
                             Button { Task { await api.updateCounter(c.id, ["archived": c.archived == 1 ? 0 : 1]); await load() } } label: {
@@ -168,6 +202,10 @@ struct TimerView: View {
             }
             .sheet(item: $editingCounter) { c in
                 NewTimerSheet(onSaved: { await load() }, editingCounter: c)
+            }
+            .sheet(item: $detailCounter) { c in
+                CounterDetailSheet(counter: c, onChanged: { await load() })
+                    .environmentObject(api)
             }
             .task { await load() }
             .refreshable { await load() }
@@ -281,6 +319,7 @@ private struct CounterRow: View {
     let counter: TallyCounter
     let onPress: (Int) -> Void
     let onCashOut: () -> Void
+    var onOpen: (() -> Void)? = nil
     @State private var confirmCashOut = false
 
     var body: some View {
@@ -295,6 +334,16 @@ private struct CounterRow: View {
                 }
                 Spacer()
                 Text("\(counter.count)").font(.system(size: 28, weight: .bold, design: .rounded)).monospacedDigit()
+                // Settings and history lived behind a swipe, which is to say
+                // nowhere: you cannot discover a swipe. A visible control.
+                if let onOpen {
+                    Button(action: onOpen) {
+                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Settings and history for \(counter.title)")
+                }
             }
             HStack(spacing: 10) {
                 Button { onPress(-1) } label: { Image(systemName: "minus").frame(maxWidth: .infinity).frame(height: 36) }
@@ -557,4 +606,126 @@ private struct LogPastTimeSheet: View {
             dismiss()
         }
     }
+}
+
+
+// MARK: - Counter detail
+
+/// Settings and history for one counter.
+///
+/// The server has served `/counters/<id>/presses` and `/counters/<id>/payouts`
+/// since counters existed, and nothing on the phone ever asked for them — so
+/// the phone could add to a history it could not read. Editing was reachable
+/// only by swiping a row, which is a gesture with no affordance.
+struct CounterDetailSheet: View {
+    let counter: TallyCounter
+    var onChanged: () async -> Void
+
+    @EnvironmentObject var api: APIClient
+    @Environment(\.dismiss) private var dismiss
+    @State private var presses: [CounterPress] = []
+    @State private var payouts: [CounterPayout] = []
+    @State private var loading = true
+    @State private var editing = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("This cycle") {
+                    LabeledContent("Count", value: "\(counter.count)")
+                    if counter.pricePerUnit > 0 {
+                        LabeledContent("Rate", value: TimerFormat.money(counter.pricePerUnit, counter.currency) + " each")
+                        LabeledContent("Owed", value: TimerFormat.money(counter.payout, counter.currency))
+                    }
+                    LabeledContent("Today", value: "\(counter.todayCount)")
+                    LabeledContent("All time", value: "\(counter.totalCount)")
+                }
+
+                Section {
+                    Button { editing = true } label: {
+                        Label("Edit counter", systemImage: "slider.horizontal.3")
+                    }
+                }
+
+                Section(payouts.isEmpty ? "Cash-outs — none yet" : "Cash-outs") {
+                    ForEach(payouts) { p in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(TimerFormat.money(p.amount, p.currency)).font(.body.weight(.medium))
+                                Text("\(p.count) press\(p.count == 1 ? "" : "es")")
+                                    .font(.caption).foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Text(Self.day(p.payoutAt)).font(.caption).foregroundColor(.secondary)
+                        }
+                    }
+                }
+
+                Section(presses.isEmpty ? (loading ? "Loading…" : "Presses — none yet") : "Presses") {
+                    ForEach(presses) { press in
+                        HStack {
+                            Text(press.delta > 0 ? "+\(press.delta)" : "\(press.delta)")
+                                .font(.body.weight(.semibold)).monospacedDigit()
+                                .foregroundColor(press.delta > 0 ? .primary : .secondary)
+                                .frame(width: 40, alignment: .leading)
+                            if !press.label.isEmpty {
+                                Text(press.label).font(.subheadline)
+                            }
+                            Spacer()
+                            Text(Self.stamp(press.pressedAt)).font(.caption).foregroundColor(.secondary)
+                        }
+                        .swipeActions {
+                            Button(role: .destructive) {
+                                Task {
+                                    await api.deleteCounterPress(press.id)
+                                    await load()
+                                    await onChanged()
+                                }
+                            } label: { Label("Delete", systemImage: "trash") }
+                        }
+                    }
+                }
+            }
+            .navigationTitle(counter.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .sheet(isPresented: $editing) {
+                NewTimerSheet(onSaved: { await onChanged() }, editingCounter: counter)
+            }
+            .task { await load() }
+        }
+    }
+
+    private func load() async {
+        loading = true
+        async let p = api.counterPresses(counter.id)
+        async let o = api.counterPayouts(counter.id)
+        presses = await p
+        payouts = await o
+        loading = false
+    }
+
+    /// The server sends ISO 8601 with an offset; show something a person reads.
+    private static func stamp(_ iso: String) -> String {
+        guard let d = ISO8601DateFormatter.flexible.date(from: iso) else { return iso.prefix(16).description }
+        let f = DateFormatter(); f.dateFormat = "d MMM, HH:mm"
+        return f.string(from: d)
+    }
+
+    private static func day(_ iso: String) -> String {
+        guard let d = ISO8601DateFormatter.flexible.date(from: iso) else { return iso.prefix(10).description }
+        let f = DateFormatter(); f.dateFormat = "d MMM yyyy"
+        return f.string(from: d)
+    }
+}
+
+extension ISO8601DateFormatter {
+    /// The API sends fractional seconds and an offset; the default parser
+    /// rejects fractional seconds, which is how a valid timestamp renders as
+    /// a raw string.
+    static let flexible: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
 }

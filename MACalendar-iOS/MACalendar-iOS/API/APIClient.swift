@@ -863,6 +863,27 @@ class APIClient: ObservableObject {
     func pressCounter(_ id: Int, delta: Int) async { _ = try? await request("/counters/\(id)/press", method: "POST", body: ["delta": delta]) }
     func cashOutCounter(_ id: Int) async { _ = try? await request("/counters/\(id)/cashout", method: "POST", body: [:]) }
 
+    /// Every tap on this counter, newest first. The server has served this
+    /// since counters existed; nothing on the phone asked for it.
+    func counterPresses(_ id: Int) async -> [CounterPress] {
+        guard let data = try? await request("/counters/\(id)/presses"),
+              let r = try? JSONDecoder().decode(CounterPressesResponse.self, from: data)
+        else { return [] }
+        return r.presses
+    }
+
+    /// Every cash-out on this counter.
+    func counterPayouts(_ id: Int) async -> [CounterPayout] {
+        guard let data = try? await request("/counters/\(id)/payouts"),
+              let r = try? JSONDecoder().decode(CounterPayoutsResponse.self, from: data)
+        else { return [] }
+        return r.payouts
+    }
+
+    func deleteCounterPress(_ pressID: Int) async {
+        _ = try? await request("/counter_presses/\(pressID)", method: "DELETE")
+    }
+
     /// A few bytes that change whenever anything in the Mac's database does.
     /// Polling this is cheap enough to do every couple of seconds, so a change
     /// made on the Mac shows up almost at once instead of on the next 30 s
