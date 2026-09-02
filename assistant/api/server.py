@@ -386,7 +386,17 @@ def start_pending_retry_loop(run_transcript, interval: float = 30.0) -> None:
 def create_app() -> Flask:
     app = Flask(__name__)
     _no_bg = os.environ.get("MACALENDAR_NO_WARMUP") == "1"   # tests
-    if not _no_bg:
+    # Under --reload, Werkzeug runs this module twice: once in the watcher that
+    # does nothing but restart the child, and once in the child that serves. The
+    # watcher has no use for 5.8 GB of llama, a Whisper model and spaCy, and
+    # loading them there doubles both memory and startup. WERKZEUG_RUN_MAIN is
+    # set only in the child; it is absent entirely when the reloader is off, so
+    # the normal path is unaffected.
+    _is_reload_watcher = (
+        os.environ.get("WERKZEUG_RUN_MAIN") is None
+        and os.environ.get("MACALENDAR_RELOADING") == "1"
+    )
+    if not _no_bg and not _is_reload_watcher:
         warm_up_components()
 
     # ------------------------------------------------------------------

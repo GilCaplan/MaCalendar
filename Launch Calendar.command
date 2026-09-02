@@ -79,10 +79,22 @@ if command -v ollama &>/dev/null; then
     fi
 fi
 
-# Start the iPhone API server in the background (Tailscale mode)
+# Start the API server — the brain — in the background (Tailscale mode).
 # If you get a port collision on 8080, change the port here and on your iPhone Settings.
+#
+# --reload restarts it by itself when anything under assistant/ changes, so
+# editing the assistant no longer means quitting and relaunching everything.
+# It is the Werkzeug reloader WITHOUT the debugger: --debug would also expose
+# a browser shell on 0.0.0.0, which on a tailnet is a shell for every device
+# on it (assistant.api refuses that combination outright).
+#
+# The GUI and the HUD are not reloaded — they are thin now, and restarting a
+# window you are looking at is worse than restarting a server you are not.
+# Set MACALENDAR_NO_RELOAD=1 to pin the server too.
+RELOAD="--reload"
+[ "$MACALENDAR_NO_RELOAD" = "1" ] && RELOAD=""
 PORT=8080
-python -m assistant.api --tailscale --port $PORT &
+python -m assistant.api --tailscale --port $PORT $RELOAD &
 API_PID=$!
 
 # Start the thinking HUD — its own always-on-top window, deliberately not part
