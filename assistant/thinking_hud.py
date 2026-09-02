@@ -30,7 +30,7 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import QAction, QCursor, QIcon
 from PyQt6.QtWidgets import (
-    QApplication, QMenu, QSystemTrayIcon, QVBoxLayout, QWidget,
+    QApplication, QLineEdit, QMenu, QSystemTrayIcon, QVBoxLayout, QWidget,
 )
 
 from assistant import trace_bus
@@ -270,7 +270,16 @@ class ThinkingHUD(QWidget):
         """
         self.panel.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         for child in self.panel.findChildren(QWidget):
-            child.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            if isinstance(child, QLineEdit):
+                # A text field is the one thing here that *must* take the
+                # keyboard, or it cannot be typed into — which is exactly what
+                # NoFocus did to the history search box. ClickFocus is the
+                # distinction that matters: it accepts focus when you click it
+                # and never grabs it when the card merely appears, which is
+                # what "read-only until you use it" was supposed to mean.
+                child.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+            else:
+                child.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
     def _fit(self) -> None:
         self.setFixedSize(self.panel.width() + 2 * SHADOW_MARGIN,

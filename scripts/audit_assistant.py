@@ -37,6 +37,10 @@ _TMP = tempfile.mkdtemp(prefix="macal_audit_")
 os.environ["MACALENDAR_DB"] = os.path.join(_TMP, "calendar.db")
 os.environ["MACALENDAR_MEMORY_DB"] = os.path.join(_TMP, "memory.db")
 os.environ["MACALENDAR_NO_WARMUP"] = "1"
+# The trace bus is the durable record the thinking card's History reads back.
+# Without this the audit publishes 89 synthetic commands into it on every run,
+# and the log of what you actually asked the assistant becomes mostly corpus.
+os.environ["MACALENDAR_TRACE_BUS"] = os.path.join(_TMP, "trace_bus.jsonl")
 
 # The audit is meant to run against the REAL vocabulary — that's part of what's
 # being measured — but running it must not change it. Work from a copy: the

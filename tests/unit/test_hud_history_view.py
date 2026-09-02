@@ -332,3 +332,97 @@ def test_the_tools_hide_with_the_list(qapp, bus):
         assert not p._hist_tools.isVisible()
     finally:
         hud.close()
+
+
+def test_the_search_box_can_actually_take_the_keyboard(qapp, bus):
+    """The bug QTest.keyClicks cannot see.
+
+    The card sets NoFocus on everything so that appearing never steals the
+    keyboard mid-sentence. Applied to the search box that makes it impossible
+    to type into — and every test above still passed, because keyClicks
+    delivers events straight to a widget and never consults focus.
+
+    ClickFocus is the distinction: accepts the keyboard when you click it,
+    never grabs it when the card merely appears.
+    """
+    from PyQt6.QtCore import Qt
+
+    from assistant.thinking_hud import ThinkingHUD
+    _write(bus, 4)
+    hud = ThinkingHUD()
+    try:
+        hud.show()
+        qapp.processEvents()
+        hud.panel.toggle_history(True)
+        qapp.processEvents()
+
+        box = hud.panel._hist_search
+        assert box.focusPolicy() != Qt.FocusPolicy.NoFocus, \
+            "the search box cannot be typed into"
+        box.setFocus()
+        qapp.processEvents()
+        assert box.hasFocus()
+    finally:
+        hud.close()
+
+
+def test_everything_that_is_not_a_text_field_still_refuses_focus(qapp, bus):
+    """The exemption is for text entry only — buttons taking focus is what
+    pulled the caret out of whatever you were typing in."""
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QLineEdit
+
+    from assistant.thinking_hud import ThinkingHUD
+    _write(bus, 3)
+    hud = ThinkingHUD()
+    try:
+        hud.show()
+        qapp.processEvents()
+        hud.panel.toggle_history(True)
+        qapp.processEvents()
+
+        for child in hud.panel.findChildren(object):
+            if hasattr(child, "focusPolicy") and not isinstance(child, QLineEdit):
+                assert child.focusPolicy() == Qt.FocusPolicy.NoFocus, \
+                    f"{child.__class__.__name__} would steal the keyboard"
+    finally:
+        hud.close()
+
+
+def test_synthetic_runs_are_hidden_unless_asked_for(qapp, bus):
+    """A curl while developing, or an audit's 89 corpus commands, are not
+    things you asked the assistant — and they swamp the ones that are."""
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtTest import QTest
+
+    from assistant.thinking_hud import ThinkingHUD
+    import json as _json
+    import time as _time
+
+    with open(bus, "w", encoding="utf-8") as f:
+        for i, src in enumerate(["mac", "ios", "test", "test", "test"]):
+            f.write(_json.dumps({
+                "kind": "trace", "run": f"r{i}", "source": src, "ts": _time.time(),
+                "steps": [], "result": {"transcript": f"cmd {i}", "message": "ok"},
+            }) + "\n")
+
+    hud = ThinkingHUD()
+    try:
+        hud.show()
+        qapp.processEvents()
+        hud.panel.toggle_history(True)
+        qapp.processEvents()
+        p = hud.panel
+
+        visible = [r for r in p._hist_rows if r.isVisible()]
+        assert len(visible) == 2, "test runs are showing by default"
+        assert all(r.entry["source"] in ("mac", "ios") for r in visible)
+        assert "3 test runs hidden" in p._hist_count.text()
+
+        QTest.mouseClick(p._hist_chips["tests"], Qt.MouseButton.LeftButton)
+        qapp.processEvents()
+        visible = [r for r in p._hist_rows if r.isVisible()]
+        assert len(visible) == 3
+        assert all(r.entry["source"] == "test" for r in visible)
+    finally:
+        hud.close()

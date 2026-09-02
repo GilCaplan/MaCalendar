@@ -767,7 +767,7 @@ class ThinkingPanel(QFrame):
         # did it go wrong. Anything more is a query builder.
         self._hist_chips: dict[str, QPushButton] = {}
         for key, text in (("mac", "Mac"), ("ios", "iPhone"), ("events", "Events"),
-                          ("tasks", "Tasks"), ("failed", "Failed")):
+                          ("tasks", "Tasks"), ("failed", "Failed"), ("tests", "Tests")):
             b = QPushButton(text)
             b.setCheckable(True)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -950,6 +950,10 @@ class ThinkingPanel(QFrame):
         needle = self._hist_search.text().strip().lower()
         on = {k for k, b in self._hist_chips.items() if b.isChecked()}
         sources = {k for k in ("mac", "ios") if k in on}
+        # Commands from a script or a curl while developing are not things you
+        # asked the assistant, and they swamp the ones that are — an audit run
+        # is 89 of them. Hidden unless asked for.
+        show_tests = "tests" in on
         kinds = {k for k in ("events", "tasks") if k in on}
 
         shown = 0
@@ -959,7 +963,10 @@ class ThinkingPanel(QFrame):
             haystack = f"{result.get('transcript', '')} {result.get('message', '')}".lower()
             actions = [str(a) for a in (result.get("actions") or [])]
 
-            ok = (not needle) or needle in haystack
+            is_test = (entry.get("source") or "").lower() not in ("mac", "ios")
+            ok = (show_tests == is_test) if show_tests else (not is_test)
+            if ok:
+                ok = (not needle) or needle in haystack
             if ok and sources:
                 ok = (entry.get("source") or "mac").lower() in sources
             if ok and kinds:
@@ -974,9 +981,19 @@ class ThinkingPanel(QFrame):
             shown += ok
 
         total = len(self._hist_rows)
-        self._hist_count.setText(
-            f"{total} command{'' if total == 1 else 's'}" if shown == total
-            else f"{shown} of {total}")
+        hidden_tests = sum(
+            1 for r in self._hist_rows
+            if (r.entry.get("source") or "").lower() not in ("mac", "ios"))
+        yours = total - hidden_tests
+        if show_tests:
+            self._hist_count.setText(f"{shown} of {total} (including tests)")
+        elif shown == yours:
+            self._hist_count.setText(
+                f"{yours} command{'' if yours == 1 else 's'}"
+                + (f" · {hidden_tests} test run{'' if hidden_tests == 1 else 's'} hidden"
+                   if hidden_tests else ""))
+        else:
+            self._hist_count.setText(f"{shown} of {yours}")
         self._hist_empty.setVisible(total > 0 and shown == 0)
         if total and not shown:
             self._hist_empty.setText("Nothing matches that.")

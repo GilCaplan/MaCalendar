@@ -1323,8 +1323,12 @@ def create_app() -> Flask:
         # `source` is the only thing that differs between the two surfaces: it
         # labels the trace, the vocabulary corrections and the command memory.
         # The Mac GUI posts here too — this route is the brain for both.
+        # "test" is for anything driving the assistant that is not a person:
+        # curl while developing, a script, a smoke check. It keeps synthetic
+        # commands out of the history you actually read, and out of the
+        # command memory's few-shot examples.
         src = (body.get("source") or "ios").strip().lower()
-        if src not in ("ios", "mac"):
+        if src not in ("ios", "mac", "test"):
             src = "ios"
         view = (body.get("current_view") or "month").strip().lower()
         logger.info("%s Text command: %s", "🖥️" if src == "mac" else "📱", transcript)
