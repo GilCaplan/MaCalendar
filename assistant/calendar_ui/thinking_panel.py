@@ -39,6 +39,10 @@ PANEL_HEIGHT = 440
 # the last dozen commands — far more than anyone scrolls back through.
 MAX_HISTORY_WIDGETS = 90
 
+# How many past commands the History list offers. The bus keeps more; this is
+# about how long the list takes to build and how far anyone actually scrolls.
+HISTORY_LIMIT = 200
+
 # stage -> icon file in calendar_ui/icons (same names the iOS AssistantIcon uses)
 _STAGE_ICONS = {
     "stt": "heard", "vocab": "vocab", "rule": "rule", "memory": "memory",
@@ -537,6 +541,49 @@ class _ResultCard(QFrame):
 
 # ------------------------------------------------------------------- panel
 
+class _HistoryRow(QPushButton):
+    """One past command in the history list: what you said, what it did."""
+
+    def __init__(self, entry: dict, theme, parent=None) -> None:
+        super().__init__(parent)
+        self.entry = entry
+        result = entry.get("result") or {}
+        said = (result.get("transcript") or "").strip() or "(no transcript)"
+        did = (result.get("message") or "").strip() or "—"
+        when = _dt.datetime.fromtimestamp(entry.get("ts") or 0).strftime("%d %b %H:%M")
+        src = _source_label(entry.get("source") or "mac")
+        where = "" if src == "Mac" else f" · {src}"
+
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFlat(True)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(8, 6, 8, 6)
+        lay.setSpacing(2)
+
+        self._when = QLabel(f"{when}{where}")
+        f = self._when.font(); f.setPointSize(max(9, f.pointSize() - 2)); self._when.setFont(f)
+        lay.addWidget(self._when)
+
+        self._said = QLabel(said if len(said) < 70 else said[:69] + "…")
+        self._said.setWordWrap(True)
+        lay.addWidget(self._said)
+
+        self._did = QLabel(did if len(did) < 80 else did[:79] + "…")
+        self._did.setWordWrap(True)
+        f = self._did.font(); f.setPointSize(max(9, f.pointSize() - 1)); self._did.setFont(f)
+        lay.addWidget(self._did)
+
+        self.apply_theme(theme)
+
+    def apply_theme(self, theme) -> None:
+        self._when.setStyleSheet(f"color: {theme.text2};")
+        self._said.setStyleSheet(f"color: {theme.text}; font-weight: 600;")
+        self._did.setStyleSheet(f"color: {theme.text2};")
+        self.setStyleSheet(
+            f"QPushButton {{ border: none; border-radius: 6px; text-align: left; }}"
+            f"QPushButton:hover {{ background: {theme.surface}; }}")
+
+
 class _RunDivider(QWidget):
     """Heads each command in the timeline once more than one is shown.
 
@@ -614,6 +661,14 @@ class ThinkingPanel(QFrame):
         head.addStretch(1)
         # Minimise to the title bar. The header keeps showing the live step
         # count, so a command still in flight is visible while it's out of the way.
+        self._hist_btn = QPushButton("History")
+        self._hist_btn.setFlat(True)
+        self._hist_btn.setFixedHeight(24)
+        self._hist_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._hist_btn.setToolTip("Every command the assistant has run")
+        self._hist_btn.clicked.connect(self.toggle_history)
+        head.addWidget(self._hist_btn)
+
         self._min_btn = QPushButton("–")
         self._min_btn.setFlat(True)
         self._min_btn.setFixedSize(24, 24)
@@ -668,6 +723,27 @@ class ThinkingPanel(QFrame):
         self._body_lay.addStretch(1)
         self._scroll.setWidget(self._body)
         root.addWidget(self._scroll, 1)
+
+        # The history list is its own scroll area rather than more rows in the
+        # timeline: 300 past commands as step rows would be unreadable, and the
+        # question "what has it done" is a different one from "what is it doing".
+        self._hist_scroll = QScrollArea()
+        self._hist_scroll.setWidgetResizable(True)
+        self._hist_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._hist_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._hist_body = QWidget()
+        self._hist_lay = QVBoxLayout(self._hist_body)
+        self._hist_lay.setContentsMargins(8, 8, 8, 8)
+        self._hist_lay.setSpacing(2)
+        self._hist_empty = QLabel("Nothing yet — commands show up here once you use it.")
+        self._hist_empty.setWordWrap(True)
+        self._hist_lay.addWidget(self._hist_empty)
+        self._hist_lay.addStretch(1)
+        self._hist_scroll.setWidget(self._hist_body)
+        self._hist_scroll.hide()
+        root.addWidget(self._hist_scroll, 1)
+        self._showing_history = False
+        self._hist_rows: list = []
 
         self._fade = QPropertyAnimation(self, b"windowOpacity", self)
         self._fade.setDuration(160)
@@ -761,6 +837,50 @@ class ThinkingPanel(QFrame):
     def running(self) -> bool:
         return not self._finished
 
+    def toggle_history(self, on: bool | None = None) -> None:
+        """Swap the timeline for the list of everything it has ever run."""
+        self._showing_history = (not self._showing_history) if on is None else on
+        if self._showing_history:
+            self._load_history()
+        self._scroll.setVisible(not self._showing_history and not self._minimised)
+        self._hist_scroll.setVisible(self._showing_history and not self._minimised)
+        self._hist_btn.setText("Back" if self._showing_history else "History")
+        self._hist_btn.setToolTip("Back to the current command" if self._showing_history
+                                  else "Every command the assistant has run")
+
+    def _load_history(self) -> None:
+        """Rebuild the list from the bus file — the durable record.
+
+        Read fresh each time rather than kept in memory: it is the only copy
+        that survives this process restarting, and it holds everything from
+        before the card was ever opened.
+        """
+        for row in self._hist_rows:
+            row.setParent(None)
+            row.deleteLater()
+        self._hist_rows.clear()
+
+        try:
+            from assistant import trace_bus
+            entries = trace_bus.read_history(HISTORY_LIMIT)
+        except Exception:
+            entries = []
+
+        self._hist_empty.setVisible(not entries)
+        for entry in entries:
+            row = _HistoryRow(entry, self._theme, self._hist_body)
+            row.clicked.connect(lambda _=False, e=entry: self._open_history_entry(e))
+            self._hist_rows.append(row)
+            self._hist_lay.insertWidget(len(self._hist_rows) - 1, row)
+
+    def _open_history_entry(self, entry: dict) -> None:
+        """Show one past command in the timeline, as it looked when it ran."""
+        self.begin(source=entry.get("source") or "mac")
+        for step in entry.get("steps") or []:
+            self.add_step(step)
+        self.finish(entry.get("result") or {})
+        self.toggle_history(False)
+
     def _update_count(self) -> None:
         n = len(self._rows)
         self._count.setText("" if not n else f"{n} step{'' if n == 1 else 's'}")
@@ -784,7 +904,8 @@ class ThinkingPanel(QFrame):
     def toggle_minimised(self, minimised: bool | None = None) -> None:
         """Collapse to the title bar, or restore."""
         self._minimised = (not self._minimised) if minimised is None else minimised
-        self._scroll.setVisible(not self._minimised)
+        self._scroll.setVisible(not self._minimised and not self._showing_history)
+        self._hist_scroll.setVisible(not self._minimised and self._showing_history)
         self._rule.setVisible(not self._minimised)
         self._min_btn.setText("+" if self._minimised else "–")
         self._min_btn.setToolTip("Restore" if self._minimised else "Minimise")

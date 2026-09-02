@@ -141,3 +141,38 @@ def read_since(offset: int) -> tuple[list[dict[str, Any]], int]:
             return out, f.tell()
     except OSError:
         return [], offset
+
+
+def read_history(limit: int = 200) -> list[dict[str, Any]]:
+    """The most recent finished runs, newest first.
+
+    The bus file is the only durable record of what the assistant has done —
+    the HUD holds a handful of runs in memory and loses them on restart, and
+    everything before it started is only here. Reading it back is what lets the
+    card show more than the command you just gave.
+
+    Only complete runs are returned: a "trace" carries its steps and its result
+    together, where a live run is a "begin" followed by loose steps that may
+    still be arriving.
+    """
+    try:
+        with open(BUS_PATH, encoding="utf-8") as f:
+            lines = f.readlines()
+    except OSError:
+        return []
+
+    out: list[dict[str, Any]] = []
+    for line in reversed(lines):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if entry.get("kind", "trace") != "trace":
+            continue
+        out.append(entry)
+        if len(out) >= limit:
+            break
+    return out
