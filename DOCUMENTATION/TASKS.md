@@ -54,6 +54,36 @@ Running list of user-reported issues and feature requests, with status. Update w
 | 48 | **A multi-item task command made one task.** "buy chicken and rice" became one task — the LLM merged it (sometimes into an invented "buy groceries"), the rule path kept the verb only on the first. One task per item now, verb shared out, tag inferred from each title | done 2026-08-31 | `assistant/intent/list_split.py`, `assistant/actions/todo/tagging.py` |
 | 49 | **The trace was only visible if you were looking at the calendar** — which you are not when you speak to the assistant from your phone. It is its own always-on-top app now: never takes focus, translucent until hovered, works with the calendar closed | done 2026-08-31 | `assistant/thinking_hud.py`, streaming `assistant/trace_bus.py` |
 
-Working agreements
+| 50 | Same brain for both devices: the GUI stopped parsing locally and now POSTs to `assistant.api` like the phone does; ~1,200 lines of duplicated orchestration deleted | done 2026-09-01 | `assistant/pipeline.py`, `assistant/api/server.py` |
+| 51 | The LLM now validates **every** command, not only low-confidence ones — a confident wrong parse was the one case nothing was checking | done 2026-09-01 | `verify_fast_path` in `config.example.yaml`, `server._run_transcript` |
+| 52 | Thinking panel: stopped re-popping, keeps a searchable history of every run, filters by device / kind / outcome, and separates test traffic from real use | done 2026-09-01 | `assistant/calendar_ui/thinking_panel.py`, `assistant/thinking_hud.py`, `trace_bus.read_history` |
+| 53 | Repeating events understand "every day at 7pm until Oct 6" — "until" exclusive unless stated, and occurrences on Shabbat and chag are skipped using locally-computed sundown (meals excepted, fasts not) | done 2026-09-01 | `assistant/db.py` `_skip_for_observance`, `assistant/observance.py` |
+| 54 | Personal vocabulary gained two more powers beyond spelling fixes: expand an acronym, and carry a label used for task tags and event colours | done 2026-09-01 | `assistant/stt/vocab.py`, `assistant/actions/todo/tagging.py` |
+| 55 | **Settings UI for the vocabulary** — view, edit and clear labels and acronyms on both iOS and macOS, with the user's permission required before anything is added | todo | `VocabularyView.swift`, Mac Settings |
+| 56 | **The harness**: a memory-aware audit mode so the personalisation layer can be measured at all — does history help, is `k=4` right, are verified examples better | todo | `scripts/audit_assistant.py --memory` |
+| 57 | **Confidence calibration**: the multipliers in `_compute_confidence` are hand-picked and have never been checked against outcomes. The audit already records score and correctness, so bucketing by score answers it | todo | `assistant/intent/rule_parser.py` |
+| 58 | Two-level label hierarchy (Exercise → Running / Gym) and promoting the planner's ad-hoc categories into the registry | todo | `categories.py`, `tagging.py` |
+| 59 | Ask for 👍/👎 only when the self-check is unsure, instead of on every command — `scratchpad/flag_precision.py` measures whether its opinion agrees with the user's before this is built | todo | review flow |
+| 60 | Few-shot pool: prefer verified examples, and stop recency from evicting corrections | todo | `assistant/intent/parser.py` `_few_shot_for` |
+| 61 | Three iOS fixes committed but **not installed on the device** — poll storm, counter history sheet, speech continuing after it was turned off | todo | `xcrun devicectl device install app` |
+| 62 | Explainer artifacts: big-picture done; internals page still needs genericising, a first-time-reader rewrite, and interactive figures | in progress | `DOCUMENTATION/ARTIFACT_BUILDER.md` |
+
+## How we are working right now
+
+Order of play, agreed 2026-09-02:
+
+1. **Finish the internals artifact** — genericise it, rewrite it for a reader
+   with no context, add the three interactive figures. Brief:
+   `DOCUMENTATION/ARTIFACT_BUILDER.md`.
+2. **Install the iOS build** so the three committed fixes are actually on the
+   phone.
+3. **Build the harness**, then use it to answer the calibration question.
+
+Nothing after 3 gets planned until 3 has produced a number. Several decisions
+queued behind it — `k`, the eviction policy, the confidence weights, whether
+labelling should move to the LLM — are currently arguments rather than results,
+and the harness is what turns them into results.
+
+## Working agreements
 - Everything on the phone is local: no third-party services; the only network peer is the Mac over Tailscale.
 - Prefer doing work directly over spawning sub-agents; keep context small (`/compact` between big tasks).

@@ -180,6 +180,15 @@ Three exceptions, each with a reason:
 - **Nothing is skipped if observance cannot be computed.** A series quietly
   losing days is worse than one landing where it should not.
 
+## Where the plan lives
+
+`DOCUMENTATION/TASKS.md` is the tracker and carries the current order of play at
+the bottom — read it before picking up work, and move a row rather than starting
+a parallel list. `DOCUMENTATION/MODELS.md` is the canonical answer to which
+models do what. `DOCUMENTATION/ARTIFACT_BUILDER.md` is the brief for the
+published explainer pages, including the rule that no personal detail of the
+author may appear in one.
+
 ## Conventions
 
 Commit messages explain what was wrong and how it was found, not just what

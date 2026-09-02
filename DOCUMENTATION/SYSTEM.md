@@ -29,6 +29,15 @@ Before fixing a bug or adding a feature, **read `CODE_MAP.md`** — it has preci
 - **Smart Recurrence**: Edit whole series or single instances with an intuitive prompt.
 - **Task Management**: Native drag-and-drop reordering on both platforms.
 
+## Models
+
+Three, all local: Whisper `base` for speech, spaCy `en_core_web_sm` for the
+grammar the rule parser reads, and Llama 3.1 8B in Ollama for meaning. The 8B
+model does six distinct jobs, only three of which are on the path between
+speaking and seeing the result. No embedding model; no classifier model.
+Full table, including which config key sets each and why the sizes were chosen:
+`DOCUMENTATION/MODELS.md`.
+
 ## NLU Parse Path
 ```
 Voice command
