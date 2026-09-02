@@ -120,6 +120,20 @@ def infer_tag(title: str, palette: Optional[Iterable[str]] = None) -> Optional[s
     text = " " + re.sub(r"[^\w\s'-]", " ", title.lower()) + " "
     text = re.sub(r"\s+", " ", text)
 
+    # This user's own words come first. The vocabulary already knew "Haxaga"
+    # and "Malag" were words they say — it just had nowhere to record what they
+    # were *about*, so half their untagged tasks were course work the tagger
+    # could not see. A label they set by hand outranks any list that ships with
+    # the app: they said Haxaga is a course, so it is, whatever else the
+    # sentence looks like.
+    try:
+        from assistant.stt.vocab import get_vocab
+        personal = get_vocab().label_for(title)
+        if personal and personal.lower() in allowed:
+            return allowed[personal.lower()]
+    except Exception:                       # pragma: no cover - defensive
+        pass
+
     best, best_score = None, 0.0
     for tag, keywords in KEYWORDS.items():
         if tag.lower() not in allowed:

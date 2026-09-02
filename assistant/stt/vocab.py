@@ -80,13 +80,47 @@ def _norm(s: str) -> str:
 
 @dataclass
 class VocabEntry:
+    """A word this user says that English does not know.
+
+    Three things can be true of such a word, and they are deliberately
+    separate because they behave differently:
+
+    `aliases` fix a mishearing. "hexagon" was never what you said, so the
+    transcript is rewritten and nothing is lost.
+
+    `expands_to` is shorthand. "MT" *is* what you said and meant, so it is
+    never substituted into your text — expanding it would edit your words
+    rather than correct them. It is context: what the acronym means, for
+    labelling, for search, and for telling the model.
+
+    `label` is what the word implies about a task or event. "Haxaga" is a
+    course, so a task mentioning it is Coursework. This is the field that was
+    missing: the vocabulary already knew Haxaga and Malag were your words, and
+    the tagger could not use that, so both systems learned about the same 374
+    words separately.
+    """
+
     word: str
     aliases: list[str] = field(default_factory=list)
     hits: int = 0
     added: float = field(default_factory=time.time)
+    expands_to: str = ""
+    label: str = ""
+
+    @property
+    def is_acronym(self) -> bool:
+        return bool(self.expands_to)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"word": self.word, "aliases": self.aliases, "hits": self.hits, "added": self.added}
+        d: dict[str, Any] = {"word": self.word, "aliases": self.aliases,
+                             "hits": self.hits, "added": self.added}
+        # Written only when set, so 374 existing entries keep the shape they
+        # have and a hand-edited vocab.json does not grow empty fields.
+        if self.expands_to:
+            d["expands_to"] = self.expands_to
+        if self.label:
+            d["label"] = self.label
+        return d
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "VocabEntry":
@@ -95,6 +129,8 @@ class VocabEntry:
             aliases=[str(a) for a in d.get("aliases", []) if str(a).strip()],
             hits=int(d.get("hits", 0)),
             added=float(d.get("added", time.time())),
+            expands_to=str(d.get("expands_to", "") or "").strip(),
+            label=str(d.get("label", "") or "").strip(),
         )
 
 
@@ -414,6 +450,51 @@ class VocabStore:
 
 
     # ---------------------------------------------------------- suggest
+
+    def label_for(self, text: str) -> str:
+        """The label implied by any of this user's own words in *text*.
+
+        Checked before the generic keyword lists, because a word the user
+        curated by hand outranks a word that ships with the app: "Haxaga" is a
+        course because they said so, whatever else the sentence looks like.
+
+        Longest word first, so "Modern Computer Vision" wins over a "vision"
+        entry rather than depending on dictionary order.
+        """
+        self._load()
+        if not text:
+            return ""
+        hay = " " + re.sub(r"[^\w\s'-]", " ", text.lower()) + " "
+        with self._lock:
+            labelled = [e for e in self._entries if e.label]
+            for e in sorted(labelled, key=lambda x: -len(x.word)):
+                needle = " " + e.word.lower() + " "
+                if needle in hay:
+                    return e.label
+        return ""
+
+    def acronyms(self) -> list[VocabEntry]:
+        """Shorthand this user uses, longest first. Never substituted into
+        their text — see VocabEntry — but worth telling the model about."""
+        self._load()
+        with self._lock:
+            return sorted((e for e in self._entries if e.expands_to),
+                          key=lambda x: -len(x.word))
+
+    def expansion_note(self, text: str) -> str:
+        """A one-line gloss of any shorthand in *text*, for the LLM prompt.
+
+        "Chapter of MT" stays exactly that in the task; the model is simply
+        told, alongside it, that MT means Mishnah Torah.
+        """
+        if not text:
+            return ""
+        hay = " " + re.sub(r"[^\w\s'-]", " ", text.lower()) + " "
+        found = [e for e in self.acronyms() if " " + e.word.lower() + " " in hay]
+        if not found:
+            return ""
+        return "Shorthand this user uses: " + ", ".join(
+            f"{e.word} = {e.expands_to}" for e in found)
 
     def suggestions(self, transcript: str, floor: float = 0.6) -> list[dict[str, Any]]:
         """Words the user may want to check: near-misses of vocab words below
