@@ -74,14 +74,27 @@ confirmation_level: 1
 # author. Set false to go back to trusting the rules unchecked.
 verify_fast_path: true
 
-# Let the self-check actually change the record instead of only saying what it
-# thinks. It was advisory because the verifier proposed changes on ~98% of
-# commands and fixed fewer than it broke — it was judging the rule parser's raw
-# slots, so every create_event looked like it was missing an end time. It now
-# judges what reached the database, and the replacement is authored by the full
-# parser rather than the verifier, whose inline suggestions were unreliable.
-# A correction the parser disagrees with is discarded.
-self_check_apply: true
+# Should the self-check WRITE its corrections, or only report them?
+#
+# Measured, not guessed. Audit of 2026-09-02, 89 commands, after the raw-slots
+# fix and the parser-authored corrections:
+#
+#     quick answer   97% correct
+#     once settled   96% correct      <-- applying made it worse
+#     self-check ran on 85, proposed 38, applied 29
+#     fixed by self-check: 0    broken by self-check: 1
+#
+# Zero fixed is the number that matters. The one break shows why: "meeting
+# tomorrow at 2 sorry not 2, 3 pm with Adin" was parsed correctly as 3 pm, and
+# the self-check moved it back to 2 pm. The guard that only accepts a time
+# actually spoken in the command did not help — "2" was spoken, in the half of
+# the sentence the speaker retracted.
+#
+# So it stays advisory: it still runs on every command, still reasons, still
+# shows its verdict in the thinking panel, and the escalation path still
+# rewrites genuinely wrong actions at execution time. It just does not get to
+# silently edit a record it cannot reliably improve. Set true to let it write.
+self_check_apply: false
 
 audio:
   sample_rate: 16000
