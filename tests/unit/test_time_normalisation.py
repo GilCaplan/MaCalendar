@@ -63,5 +63,11 @@ def test_pm_does_not_double_shift_an_afternoon_hour():
 
 
 def test_an_unspecified_time_falls_back_to_the_default_rather_than_erroring():
-    """Empty is "the speaker didn't say", not "the speaker said nonsense"."""
-    assert _time("") == "09:00"
+    """Empty is "the speaker didn't say", not "the speaker said nonsense".
+
+    Asserts the shape, not a value: the default is derived from the current
+    clock, so pinning it to "09:00" makes the suite pass or fail depending on
+    what time it is run.
+    """
+    import re
+    assert re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", _time(""))

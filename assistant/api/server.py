@@ -31,7 +31,7 @@ def load_config(path: str = "config.yaml") -> AppConfig:
         except ConfigError:
             return AppConfig()
 from assistant.db import get_db
-from assistant.exceptions import AssistantError
+from assistant.exceptions import AssistantError, TargetNotFound
 
 logger = logging.getLogger(__name__)
 
@@ -592,7 +592,51 @@ def create_app() -> Flask:
                 continue
             try:
                 ev_before, td_before = ctx.last_event_id, ctx.last_todo_id
-                result = action_cls().execute(intent, cfg)
+                try:
+                    result = action_cls().execute(intent, cfg)
+                except TargetNotFound as nf:
+                    # Same escalation the Mac pipeline does. The phone runs its
+                    # own parse/execute loop in this process, so this has to be
+                    # written twice or the two surfaces disagree — and the one
+                    # that reported "I couldn't find a task matching 'walk mark
+                    # stalk'" was this one.
+                    #
+                    # Without the explicit catch the bare `except Exception`
+                    # below turns a legitimate "nothing matched" into
+                    # "Error: ..." on a failed step, which is worse than what
+                    # it replaced.
+                    _eligible = (parse_path == "rule" and len(parsed) == 1
+                                 and not messages)
+                    _replacement = None
+                    if _eligible:
+                        trace.step(RULE, "Rule parser matched nothing",
+                                   f"{action_name.replace('_', ' ')} found no target "
+                                   "— asking the LLM instead", ok=False)
+                        try:
+                            _retried = parser.parse(transcript) or []
+                        except Exception as _e:
+                            trace.step(LLM, "LLM", f"Unavailable ({_e}) — keeping the answer",
+                                       ok=False)
+                            _retried = []
+                        _cand = [(n, i) for n, i in _retried if n != "unknown"]
+                        if len(_cand) == 1 and _cand[0][0] != action_name:
+                            _replacement = _cand[0]
+                        elif _cand:
+                            trace.step(LLM, "LLM",
+                                       "Agrees — the target really is missing", ok=False)
+                    if _replacement is None:
+                        messages.append(nf.message)
+                        trace.step(EXECUTE, action_name.replace("_", " ").title(),
+                                   nf.message, ok=False)
+                        continue
+                    action_name, intent = _replacement
+                    action_cls = registry.get(action_name)
+                    if action_cls is None:
+                        messages.append(nf.message)
+                        continue
+                    trace.step(LLM, "LLM",
+                               f"Re-read it as {action_name.replace('_', ' ')}")
+                    result = action_cls().execute(intent, cfg)
                 logger.info("📱 Action %s → %s", action_name, result)
                 messages.append(result or "")
                 action_names.append(action_name)
