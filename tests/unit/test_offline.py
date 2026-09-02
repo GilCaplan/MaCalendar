@@ -128,6 +128,10 @@ def test_the_database_works_offline(no_network, tmp_path, monkeypatch):
 
 def test_a_cached_whisper_model_resolves_without_the_network(no_network, monkeypatch):
     """The regression: a repo id sent mlx_whisper to huggingface.co every load."""
+    # huggingface_hub arrives with the optional [mlx] extra, so a Linux CI box
+    # has no such module and monkeypatching it by name would raise on import.
+    # The code under test already degrades to the repo id without it.
+    pytest.importorskip("huggingface_hub")
     from assistant.stt import mlx_whisper_stt as m
 
     calls = {}
@@ -147,6 +151,7 @@ def test_a_cached_whisper_model_resolves_without_the_network(no_network, monkeyp
 def test_an_uncached_model_falls_back_without_raising(no_network, monkeypatch):
     """A model that was never downloaded still has to leave the app startable —
     it degrades to the repo id so a first online run can fetch it."""
+    pytest.importorskip("huggingface_hub")
     from assistant.stt import mlx_whisper_stt as m
 
     def boom(repo, **kw):

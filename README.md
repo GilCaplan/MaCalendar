@@ -10,7 +10,34 @@ A privacy-focused, voice-driven calendar assistant for macOS. This tool uses loc
 
 ![MACalendar assistant architecture](DOCUMENTATION/img/assistant-architecture.svg)
 
-A spoken command goes: **Whisper (MLX, on the Apple GPU)** → **personal vocabulary auto-correct** → **rule parser** (spaCy + date recognizer; answers ~40% of commands in ~100 ms with no LLM) → **local LLM** (Ollama, llama3.1:8b) only when the rule parser is unsure, with your most similar past commands injected as examples → validation → actions → SQLite. Every command is remembered; your edits, deletes and approve/reject become feedback that improves the next parse. Details: [DOCUMENTATION/SYSTEM.md](DOCUMENTATION/SYSTEM.md), audit: [DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md](DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md).
+A spoken command goes: **Whisper (MLX, on the Apple GPU)** → **personal vocabulary auto-correct** → **rule parser** (spaCy + date recognizer; answers ~44% of commands in ~100 ms with no LLM) → **local LLM** (Ollama, llama3.1:8b) when the rule parser is unsure, with your most similar past commands injected as examples → validation → actions → SQLite. Every command is remembered; your edits, deletes and approve/reject become feedback that improves the next parse. Details: [DOCUMENTATION/SYSTEM.md](DOCUMENTATION/SYSTEM.md), audit: [DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md](DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md).
+
+**The LLM sees every command, whichever path answered it.** A rule-path answer
+is returned immediately and then reviewed in the background: the model re-reads
+the transcript against what actually ran and says whether it agrees. It reports
+rather than rewrites — measured over the corpus, applying its corrections fixed
+nothing and broke one thing, so it advises and the trace shows what it thought.
+What *does* correct itself is narrower and evidence-based: an action that
+matches nothing re-parses with the LLM instead of answering "I couldn't find
+that", and an event the rules could only call "meeting" is named properly
+before you are told about it.
+
+### One brain, two surfaces
+
+`assistant.api` parses and executes **everything**. The Mac GUI and the iPhone
+are both clients of it — the GUI posts to `127.0.0.1:8080`, the phone posts over
+Tailscale, and `source` (`"mac"` / `"ios"`) is the only difference between them.
+They previously had separate implementations of the same pipeline, which drifted
+until the same sentence produced different results depending on which microphone
+heard it.
+
+### Nothing leaves the machine
+
+Whisper runs on the GPU from a cached model, the LLM is Ollama on `localhost`,
+spaCy and the date recogniser are local, the Hebrew calendar is pure Python, and
+the database is a file in `~/.assistant_tools/`. There is no account, no API key
+and no telemetry. `tests/unit/test_offline.py` blocks every non-loopback socket
+and fails the build if that ever stops being true.
 
 ### Seeing what it did — the thinking HUD
 
@@ -24,6 +51,17 @@ and the calendar app may not even be open. So it floats over whatever you are
 actually in, never takes keyboard focus, and sits slightly translucent until
 you hover it. Drag it by its header to move it; right-click for Hide / Reset
 position / Quit.
+
+It appears on the first command and then **updates in place** rather than
+re-announcing itself, and closing it is an instruction it remembers — reopen
+from the menu bar item. Commands that arrive while it is closed are still
+recorded.
+
+**History** lists every command it has ever run, newest first: when, from which
+device, what you said and what it did. Click one to replay its full timeline.
+Search matches both what you said and what it answered, and chips narrow by
+device (Mac / iPhone), by kind (Events / Tasks), and to the ones that went wrong
+(Failed). Scripted runs are tagged and hidden unless you ask for them.
 
 `Launch Calendar.command` starts it. On its own: `python -m assistant.thinking_hud`.
 Turn it off in **Settings › Assistant** (`ui.show_thinking`), or move it with
@@ -82,20 +120,33 @@ cp config.example.yaml config.yaml
 - **`todo.auto_tag`** / **`todo.auto_tag_infer`**: `auto_tag` is "tag mode" — every new
   task gets that one tag. With it empty, a tag is inferred from the title instead
   ("buy chicken" → Groceries), and only tags that already exist are ever used.
-- **`api.port`**: where the iPhone API listens (default `8080`); the HUD uses it too.
+- **`api.port`**: where the API listens (default `8080`). Both the phone **and the
+  Mac GUI** post commands there, and the HUD uses it too.
+- **`verify_fast_path`** / **`self_check_apply`**: the background LLM review. The
+  first is on — every command is re-read by the model and its verdict shown in the
+  trace. The second is off, and the comment beside it in `config.yaml` carries the
+  measurement: applying those corrections fixed 0 commands and broke 1.
+- **`confirmation_level`**: **no longer has any effect.** The dialog belonged
+  between parse and execute, and both now happen in the API process, which has no
+  screen. The GUI warns at startup if you have it set above 0.
 
 ## Usage
 
 ### Starting the App
 - **The easy way:** Double-click `Launch Calendar.command` in the Finder. It starts
-  everything: Ollama (if it isn't already up), the iPhone API server, the thinking
-  HUD, and the calendar window. Closing the calendar window stops the rest.
-- **The terminal way:** three processes, in any order —
+  everything: Ollama (if it isn't already up), the API server, the thinking HUD,
+  and the calendar window. Closing the calendar window stops the rest.
+- **The terminal way:** the API first, because the calendar window is a client of
+  it and will say so if it is missing —
   ```bash
-  python -m assistant.main            # the calendar window
-  python -m assistant.api --tailscale # the API the iPhone talks to
-  python -m assistant.thinking_hud    # the always-on-top trace card
+  python -m assistant.api --tailscale --reload  # THE BRAIN — start this first
+  python -m assistant.main                      # the calendar window
+  python -m assistant.thinking_hud              # the always-on-top trace card
   ```
+  `--reload` restarts the API when anything under `assistant/` changes, so editing
+  the assistant does not mean relaunching everything. **The GUI and the HUD do not
+  reload** — restart those by hand.
+
   They share no memory: the calendar DB is the source of truth, and traces travel
   between them through `~/.assistant_tools/trace_bus.jsonl`.
 

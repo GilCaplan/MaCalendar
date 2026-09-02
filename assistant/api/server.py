@@ -1243,7 +1243,7 @@ def create_app() -> Flask:
 
         logger.info("📱 Transcript: %s", transcript)
         trace.step(STT, "Heard", transcript, transcript=transcript)
-        return jsonify(_run_transcript(transcript, trace))
+        return jsonify(_run_transcript(transcript, trace, source="ios"))
 
     @app.post("/voice/stream")
     def voice_audio_stream():
@@ -1291,7 +1291,7 @@ def create_app() -> Flask:
                         return
                     logger.info("📱 Transcript: %s", transcript)
                     trace.step(STT, "Heard", transcript, transcript=transcript)
-                result = _run_transcript(transcript, trace)
+                result = _run_transcript(transcript, trace, source="ios")
                 q.put({"type": "result", **result})
             except Exception as e:  # never leave the stream hanging
                 logger.exception("📱 Stream pipeline failed: %s", e)
@@ -1323,13 +1323,18 @@ def create_app() -> Flask:
         # `source` is the only thing that differs between the two surfaces: it
         # labels the trace, the vocabulary corrections and the command memory.
         # The Mac GUI posts here too — this route is the brain for both.
-        # "test" is for anything driving the assistant that is not a person:
-        # curl while developing, a script, a smoke check. It keeps synthetic
-        # commands out of the history you actually read, and out of the
-        # command memory's few-shot examples.
-        src = (body.get("source") or "ios").strip().lower()
+        # Unidentified means synthetic. Both real clients say who they are —
+        # the GUI posts "mac", the iOS app posts "ios" — so anything that does
+        # not is a curl, a script or a smoke check, and belongs in the history
+        # only when you ask for it.
+        #
+        # This defaulted to "ios", which is how an afternoon of my own testing
+        # ended up indistinguishable from commands actually given to the phone.
+        # Defaulting the other way makes forgetting to label a test harmless
+        # and forgetting to label a real client obvious.
+        src = (body.get("source") or "test").strip().lower()
         if src not in ("ios", "mac", "test"):
-            src = "ios"
+            src = "test"
         view = (body.get("current_view") or "month").strip().lower()
         logger.info("%s Text command: %s", "🖥️" if src == "mac" else "📱", transcript)
         run = (body.get("trace_run") or "").strip() or None

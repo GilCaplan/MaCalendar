@@ -659,8 +659,11 @@ class APIClient: ObservableObject {
     }
 
     func sendText(_ transcript: String) async throws -> VoiceResponse {
+        // Identify the client. The server treats an unlabelled caller as a
+        // test, so that a curl during development cannot masquerade as a
+        // command you actually gave the phone.
         let data = try await request("/voice/text", method: "POST",
-                                     body: ["transcript": transcript])
+                                     body: ["transcript": transcript, "source": "ios"])
         return try decode(VoiceResponse.self, from: data)
     }
 
