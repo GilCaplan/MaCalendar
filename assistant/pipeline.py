@@ -229,7 +229,7 @@ class Pipeline:
 
     def _run_pipeline(self, combine: bool = False) -> None:
         t_start = time.perf_counter()
-        from assistant.trace import STT, VOCAB, ERROR
+        from assistant.trace import STT, ERROR
         trace = self._trace_begin()
 
         # 1. Listen
@@ -617,19 +617,6 @@ class Pipeline:
         self._trace_run = trace_bus.publish_begin("Mac")
         trace.on_step(lambda st: trace_bus.publish_step(self._trace_run, st.to_dict()))
         return trace
-
-    def _queue_pending(transcript: str, reason: str) -> "int | None":
-        """Park a command the LLM couldn't take, so it can be retried later.
-
-        The API server does this for phone commands; without it a command
-        spoken to the Mac while Ollama was down was simply lost.
-        """
-        try:
-            from assistant.intent.memory import get_memory
-            return get_memory().add_pending(transcript, reason, source="mac")
-        except Exception as exc:
-            logger.warning("🖥️ Could not queue pending command: %s", exc)
-            return None
 
     @staticmethod
     def _uncertain_words(transcript: str) -> list:

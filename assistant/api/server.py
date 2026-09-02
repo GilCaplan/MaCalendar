@@ -471,7 +471,7 @@ def create_app() -> Flask:
         from assistant.pipeline import _strip_stop_keyword
         from assistant.stt.vocab import apply_vocab
         from assistant.trace import (
-            Trace, VOCAB, RULE, MEMORY, LLM, VALIDATE, EXECUTE, DONE, ERROR,
+            Trace, VOCAB, RULE, LLM, VALIDATE, EXECUTE, DONE, ERROR,
         )
         trace = trace or Trace(source=source)
         # A caller that has already opened a run on the bus (the Mac GUI does,
