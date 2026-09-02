@@ -179,3 +179,8 @@ class QueryScheduleIntent(BaseIntent):
     """Intent for querying and reading out the user's schedule."""
     scope: str = "today"        # "today" | "tomorrow" | "week"
     query_type: str = "full"    # "full" | "first" | "next" | "count"
+    # A specific day, when one was named. scope could only say today, tomorrow
+    # or week, so "what do I have on friday" had nowhere to put "friday" and
+    # fell back to the default — answering confidently about the wrong day.
+    # When this is set it wins over scope.
+    date: Optional[str] = None  # YYYY-MM-DD

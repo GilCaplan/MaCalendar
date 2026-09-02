@@ -241,6 +241,14 @@ class QueryScheduleAction(BaseAction):
                     "'next' = next upcoming event, 'count' = how many events."
                 ),
             },
+            "date": {
+                "type": "string",
+                "description": (
+                    "A specific day as YYYY-MM-DD, when one is named — "
+                    "'what do I have on friday', 'anything on the 14th'. "
+                    "Overrides scope. Leave out for today/tomorrow/this week."
+                ),
+            },
         },
         "required": [],
     }
@@ -251,7 +259,21 @@ class QueryScheduleAction(BaseAction):
         db = get_db()
 
         today = dt.date.today()
-        if intent.scope == "tomorrow":
+        # A named day wins over scope: scope can only say today/tomorrow/week,
+        # so "friday" used to arrive as the default and answer for today.
+        named = None
+        if getattr(intent, "date", None):
+            try:
+                named = dt.date.fromisoformat(str(intent.date))
+            except ValueError:
+                named = None
+
+        if named is not None:
+            target_date = named
+            day_label = ("today" if named == today
+                         else "tomorrow" if named == today + dt.timedelta(days=1)
+                         else named.strftime("%A, %-d %B"))
+        elif intent.scope == "tomorrow":
             target_date = today + dt.timedelta(days=1)
             day_label = "tomorrow"
         elif intent.scope == "week":
@@ -260,7 +282,7 @@ class QueryScheduleAction(BaseAction):
             target_date = today
             day_label = "today"
 
-        if intent.scope == "week":
+        if intent.scope == "week" and named is None:
             week_start = today - dt.timedelta(days=today.weekday())
             events = db.get_events_for_week(week_start)
         else:
