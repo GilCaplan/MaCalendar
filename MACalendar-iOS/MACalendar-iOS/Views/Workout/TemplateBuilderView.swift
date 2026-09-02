@@ -409,13 +409,15 @@ private struct SetRow: View {
                     set.type = newType
                     if newType == .reps, set.targetReps == nil { set.targetReps = 8 }
                     if newType == .time, set.targetSeconds == nil { set.targetSeconds = 30 }
+                    if newType == .distance, set.distanceM == nil { set.distanceM = 400 }
                 }
             )) {
                 Text("Reps").tag(SetType.reps)
                 Text("Time").tag(SetType.time)
+                Text("Dist").tag(SetType.distance)
             }
             .pickerStyle(.segmented)
-            .frame(width: 110)
+            .frame(width: 150)
 
             if set.type == .reps {
                 Stepper("\(set.targetReps ?? 8)", value: Binding(
@@ -426,6 +428,19 @@ private struct SetRow: View {
                 Stepper(weightLabel, value: Binding(
                     get: { set.weightKg ?? 0 }, set: { set.weightKg = $0 == 0 ? nil : $0 }
                 ), in: 0...300, step: 1.25)
+                .font(.caption)
+            } else if set.type == .distance {
+                Stepper((set.distanceM ?? 400).formattedDistance, value: Binding(
+                    get: { set.distanceM ?? 400 }, set: { set.distanceM = $0 }
+                ), in: 50...42200, step: 50)
+                .font(.caption)
+
+                // Pace is optional: 0 means "by feel", which is what an easy
+                // run wants and what a rep session never does.
+                Stepper(paceLabel, value: Binding(
+                    get: { set.targetPaceSecPerKm ?? 0 },
+                    set: { set.targetPaceSecPerKm = $0 == 0 ? nil : $0 }
+                ), in: 0...600, step: 5)
                 .font(.caption)
             } else {
                 Stepper("\(set.targetSeconds ?? 30)s", value: Binding(
@@ -446,6 +461,11 @@ private struct SetRow: View {
     private var weightLabel: String {
         guard let w = set.weightKg, w > 0 else { return "BW" }
         return "\(w.formattedKg)kg"
+    }
+
+    private var paceLabel: String {
+        guard let p = set.targetPaceSecPerKm, p > 0 else { return "feel" }
+        return p.formattedPace
     }
 }
 

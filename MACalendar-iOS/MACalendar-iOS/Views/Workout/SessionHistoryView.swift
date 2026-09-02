@@ -113,6 +113,7 @@ private struct LogEditRow: View {
                     log.completedAt = log.completedAt ?? Date()
                     if log.type == .reps { log.actualReps = log.actualReps ?? 8 }
                     if log.type == .time { log.actualSeconds = log.actualSeconds ?? 30 }
+                    if log.type == .distance { log.actualDistanceM = log.actualDistanceM ?? 400 }
                 }
                 .font(.caption)
             } else {
@@ -124,6 +125,16 @@ private struct LogEditRow: View {
                     Stepper(weightLabel,
                             value: Binding(get: { log.actualWeightKg ?? 0 }, set: { log.actualWeightKg = $0 == 0 ? nil : $0 }),
                             in: 0...300, step: 1.25)
+                        .font(.caption)
+                } else if log.type == .distance {
+                    Stepper((log.actualDistanceM ?? 0).formattedDistance,
+                            value: Binding(get: { log.actualDistanceM ?? 0 }, set: { log.actualDistanceM = $0 }),
+                            in: 0...42200, step: 50)
+                        .font(.caption)
+                    Stepper(paceLabel,
+                            value: Binding(get: { log.actualPaceSecPerKm ?? 0 },
+                                           set: { log.actualPaceSecPerKm = $0 == 0 ? nil : $0 }),
+                            in: 0...600, step: 5)
                         .font(.caption)
                 } else {
                     Stepper("\(log.actualSeconds ?? 0)s",
@@ -145,5 +156,10 @@ private struct LogEditRow: View {
     private var weightLabel: String {
         guard let w = log.actualWeightKg, w > 0 else { return "BW" }
         return "\(w.formattedKg)kg"
+    }
+
+    private var paceLabel: String {
+        guard let p = log.actualPaceSecPerKm, p > 0 else { return "feel" }
+        return p.formattedPace
     }
 }
