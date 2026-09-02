@@ -259,9 +259,15 @@ class CommandMemory:
     def retrieve(self, transcript: str, k: int = 4, min_score: float = 0.25) -> list[dict[str, Any]]:
         """Most similar useful past examples for ``transcript``.
 
-        Uses only successful, non-rejected examples. Corrected examples use
-        the user's correction as the target and get a relevance bonus —
-        that's the highest-value signal we have.
+        Uses only successful, non-rejected examples that a person actually
+        gave. Corrected examples use the user's correction as the target and
+        get a relevance bonus — that's the highest-value signal we have.
+
+        `source="test"` is excluded for the same reason rejected commands are:
+        these examples are shown to the LLM as evidence of how *this user*
+        speaks, and a curl typed while developing is not that. An afternoon of
+        testing put five synthetic commands in here, where they were eligible
+        to teach the parser someone else's phrasing.
         """
         q_tokens = _tokens(transcript)
         q_norm = _norm(transcript)
@@ -271,6 +277,7 @@ class CommandMemory:
             rows = c.execute(
                 "SELECT id, ts, transcript, actions_json, correction_json, feedback FROM examples "
                 "WHERE success=1 AND feedback != ? AND actions_json != '[]' "
+                "AND COALESCE(source, '') != 'test' "
                 "ORDER BY ts DESC LIMIT 2000", (FEEDBACK_REJECTED,)).fetchall()
         scored: list[tuple[float, sqlite3.Row]] = []
         seen: set[str] = set()
