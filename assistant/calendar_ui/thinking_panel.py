@@ -666,7 +666,11 @@ class ThinkingPanel(QFrame):
         self._hist_btn.setFixedHeight(24)
         self._hist_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._hist_btn.setToolTip("Every command the assistant has run")
-        self._hist_btn.clicked.connect(self.toggle_history)
+        # Through a lambda, not connected directly: QPushButton.clicked emits a
+        # `checked` bool, which binds to toggle_history's `on` argument as
+        # False — so every click meant "hide history" and the button did
+        # nothing. The minimise button beside it already does this.
+        self._hist_btn.clicked.connect(lambda: self.toggle_history())
         head.addWidget(self._hist_btn)
 
         self._min_btn = QPushButton("–")
@@ -954,6 +958,11 @@ class ThinkingPanel(QFrame):
                 f"QPushButton {{ background: transparent; border: none; color: {theme.text2};"
                 f" font-size: {_size}px; }} QPushButton:hover {{ color: {theme.text}; }}"
             )
+        self._hist_btn.setStyleSheet(
+            f"QPushButton {{ background: transparent; border: none; color: {theme.text2};"
+            f" font-size: 11px; padding: 0 6px; }}"
+            f"QPushButton:hover {{ color: {theme.text}; }}"
+        )
         self._rule.setStyleSheet(f"background-color: {theme.border}; border: none;")
         # The card carries its own scrollbar style. Inside the calendar app it
         # inherited one from the application stylesheet; as its own window

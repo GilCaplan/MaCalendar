@@ -104,6 +104,37 @@ def test_opening_a_past_command_replays_its_steps(qapp, bus):
         hud.close()
 
 
+def test_clicking_the_button_actually_toggles(qapp, bus):
+    """Clicked, not called.
+
+    Every other test here drove toggle_history() directly and passed while the
+    button did nothing at all: QPushButton.clicked emits a `checked` bool, and
+    connecting it straight to toggle_history bound that False to the `on`
+    argument — so every click meant "hide history". Only a real mouse event
+    goes through the signal, so only a real mouse event catches it.
+    """
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtTest import QTest
+
+    from assistant.thinking_hud import ThinkingHUD
+    _write(bus, 3)
+    hud = ThinkingHUD()
+    try:
+        hud.show()
+        qapp.processEvents()
+        btn = hud.panel._hist_btn
+
+        QTest.mouseClick(btn, Qt.MouseButton.LeftButton)
+        assert hud.panel._showing_history, "the button did not open history"
+        assert btn.text() == "Back"
+
+        QTest.mouseClick(btn, Qt.MouseButton.LeftButton)
+        assert not hud.panel._showing_history, "the button did not close history"
+        assert btn.text() == "History"
+    finally:
+        hud.close()
+
+
 def test_the_two_views_are_never_both_visible(qapp, bus):
     from assistant.thinking_hud import ThinkingHUD
     _write(bus, 2)
