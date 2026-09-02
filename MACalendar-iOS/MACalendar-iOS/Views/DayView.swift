@@ -180,6 +180,17 @@ private struct EventBlock: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(event.title).font(.system(size: settings.fontDay, weight: .semibold)).foregroundColor(textColor)
                     Text(event.displayTime).font(.system(size: settings.fontDay - 2)).foregroundColor(textColor.opacity(0.85))
+                    // A planned session carries the part worth reading — the
+                    // pace and the intervals — in its body. Show it on the grid
+                    // when the block is tall enough to hold a line without
+                    // crowding the title; a 30-minute block is not.
+                    if !event.description.isEmpty, height >= 46 {
+                        Text(event.description)
+                            .font(.system(size: settings.fontDay - 2))
+                            .foregroundColor(textColor.opacity(0.85))
+                            .lineLimit(height >= 70 ? 3 : 1)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .padding(4)
             }

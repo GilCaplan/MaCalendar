@@ -26,6 +26,13 @@ for _threads in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS",
 # headless, and on a CI runner there is no display to open one on.
 _os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+# create_app() otherwise spawns a daemon thread that loads Whisper and spaCy
+# while the suite keeps running, and the two unzipping model files on separate
+# threads segfault the interpreter — the same spaCy/torch collision the BLAS
+# pin above exists for. A test that builds the app wants the routes, never the
+# models.
+_os.environ.setdefault("MACALENDAR_NO_WARMUP", "1")
+
 _SCRATCH = _tempfile.mkdtemp(prefix="macalendar-tests-")
 for _var, _name in (("MACALENDAR_DB", "calendar.db"),
                     ("MACALENDAR_MEMORY_DB", "nlu_memory.db"),

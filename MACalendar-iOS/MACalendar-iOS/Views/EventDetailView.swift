@@ -12,6 +12,7 @@ struct EventDetailView: View {
     @State private var endTime: String
     @State private var location: String
     @State private var attendees: String
+    @State private var notes: String
     @State private var saving = false
     @State private var confirmDelete = false
     @State private var errorMessage: String?
@@ -34,6 +35,7 @@ struct EventDetailView: View {
         _endTime   = State(initialValue: event.endTime)
         _location  = State(initialValue: event.location)
         _attendees = State(initialValue: event.attendees)
+        _notes     = State(initialValue: event.description)
     }
 
     // MARK: - Computed helpers
@@ -94,6 +96,13 @@ struct EventDetailView: View {
                     TextField("Attendees", text: $attendees)
                         .onSubmit { if !saving && !title.isEmpty { save() } }
                 }
+                // The event body. This is where a planned session keeps the
+                // part that matters — "2 × 10 min @ 4:40 — 2 min jog between" —
+                // so it needs room to wrap, not a one-line TextField.
+                Section(header: Text("Notes")) {
+                    TextField("Notes", text: $notes, axis: .vertical)
+                        .lineLimit(3...12)
+                }
                 GuestsSection(attendees: $attendees, title: title, date: date, startTime: startTime, endTime: endTime, location: location)
                 if !isNew && !isReadOnly {
                     Section {
@@ -153,13 +162,15 @@ struct EventDetailView: View {
                     _ = try await api.createEvent([
                         "title": title, "date": date,
                         "start_time": startTime, "end_time": endTime,
-                        "location": location, "attendees": attendees
+                        "location": location, "attendees": attendees,
+                        "description": notes
                     ])
                 } else {
                     try await api.updateEvent(id: event.id, fields: [
                         "title": title, "date": date,
                         "start_time": startTime, "end_time": endTime,
-                        "location": location, "attendees": attendees
+                        "location": location, "attendees": attendees,
+                        "description": notes
                     ])
                 }
                 saving = false

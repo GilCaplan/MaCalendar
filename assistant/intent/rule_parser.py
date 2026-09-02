@@ -1238,6 +1238,12 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
                 scope = scope_val
                 break
         slots["scope"] = scope
+        # _SCOPE_PHRASES knows "today", "tomorrow" and "week" and nothing else,
+        # so a named day — "what do I have on friday" — matched no phrase and
+        # silently kept the default. The same extractor that dates an event
+        # resolves it, so the two agree about what Friday means.
+        if scope != "week" and temporal.get("date"):
+            slots["date"] = temporal["date"]
         # Query type
         if any(w in span_lower for w in ("first", "earliest")):
             slots["query_type"] = "first"

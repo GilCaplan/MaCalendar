@@ -165,6 +165,34 @@ class HebrewCalendarConfig(BaseModel):
     israel_holidays: bool = True
 
 
+class ObservanceConfig(BaseModel):
+    """Where sundown is computed for, and how much room to leave around it.
+
+    Drives workout scheduling only (see assistant/observance.py) — the Hebrew
+    date *display* settings live in HebrewCalendarConfig above and are
+    deliberately separate: one answers "what is today called?", this one
+    answers "may I train, and when?".
+    """
+    latitude: float = 31.7683            # Jerusalem
+    longitude: float = 35.2137
+    timezone: str = "Asia/Jerusalem"
+    city: str = "Jerusalem"
+    # Solar depression for tzeit hakochavim; 8.5 deg is common Israeli practice.
+    tzeit_depression: float = 8.5
+    candle_lighting_minutes: int = 18
+    # How long before candle lighting a session must be finished.
+    erev_buffer_minutes: int = 90
+    motzei_buffer_minutes: int = 30
+    earliest_hour: int = 5
+    latest_evening: str = "22:30"
+    # Minor fasts (Tzom Gedalia, 17 Tammuz...) as full rest days rather than
+    # pushing the session past nightfall.
+    minor_fast_is_rest_day: bool = True
+    # Allow motzei Shabbat / motzei chag as a last resort when a chag would
+    # otherwise cost a session outright.
+    allow_motzei_fallback: bool = True
+
+
 class NLUConfig(BaseModel):
     # Words that trigger instant fast-path create + background LLM title fix.
     # When a voice command's extracted title matches one of these, the event is
@@ -209,6 +237,7 @@ class AppConfig(BaseModel):
     theme: Literal["light", "dark"] = "dark"
     ui: UIConfig = UIConfig()
     hebrew_calendar: HebrewCalendarConfig = HebrewCalendarConfig()
+    observance: ObservanceConfig = ObservanceConfig()
 
     @field_validator("confirmation_level")
     @classmethod

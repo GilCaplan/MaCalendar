@@ -60,7 +60,25 @@ struct WorkoutStatsView: View {
             statTile("Total Sets", "\(totalSets)")
             statTile("Volume", "\(Int(totalVolume)) kg")
             statTile("Time", timeLabel)
+            // Only shown once there is running to show — a lifter should not
+            // have to look at "0.0 km" forever.
+            if totalDistanceM > 0 {
+                statTile("Distance", distanceLabel)
+            }
         }
+    }
+
+    /// Metres covered across every logged distance set in range.
+    private var totalDistanceM: Double {
+        sessionsInRange.reduce(0.0) { sum, session in
+            sum + session.setLogs
+                .filter { !$0.skipped && $0.type == .distance }
+                .reduce(0.0) { $0 + ($1.actualDistanceM ?? 0) }
+        }
+    }
+
+    private var distanceLabel: String {
+        String(format: "%.1f km", totalDistanceM / 1000)
     }
 
     private var totalSets: Int {

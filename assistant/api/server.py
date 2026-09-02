@@ -31,7 +31,7 @@ def load_config(path: str = "config.yaml") -> AppConfig:
         except ConfigError:
             return AppConfig()
 from assistant.db import get_db
-from assistant.exceptions import AssistantError
+from assistant.exceptions import AssistantError, TargetNotFound
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +61,7 @@ def _get_registry() -> ActionRegistry:
         import assistant.actions.todo             # noqa: F401
         import assistant.actions.clarify          # noqa: F401
         import assistant.actions.workout_routine  # noqa: F401
+        import assistant.actions.schedule_workout  # noqa: F401
         _registry = ActionRegistry()
     return _registry
 
@@ -158,18 +159,47 @@ def _run_server_verify(token: str, transcript: str, rule_result, executed=None,
                             db.update_todo(rid, **{k: v for k, v in patch.items() if k in ("title", "list_name")})
                             refresh = "todos"; applied = True
                 else:
-                    action = correction.get("action", "")
-                    params = correction.get("parameters") or {}
-                    action_cls = _get_registry().get(action)
                     executed_names = [n for n, _ in (executed or [])]
+                    # The verdict decides *whether* to change something; the
+                    # parser decides *what to*. Asked to author the replacement
+                    # itself the verifier proposed create_todo for "Walk Mark's
+                    # dog today at 2:30PM" — which states a time and is an
+                    # event — and wanted to redo a correct complete_todo as
+                    # update_todo. Re-reading the sentence with the full parser
+                    # gets both right, and its agreement with what already ran
+                    # is the signal that the verdict was a false alarm.
+                    _re_parsed = [(n, i) for n, i in (parser.parse(transcript) or [])
+                                  if n != "unknown"]
+                    if not _re_parsed:
+                        raise ValueError("re-parse produced nothing usable")
+                    if len(_re_parsed) > 1:
+                        raise ValueError("re-parse ambiguous — refusing to undo and redo")
+                    if [n for n, _ in _re_parsed] == executed_names:
+                        raise ValueError("parser agrees with what ran — false alarm")
+
+                    action, _authored = _re_parsed[0]
+                    params = (_authored.model_dump(exclude_none=True)
+                              if hasattr(_authored, "model_dump") else {})
+                    action_cls = _get_registry().get(action)
                     if action == "create_event" and "create_todo" in executed_names and not _spoken_times(transcript):
                         raise ValueError("refusing task→event flip without a spoken time")
                     if action in executed_names:
                         raise ValueError("major correction proposes the same action")
+                    # Undo-and-redo means *replacing* a record. Now that the
+                    # check also runs on queries, clarifications and commands
+                    # that failed, there may be no record to replace — and
+                    # "what do I have Thursday?" must never leave a new event
+                    # behind because the verifier decided it sounded like one.
+                    # Creating something the user never asked to create is a
+                    # worse failure than answering a question imperfectly.
+                    _undoable = [r for r in recs if r[2].startswith("create_")]
+                    if not _undoable:
+                        raise ValueError(
+                            "nothing was created to replace — reporting the disagreement "
+                            "instead of writing a new record")
                     if action_cls is not None and action.startswith(("create_",)):
-                        for rtype, rid, act in recs:
-                            if act.startswith("create_"):
-                                (db.delete_event if rtype == "event" else db.delete_todo)(rid)
+                        for rtype, rid, act in _undoable:
+                            (db.delete_event if rtype == "event" else db.delete_todo)(rid)
                         intent = action_cls.intent_model(**params)
                         action_cls().execute(intent, load_config())
                         refresh = "events" if "event" in action else "todos" if "todo" in action else ""
@@ -274,6 +304,55 @@ def _spoken_times(text: str) -> set[str]:
     return out
 
 
+# Words that name no particular thing. "meeting" and "appointment" are real
+# event types but say nothing on their own, and the rule parser reaches for
+# them when it cannot find a better noun. A title *starting* with one is just
+# as unusable as the bare word: "event with yotem" tells you as little.
+_CONTENTLESS_TITLES = {
+    "event", "events", "meeting", "meetings", "set meeting", "appointment",
+    "activity", "session", "thing", "item", "task", "reminder",
+}
+
+# The subset that names nothing at all. "meeting" is a real kind of event and
+# survives being qualified; "event" never does.
+_EMPTY_NOUNS = {"event", "events", "activity", "thing", "item"}
+
+
+def _is_placeholder_title(title: str, cfg) -> bool:
+    """Would this title be useless in a calendar?"""
+    t = (title or "").strip().lower().strip(" .-")
+    if not t:
+        return True
+    configured = {k.lower() for k in getattr(cfg.nlu, "event_keywords", [])}
+    if t in _CONTENTLESS_TITLES | configured:
+        return True
+    # "event with yotem" is as unreadable as "event". But "meeting with Adin"
+    # is a perfectly good title, and so is "Meeting with Ravid at Kems" — a
+    # meeting is a real kind of thing, where an "event" is not. So only the
+    # genuinely empty nouns disqualify a title they lead; the rest have to be
+    # bare to count.
+    #
+    # Worth saying that this rule is doing less than it looks: all 27 generic
+    # titles in a week of flagged commands were bare words. The led-by case is
+    # here because it costs nothing, not because it was measured.
+    first, _, rest = t.partition(" ")
+    return bool(rest) and first in _EMPTY_NOUNS and \
+        rest.split(" ", 1)[0] in ("with", "for", "to", "on", "at", "about", "re")
+
+
+def _fix_title_now(transcript: str, event_id: int, keyword: str) -> "str | None":
+    """Ask the LLM to name the event, and patch it. Returns the new title."""
+    try:
+        new_title = _get_parser().fix_title_async(transcript, keyword)
+        if new_title and new_title.strip().lower() != keyword.strip().lower():
+            get_db().update_event(event_id, title=new_title.strip())
+            logger.info("Title fixed for event %s: %r → %r", event_id, keyword, new_title)
+            return new_title.strip()
+    except Exception as exc:
+        logger.debug("Title fix failed for event %s: %s", event_id, exc)
+    return None
+
+
 def _fix_title_bg(transcript: str, event_id: int, keyword: str) -> None:
     try:
         new_title = _get_parser().fix_title_async(transcript, keyword)
@@ -356,7 +435,17 @@ def start_pending_retry_loop(run_transcript, interval: float = 30.0) -> None:
 def create_app() -> Flask:
     app = Flask(__name__)
     _no_bg = os.environ.get("MACALENDAR_NO_WARMUP") == "1"   # tests
-    if not _no_bg:
+    # Under --reload, Werkzeug runs this module twice: once in the watcher that
+    # does nothing but restart the child, and once in the child that serves. The
+    # watcher has no use for 5.8 GB of llama, a Whisper model and spaCy, and
+    # loading them there doubles both memory and startup. WERKZEUG_RUN_MAIN is
+    # set only in the child; it is absent entirely when the reloader is off, so
+    # the normal path is unaffected.
+    _is_reload_watcher = (
+        os.environ.get("WERKZEUG_RUN_MAIN") is None
+        and os.environ.get("MACALENDAR_RELOADING") == "1"
+    )
+    if not _no_bg and not _is_reload_watcher:
         warm_up_components()
 
     # ------------------------------------------------------------------
@@ -439,7 +528,9 @@ def create_app() -> Flask:
     # Voice endpoints
     # ------------------------------------------------------------------
 
-    def _run_transcript(transcript: str, trace: "Trace | None" = None) -> dict[str, Any]:
+    def _run_transcript(transcript: str, trace: "Trace | None" = None,
+                        source: str = "ios", current_view: str = "month",
+                        trace_run: str | None = None) -> dict[str, Any]:
         """Parse and execute a transcript; return the API response dict.
 
         Builds a stage-by-stage ``trace`` (the "thinking log" shown on the
@@ -450,9 +541,16 @@ def create_app() -> Flask:
         from assistant.pipeline import _strip_stop_keyword
         from assistant.stt.vocab import apply_vocab
         from assistant.trace import (
-            Trace, VOCAB, RULE, MEMORY, LLM, VALIDATE, EXECUTE, DONE, ERROR,
+            Trace, VOCAB, RULE, LLM, VALIDATE, EXECUTE, DONE, ERROR,
         )
-        trace = trace or Trace(source="ios")
+        trace = trace or Trace(source=source)
+        # A caller that has already opened a run on the bus (the Mac GUI does,
+        # so its HUD shows steps as they happen) passes its id in. Stream into
+        # that run instead of publishing a second one at the end, which would
+        # draw the same command twice.
+        if trace_run:
+            from assistant import trace_bus as _tb
+            trace.on_step(lambda st: _tb.publish_step(trace_run, st.to_dict()))
         parser = _get_parser()
         rule_parser = _get_rule_parser()
         cfg = load_config()
@@ -461,7 +559,7 @@ def create_app() -> Flask:
         # Parity with the Mac pipeline: drop trailing "execute"/"done"/… stop words
         transcript = _strip_stop_keyword(transcript, cfg.audio.stop_phrases)
         # Personal vocabulary auto-correct
-        transcript, vocab_fixes = apply_vocab(transcript, source="ios")
+        transcript, vocab_fixes = apply_vocab(transcript, source=source)
         corrections = [c.to_dict() for c in vocab_fixes]
         trace.step(VOCAB, "Vocabulary",
                    ("Fixed " + ", ".join(f"{c.original}→{c.replacement}" for c in vocab_fixes))
@@ -473,6 +571,30 @@ def create_app() -> Flask:
         rule_result = None
         llm_ms = 0
 
+        def _parse_one(segment: str, rule_parser, parser):
+            """Parse one separated segment: rules first, then the LLM.
+
+            Same order the whole-transcript path uses; a segment is short
+            enough that the rules usually settle it without an LLM call, which
+            is the entire point of splitting.
+            """
+            if rule_parser is not None:
+                try:
+                    rr = rule_parser.analyze(segment, current_view=current_view)
+                    if rr.confidence >= RULE_THRESHOLD and not rr.missing_slots:
+                        return rr.intents
+                    try:
+                        return parser.parse_with_context(segment, rr)
+                    except Exception:
+                        pass
+                except RuleParserSkip:
+                    pass
+            try:
+                return parser.parse(segment)
+            except Exception as exc:
+                logger.warning("Segment parse failed for %r: %s", segment[:50], exc)
+                return None
+
         def _llm_step(title: str) -> None:
             nonlocal llm_ms
             llm_ms += parser.last_llm_ms
@@ -482,9 +604,64 @@ def create_app() -> Flask:
                        raw=(parser.last_raw_response or "")[:1500] or None,
                        examples=parser.last_examples_used)
 
-        if rule_parser is not None:
+        # Batched commands: "[gym tomorrow at 7am] [lunch with Tal at noon]".
+        #
+        # A client with several commands in hand sends them as one request with
+        # each wrapped in brackets. They are split back apart here and parsed
+        # independently, which is what makes this cheaper rather than more
+        # expensive: a short single command usually settles on the rule path
+        # for no LLM call at all, where the joined sentence would have needed
+        # one to untangle it. What is actually saved is the review — the
+        # self-check runs once per request, so three batched commands cost one
+        # LLM call instead of three.
+        #
+        # Brackets rather than "and" because a delimiter has to be something
+        # that cannot occur inside a command, and "and" very much can:
+        # "meeting with Tal and Ravid" is one event, not two.
+        _bracketed = re.findall(r"\[([^\[\]]+)\]", transcript)
+        if len(_bracketed) > 1:
+            _segs = [s.strip() for s in _bracketed if s.strip()]
+            logger.info("Batched request: %d bracketed commands", len(_segs))
+            trace.step(RULE, "Split into commands",
+                       f"{len(_segs)} batched: " + " · ".join(s[:40] for s in _segs))
+            _all: list = []
+            for _seg in _segs:
+                _got = _parse_one(_seg, rule_parser, parser)
+                if _got:
+                    _all.extend(_got)
+            if _all:
+                parsed = _all
+                parse_path = "batch"
+            # Whatever happens, the brackets must not reach the parser or the
+            # stored title — an event called "[gym]" helps nobody.
+            transcript = " ".join(_segs)
+
+        # Event separator: split one recording into independent commands so
+        # each short single-event half can hit the rule fast-path instead of
+        # asking the LLM to untangle both at once. This was Mac-only while the
+        # GUI had its own pipeline; it belongs here now that this is the only
+        # brain, and the phone gains it by moving.
+        separator = (cfg.audio.event_separator or "").strip()
+        if parsed is None and separator:
+            _segs = [s.strip() for s in
+                     re.split(re.escape(separator), transcript, flags=re.IGNORECASE)
+                     if s.strip()]
+            if len(_segs) > 1:
+                logger.info("Separator %r split transcript into %d segments", separator, len(_segs))
+                trace.step(RULE, "Split into segments",
+                           f"{len(_segs)} commands separated by “{separator}”")
+                _all: list = []
+                for _seg in _segs:
+                    _got = _parse_one(_seg, rule_parser, parser)
+                    if _got:
+                        _all.extend(_got)
+                if _all:
+                    parsed = _all
+                    parse_path = "separator"
+
+        if parsed is None and rule_parser is not None:
             try:
-                rule_result = rule_parser.analyze(transcript)
+                rule_result = rule_parser.analyze(transcript, current_view=current_view)
                 if rule_result.confidence >= RULE_THRESHOLD and not rule_result.missing_slots:
                     parsed = rule_result.intents
                     parse_path = "rule"
@@ -542,7 +719,7 @@ def create_app() -> Flask:
                 if retryable:
                     try:
                         from assistant.intent.memory import get_memory
-                        pending_id = get_memory().add_pending(transcript, msg, source="ios")
+                        pending_id = get_memory().add_pending(transcript, msg, source=source)
                     except Exception as pe:
                         logger.warning("📱 Could not queue command: %s", pe)
                 if "offline" in msg.lower():
@@ -552,7 +729,8 @@ def create_app() -> Flask:
                     msg = "The model took too long. I saved this command — tap Retry to try again."
                 trace.step(ERROR, "Parse failed", str(e)
                            + (" — queued for retry" if pending_id else ""), ok=False)
-                _record_memory(cfg, raw_transcript, transcript, "llm", [], msg, False, llm_ms, trace, [])
+                _record_memory(cfg, raw_transcript, transcript, "llm", [], msg, False, llm_ms, trace, [],
+                               source=source)
                 resp = {"message": msg, "actions": [], "refresh": "", "parse": "error",
                         "transcript": transcript, "original_transcript": raw_transcript,
                         "corrections": corrections, "trace": trace.to_list(),
@@ -591,7 +769,51 @@ def create_app() -> Flask:
                 continue
             try:
                 ev_before, td_before = ctx.last_event_id, ctx.last_todo_id
-                result = action_cls().execute(intent, cfg)
+                try:
+                    result = action_cls().execute(intent, cfg)
+                except TargetNotFound as nf:
+                    # Same escalation the Mac pipeline does. The phone runs its
+                    # own parse/execute loop in this process, so this has to be
+                    # written twice or the two surfaces disagree — and the one
+                    # that reported "I couldn't find a task matching 'walk mark
+                    # stalk'" was this one.
+                    #
+                    # Without the explicit catch the bare `except Exception`
+                    # below turns a legitimate "nothing matched" into
+                    # "Error: ..." on a failed step, which is worse than what
+                    # it replaced.
+                    _eligible = (parse_path == "rule" and len(parsed) == 1
+                                 and not messages)
+                    _replacement = None
+                    if _eligible:
+                        trace.step(RULE, "Nothing matched — rechecking",
+                                   f"{action_name.replace('_', ' ')} found no target "
+                                   "— asking the LLM instead")
+                        try:
+                            _retried = parser.parse(transcript) or []
+                        except Exception as _e:
+                            trace.step(LLM, "LLM", f"Unavailable ({_e}) — keeping the answer",
+                                       ok=False)
+                            _retried = []
+                        _cand = [(n, i) for n, i in _retried if n != "unknown"]
+                        if len(_cand) == 1 and _cand[0][0] != action_name:
+                            _replacement = _cand[0]
+                        elif _cand:
+                            trace.step(LLM, "LLM",
+                                       "Agrees — the target really is missing", ok=False)
+                    if _replacement is None:
+                        messages.append(nf.message)
+                        trace.step(EXECUTE, action_name.replace("_", " ").title(),
+                                   nf.message, ok=False)
+                        continue
+                    action_name, intent = _replacement
+                    action_cls = registry.get(action_name)
+                    if action_cls is None:
+                        messages.append(nf.message)
+                        continue
+                    trace.step(LLM, "LLM",
+                               f"Re-read it as {action_name.replace('_', ' ')}")
+                    result = action_cls().execute(intent, cfg)
                 logger.info("📱 Action %s → %s", action_name, result)
                 messages.append(result or "")
                 action_names.append(action_name)
@@ -616,6 +838,31 @@ def create_app() -> Flask:
         else:
             refresh = ""
 
+        if parse_path == "rule":
+            for rtype, rid, act in records:
+                if rtype == "event" and act == "create_event":
+                    ev = get_db().get_event(rid)
+                    if ev and _is_placeholder_title(ev["title"], cfg):
+                        # Fixed before answering, not after. This used to run on
+                        # a daemon thread, so the reply said "Created event
+                        # 'meeting'" and the better title arrived seconds later
+                        # — by which time the answer had been read and judged.
+                        # 22 of the 37 titles on flagged commands were the bare
+                        # word "meeting", every one of them eligible for a fix
+                        # that landed too late to count.
+                        #
+                        # It costs an LLM call on a path whose whole point is
+                        # avoiding one, but only for events the rules could not
+                        # name, and an instant wrong title is worth less than a
+                        # slower right one: a calendar full of "meeting" cannot
+                        # be read back.
+                        better = _fix_title_now(transcript, rid, ev["title"])
+                        if better:
+                            trace.step(RULE, "Named the event",
+                                       f"“{ev['title']}” → “{better}”")
+                            messages = [m.replace(f"'{ev['title']}'", f"'{better}'")
+                                        for m in messages]
+
         response_msg = " ".join(m for m in messages if m)
         logger.info("📱 Response: %s | refresh=%s | parse=%s", response_msg, refresh or "none", parse_path)
 
@@ -636,24 +883,34 @@ def create_app() -> Flask:
         # and hand the iOS app a token it can poll with GET /voice/verify/<token>
         # Rule fast-path parity with the Mac: a placeholder title ("meeting",
         # "set meeting", …) gets a proper title from the LLM in the background.
-        if parse_path == "rule":
-            keywords = {k.lower() for k in cfg.nlu.event_keywords} | {"event", "set meeting", "meeting", "appointment"}
-            for rtype, rid, act in records:
-                if rtype == "event" and act == "create_event":
-                    ev = get_db().get_event(rid)
-                    if ev and ev["title"].strip().lower() in keywords:
-                        _threading.Thread(target=_fix_title_bg, args=(transcript, rid, ev["title"]), daemon=True).start()
-
-        trace.step(DONE, "Done", f"{parse_path} path · {trace.total_ms} ms total", path=parse_path)
+        trace.step(DONE, "Done", f"{parse_path} path · {trace.total_ms / 1000:.1f} s total", path=parse_path)
         memory_id = _record_memory(cfg, raw_transcript, transcript, parse_path,
                                    [(n, i) for n, i in parsed if n != "unknown"],
-                                   response_msg, _success, llm_ms, trace, records)
+                                   response_msg, _success, llm_ms, trace, records,
+                                   source=source)
 
-        # Background self-check (any parse path): LLM re-reasons over the
-        # transcript + what ran + the user's history, and fixes itself if needed.
+        # Background self-check: the LLM re-reasons over the transcript, what
+        # ran, and this user's history, and fixes the record if it disagrees.
+        #
+        # It runs on EVERY command. It used to be skipped in three places, and
+        # each gap was a command the rules decided alone with nothing ever
+        # looking at it again:
+        #
+        #   • queries and clarifications were excluded as "nothing to correct".
+        #     There is no record to patch, true — but "what do I have Thursday"
+        #     answered from the wrong day is still wrong, and the check is what
+        #     notices.
+        #   • a command that failed got no check at all, which is backwards:
+        #     failing is when a second opinion is most likely to help.
+        #   • only actions the rules had matched were passed along.
+        #
+        # A read-only or failed command can still be judged; what changes is
+        # that there is nothing to undo, which _run_server_verify already
+        # handles — a correction with no record to apply to reports
+        # applied=False rather than touching anything.
         verify_token: str | None = None
-        checkable = [(n, i) for n, i in parsed if n in action_names and n not in ("clarify", "query_schedule", "query_todos")]
-        if _success and checkable and cfg.verify_fast_path:
+        checkable = [(n, i) for n, i in parsed if n != "unknown"]
+        if cfg.verify_fast_path and (checkable or transcript.strip()):
             import uuid
             verify_token = str(uuid.uuid4())
             with _verify_lock:
@@ -688,6 +945,15 @@ def create_app() -> Flask:
         # separate process, so it can't see this Trace directly.
         try:
             from assistant import trace_bus
+            if trace_run:
+                trace_bus.publish_result(trace_run, {
+                    "transcript": transcript,
+                    "message": response_msg,
+                    "actions": action_names,
+                    "corrections": corrections,
+                    "memory_id": memory_id,
+                })
+                return resp
             trace_bus.publish(trace.source, resp["trace"], {
                 "transcript": transcript,
                 "message": response_msg,
@@ -931,13 +1197,13 @@ def create_app() -> Flask:
             return {}
 
     def _record_memory(cfg, raw, transcript, parse_path, actions, result, success,
-                       llm_ms, trace, records) -> int | None:
+                       llm_ms, trace, records, *, source: str = "ios") -> int | None:
         if not getattr(cfg.nlu, "memory_enabled", True):
             return None
         try:
             from assistant.intent.memory import get_memory
             return get_memory().record(
-                transcript=transcript, raw_transcript=raw, source="ios",
+                transcript=transcript, raw_transcript=raw, source=source,
                 parse_path=parse_path, actions=actions, result=result,
                 success=success, llm_ms=llm_ms, total_ms=trace.total_ms, records=records,
             )
@@ -1054,8 +1320,17 @@ def create_app() -> Flask:
         transcript = body.get("transcript", "").strip()
         if not transcript:
             return jsonify({"error": "Missing 'transcript' field", "code": 400}), 400
-        logger.info("📱 Text command: %s", transcript)
-        return jsonify(_run_transcript(transcript))
+        # `source` is the only thing that differs between the two surfaces: it
+        # labels the trace, the vocabulary corrections and the command memory.
+        # The Mac GUI posts here too — this route is the brain for both.
+        src = (body.get("source") or "ios").strip().lower()
+        if src not in ("ios", "mac"):
+            src = "ios"
+        view = (body.get("current_view") or "month").strip().lower()
+        logger.info("%s Text command: %s", "🖥️" if src == "mac" else "📱", transcript)
+        run = (body.get("trace_run") or "").strip() or None
+        return jsonify(_run_transcript(transcript, source=src, current_view=view,
+                                       trace_run=run))
 
     # ------------------------------------------------------------------
     # Personal vocabulary (STT auto-correct)
@@ -1955,6 +2230,96 @@ def create_app() -> Flask:
             return jsonify({"error": "Session not found", "code": 404}), 404
         db.delete_workout_session(session_id)
         return jsonify({"deleted": session_id})
+
+    # ------------------------------------------------------------------
+    # Workout: Plans + the observance calendar behind them
+    # ------------------------------------------------------------------
+
+    @app.get("/workout/plans")
+    def workout_plans_list():
+        status = request.args.get("status", "")
+        return jsonify(get_db().get_workout_plans(status=status or None))
+
+    @app.get("/workout/plans/<plan_id>")
+    def workout_plan_get(plan_id: str):
+        plan = get_db().get_workout_plan(plan_id)
+        if plan is None:
+            return jsonify({"error": "Plan not found", "code": 404}), 404
+        return jsonify(plan)
+
+    @app.delete("/workout/plans/<plan_id>")
+    def workout_plan_delete(plan_id: str):
+        db = get_db()
+        if db.get_workout_plan(plan_id) is None:
+            return jsonify({"error": "Plan not found", "code": 404}), 404
+        keep = request.args.get("keep_events", "").lower() in ("1", "true", "yes")
+        removed = db.delete_workout_plan(plan_id, delete_events=not keep)
+        return jsonify({"deleted": plan_id, "events_removed": removed})
+
+    @app.get("/workout/plan-items")
+    def workout_plan_items_list():
+        """Scheduled sessions in a date range — what the phone's day view asks for."""
+        return jsonify(get_db().get_workout_plan_items(
+            start_date=request.args.get("start_date", ""),
+            end_date=request.args.get("end_date", ""),
+            plan_id=request.args.get("plan_id", ""),
+        ))
+
+    @app.patch("/workout/plan-items/<item_id>")
+    def workout_plan_item_update(item_id: str):
+        db = get_db()
+        if db.get_workout_plan_item(item_id) is None:
+            return jsonify({"error": "Plan item not found", "code": 404}), 404
+        db.update_workout_plan_item(item_id, **(request.get_json(silent=True) or {}))
+        return jsonify(db.get_workout_plan_item(item_id))
+
+    @app.get("/observance")
+    def observance_range():
+        """Training availability per day: what is blocked, and which windows remain.
+
+        Lets a client show *why* a day is unavailable without reimplementing
+        the Hebrew calendar — the phone renders what the Mac decided.
+        """
+        from assistant import observance as ob
+        from assistant.actions.schedule_workout.action import observance_settings
+
+        try:
+            start = datetime.date.fromisoformat(request.args["start_date"])
+            end = datetime.date.fromisoformat(request.args["end_date"])
+        except (KeyError, ValueError):
+            return jsonify({
+                "error": "start_date and end_date are required (YYYY-MM-DD)",
+                "code": 400,
+            }), 400
+        if end < start:
+            return jsonify({"error": "end_date precedes start_date", "code": 400}), 400
+        if (end - start).days > 400:
+            return jsonify({"error": "range must be 400 days or fewer", "code": 400}), 400
+
+        settings = observance_settings(load_config())
+        out = []
+        cur = start
+        while cur <= end:
+            av = ob.availability(cur, settings)
+            out.append({
+                "date": cur.isoformat(),
+                "status": av.status,
+                "reason": av.reason,
+                "holiday": av.holiday_name,
+                "is_chol_hamoed": ob.is_chol_hamoed(cur),
+                "is_fast_day": ob.is_fast_day(cur),
+                "windows": [
+                    {
+                        "start": w.start.strftime("%H:%M"),
+                        "end": w.end.strftime("%H:%M"),
+                        "label": w.label,
+                        "fallback": w.fallback,
+                    }
+                    for w in av.windows
+                ],
+            })
+            cur += datetime.timedelta(days=1)
+        return jsonify(out)
 
     # ------------------------------------------------------------------
     # Config

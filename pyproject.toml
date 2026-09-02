@@ -25,6 +25,8 @@ dependencies = [
     "python-dateutil==2.9.0",
     "pytz==2024.1",
     "pyluach>=2.3.0",
+    # Sunset/nightfall for workout scheduling. Pure Python, fully offline.
+    "astral>=3.2",
     "Flask>=3.0",
 ]
 

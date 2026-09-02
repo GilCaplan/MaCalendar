@@ -307,7 +307,7 @@ class VocabDialog(QDialog):
         summary = QLabel(
             f"{stats['total']} commands remembered · "
             f"{fb.get('corrected', 0)} corrected · {fb.get('rejected', 0)} rejected · "
-            f"avg LLM {stats['avg_llm_ms']} ms · avg total {stats['avg_total_ms']} ms"
+            f"avg LLM {stats['avg_llm_ms'] / 1000:.1f} s · avg total {stats['avg_total_ms'] / 1000:.1f} s"
         )
         summary.setObjectName("muted")
         lay.addWidget(summary)
@@ -391,7 +391,8 @@ class VocabDialog(QDialog):
         lines = [
             f"Transcript: {ex['transcript']}",
             f"Raw STT:    {ex['raw_transcript']}" if ex.get("raw_transcript") != ex["transcript"] else "",
-            f"Path: {ex['parse_path']}   LLM: {ex['llm_ms']} ms   total: {ex['total_ms']} ms",
+            f"Path: {ex['parse_path']}   LLM: {ex['llm_ms'] / 1000:.1f} s   "
+                f"total: {ex['total_ms'] / 1000:.1f} s",
             f"Result: {ex['result']}",
             "Actions: " + json.dumps(ex["actions"], ensure_ascii=False, indent=1),
         ]

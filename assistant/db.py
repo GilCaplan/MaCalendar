@@ -7,6 +7,7 @@ import datetime
 import json
 import os
 import sqlite3
+import uuid
 from contextlib import contextmanager
 from typing import Generator, List, Optional
 
@@ -327,6 +328,66 @@ CREATE TABLE IF NOT EXISTS workout_set_logs (
 )
 """
 
+# Columns added to the workout tables after the gym-only first release. Running
+# needs a third kind of set: not reps-and-weight, not a timed hold, but a
+# distance at a target pace — "5 x 400m @ 3:50". Modelled as set type
+# 'distance' so the existing block/set/session/log machinery (and the
+# follow-along that rides on it) is reused rather than duplicated.
+_WORKOUT_MIGRATIONS = [
+    ("workout_template_sets", "ALTER TABLE workout_template_sets ADD COLUMN distance_m REAL"),
+    ("workout_template_sets", "ALTER TABLE workout_template_sets ADD COLUMN target_pace_sec_per_km INTEGER"),
+    ("workout_set_logs",      "ALTER TABLE workout_set_logs ADD COLUMN actual_distance_m REAL"),
+    ("workout_set_logs",      "ALTER TABLE workout_set_logs ADD COLUMN actual_pace_sec_per_km INTEGER"),
+]
+
+# ---------------------------------------------------------------------------
+# Workout scheduling: a dated block of sessions.
+#
+# Templates answer "what does this session consist of?"; plans answer "on which
+# day does it happen, and in which part of that day?". Keeping them in separate
+# tables is what allows one template ("Threshold 2 x 12 min") to be scheduled
+# many times, and a plan to be re-flowed around a chag without touching the
+# session content.
+#
+# Each item carries `event_id`: the calendar event it was materialised into.
+# That link is what makes re-planning update the calendar rather than litter it
+# with duplicates, and it is why deleting a plan can clean up after itself.
+# ---------------------------------------------------------------------------
+
+_CREATE_WORKOUT_PLANS_TABLE = """
+CREATE TABLE IF NOT EXISTS workout_plans (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    goal       TEXT NOT NULL DEFAULT '',
+    start_date TEXT NOT NULL,
+    end_date   TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    status     TEXT NOT NULL DEFAULT 'active'   -- 'active' | 'draft' | 'archived'
+)
+"""
+
+_CREATE_WORKOUT_PLAN_ITEMS_TABLE = """
+CREATE TABLE IF NOT EXISTS workout_plan_items (
+    id              TEXT PRIMARY KEY,
+    plan_id         TEXT    NOT NULL,
+    date            TEXT    NOT NULL,
+    start_time      TEXT    NOT NULL DEFAULT '',
+    end_time        TEXT    NOT NULL DEFAULT '',
+    -- 'long'|'easy'|'threshold'|'speed'|'tt'|'gym'|'calisthenics'|'rest'
+    kind            TEXT    NOT NULL,
+    discipline      TEXT    NOT NULL DEFAULT 'run',   -- 'run' | 'strength'
+    title           TEXT    NOT NULL,
+    detail          TEXT    NOT NULL DEFAULT '',
+    distance_km     REAL,
+    template_id     TEXT,                             -- follow-along template
+    event_id        INTEGER,                          -- materialised calendar event
+    window_label    TEXT    NOT NULL DEFAULT '',      -- 'morning'|'daytime'|'evening'
+    observance_note TEXT    NOT NULL DEFAULT '',      -- why it sits where it does
+    session_id      TEXT,                             -- logged session, once done
+    created_at      TEXT    NOT NULL
+)
+"""
+
 _CREATE_INDEXES = """
 CREATE INDEX IF NOT EXISTS idx_events_date      ON events(date);
 CREATE INDEX IF NOT EXISTS idx_events_series    ON events(series_id);
@@ -342,6 +403,9 @@ CREATE INDEX IF NOT EXISTS idx_workout_blocks_template   ON workout_template_blo
 CREATE INDEX IF NOT EXISTS idx_workout_sets_block        ON workout_template_sets(block_id, set_index);
 CREATE INDEX IF NOT EXISTS idx_workout_sessions_started  ON workout_sessions(started_at);
 CREATE INDEX IF NOT EXISTS idx_workout_set_logs_session  ON workout_set_logs(session_id);
+CREATE INDEX IF NOT EXISTS idx_workout_plan_items_date   ON workout_plan_items(date);
+CREATE INDEX IF NOT EXISTS idx_workout_plan_items_plan   ON workout_plan_items(plan_id, date);
+CREATE INDEX IF NOT EXISTS idx_workout_plan_items_event  ON workout_plan_items(event_id);
 """
 
 
@@ -474,6 +538,9 @@ class CalendarDB:
             conn.execute(_CREATE_WORKOUT_TEMPLATE_SETS_TABLE)
             conn.execute(_CREATE_WORKOUT_SESSIONS_TABLE)
             conn.execute(_CREATE_WORKOUT_SET_LOGS_TABLE)
+            conn.execute(_CREATE_WORKOUT_PLANS_TABLE)
+            conn.execute(_CREATE_WORKOUT_PLAN_ITEMS_TABLE)
+            self._migrate_workouts(conn)
             for stmt in _CREATE_INDEXES.strip().splitlines():
                 stmt = stmt.strip()
                 if stmt:
@@ -515,6 +582,24 @@ class CalendarDB:
             if col not in existing:
                 try:
                     conn.execute(stmt)
+                except sqlite3.OperationalError:
+                    pass  # already exists
+
+    def _migrate_workouts(self, conn: sqlite3.Connection) -> None:
+        """Apply any missing workout schema migrations safely.
+
+        Unlike the events/todos migrators this one spans two tables, so each
+        statement carries the table its column belongs to.
+        """
+        cache: dict = {}
+        for table, stmt in _WORKOUT_MIGRATIONS:
+            if table not in cache:
+                cache[table] = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+            col = stmt.split("ADD COLUMN")[1].strip().split()[0]
+            if col not in cache[table]:
+                try:
+                    conn.execute(stmt)
+                    cache[table].add(col)
                 except sqlite3.OperationalError:
                     pass  # already exists
 
@@ -1871,13 +1956,14 @@ class CalendarDB:
                         """
                         INSERT INTO workout_template_sets
                             (id, block_id, side, set_index, type, target_reps, weight_kg,
-                             target_seconds, note)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             target_seconds, note, distance_m, target_pace_sec_per_km)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             s["id"], block["id"], side, set_idx, s["type"],
                             s.get("target_reps"), s.get("weight_kg"), s.get("target_seconds"),
                             s.get("note") or "",
+                            s.get("distance_m"), s.get("target_pace_sec_per_km"),
                         ),
                     )
 
@@ -2003,6 +2089,147 @@ class CalendarDB:
             conn.execute(
                 "UPDATE workout_templates SET status = 'saved' WHERE id = ?", (template_id,)
             )
+
+    # ------------------------------------------------------------------
+    # Workout: Plans (a dated block of sessions)
+    # ------------------------------------------------------------------
+
+    _PLAN_ITEM_FIELDS = (
+        "date", "start_time", "end_time", "kind", "discipline", "title", "detail",
+        "distance_km", "template_id", "event_id", "window_label", "observance_note",
+        "session_id",
+    )
+
+    def create_workout_plan(self, plan: dict) -> str:
+        """Insert a plan and its items. Items may carry no event_id yet — the
+        scheduler materialises calendar events in a second pass and links them
+        back with `set_plan_item_event`."""
+        plan_id = plan.get("id") or str(uuid.uuid4())
+        now = datetime.datetime.now().isoformat()
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO workout_plans (id, name, goal, start_date, end_date, created_at, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    plan_id, plan["name"], plan.get("goal") or "",
+                    plan["start_date"], plan["end_date"],
+                    plan.get("created_at") or now, plan.get("status") or "active",
+                ),
+            )
+            self._insert_plan_items(conn, plan_id, plan.get("items") or [])
+        return plan_id
+
+    def _insert_plan_items(self, conn: sqlite3.Connection, plan_id: str, items: list) -> None:
+        now = datetime.datetime.now().isoformat()
+        for item in items:
+            cols = ", ".join(self._PLAN_ITEM_FIELDS)
+            marks = ", ".join("?" for _ in self._PLAN_ITEM_FIELDS)
+            values = [item.get(f) for f in self._PLAN_ITEM_FIELDS]
+            # Text columns are NOT NULL with '' defaults; None would violate them.
+            for i, f in enumerate(self._PLAN_ITEM_FIELDS):
+                if f in ("start_time", "end_time", "detail", "window_label",
+                         "observance_note", "discipline") and values[i] is None:
+                    values[i] = "" if f != "discipline" else "run"
+            conn.execute(
+                f"INSERT INTO workout_plan_items (id, plan_id, {cols}, created_at) "
+                f"VALUES (?, ?, {marks}, ?)",
+                [item.get("id") or str(uuid.uuid4()), plan_id, *values,
+                 item.get("created_at") or now],
+            )
+
+    def get_workout_plans(self, status: Optional[str] = None) -> List[dict]:
+        with self._conn() as conn:
+            if status:
+                rows = conn.execute(
+                    "SELECT * FROM workout_plans WHERE status = ? ORDER BY start_date DESC",
+                    (status,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM workout_plans ORDER BY start_date DESC"
+                ).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_workout_plan(self, plan_id: str) -> Optional[dict]:
+        """A plan with its items attached, ordered by date then start time."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM workout_plans WHERE id = ?", (plan_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            plan = dict(row)
+            plan["items"] = [dict(r) for r in conn.execute(
+                "SELECT * FROM workout_plan_items WHERE plan_id = ? "
+                "ORDER BY date ASC, start_time ASC",
+                (plan_id,),
+            ).fetchall()]
+            return plan
+
+    def get_workout_plan_items(
+        self, start_date: str = "", end_date: str = "", plan_id: str = ""
+    ) -> List[dict]:
+        """Items in a date range — what the calendar's day/week views ask for."""
+        clauses, params = [], []
+        if start_date:
+            clauses.append("date >= ?"); params.append(start_date)
+        if end_date:
+            clauses.append("date <= ?"); params.append(end_date)
+        if plan_id:
+            clauses.append("plan_id = ?"); params.append(plan_id)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self._conn() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM workout_plan_items {where} ORDER BY date ASC, start_time ASC",
+                params,
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_workout_plan_item(self, item_id: str) -> Optional[dict]:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM workout_plan_items WHERE id = ?", (item_id,)
+            ).fetchone()
+            return dict(row) if row else None
+
+    def update_workout_plan_item(self, item_id: str, **fields) -> None:
+        allowed = {f: v for f, v in fields.items() if f in self._PLAN_ITEM_FIELDS}
+        if not allowed:
+            return
+        sets = ", ".join(f"{k} = ?" for k in allowed)
+        with self._conn() as conn:
+            conn.execute(
+                f"UPDATE workout_plan_items SET {sets} WHERE id = ?",
+                [*allowed.values(), item_id],
+            )
+
+    def set_plan_item_event(self, item_id: str, event_id: Optional[int]) -> None:
+        """Link a plan item to the calendar event it was materialised into."""
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE workout_plan_items SET event_id = ? WHERE id = ?",
+                (event_id, item_id),
+            )
+
+    def delete_workout_plan(self, plan_id: str, delete_events: bool = True) -> int:
+        """Remove a plan and its items. Unless told otherwise, the calendar
+        events the plan created go with it — leaving them behind is how a
+        re-plan ends up with two of every session."""
+        removed = 0
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT event_id FROM workout_plan_items WHERE plan_id = ? AND event_id IS NOT NULL",
+                (plan_id,),
+            ).fetchall()
+            if delete_events:
+                for r in rows:
+                    conn.execute("DELETE FROM events WHERE id = ?", (r[0],))
+                    removed += 1
+            conn.execute("DELETE FROM workout_plan_items WHERE plan_id = ?", (plan_id,))
+            conn.execute("DELETE FROM workout_plans WHERE id = ?", (plan_id,))
+        return removed
 
     # ------------------------------------------------------------------
     # Workout: Sessions (+ nested set logs)

@@ -175,6 +175,18 @@ private struct ActiveSetCard: View {
                 bigStepper(label: "kg", value: Int((current.targetWeightKg ?? 0).rounded()), in: 0...400, step: 1) { newVal in
                     store.updatePlannedWeight(current.id, weightKg: newVal == 0 ? nil : Double(newVal))
                 }
+            } else if current.type == .distance {
+                // Metres in 50 m steps — fine for 400s and 1000s alike, and
+                // the pace stepper moves in 5 s/km, which is about the
+                // smallest difference worth aiming at.
+                bigStepper(label: "Metres", value: Int((current.targetDistanceM ?? 400).rounded()),
+                           in: 50...42200, step: 50) { newVal in
+                    store.updatePlannedSet(current.id, distanceM: Double(newVal))
+                }
+                bigStepper(label: "Pace /km", value: current.targetPaceSecPerKm ?? 300,
+                           in: 150...600, step: 5, display: { $0.formattedPace }) { newVal in
+                    store.updatePlannedSet(current.id, paceSecPerKm: newVal)
+                }
             } else {
                 bigStepper(label: "Seconds", value: current.targetSeconds ?? 30, in: 5...600, step: 5) { newVal in
                     store.updatePlannedSet(current.id, seconds: newVal)
@@ -183,14 +195,16 @@ private struct ActiveSetCard: View {
         }
     }
 
-    private func bigStepper(label: String, value: Int, in range: ClosedRange<Int>, step: Int = 1, onChange: @escaping (Int) -> Void) -> some View {
+    private func bigStepper(label: String, value: Int, in range: ClosedRange<Int>, step: Int = 1,
+                            display: ((Int) -> String)? = nil,
+                            onChange: @escaping (Int) -> Void) -> some View {
         VStack(spacing: 6) {
             Text(label).font(.caption).foregroundColor(.secondary)
             HStack(spacing: 14) {
                 Button { onChange(max(range.lowerBound, value - step)) } label: {
                     Image(systemName: "minus.circle.fill").font(.title)
                 }
-                Text("\(value)")
+                Text(display?(value) ?? "\(value)")
                     .font(.system(size: 34, weight: .bold, design: .rounded))
                     .frame(minWidth: 60)
                 Button { onChange(min(range.upperBound, value + step)) } label: {
@@ -274,6 +288,10 @@ private struct ThenAutomaticallyStrip: View {
         if p.type == .reps {
             let w = p.targetWeightKg ?? 0
             return w > 0 ? "\(p.targetReps ?? 0) × \(w.formattedKg)kg" : "\(p.targetReps ?? 0) reps"
+        } else if p.type == .distance {
+            let d = (p.targetDistanceM ?? 0).formattedDistance
+            if let pace = p.targetPaceSecPerKm { return "\(d) @ \(pace.formattedPace)" }
+            return d
         } else {
             return "\(p.targetSeconds ?? 0)s"
         }
@@ -320,12 +338,16 @@ private struct NextSetEditPopover: View {
     @State private var reps: Int
     @State private var weight: Int
     @State private var seconds: Int
+    @State private var metres: Int
+    @State private var pace: Int
 
     init(planned: PlannedSet) {
         self.planned = planned
         _reps = State(initialValue: planned.targetReps ?? 8)
         _weight = State(initialValue: Int((planned.targetWeightKg ?? 0).rounded()))
         _seconds = State(initialValue: planned.targetSeconds ?? 30)
+        _metres = State(initialValue: Int((planned.targetDistanceM ?? 400).rounded()))
+        _pace = State(initialValue: planned.targetPaceSecPerKm ?? 300)
     }
 
     var body: some View {
@@ -336,6 +358,11 @@ private struct NextSetEditPopover: View {
                     .onChange(of: reps) { store.updatePlannedSet(planned.id, reps: $0) }
                 Stepper("\(weight) kg", value: $weight, in: 0...400)
                     .onChange(of: weight) { store.updatePlannedWeight(planned.id, weightKg: $0 == 0 ? nil : Double($0)) }
+            } else if planned.type == .distance {
+                Stepper(Double(metres).formattedDistance, value: $metres, in: 50...42200, step: 50)
+                    .onChange(of: metres) { store.updatePlannedSet(planned.id, distanceM: Double($0)) }
+                Stepper("\(pace.formattedPace) /km", value: $pace, in: 150...600, step: 5)
+                    .onChange(of: pace) { store.updatePlannedSet(planned.id, paceSecPerKm: $0) }
             } else {
                 Stepper("\(seconds)s", value: $seconds, in: 5...600, step: 5)
                     .onChange(of: seconds) { store.updatePlannedSet(planned.id, seconds: $0) }
@@ -364,7 +391,7 @@ private struct ReorderPanel: View {
                     HStack {
                         Text(store.exercise(p.exerciseId)?.name ?? "—").font(.caption)
                         Spacer()
-                        Text(p.type == .reps ? "\(p.targetReps ?? 0) reps" : "\(p.targetSeconds ?? 0)s")
+                        Text(upcomingLabel(p))
                             .font(.caption2).foregroundColor(.secondary)
                     }
                 }
@@ -373,6 +400,14 @@ private struct ReorderPanel: View {
             .environment(\.editMode, .constant(.active))
             .frame(height: min(CGFloat(upcoming.count) * 44 + 8, 260))
             .listStyle(.plain)
+        }
+    }
+
+    private func upcomingLabel(_ p: PlannedSet) -> String {
+        switch p.type {
+        case .reps:     return "\(p.targetReps ?? 0) reps"
+        case .time:     return "\(p.targetSeconds ?? 0)s"
+        case .distance: return (p.targetDistanceM ?? 0).formattedDistance
         }
     }
 }
@@ -450,6 +485,15 @@ private struct RestCard: View {
                     editablePill("\((next.targetWeightKg ?? 0).formattedKg) kg") { d in
                         let newVal = max(0, (next.targetWeightKg ?? 0) + Double(d))
                         store.updatePlannedWeight(next.id, weightKg: newVal == 0 ? nil : newVal)
+                    }
+                } else if next.type == .distance {
+                    editablePill((next.targetDistanceM ?? 0).formattedDistance) { d in
+                        store.updatePlannedSet(next.id, distanceM: max(50, (next.targetDistanceM ?? 400) + Double(d * 50)))
+                    }
+                    if let pace = next.targetPaceSecPerKm {
+                        editablePill("\(pace.formattedPace) /km") { d in
+                            store.updatePlannedSet(next.id, paceSecPerKm: max(150, pace + d * 5))
+                        }
                     }
                 } else {
                     editablePill("\(next.targetSeconds ?? 0)s") { d in store.updatePlannedSet(next.id, seconds: max(5, (next.targetSeconds ?? 0) + d * 5)) }

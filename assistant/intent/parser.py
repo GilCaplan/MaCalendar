@@ -321,12 +321,29 @@ class IntentParser:
         transcript: str,
         rule_result: "RuleParseResult",
     ) -> "dict | None":
-        """Build a severity-tiered verification prompt and call the active LLM backend."""
+        """Build a severity-tiered verification prompt and call the active LLM backend.
+
+        Judged against the *validated intents*, which is what actually reached
+        the database — not `raw_slots`, which is the rule parser's working
+        state from before CalendarIntent filled its defaults. The difference is
+        not cosmetic: raw slots carry `end_time: ""` on every single
+        create_event, because the end is derived later. Shown that, the
+        verifier correctly observes that the event has no end time and patches
+        one in — onto a record that already had the right one. That is most of
+        how this feature came to propose corrections on ~96% of commands and
+        fix nothing, which is why it was switched off.
+        """
         action_summaries = []
-        for action_name, raw_slots in rule_result.raw_slots.items():
-            filled = {k: v for k, v in raw_slots.items() if v or v == 0}
+        for action_name, intent in rule_result.intents:
+            if hasattr(intent, "model_dump"):
+                params = intent.model_dump(exclude_none=True)
+                params = {k: v for k, v in params.items() if v or v == 0}
+            elif isinstance(intent, dict):
+                params = intent
+            else:
+                params = {}
             action_summaries.append(
-                f"  action={action_name!r}, slots={json.dumps(filled, default=str)}"
+                f"  action={action_name!r}, parameters={json.dumps(params, default=str)}"
             )
         actions_block = "\n".join(action_summaries) if action_summaries else "  (none)"
         return self._verify_block(transcript, actions_block, "A fast rule parser")
@@ -377,6 +394,17 @@ class IntentParser:
             '     "parameters": {<full correct params>},\n'
             '     "speech": "<under 15 words for TTS>"}\n'
             f"Valid action names: {', '.join(self.registry.all_names())}.\n\n"
+            "Default to agreement. Most commands are interpreted correctly, and a\n"
+            "wrong 'correction' overwrites a record the user is already happy with.\n"
+            'Return {"ok": true} unless you can name a definite error. In particular:\n'
+            "  • The parameters shown are the FINAL stored values, after defaults were\n"
+            "    applied. An end time the speaker never said is not missing and not\n"
+            "    wrong — it was derived. Never patch a field just to fill it in.\n"
+            "  • Never patch a field to a value the speaker did not state.\n"
+            "  • Casing, punctuation and word order in a title are not errors.\n"
+            "  • If you disagree only about style or phrasing, that is ok:true.\n"
+            '  • If something is off but you cannot say what the value should be,\n'
+            '    return {"ok": true} rather than a guess.\n\n'
             "Key routing rules (apply these FIRST before judging):\n"
             "  • If the command says 'set/create/schedule/book a meeting/appointment/call/session'\n"
             "    AND includes a specific time or date → it is ALWAYS create_event. Never create_todo.\n"
@@ -436,7 +464,28 @@ class IntentParser:
             logger.debug("🖥️ Background verify: confirmed ✓")
             return None  # silent — rule parser was right
 
-        severity = data.get("severity", "major")
+        # Severity decides between patching a field and undoing the record and
+        # rebuilding it, so an absent one must never default to the destructive
+        # branch. Infer it from what the verdict actually carries: a full
+        # replacement action means major, a field patch means minor, and a
+        # bare {"ok": false} with neither is not actionable — the model has
+        # said it is unhappy without saying what to do, and acting on that is
+        # guessing. Treat it as agreement.
+        severity = data.get("severity")
+        if severity not in ("minor", "major"):
+            if data.get("action"):
+                severity = "major"
+            elif data.get("patch"):
+                severity = "minor"
+            else:
+                logger.info("🖥️ Background verify: not-ok with no action or patch — ignoring")
+                return None
+            data["severity"] = severity
+
+        if severity == "minor" and not data.get("patch"):
+            logger.info("🖥️ Background verify: minor with an empty patch — ignoring")
+            return None
+
         logger.info(
             "🖥️ Background verify correction — severity=%s action=%r patch=%r",
             severity, data.get("action"), data.get("patch"),

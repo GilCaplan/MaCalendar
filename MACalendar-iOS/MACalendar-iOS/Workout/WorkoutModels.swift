@@ -27,9 +27,16 @@ struct Exercise: Codable, Identifiable, Equatable, Hashable {
 /// Type is per-SET, not per-exercise — one exercise's sets can mix reps
 /// and time sets (e.g. a plank exercise logged as 3 timed holds, or a
 /// pull-up exercise mixing weighted reps and a max-time hang).
+///
+/// `.distance` is what makes running fit here. A "5 × 400 m @ 3:50" interval
+/// session is one single-exercise block of five distance sets, with the
+/// recovery jog as the rest between them — so intervals reuse the whole
+/// live-session engine (flatten → current set → rest → log) rather than
+/// needing a parallel one.
 enum SetType: String, Codable {
     case reps
     case time
+    case distance
 }
 
 /// A single planned set inside a template's block. `note` is optional
@@ -45,6 +52,11 @@ struct SetTemplate: Codable, Identifiable, Equatable {
     // .time
     var targetSeconds: Int?
 
+    // .distance — metres, and an optional target pace in seconds per km
+    // (nil = "run it by feel", which is what an easy run wants).
+    var distanceM: Double?
+    var targetPaceSecPerKm: Int?
+
     var note: String?
 
     enum CodingKeys: String, CodingKey {
@@ -52,15 +64,20 @@ struct SetTemplate: Codable, Identifiable, Equatable {
         case targetReps = "target_reps"
         case weightKg = "weight_kg"
         case targetSeconds = "target_seconds"
+        case distanceM = "distance_m"
+        case targetPaceSecPerKm = "target_pace_sec_per_km"
     }
 
     init(id: UUID = UUID(), type: SetType, targetReps: Int? = nil, weightKg: Double? = nil,
-         targetSeconds: Int? = nil, note: String? = nil) {
+         targetSeconds: Int? = nil, distanceM: Double? = nil, targetPaceSecPerKm: Int? = nil,
+         note: String? = nil) {
         self.id = id
         self.type = type
         self.targetReps = targetReps
         self.weightKg = weightKg
         self.targetSeconds = targetSeconds
+        self.distanceM = distanceM
+        self.targetPaceSecPerKm = targetPaceSecPerKm
         self.note = note
     }
 
@@ -69,6 +86,9 @@ struct SetTemplate: Codable, Identifiable, Equatable {
     }
     static func time(_ seconds: Int, note: String? = nil) -> SetTemplate {
         SetTemplate(type: .time, targetSeconds: seconds, note: note)
+    }
+    static func distance(_ metres: Double, paceSecPerKm: Int? = nil, note: String? = nil) -> SetTemplate {
+        SetTemplate(type: .distance, distanceM: metres, targetPaceSecPerKm: paceSecPerKm, note: note)
     }
 }
 
@@ -176,6 +196,8 @@ struct SetLog: Codable, Identifiable, Equatable {
     var actualReps: Int?
     var actualSeconds: Int?
     var actualWeightKg: Double?
+    var actualDistanceM: Double?
+    var actualPaceSecPerKm: Int?
     var completedAt: Date?
     var skipped: Bool
 
@@ -186,11 +208,14 @@ struct SetLog: Codable, Identifiable, Equatable {
         case actualReps = "actual_reps"
         case actualSeconds = "actual_seconds"
         case actualWeightKg = "actual_weight_kg"
+        case actualDistanceM = "actual_distance_m"
+        case actualPaceSecPerKm = "actual_pace_sec_per_km"
         case completedAt = "completed_at"
     }
 
     init(id: UUID = UUID(), exerciseId: UUID, setIndex: Int, type: SetType,
          actualReps: Int? = nil, actualSeconds: Int? = nil, actualWeightKg: Double? = nil,
+         actualDistanceM: Double? = nil, actualPaceSecPerKm: Int? = nil,
          completedAt: Date? = nil, skipped: Bool = false) {
         self.id = id
         self.exerciseId = exerciseId
@@ -199,6 +224,8 @@ struct SetLog: Codable, Identifiable, Equatable {
         self.actualReps = actualReps
         self.actualSeconds = actualSeconds
         self.actualWeightKg = actualWeightKg
+        self.actualDistanceM = actualDistanceM
+        self.actualPaceSecPerKm = actualPaceSecPerKm
         self.completedAt = completedAt
         self.skipped = skipped
     }
@@ -246,12 +273,15 @@ struct PlannedSet: Codable, Identifiable, Equatable {
     var targetReps: Int?
     var targetWeightKg: Double?
     var targetSeconds: Int?
+    var targetDistanceM: Double?
+    var targetPaceSecPerKm: Int?
     var note: String?
     var restAfterSeconds: Int      // rest to take after completing this set (0 = none)
     var startsNewExercise: Bool    // true if this is the first planned set of a new exercise
 
     init(id: UUID = UUID(), exerciseId: UUID, setIndex: Int, type: SetType,
          targetReps: Int? = nil, targetWeightKg: Double? = nil, targetSeconds: Int? = nil,
+         targetDistanceM: Double? = nil, targetPaceSecPerKm: Int? = nil,
          note: String? = nil, restAfterSeconds: Int = 0, startsNewExercise: Bool = false) {
         self.id = id
         self.exerciseId = exerciseId
@@ -260,6 +290,8 @@ struct PlannedSet: Codable, Identifiable, Equatable {
         self.targetReps = targetReps
         self.targetWeightKg = targetWeightKg
         self.targetSeconds = targetSeconds
+        self.targetDistanceM = targetDistanceM
+        self.targetPaceSecPerKm = targetPaceSecPerKm
         self.note = note
         self.restAfterSeconds = restAfterSeconds
         self.startsNewExercise = startsNewExercise
@@ -289,6 +321,26 @@ struct LiveSessionState: Codable, Equatable {
         return plannedSets[i]
     }
     var isFinished: Bool { currentIndex >= plannedSets.count }
+}
+
+// MARK: - Running display
+
+extension Double {
+    /// Metres as a runner reads them: "400 m" under a kilometre, "12.5 km" over.
+    var formattedDistance: String {
+        if self < 1000 { return "\(Int(self.rounded())) m" }
+        let km = self / 1000
+        return km.truncatingRemainder(dividingBy: 1) == 0
+            ? String(format: "%.0f km", km)
+            : String(format: "%.1f km", km)
+    }
+}
+
+extension Int {
+    /// Seconds per km as "4:35". Pace is never read as a decimal.
+    var formattedPace: String {
+        String(format: "%d:%02d", self / 60, self % 60)
+    }
 }
 
 // MARK: - Server sync coding

@@ -256,7 +256,10 @@ class WorkoutStore: ObservableObject {
                     result.append(PlannedSet(
                         exerciseId: exId, setIndex: i, type: set.type,
                         targetReps: set.targetReps, targetWeightKg: set.weightKg,
-                        targetSeconds: set.targetSeconds, note: set.note,
+                        targetSeconds: set.targetSeconds,
+                        targetDistanceM: set.distanceM,
+                        targetPaceSecPerKm: set.targetPaceSecPerKm,
+                        note: set.note,
                         restAfterSeconds: rest, startsNewExercise: i == 0
                     ))
                 }
@@ -272,7 +275,10 @@ class WorkoutStore: ObservableObject {
                     result.append(PlannedSet(
                         exerciseId: exA, setIndex: r, type: a.type,
                         targetReps: a.targetReps, targetWeightKg: a.weightKg,
-                        targetSeconds: a.targetSeconds, note: a.note,
+                        targetSeconds: a.targetSeconds,
+                        targetDistanceM: a.distanceM,
+                        targetPaceSecPerKm: a.targetPaceSecPerKm,
+                        note: a.note,
                         restAfterSeconds: 0, startsNewExercise: r == 0
                     ))
                     let b = block.setsB[r]
@@ -280,7 +286,10 @@ class WorkoutStore: ObservableObject {
                     result.append(PlannedSet(
                         exerciseId: exB, setIndex: r, type: b.type,
                         targetReps: b.targetReps, targetWeightKg: b.weightKg,
-                        targetSeconds: b.targetSeconds, note: b.note,
+                        targetSeconds: b.targetSeconds,
+                        targetDistanceM: b.distanceM,
+                        targetPaceSecPerKm: b.targetPaceSecPerKm,
+                        note: b.note,
                         restAfterSeconds: isVeryLastSet ? 0 : restAfterRound,
                         startsNewExercise: r == 0
                     ))
@@ -314,7 +323,10 @@ class WorkoutStore: ObservableObject {
             appended.append(PlannedSet(
                 exerciseId: exerciseId, setIndex: i, type: set.type,
                 targetReps: set.targetReps, targetWeightKg: set.weightKg,
-                targetSeconds: set.targetSeconds, note: set.note,
+                targetSeconds: set.targetSeconds,
+                targetDistanceM: set.distanceM,
+                targetPaceSecPerKm: set.targetPaceSecPerKm,
+                note: set.note,
                 restAfterSeconds: isLast ? 0 : restBetweenSets, startsNewExercise: i == 0
             ))
         }
@@ -343,7 +355,10 @@ class WorkoutStore: ObservableObject {
         copy = PlannedSet(
             exerciseId: template.exerciseId, setIndex: existingCount, type: template.type,
             targetReps: template.targetReps, targetWeightKg: template.targetWeightKg,
-            targetSeconds: template.targetSeconds, note: template.note,
+            targetSeconds: template.targetSeconds,
+            targetDistanceM: template.targetDistanceM,
+            targetPaceSecPerKm: template.targetPaceSecPerKm,
+            note: template.note,
             restAfterSeconds: template.restAfterSeconds, startsNewExercise: false
         )
         // The now-earlier set no longer ends its exercise, so it should
@@ -370,10 +385,13 @@ class WorkoutStore: ObservableObject {
     /// current-set steppers. `nil` for reps/seconds means "leave as-is";
     /// weight has its own setter below since `nil` is itself a meaningful
     /// value there (bodyweight), so it can't share that convention.
-    func updatePlannedSet(_ id: UUID, reps: Int? = nil, seconds: Int? = nil) {
+    func updatePlannedSet(_ id: UUID, reps: Int? = nil, seconds: Int? = nil,
+                          distanceM: Double? = nil, paceSecPerKm: Int? = nil) {
         guard var state = liveState, let idx = state.plannedSets.firstIndex(where: { $0.id == id }) else { return }
         if let reps { state.plannedSets[idx].targetReps = reps }
         if let seconds { state.plannedSets[idx].targetSeconds = seconds }
+        if let distanceM { state.plannedSets[idx].targetDistanceM = distanceM }
+        if let paceSecPerKm { state.plannedSets[idx].targetPaceSecPerKm = paceSecPerKm }
         liveState = state
         persistLive()
     }
@@ -396,7 +414,8 @@ class WorkoutStore: ObservableObject {
     /// Logs the current set as complete (or skipped) and either starts the
     /// rest countdown or advances immediately if no rest follows.
     func completeCurrentSet(actualReps: Int? = nil, actualWeightKg: Double? = nil,
-                             actualSeconds: Int? = nil, skipped: Bool = false) {
+                             actualSeconds: Int? = nil, actualDistanceM: Double? = nil,
+                             actualPaceSecPerKm: Int? = nil, skipped: Bool = false) {
         guard var state = liveState, let planned = state.currentPlanned else { return }
 
         let log = SetLog(
@@ -404,6 +423,8 @@ class WorkoutStore: ObservableObject {
             actualReps: skipped ? nil : (actualReps ?? planned.targetReps),
             actualSeconds: skipped ? nil : (actualSeconds ?? planned.targetSeconds),
             actualWeightKg: skipped ? nil : (actualWeightKg ?? planned.targetWeightKg),
+            actualDistanceM: skipped ? nil : (actualDistanceM ?? planned.targetDistanceM),
+            actualPaceSecPerKm: skipped ? nil : (actualPaceSecPerKm ?? planned.targetPaceSecPerKm),
             completedAt: skipped ? nil : Date(), skipped: skipped
         )
         state.session.setLogs.append(log)
