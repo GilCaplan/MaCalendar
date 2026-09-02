@@ -63,9 +63,24 @@ DEFAULTS: list[dict[str, Any]] = [
         "shabbat", "shabbos", "tfila", "tefilla", "davening", "daven", "shiur", "limud", "torah", "daf yomi",
         "chavruta", "kabbalat", "seudah", "megillah", "selichot", "chag", "erev", "motzei", "kippur", "rosh hashanah",
         "sukkot", "pesach", "purim", "chanukah", "shavuot", "yahrzeit", "leyning", "kol nidre", "fast"]},
+    # The training vocabulary was the biggest single gap in this list: a third
+    # of the calendar fell through to Personal, and twelve of those thirteen
+    # events were runs — "Easy 8 km", "Long 11 km", "Easy 5 km + strides".
+    # The words a runner actually writes down are distances, paces and session
+    # types, and none of them were here.
     {"name": "Fitness", "color": "#22c55e", "alt": "#15803d", "keywords": [
         "gym", "workout", "run", "running", "jog", "swim", "swimming", "tennis", "football", "soccer", "basketball",
-        "cycling", "bike", "ride", "hike", "yoga", "pilates", "training", "race", "sportplex", "match", "pushups"]},
+        "cycling", "bike", "ride", "hike", "yoga", "pilates", "training", "race", "sportplex", "match", "pushups",
+        # distance and session shorthand
+        "km", "k run", "5k", "10k", "half marathon", "marathon", "mile", "miles",
+        "easy run", "long run", "recovery run", "shakeout", "strides", "tempo",
+        "threshold", "intervals", "interval", "fartlek", "time trial", "reps",
+        "400m", "800m", "1000m", "400 m", "800 m", "1000 m", "1k reps",
+        "hill repeats", "negative split", "speed", "speed session", "w/u", "c/d",
+        # strength and the words this plan uses for it
+        "calisthenics", "lifting", "squat", "squats", "deadlift", "bench",
+        "pull-up", "pull-ups", "push-up", "push-ups", "core", "mobility",
+        "stretch", "stretching", "warm-up", "cool-down", "cooldown"]},
     {"name": "Health", "color": "#ef4444", "alt": "#b91c1c", "keywords": [
         "doctor", "dentist", "dental", "clinic", "kupat cholim", "maccabi", "clalit", "meuhedet", "appointment",
         "checkup", "check-up", "blood test", "vaccine", "physio", "therapy", "pharmacy", "hospital", "optician"]},
@@ -199,26 +214,43 @@ def remove(name: str) -> bool:
 
 
 def classify(title: str, attendees: str | list | None = None, location: str = "", description: str = "") -> str:
-    """Best category name for an event. Deterministic, keyword-scored; 'Personal' if unsure."""
-    text = " ".join(str(x or "") for x in (title, location, description)).lower()
+    """Best category name for an event. Deterministic, keyword-scored; 'Personal' if unsure.
+
+    The title counts for more than everything else. It used to count the same,
+    which let a note about *when* outvote the statement of *what*: the running
+    plan appends observance notes to the description, so "Threshold 9 km" with
+    "Erev Shabbat" underneath scored Prayer — the same title landed in two
+    different categories depending on which day it fell on.
+    """
+    def _clean(x) -> str:
+        return " " + re.sub(r"[^\w\s'-]", " ", str(x or "").lower()) + " "
+
+    title_text = _clean(title)
+    rest = _clean(" ".join(str(x or "") for x in (location, description)))
     att = attendees if isinstance(attendees, list) else [a for a in str(attendees or "").split(",") if a.strip()]
     if att:
-        text += " with " + " ".join(att).lower()
-    text = " " + re.sub(r"[^\w\s'-]", " ", text) + " "
+        rest = rest[:-1] + " with " + " ".join(att).lower() + " "
+    text = title_text + rest
     best, best_score = "Personal", 0.0
     scores: dict[str, float] = {}
     phrase_hit = False          # did any category match a multi-word phrase?
+    # A hit in the title is worth more than a hit anywhere else. TITLE_WEIGHT
+    # of 2 means a single title keyword beats a single one in a description,
+    # while two supporting words in a description can still carry a title that
+    # says nothing.
+    TITLE_WEIGHT = 3.0
     for c in _load()["categories"]:
         score = 0.0
         for kw in c.get("keywords", []):
             if not kw:
                 continue
             k = " " + kw.lower() + " " if " " in kw else None
-            if k and k in text:
-                score += 2.0 + 0.2 * len(kw.split())
-                phrase_hit = True
-            elif re.search(rf"(?<![\w'-]){re.escape(kw.lower())}(?![\w'-])", text):
-                score += 1.5 if len(kw) > 3 else 1.0
+            for haystack, weight in ((title_text, TITLE_WEIGHT), (rest, 1.0)):
+                if k and k in haystack:
+                    score += (2.0 + 0.2 * len(kw.split())) * weight
+                    phrase_hit = True
+                elif re.search(rf"(?<![\w'-]){re.escape(kw.lower())}(?![\w'-])", haystack):
+                    score += (1.5 if len(kw) > 3 else 1.0) * weight
         # Generic "with <name>" is a weak Social signal; a real Social keyword beats it.
         if c["name"] == "Social" and score and re.search(r"\bwith\b", text) and score <= 1.0:
             score = 0.6

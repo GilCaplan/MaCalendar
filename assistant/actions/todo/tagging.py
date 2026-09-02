@@ -39,6 +39,27 @@ KEYWORDS: dict[str, list[str]] = {
         "coffee", "tea", "juice", "wine", "beer", "soda", "cola",
         "toilet paper", "paper towels", "napkins", "detergent", "soap", "shampoo",
         "toothpaste", "garbage bags", "trash bags", "dish soap", "tin foil",
+        # More of the shopping list itself. The list above named the errand and
+        # the staples; half the untagged tasks on this calendar were single
+        # items — "zucchini", "Canola oil", "gatorade" — which no amount of
+        # words for *shopping* will ever match. These are things anybody buys,
+        # so they ship prebuilt; anything specific to one person belongs in
+        # their own vocabulary, confirmed rather than assumed.
+        "zucchini", "courgette", "eggplant", "aubergine", "squash", "pumpkin",
+        "peppers", "broccoli", "cauliflower", "mushrooms", "celery", "corn",
+        "peas", "beets", "radish", "cabbage", "leek", "sweet potato", "ginger",
+        "parsley", "cilantro", "coriander", "basil", "mint", "dill", "herbs",
+        "canola oil", "vegetable oil", "sunflower oil", "sesame oil", "vinegar",
+        "ketchup", "mayo", "mayonnaise", "mustard", "soy sauce", "silan",
+        "date honey", "zaatar", "paprika", "cumin", "turmeric",
+        "cream", "sour cream", "cream cheese", "almond milk", "oat milk",
+        "soy milk", "ice cream", "frozen",
+        "bagels", "rolls", "buns", "baguette", "cake", "muffins", "pastry",
+        "gatorade", "powerade", "pepsi", "coke", "coca-cola", "sprite", "fanta",
+        "dr. brown", "dr brown", "cold brew", "espresso", "sparkling water",
+        "soda water", "seltzer", "gazoz", "smoothie", "lemonade",
+        "nuts", "almonds", "walnuts", "cashews", "pistachios", "raisins",
+        "dates", "olives", "pickles", "sauce", "pesto", "salsa",
     ],
     "Coursework": [
         "homework", "hw", "assignment", "problem set", "pset", "essay",
