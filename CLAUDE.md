@@ -162,6 +162,24 @@ A weekly series starts on the soonest weekday the sentence names, not on
 whatever date the model returned; it used to put "every sunday and tuesday" on
 a Wednesday.
 
+**Series skip Shabbat and yom tov**, bounded by candle lighting and tzeit at
+the configured location (`hebrew_calendar` / `observance` settings in
+config.yaml — latitude, longitude, timezone), not by midnight. Candle lighting
+in Jerusalem is 18:43 in September and 16:20 in December, so a 19:00 Friday
+event is outside Shabbat in one and inside it in the other; a date-only rule
+gets a whole season wrong.
+
+Three exceptions, each with a reason:
+
+- **Meals are allowed** — they are what the day is for. Unless it is a fast,
+  where a meal is the one thing that must not be booked; Yom Kippur is both and
+  the fast wins.
+- **A series anchored on Shabbat keeps it.** A Saturday shiur was put there on
+  purpose, and skipping every instance would leave a weekly series with one
+  event.
+- **Nothing is skipped if observance cannot be computed.** A series quietly
+  losing days is worse than one landing where it should not.
+
 ## Conventions
 
 Commit messages explain what was wrong and how it was found, not just what

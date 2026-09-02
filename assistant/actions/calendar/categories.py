@@ -36,6 +36,21 @@ DEFAULTS: list[dict[str, Any]] = [
     {"name": "Meeting", "color": "#f59e0b", "alt": "#b45309", "keywords": [
         "meeting", "meet", "call", "zoom", "sync", "1:1", "one on one", "catch up", "catch-up", "review", "demo",
         "presentation", "planning", "talk with", "chat with", "discussion"]},
+    # The three seudot and their relatives scattered across three categories —
+    # "Shabbat lunch" scored Social, "kiddush" and "seudah shlishit" scored
+    # Prayer, "melave malka" matched nothing and fell to Personal. One weekly
+    # fixture in three colours. Multi-word keywords score highest (2.0 + 0.2
+    # per word) so "shabbat lunch" beats the bare "lunch" that sent it to
+    # Social, and the phrases here are specific enough not to steal an
+    # ordinary weekday meal.
+    {"name": "Shabbat Meal", "color": "#c084fc", "alt": "#8b5cf6", "keywords": [
+        "shabbat meal", "shabbat lunch", "shabbat dinner", "shabbos meal",
+        "shabbos lunch", "shabbos dinner", "friday night dinner",
+        "friday night meal", "shabbat seudah", "seudah", "seuda", "seudat",
+        "seudah shlishit", "shalosh seudos", "shalosh seudot", "kiddush",
+        "melave malka", "melaveh malka", "melava malka", "chag meal",
+        "yom tov meal", "yom tov lunch", "chag lunch", "chag dinner",
+        "break-fast", "break fast", "seudat mitzvah"]},
     {"name": "Social", "color": "#ec4899", "alt": "#be185d", "keywords": [
         "dinner", "lunch", "coffee", "drinks", "beer", "pub", "bar", "party", "pregame", "pizza", "bbq", "barbecue",
         "hangout", "hang out", "movie", "cinema", "concert", "show", "game night", "bowling", "birthday", "bday",
@@ -191,6 +206,8 @@ def classify(title: str, attendees: str | list | None = None, location: str = ""
         text += " with " + " ".join(att).lower()
     text = " " + re.sub(r"[^\w\s'-]", " ", text) + " "
     best, best_score = "Personal", 0.0
+    scores: dict[str, float] = {}
+    phrase_hit = False          # did any category match a multi-word phrase?
     for c in _load()["categories"]:
         score = 0.0
         for kw in c.get("keywords", []):
@@ -199,13 +216,27 @@ def classify(title: str, attendees: str | list | None = None, location: str = ""
             k = " " + kw.lower() + " " if " " in kw else None
             if k and k in text:
                 score += 2.0 + 0.2 * len(kw.split())
+                phrase_hit = True
             elif re.search(rf"(?<![\w'-]){re.escape(kw.lower())}(?![\w'-])", text):
                 score += 1.5 if len(kw) > 3 else 1.0
         # Generic "with <name>" is a weak Social signal; a real Social keyword beats it.
         if c["name"] == "Social" and score and re.search(r"\bwith\b", text) and score <= 1.0:
             score = 0.6
+        scores[c["name"]] = score
         if score > best_score:
             best, best_score = c["name"], score
+
+    # "Shabbat dinner with Ima" scored Social 2.5 against Shabbat Meal 2.4:
+    # "dinner" plus the bare word "with", against a phrase that names the
+    # occasion exactly. A generic "with" should not outweigh a specific
+    # multi-word match, so it is withdrawn once one exists — the guard above
+    # only fires when Social has nothing else at all.
+    if phrase_hit and best == "Social" and re.search(r"\bwith\b", text):
+        social = scores.get("Social", 0.0) - 1.0
+        rival = max((v for k, v in scores.items() if k != "Social"), default=0.0)
+        if rival > social:
+            best = next(k for k, v in scores.items() if v == rival and k != "Social")
+            best_score = rival
     # Names of people alone (vocab) → Social unless something stronger matched
     if best_score == 0:
         try:

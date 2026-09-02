@@ -51,7 +51,7 @@ def build() -> List[SessionSpec]:
         _s("gym", "Gym / Calisthenics", D(2026, 9, 2)),
         _s("gym", "Gym / Calisthenics", D(2026, 9, 3)),
         _s("threshold", "Threshold 9 km", D(2026, 9, 4),
-           "2 × 10 min @ 4:40 — 2 min jog between", 9.0),
+           "2.5 km w/u · 2 × 10 min @ 4:40 (2 min jog between) · 2 km c/d", 9.0),
         _s("rest", "Rest — Shabbat", D(2026, 9, 5)),
 
         # --- Week 1: Sun 6 - Sat 12 Sep. Rosh Hashanah from Friday sundown.
@@ -59,10 +59,11 @@ def build() -> List[SessionSpec]:
         _s("gym", "Gym / Calisthenics", D(2026, 9, 7)),
         _s("easy", "Easy 5 km + strides", D(2026, 9, 8), "5 km + 6 × 20 s strides", 5.0),
         _s("gym", "Gym / Calisthenics", D(2026, 9, 8)),
-        _s("threshold", "Threshold 9 km", D(2026, 9, 9), "2 × 12 min @ 4:40 — 2 min jog", 9.0),
+        _s("threshold", "Threshold 9 km", D(2026, 9, 9),
+           "2 km w/u · 2 × 12 min @ 4:40 (2 min jog) · 1.5 km c/d", 9.0),
         _s("gym", "Gym / Calisthenics", D(2026, 9, 10)),
         _s("speed", "Speed 5 × 400 m", D(2026, 9, 11),
-           "5 × 400 m @ 3:50 — full recovery; focus on turnover", 6.0),
+           "2 km w/u · 5 × 400 m @ 3:50 (full recovery) · 1.5 km c/d — focus on turnover", 6.0),
         _s("rest", "Rest — Shabbat & Rosh Hashanah I", D(2026, 9, 12)),
 
         # --- Week 2: Sun 13 - Sat 19 Sep. Chag Sunday, fast Monday. -------
@@ -70,10 +71,10 @@ def build() -> List[SessionSpec]:
         # Deliberately left on Tzom Gedalia — the scheduler moves it.
         _s("long", "Long 12 km", D(2026, 9, 14), "12 km @ 6:10–6:30", 12.0),
         _s("threshold", "Threshold 10 km", D(2026, 9, 16),
-           "3 × 10 min @ 4:35 — 2 min jog", 10.0),
+           "2 km w/u · 3 × 10 min @ 4:35 (2 min jog) · 1.5 km c/d", 10.0),
         _s("gym", "Gym / Calisthenics", D(2026, 9, 16)),
         _s("gym", "Gym / Calisthenics", D(2026, 9, 17)),
-        _s("speed", "Speed 6 × 400 m", D(2026, 9, 18), "6 × 400 m @ 3:50", 6.0),
+        _s("speed", "Speed 6 × 400 m", D(2026, 9, 18), "2 km w/u · 6 × 400 m @ 3:50 (full recovery) · 1.5 km c/d", 6.0),
         _s("rest", "Rest — Shabbat", D(2026, 9, 19)),
 
         # --- Week 3: Sun 20 - Sat 26 Sep. Yom Kippur; the deload. ---------
@@ -87,7 +88,7 @@ def build() -> List[SessionSpec]:
         _s("gym", "Gym / Calisthenics", D(2026, 9, 23)),
         _s("gym", "Gym / Calisthenics", D(2026, 9, 24)),
         _s("threshold", "Threshold 9 km", D(2026, 9, 25),
-           "2 × 12 min @ 4:35 — before Sukkot", 9.0),
+           "2 km w/u · 2 × 12 min @ 4:35 (2 min jog) · 1.5 km c/d — before Sukkot", 9.0),
         _s("rest", "Rest — Shabbat & Sukkot day 1", D(2026, 9, 26)),
 
         # --- Week 4: Sun 27 Sep - Sat 3 Oct. Chol HaMoed; biggest week yet.
@@ -95,33 +96,33 @@ def build() -> List[SessionSpec]:
         _s("gym", "Gym / Calisthenics", D(2026, 9, 28)),
         _s("easy", "Easy 5 km + strides", D(2026, 9, 29), "5 km + 6 × 20 s strides", 5.0),
         _s("gym", "Gym / Calisthenics", D(2026, 9, 29)),
-        _s("threshold", "Threshold 10 km", D(2026, 9, 30),
-           "3 × 12 min @ 4:30 — 2 min jog", 10.0),
+        _s("threshold", "Threshold 12 km", D(2026, 9, 30),
+           "2 km w/u · 3 × 12 min @ 4:30 (2 min jog) · 2 km c/d", 12.0),
         _s("gym", "Gym / Calisthenics", D(2026, 10, 1)),
         _s("speed", "Speed 8 × 400 m", D(2026, 10, 2),
-           "8 × 400 m @ 3:50 — Hoshana Rabbah; chag starts at sundown", 7.0),
+           "2 km w/u · 8 × 400 m @ 3:50 (full recovery) · 1.5 km c/d — Hoshana Rabbah; chag starts at sundown", 7.0),
         _s("rest", "Rest — Shabbat & Shemini Atzeret / Simchat Torah", D(2026, 10, 3)),
 
         # --- Week 5: Sun 4 - Sat 10 Oct. Calendar clear; long run to Friday.
         _s("threshold", "Threshold 30 min", D(2026, 10, 4),
-           "30 min continuous @ 4:30 — one block, no breaks", 10.0),
+           "2 km w/u · 30 min continuous @ 4:30 (one block, no breaks) · 1 km c/d", 10.0),
         _s("gym", "Gym / Calisthenics", D(2026, 10, 5)),
         _s("easy", "Easy 6 km + strides", D(2026, 10, 6), "6 km + 6 × 20 s strides", 6.0),
         _s("gym", "Gym / Calisthenics", D(2026, 10, 6)),
         _s("speed", "Speed 5 × 1000 m", D(2026, 10, 7),
-           "5 × 1000 m @ 4:05 — 2 min jog. This is goal pace.", 10.0),
+           "2.5 km w/u · 5 × 1000 m @ 4:05 (2 min jog) · 2 km c/d — this is goal pace", 10.0),
         _s("gym", "Gym / Calisthenics", D(2026, 10, 8)),
         _s("long", "Long 15 km", D(2026, 10, 9),
            "15 km @ 6:00–6:30 — longest run since 5 Aug", 15.0, minutes=110),
         _s("rest", "Rest — Shabbat", D(2026, 10, 10)),
 
         # --- Week 6: Sun 11 - Sat 17 Oct. Benchmark week. -----------------
-        _s("threshold", "Threshold 30 min", D(2026, 10, 11), "30 min continuous @ 4:25", 11.0),
+        _s("threshold", "Threshold 30 min", D(2026, 10, 11), "2 km w/u · 30 min continuous @ 4:25 · 2 km c/d", 11.0),
         _s("gym", "Gym / Calisthenics", D(2026, 10, 12)),
         _s("easy", "Easy 6 km", D(2026, 10, 13), "6 km — strictly easy", 6.0),
         _s("gym", "Gym / Calisthenics", D(2026, 10, 13)),
         _s("speed", "Speed 4 × 1000 m", D(2026, 10, 14),
-           "4 × 1000 m @ 4:00 — short of the usual set, on purpose", 9.0),
+           "2.5 km w/u · 4 × 1000 m @ 4:00 (2 min jog) · 2 km c/d — short of the usual set, on purpose", 9.0),
         _s("rest", "Rest — mobility only", D(2026, 10, 15)),
         _s("tt", "5K Time Trial", D(2026, 10, 16),
            "All out. 2 km w/u · 5 km · 2 km c/d — flat route, no watch-chasing",

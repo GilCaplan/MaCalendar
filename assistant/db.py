@@ -13,6 +13,12 @@ from typing import Generator, List, Optional
 
 from assistant.actions.calendar.intent import CalendarIntent
 
+# Repeating events skip Shabbat and yom tov. The rest of this project is
+# already observance-aware — the training planner will not put a run on
+# Shabbat — so a nightly prayer series that lands on one was inconsistent
+# rather than merely unhelpful.
+RECURRENCE_SKIPS_OBSERVANCE = True
+
 DB_PATH = os.path.expanduser("~/.assistant_tools/calendar.db")
 
 _CREATE_TODOS_TABLE = """
@@ -486,6 +492,102 @@ def auto_category_and_color(conn: sqlite3.Connection, title: str, date: str, sta
         return category or "", color or "#0078d4"
 
 
+
+def _skip_for_observance(date: datetime.date, start_time: str = "",
+                         title: str = "", description: str = "") -> bool:
+    """Should a repeating event skip this slot?
+
+    Shabbat and yom tov are bounded by candle lighting and tzeit hakochavim at
+    the configured location, not by midnight. That matters: candle lighting in
+    Jerusalem is 18:43 in September and 16:20 in December, so a 19:00 event on a
+    Friday is outside Shabbat in one and well inside it in the other. Using the
+    date alone would skip a whole Friday in summer and admit a Friday evening
+    in winter, both wrong.
+
+    Meals are the exception, because they are what the day is for — kiddush and
+    seudah belong on Shabbat. Unless it is a fast, where a meal is the one thing
+    that must not be booked. Yom Kippur is both, and the fast check wins.
+
+    The evening after a fast needs no special case: a minor fast ends at tzeit
+    and is not yom tov, so nothing about that evening is blocked.
+
+    Best effort throughout. If observance cannot be computed — pyluach absent,
+    astral without solar data, an unparseable time — nothing is skipped. A
+    recurring event quietly losing days is worse than one landing where it
+    should not.
+    """
+    if not RECURRENCE_SKIPS_OBSERVANCE:
+        return False
+    try:
+        from assistant.observance import (
+            candle_lighting, is_fast_day, is_shabbat, is_yom_tov, tzeit,
+        )
+
+        holy = is_shabbat(date) or is_yom_tov(date)
+        tomorrow = date + datetime.timedelta(days=1)
+        eve_of_holy = is_shabbat(tomorrow) or is_yom_tov(tomorrow)
+        if not (holy or eve_of_holy):
+            return False
+
+        if _is_meal(title, description) and not is_fast_day(date):
+            return False
+
+        try:
+            when = datetime.time.fromisoformat(start_time) if start_time else None
+        except ValueError:
+            when = None
+        if when is None:
+            # No usable time: fall back to the date, which is the safe
+            # direction — a recurring event with no time on Shabbat is not
+            # something to insert on a guess.
+            return holy
+
+        if holy:
+            ends = tzeit(date)
+            if ends is not None and when >= ends.replace(microsecond=0):
+                return False            # after tzeit: the day is over
+            return True
+        # Erev: blocked only once candles are lit.
+        starts = candle_lighting(date)
+        return starts is not None and when >= starts.replace(microsecond=0)
+    except Exception:                       # pragma: no cover - defensive
+        return False
+
+
+# Words that mean food is the event. Deliberately NOT the category
+# classifier: that one colours by social context, so it files "lunch" and
+# "dinner" under Social and "kiddush" and "seudah" under Prayer — sensible for
+# a calendar's palette, useless for "may this happen on Shabbat".
+_MEAL_WORDS = (
+    "meal", "lunch", "dinner", "breakfast", "brunch", "supper", "feast",
+    "seudah", "seuda", "seudat", "kiddush", "melave malka", "melaveh malka",
+    "shalosh seudos", "shalosh seudot", "seudah shlishit", "se'udah",
+    "eat", "eating", "food", "bbq", "barbecue", "picnic",
+)
+
+
+def _is_meal(title: str, description: str = "") -> bool:
+    """Is food the point of this event?
+
+    The one thing that belongs on Shabbat and yom tov — kiddush, the seudot,
+    Friday night dinner — and the one thing that must not be booked on a fast.
+
+    Asks the classifier first, so the "Shabbat Meal" category and this rule
+    cannot drift apart: an event coloured as a Shabbat meal is one that may be
+    booked on Shabbat, and the two answers come from the same word list. The
+    literal check below still catches an ordinary weekday "lunch", which the
+    classifier files as Social because it is colouring by social context.
+    """
+    text = f"{title or ''} {description or ''}".lower()
+    try:
+        from assistant.actions.calendar.categories import classify
+        if classify(title or "", "", "", description or "") in ("Shabbat Meal", "Meal"):
+            return True
+    except Exception:                       # pragma: no cover - defensive
+        pass
+    return any(w in text for w in _MEAL_WORDS)
+
+
 class CalendarDB:
     """Thread-safe SQLite calendar event store."""
 
@@ -737,6 +839,15 @@ class CalendarDB:
 
         current = datetime.date.fromisoformat(intent.date)
         anchor_day = current.day  # original day-of-month; see _next_date docstring
+
+        # A series whose first event is itself on Shabbat or yom tov was put
+        # there deliberately — a Saturday shiur, a monthly review that happens
+        # to fall on the 31st — and skipping every later one would leave a
+        # "weekly" series with exactly one event in it. Observance skipping is
+        # for series that cross Shabbat incidentally, like "every day at 1900",
+        # not for ones anchored to it.
+        anchored_on_holy = _skip_for_observance(
+            current, intent.start_time, intent.title, intent.description or "")
         count = 0
         max_instances = 500  # hard safety cap
 
@@ -744,6 +855,18 @@ class CalendarDB:
             current = _next_date(current, recurrence, anchor_day=anchor_day)
             if current > end_date:
                 break
+            if not anchored_on_holy and _skip_for_observance(
+                    current, intent.start_time, intent.title, intent.description or ""):
+                # Shabbat and yom tov are skipped, not shifted: "every day at
+                # 1900" through a week that contains Shabbat means the six days
+                # it can mean, and moving one to a Sunday would invent a second
+                # event that evening. The cadence keeps its rhythm and the
+                # calendar keeps the truth.
+                #
+                # Only days when work is forbidden count — yom_tov_name()
+                # returns '' on chol hamoed, Chanukah and Purim, which are
+                # ordinary days you can daven and run on.
+                continue
             conn.execute(
                 """
                 INSERT INTO events
