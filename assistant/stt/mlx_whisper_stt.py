@@ -12,6 +12,7 @@ Models are pulled from Hugging Face on first use (e.g.
 from __future__ import annotations
 
 import logging
+import os
 
 import numpy as np
 
@@ -29,13 +30,41 @@ class MlxWhisperSTT(STTProvider):
             raise WhisperError(
                 "mlx-whisper is not installed. Run: pip install mlx-whisper"
             ) from e
-        self._model = config.model
+        self._model = self._resolve_local(config.model)
         self._language = config.language
         # Load weights now so the first command doesn't pay the download/compile cost.
         try:
             self.transcribe(np.zeros(16000, dtype=np.float32))
         except Exception as e:  # pragma: no cover — surfaced on first real call instead
             logger.warning("MLX whisper warm-up failed: %s", e)
+
+    @staticmethod
+    def _resolve_local(model: str) -> str:
+        """Turn a HF repo id into the cached directory on disk, once.
+
+        Handed a repo id, mlx_whisper asks huggingface.co to resolve the
+        revision on every single load — a network round trip that downloads
+        0 bytes because the weights are already cached. It made every server
+        restart slower, printed a download bar for a download that was not
+        happening, and meant an assistant that is otherwise entirely local
+        could not start without the internet.
+
+        Resolving to the local snapshot path skips the hub completely.
+        Anything that already looks like a path is passed straight through,
+        and if the model is genuinely not cached yet the repo id is returned so
+        the first run can still fetch it.
+        """
+        if os.path.isdir(model):
+            return model
+        try:
+            from huggingface_hub import snapshot_download
+            path = snapshot_download(model, local_files_only=True)
+            logger.info("Whisper model resolved from cache: %s", path)
+            return path
+        except Exception as exc:
+            logger.info("Whisper model %s not in the local cache (%s) — "
+                        "fetching it this once", model, type(exc).__name__)
+            return model
 
     def transcribe(self, audio: np.ndarray) -> str:
         import mlx_whisper

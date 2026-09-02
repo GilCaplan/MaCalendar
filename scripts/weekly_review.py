@@ -34,6 +34,44 @@ def pct(v, q):
     return v[f] + (v[c] - v[f]) * (k - f)
 
 
+# A person cannot read a command, decide, and click in under this. Verdicts
+# arriving faster than this in a group are clearing a queue, not judging it.
+BULK_WINDOW_S = 3.0
+BULK_MIN = 5
+
+# Below this many approvals the accuracy ratio is dominated by whether the
+# thumbs-up gets used, so it is not reported.
+MIN_APPROVALS = 3
+
+
+def _drop_bulk_runs(rows):
+    """Split rows into (considered, bulk-marked).
+
+    Looks for runs of verdicts whose timestamps are packed tighter than a human
+    could produce. Only actual verdicts count — "none" is unreviewed and never
+    part of a burst.
+    """
+    verdicts = sorted((r for r in rows if r["feedback"] in ("approved", "corrected", "rejected")),
+                      key=lambda r: r["ts"])
+    bulk_ids, run = set(), []
+
+    def _flush():
+        if len(run) >= BULK_MIN:
+            bulk_ids.update(id(r) for r in run)
+
+    for r in verdicts:
+        if run and r["ts"] - run[0]["ts"] <= BULK_WINDOW_S:
+            run.append(r)
+        else:
+            _flush()
+            run = [r]
+    _flush()
+
+    considered = [r for r in rows if id(r) not in bulk_ids]
+    bulk = [r for r in rows if id(r) in bulk_ids]
+    return considered, bulk
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=7)
@@ -61,14 +99,46 @@ def main() -> None:
             f"LLM-path only p50 {pct([r['llm_ms'] for r in ok if r['llm_ms']], .5) / 1000:.1f} s",
             f"- **Feedback:** {reviewed}/{n} reviewed — 👍 {fb.get('approved', 0)} · ✏️ corrected {fb.get('corrected', 0)} · 👎 rejected {fb.get('rejected', 0)} · unreviewed {fb.get('none', 0)}",
         ]
-        if reviewed:
-            good = fb.get("approved", 0); bad = fb.get("corrected", 0) + fb.get("rejected", 0)
-            L.append(f"- **Accuracy on reviewed commands: {good / max(1, good + bad):.0%}** (approved ÷ approved+corrected+rejected)")
+        # Judgements made faster than a person can read the command are not
+        # judgements. Clearing a backlog of 24 in two seconds registered as 24
+        # considered rejections and dragged the headline to 9%, which is a
+        # number about a review session rather than about the assistant.
+        judged, bulk = _drop_bulk_runs(rows)
+        if bulk:
+            L.append(
+                f"- Ignoring {len(bulk)} verdict(s) marked in bursts of "
+                f"{BULK_MIN} or more within {BULK_WINDOW_S}s — too fast to be "
+                f"read, so counted as clearing a backlog rather than judging it."
+            )
+        jfb = collections.Counter(r["feedback"] for r in judged)
+        good = jfb.get("approved", 0)
+        bad = jfb.get("corrected", 0) + jfb.get("rejected", 0)
+        # Flag rate is always reportable: it counts things you actively marked.
+        if judged:
+            L.append(f"- **Flagged wrong or corrected: {bad}/{len(judged)} commands** "
+                     f"({bad / len(judged):.0%} of everything run this period)")
+
+        # Accuracy is a ratio, and a ratio needs both halves. A thumbs-up is
+        # work with no reward — a correct answer is its own confirmation — so
+        # approvals go unpressed while mistakes get flagged. With none of them
+        # the formula reads 0% no matter how the assistant actually did, which
+        # says something about the button rather than the parser. Report the
+        # number only when there is enough positive signal to divide by.
+        if good >= MIN_APPROVALS:
+            L.append(f"- **Accuracy on reviewed commands: {good / (good + bad):.0%}** "
+                     f"({good}/{good + bad} — approved ÷ approved+corrected+rejected)")
             by_path_ok = collections.defaultdict(lambda: [0, 0])
-            for r in rows:
+            for r in judged:
                 if r["feedback"] == "approved": by_path_ok[r["parse_path"]][0] += 1
                 elif r["feedback"] in ("corrected", "rejected"): by_path_ok[r["parse_path"]][1] += 1
             L.append("  - by path: " + ", ".join(f"{p} {g}/{g + b} ({g / max(1, g + b):.0%})" for p, (g, b) in by_path_ok.items()))
+        elif bad:
+            L.append(f"- **Accuracy: not computable.** Only {good} approval(s) this period "
+                     f"against {bad} flagged, so the ratio would measure how often 👍 gets "
+                     f"pressed, not how often the assistant is right. Use the flag rate "
+                     f"above, or `python -m scripts.audit_assistant` for a measured number.")
+        else:
+            L.append("- **Accuracy: no considered feedback this period.**")
 
         wrong = [r for r in rows if r["feedback"] in ("rejected", "corrected")]
         if wrong:

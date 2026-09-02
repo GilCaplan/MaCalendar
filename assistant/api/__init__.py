@@ -88,7 +88,24 @@ def main() -> None:
             "already in flight when that happens is lost — its background "
             "self-check thread goes with the process."
         )
-    app.run(host=host, port=args.port, debug=args.debug, use_reloader=reload)
+    # The reloader watches everything importable under the project, so editing
+    # a test or a script restarted the server — and each restart reloads spaCy,
+    # the date recogniser and Whisper, which is several seconds and a network
+    # round trip for a file the server never imports. Only assistant/ can change
+    # how it behaves, so only assistant/ should be able to restart it.
+    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # assistant/
+    project = os.path.dirname(here)
+    exclude = [
+        os.path.join(project, "tests", "*"),
+        os.path.join(project, "scripts", "*"),
+        os.path.join(project, "DOCUMENTATION", "*"),
+        os.path.join(project, "MACalendar-iOS", "*"),
+        os.path.join(project, ".venv", "*"),
+        os.path.join(project, ".git", "*"),
+    ]
+
+    app.run(host=host, port=args.port, debug=args.debug, use_reloader=reload,
+            exclude_patterns=exclude if reload else None)
 
 
 if __name__ == "__main__":
