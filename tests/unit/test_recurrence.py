@@ -62,3 +62,40 @@ def test_expressible_cadences_are_not_flagged(text):
     """A false warning on a series it handled correctly is noise, and noise on
     every event is how a warning stops being read."""
     assert _unsupported_cadence(text) is None
+
+
+# ---------------------------------------------------------------- end dates
+
+@pytest.mark.parametrize("text", [
+    "go pray mincha-maariv every day at 1900 until Oct 6th",
+    "every day until October 6",
+    "daily standup at 9am till friday",
+    "walk the dog every evening up to Oct 6",
+    "gym every monday before December 1",
+])
+def test_until_excludes_the_day_it_names(text):
+    """The owner's reading, stated plainly: "until" is the boundary you stop
+    at, not the last one you keep. English supports both; this project picks
+    one so it is predictable rather than guessed per sentence."""
+    from assistant.api.server import _end_is_exclusive
+    assert _end_is_exclusive(text) is True
+
+
+@pytest.mark.parametrize("text", [
+    "every day through Oct 6th",
+    "every day including October 6",
+    "every day up to and including Oct 6",
+    "shacharit every morning until the end of September",
+])
+def test_saying_so_keeps_the_last_day(text):
+    """"through", "including" — and "end of", where the phrase names the final
+    day rather than a boundary beyond it."""
+    from assistant.api.server import _end_is_exclusive
+    assert _end_is_exclusive(text) is False
+
+
+def test_a_series_with_no_end_word_is_not_shortened(text=None):
+    """No end date phrase at all must not trigger the adjustment."""
+    from assistant.api.server import _end_is_exclusive
+    assert _end_is_exclusive("gym every monday at 6am") is False
+    assert _end_is_exclusive("mincha every day at 1900") is False

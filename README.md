@@ -67,6 +67,18 @@ device (Mac / iPhone), by kind (Events / Tasks), and to the ones that went wrong
 Turn it off in **Settings › Assistant** (`ui.show_thinking`), or move it with
 `ui.thinking_corner`.
 
+### Repeating events
+
+"go pray mincha-maariv every day at 1900 until Oct 6th" works, as do weekly and
+monthly variants and phrasings like "every friday at noon" or "daily standup at
+9am until December 1".
+
+Two things worth knowing. **"until" stops before the day it names** — say
+"through Oct 6th" or "including Oct 6th" to keep it. And the model only repeats
+daily, weekly or monthly: anything else ("every other tuesday", "twice a week",
+"every weekday") is approximated to the nearest of those, and the reply tells
+you which so you can correct it.
+
 ## Prerequisites
 
 Before installation, ensure you have the following:

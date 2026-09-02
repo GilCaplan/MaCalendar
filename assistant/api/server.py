@@ -111,6 +111,24 @@ _UNSUPPORTED_CADENCE = [
     (r"\bevery\s+\w+day\s+and\s+\w+day\b", "two days a week"),
 ]
 
+# "until" names the boundary you stop at, not the last one you keep — "until
+# Oct 6th" means the series does not include 6 October. Say "through" or
+# "including" to keep it. English is genuinely ambiguous here and both readings
+# are defensible; this is the owner's, stated plainly, so it is the one
+# implemented rather than guessed at per sentence.
+_INCLUSIVE_END = r"\b(through|thru|including|inclusive|up to and including|end of)\b"
+_EXCLUSIVE_END = r"\b(until|till|til|up to|up until|before)\b"
+
+
+def _end_is_exclusive(text: str) -> bool:
+    """Does this sentence's end-date word exclude the day it names?"""
+    import re as _re2
+    t = text.lower()
+    if _re2.search(_INCLUSIVE_END, t):
+        return False
+    return bool(_re2.search(_EXCLUSIVE_END, t))
+
+
 def _named_weekdays(text: str) -> set:
     """Weekday numbers named in the text, for anchoring a weekly series."""
     import re as _re2
@@ -1177,6 +1195,20 @@ def create_app() -> Flask:
                 # beginning today, a Wednesday — 106 events, not one of them on
                 # a Sunday or a Tuesday. The recurrence was right and the anchor
                 # was whatever the model happened to pick.
+                # "until Oct 6th" stops before the 6th; "through Oct 6th" keeps
+                # it. The model has no idea which the speaker meant and always
+                # produced the inclusive one.
+                _ru = getattr(intent, "recur_until", None)
+                if _ru and getattr(intent, "recurrence", None) and _end_is_exclusive(tl):
+                    try:
+                        _rd = _dt.date.fromisoformat(str(_ru))
+                        _excl = (_rd - _dt.timedelta(days=1)).isoformat()
+                        intent.recur_until = _excl
+                        fixes.append(f"recur_until {_ru}→{_excl} "
+                                     f"(\u201cuntil\u201d excludes the day it names)")
+                    except ValueError:
+                        pass
+
                 if getattr(intent, "recurrence", None) == "weekly":
                     named = _named_weekdays(tl)
                     try:

@@ -146,6 +146,22 @@ judgement, and 24 such rejections once put the headline at 9%.
   empty slots — which surface as "I couldn't find …" — are the right answer.
   Guessing is not.
 
+## Recurring events
+
+`recurrence` is only ever `daily`, `weekly` or `monthly`. Anything a speaker
+says that is not one of those gets rounded to one that is, and the rounding is
+announced in the reply rather than done quietly — "every other tuesday" became
+one event before anyone noticed, and "every weekday" books Shabbat.
+
+**"until" excludes the day it names; "through" and "including" keep it.**
+English supports both readings, so the project picks one and applies it
+everywhere rather than guessing per sentence. "until the end of September" is
+inclusive — that phrase names the final day, not a boundary past it.
+
+A weekly series starts on the soonest weekday the sentence names, not on
+whatever date the model returned; it used to put "every sunday and tuesday" on
+a Wednesday.
+
 ## Conventions
 
 Commit messages explain what was wrong and how it was found, not just what
