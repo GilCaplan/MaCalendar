@@ -1,0 +1,619 @@
+<title>One Brain, Two Surfaces</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  /* Dark-first, because the assistant is: these are its own tokens, lifted
+     from assistant/calendar_ui/styles.py and thinking_panel.py. */
+  :root {
+    --ground:  #0f1013;
+    --surface: #141519;
+    --raised:  #1a1b20;
+    --border:  #212227;
+    --text:    #e6e7ea;
+    --muted:   #87878f;
+    --accent:  #f5a524;   /* DEFAULT_ACCENT — the rule path */
+    --llm:     #a78bfa;   /* the LLM path */
+    --done:    #3ecf7f;
+    --verify:  #f0a35e;
+    --shabbat: #6ea8fe;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --ground:  #fbfbfa;
+      --surface: #ffffff;
+      --raised:  #f4f4f2;
+      --border:  #e1e1de;
+      --text:    #17181b;
+      --muted:   #63646b;
+      --accent:  #a86a06;
+      --llm:     #6d45c8;
+      --done:    #1d854b;
+      --verify:  #a1590d;
+      --shabbat: #2b5fc4;
+    }
+  }
+  :root[data-theme="light"] {
+    --ground:  #fbfbfa;
+    --surface: #ffffff;
+    --raised:  #f4f4f2;
+    --border:  #e1e1de;
+    --text:    #17181b;
+    --muted:   #63646b;
+    --accent:  #a86a06;
+    --llm:     #6d45c8;
+    --done:    #1d854b;
+    --verify:  #a1590d;
+    --shabbat: #2b5fc4;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--text);
+    font-family: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 74ch;
+    margin: 0 auto;
+    padding: clamp(2.5rem, 6vw, 5rem) clamp(1.1rem, 4vw, 2rem) 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3.5rem;
+  }
+
+  /* ---------- masthead ---------- */
+  .mast { display: flex; flex-direction: column; gap: 1rem; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 {
+    font-family: "Instrument Serif", Georgia, serif;
+    font-weight: 400;
+    font-size: clamp(2.6rem, 7vw, 4.1rem);
+    line-height: 1.02;
+    letter-spacing: -0.015em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h1 em { font-style: italic; color: var(--accent); }
+  .standfirst { color: var(--muted); font-size: 1.06rem; max-width: 60ch; margin: 0; }
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 0.75rem;
+  }
+  .fact { background: var(--surface); padding: 0.85rem 1rem; }
+  .fact dt {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.66rem; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 0.2rem;
+  }
+  .fact dd {
+    margin: 0; font-family: "IBM Plex Mono", monospace;
+    font-size: 1.12rem; font-variant-numeric: tabular-nums; color: var(--text);
+  }
+
+  /* ---------- sections ---------- */
+  section { display: flex; flex-direction: column; gap: 1.1rem; }
+  h2 {
+    font-family: "Instrument Serif", Georgia, serif;
+    font-weight: 400; font-size: 1.95rem; line-height: 1.15;
+    margin: 0; letter-spacing: -0.01em; text-wrap: balance;
+  }
+  h3 {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); margin: 0.5rem 0 0; font-weight: 500;
+  }
+  p { margin: 0; max-width: 66ch; }
+  a { color: var(--accent); }
+  strong { color: var(--text); font-weight: 600; }
+  code {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.86em;
+    background: var(--raised);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.08em 0.36em;
+  }
+
+  figure {
+    margin: 0.5rem 0 0;
+    display: flex; flex-direction: column; gap: 0.7rem;
+    overflow-x: auto;
+  }
+  figure svg { max-width: 100%; height: auto; display: block; color: var(--text); }
+  figcaption { color: var(--muted); font-size: 0.86rem; max-width: 62ch; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td {
+    text-align: left; padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted); font-weight: 500;
+  }
+  td.num { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+  .path { color: var(--muted); }
+
+  ul { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.45rem; }
+  li { max-width: 64ch; }
+  li::marker { color: var(--muted); }
+
+  .note {
+    border-left: 2px solid var(--accent);
+    padding: 0.15rem 0 0.15rem 1rem;
+    color: var(--muted);
+    max-width: 64ch;
+  }
+  .note strong { color: var(--text); }
+
+  .rule { height: 1px; background: var(--border); border: 0; margin: 0; }
+
+  /* authority key — the four things that make decisions here */
+  .legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; margin-top: 0.2rem; }
+  .key {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    font-size: 0.82rem; color: var(--muted);
+  }
+  .sw { width: 0.7rem; height: 0.7rem; border-radius: 3px; display: inline-block; flex: none; }
+  .sw.rules { background: var(--accent); }
+  .sw.llm   { background: var(--llm); }
+  .sw.alm   { background: var(--shabbat); }
+  .sw.you   { background: var(--done); }
+
+  .tag {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.66rem; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 0.1em 0.42em; border-radius: 4px; margin-right: 0.4em;
+    border: 1px solid currentColor;
+  }
+  .tag.rules { color: var(--accent); }
+  .tag.llm   { color: var(--llm); }
+  .tag.alm   { color: var(--shabbat); }
+  .tag.you   { color: var(--done); }
+
+  .foot {
+    color: var(--muted); font-size: 0.85rem;
+    font-family: "IBM Plex Mono", monospace;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    a { transition: opacity 120ms ease; }
+    a:hover { opacity: 0.75; }
+  }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <div class="eyebrow">MACalendar · architecture</div>
+    <h1>One brain,<br><em>two surfaces</em></h1>
+    <p class="standfirst">
+      A voice-driven calendar that runs entirely on one MacBook. Four kinds of
+      authority decide things in it — keyword rules, a local 8B model, an almanac,
+      and you — and knowing which is in charge of a given step is most of
+      understanding the system. Nothing leaves the machine.
+    </p>
+    <dl class="facts">
+      <div class="fact"><dt>Python</dt><dd>32,400 lines</dd></div>
+      <div class="fact"><dt>Actions</dt><dd>15</dd></div>
+      <div class="fact"><dt>Endpoints</dt><dd>100</dd></div>
+      <div class="fact"><dt>Tests</dt><dd>653</dd></div>
+      <div class="fact"><dt>Accuracy</dt><dd>97%</dd></div>
+    </dl>
+  </header>
+
+  <hr class="rule">
+
+  <section>
+    <h2>Where everything runs</h2>
+    <p>
+      Four processes on one machine, plus two clients. The important line is the one
+      that used to be missing: <strong>the calendar window is a client too</strong>.
+      It records audio and draws results, and posts everything else to the same API
+      the phone talks to.
+    </p>
+
+    <figure>
+      <svg viewBox="0 0 720 400" role="img"
+           aria-label="One MacBook runs Ollama, the API server, the thinking HUD and the calendar GUI. The calendar GUI posts commands to the API over localhost and the iPhone posts over Tailscale; the API is the only process that parses or executes.">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+          <marker id="ah-accent" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"></path>
+          </marker>
+        </defs>
+
+        <!-- machine boundary -->
+        <rect x="12" y="30" width="470" height="356" rx="12"
+              fill="none" stroke="currentColor" stroke-opacity="0.28" stroke-dasharray="5 4"></rect>
+        <text x="28" y="52" font-family="IBM Plex Mono, monospace" font-size="11"
+              fill="currentColor" fill-opacity="0.55" letter-spacing="1.4">YOUR MACBOOK</text>
+
+        <!-- the brain -->
+        <rect x="150" y="150" width="200" height="74" rx="8"
+              fill="none" stroke="var(--accent)" stroke-width="2"></rect>
+        <text x="250" y="180" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+              font-size="13" fill="var(--accent)">assistant.api</text>
+        <text x="250" y="199" text-anchor="middle" font-size="11.5"
+              fill="currentColor" fill-opacity="0.72">parse · execute · self-check</text>
+        <text x="250" y="215" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+              font-size="10.5" fill="currentColor" fill-opacity="0.5">0.0.0.0:8080</text>
+
+        <!-- ollama -->
+        <rect x="150" y="62" width="200" height="52" rx="8"
+              fill="none" stroke="var(--llm)" stroke-opacity="0.85"></rect>
+        <text x="250" y="84" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+              font-size="12" fill="var(--llm)">ollama</text>
+        <text x="250" y="101" text-anchor="middle" font-size="11"
+              fill="currentColor" fill-opacity="0.6">llama3.1:8b · localhost:11434</text>
+        <line x1="250" y1="150" x2="250" y2="118" stroke="var(--llm)" stroke-opacity="0.75"
+              marker-end="url(#ah)"></line>
+
+        <!-- calendar GUI -->
+        <rect x="24" y="268" width="176" height="66" rx="8"
+              fill="none" stroke="currentColor" stroke-opacity="0.42"></rect>
+        <text x="112" y="292" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+              font-size="12" fill="currentColor">assistant.main</text>
+        <text x="112" y="310" text-anchor="middle" font-size="11"
+              fill="currentColor" fill-opacity="0.6">calendar window</text>
+        <text x="112" y="325" text-anchor="middle" font-size="10.5"
+              fill="currentColor" fill-opacity="0.45">records · renders</text>
+
+        <!-- HUD -->
+        <rect x="300" y="268" width="176" height="66" rx="8"
+              fill="none" stroke="var(--verify)" stroke-opacity="0.7"></rect>
+        <text x="388" y="292" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+              font-size="12" fill="var(--verify)">thinking_hud</text>
+        <text x="388" y="310" text-anchor="middle" font-size="11"
+              fill="currentColor" fill-opacity="0.6">the floating card</text>
+        <text x="388" y="325" text-anchor="middle" font-size="10.5"
+              fill="currentColor" fill-opacity="0.45">tails trace_bus.jsonl</text>
+
+        <!-- GUI -> API -->
+        <path d="M 112 268 L 112 187 L 150 187" fill="none" stroke="var(--accent)"
+              stroke-width="1.6" marker-end="url(#ah-accent)"></path>
+        <text x="118" y="243" font-family="IBM Plex Mono, monospace" font-size="10.5"
+              fill="var(--accent)">POST /voice/text</text>
+        <text x="118" y="257" font-family="IBM Plex Mono, monospace" font-size="10.5"
+              fill="var(--accent)" fill-opacity="0.75">source=mac</text>
+
+        <!-- API -> HUD via bus -->
+        <path d="M 350 200 L 388 200 L 388 268" fill="none" stroke="var(--verify)"
+              stroke-opacity="0.8" marker-end="url(#ah)"></path>
+        <text x="396" y="238" font-family="IBM Plex Mono, monospace" font-size="10.5"
+              fill="var(--verify)">appends</text>
+
+        <!-- data -->
+        <rect x="150" y="330" width="200" height="42" rx="8"
+              fill="none" stroke="var(--done)" stroke-opacity="0.7"></rect>
+        <text x="250" y="347" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+              font-size="11" fill="var(--done)">~/.assistant_tools/</text>
+        <text x="250" y="362" text-anchor="middle" font-size="10.5"
+              fill="currentColor" fill-opacity="0.55">calendar · memory · vocab</text>
+        <line x1="250" y1="224" x2="250" y2="330" stroke="var(--done)" stroke-opacity="0.7"
+              marker-end="url(#ah)"></line>
+
+        <!-- iPhone -->
+        <rect x="566" y="150" width="132" height="74" rx="8"
+              fill="none" stroke="currentColor" stroke-opacity="0.42"></rect>
+        <text x="632" y="180" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+              font-size="12" fill="currentColor">iPhone app</text>
+        <text x="632" y="199" text-anchor="middle" font-size="11"
+              fill="currentColor" fill-opacity="0.6">records · renders</text>
+        <text x="632" y="215" text-anchor="middle" font-size="10.5"
+              fill="currentColor" fill-opacity="0.45">source=ios</text>
+
+        <path d="M 566 187 L 350 187" fill="none" stroke="var(--accent)"
+              stroke-width="1.6" marker-end="url(#ah-accent)"></path>
+        <text x="458" y="178" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+              font-size="10.5" fill="var(--accent)">Tailscale</text>
+      </svg>
+      <figcaption>
+        Both surfaces post transcripts to the same endpoint. <code>source</code> is the
+        only difference between them, and it only labels the trace, the vocabulary
+        corrections and the command memory. The HUD talks to nothing — it tails a
+        JSONL file the API appends to, which is why it can float over a full-screen
+        app with the calendar closed.
+      </figcaption>
+    </figure>
+
+    <p class="note">
+      <strong>This was two implementations until recently.</strong> The GUI had its own
+      copy of the whole pipeline, and the two drifted: the phone had a sanity pass the
+      Mac lacked, the Mac had a feature the phone lacked, and a fix applied to one was
+      simply absent from the other. 333 lines of duplicated orchestration became about
+      90 lines of HTTP.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>Who decides what</h2>
+    <p>
+      Four kinds of authority run this system, and the useful question about any
+      step is which one is in charge of it. The shape of the answer:
+      <strong>the model decides what you meant; deterministic code decides whether
+      that is legal and when it lands.</strong>
+    </p>
+
+    <div class="legend">
+      <span class="key"><i class="sw rules"></i>rules — keywords, regex, arithmetic</span>
+      <span class="key"><i class="sw llm"></i>llama 3.1 — local, 8B</span>
+      <span class="key"><i class="sw alm"></i>almanac — pyluach + astral</span>
+      <span class="key"><i class="sw you"></i>you</span>
+    </div>
+
+    <figure>
+      <svg viewBox="0 0 720 396" role="img"
+           aria-label="A decision map. Vocabulary correction, path selection, the rule parse, the sanity pass, validation, categorisation and recurrence are decided by deterministic rules. The full parse, gap filling, re-reading after a no-match, naming an event and the self-check verdict are decided by the local LLM. Shabbat boundaries come from the almanac. Feedback comes from you.">
+        <defs>
+          <marker id="d-ah" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <!-- spine -->
+        <line x1="360" y1="42" x2="360" y2="330" stroke="currentColor"
+              stroke-opacity="0.16" stroke-width="1"></line>
+
+        <!-- 1 heard -->
+        <rect x="262" y="30" width="196" height="34" rx="6" fill="none"
+              stroke="currentColor" stroke-opacity="0.4"></rect>
+        <text x="360" y="52" text-anchor="middle" font-size="11.5" fill="currentColor">you speak · Whisper transcribes</text>
+
+        <!-- 2 vocab : rules -->
+        <rect x="262" y="80" width="196" height="34" rx="6" fill="none" stroke="var(--accent)"></rect>
+        <text x="360" y="102" text-anchor="middle" font-size="11.5" fill="var(--accent)">fix my words</text>
+        <text x="470" y="102" font-size="10.5" fill="currentColor" fill-opacity="0.5">lookup, no model</text>
+        <line x1="360" y1="64" x2="360" y2="80" stroke="currentColor" stroke-opacity="0.4" marker-end="url(#d-ah)"></line>
+
+        <!-- 3 which path : rules -->
+        <path d="M 360 130 L 320 152 L 360 174 L 400 152 Z" fill="none" stroke="var(--accent)"></path>
+        <text x="360" y="149" text-anchor="middle" font-size="10.5" fill="var(--accent)">sure</text>
+        <text x="360" y="162" text-anchor="middle" font-size="10.5" fill="var(--accent)">enough?</text>
+        <line x1="360" y1="114" x2="360" y2="130" stroke="var(--accent)" marker-end="url(#d-ah)"></line>
+        <text x="412" y="139" font-family="IBM Plex Mono, monospace" font-size="9.5"
+              fill="currentColor" fill-opacity="0.5">conf &#8805; 0.85</text>
+
+        <!-- 4a rule parse -->
+        <rect x="30" y="136" width="150" height="34" rx="6" fill="none" stroke="var(--accent)"></rect>
+        <text x="105" y="152" text-anchor="middle" font-size="11.5" fill="var(--accent)">rule parse</text>
+        <text x="105" y="165" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+              font-size="9.5" fill="var(--accent)" fill-opacity="0.75">44% · 0.1 s</text>
+        <line x1="320" y1="152" x2="182" y2="152" stroke="var(--accent)" marker-end="url(#d-ah)"></line>
+        <text x="250" y="146" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.5">yes</text>
+
+        <!-- 4b llm parse -->
+        <rect x="540" y="136" width="150" height="34" rx="6" fill="none" stroke="var(--llm)"></rect>
+        <text x="615" y="152" text-anchor="middle" font-size="11.5" fill="var(--llm)">what did you mean?</text>
+        <text x="615" y="165" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+              font-size="9.5" fill="var(--llm)" fill-opacity="0.75">56% · 7.8 s</text>
+        <line x1="400" y1="152" x2="538" y2="152" stroke="var(--llm)" marker-end="url(#d-ah)"></line>
+        <text x="470" y="146" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity="0.5">no</text>
+
+        <!-- 5 sanity + validate : rules -->
+        <rect x="248" y="196" width="224" height="46" rx="6" fill="none" stroke="var(--accent)"></rect>
+        <text x="360" y="214" text-anchor="middle" font-size="11.5" fill="var(--accent)">is that plausible?</text>
+        <text x="360" y="230" text-anchor="middle" font-size="10.5"
+              fill="currentColor" fill-opacity="0.6">13 guards · past dates, "at 8pm", "until"</text>
+        <path d="M 105 170 L 105 219 L 246 219" fill="none" stroke="var(--accent)" marker-end="url(#d-ah)"></path>
+        <path d="M 615 170 L 615 219 L 474 219" fill="none" stroke="var(--llm)" marker-end="url(#d-ah)"></path>
+
+        <!-- 6 write : rules + almanac -->
+        <rect x="248" y="266" width="224" height="46" rx="6" fill="none" stroke="var(--shabbat)"></rect>
+        <text x="360" y="284" text-anchor="middle" font-size="11.5" fill="var(--shabbat)">when does it land?</text>
+        <text x="360" y="300" text-anchor="middle" font-size="10.5"
+              fill="currentColor" fill-opacity="0.6">recurrence · Shabbat &amp; chag · sundown</text>
+        <line x1="360" y1="242" x2="360" y2="266" stroke="currentColor" stroke-opacity="0.5" marker-end="url(#d-ah)"></line>
+
+        <!-- 7 db -->
+        <rect x="284" y="344" width="152" height="30" rx="6" fill="none" stroke="var(--done)"></rect>
+        <text x="360" y="364" text-anchor="middle" font-family="IBM Plex Mono, monospace"
+              font-size="11" fill="var(--done)">calendar.db</text>
+        <line x1="360" y1="312" x2="360" y2="344" stroke="var(--done)" marker-end="url(#d-ah)"></line>
+
+        <!-- self-check : llm, advisory -->
+        <rect x="500" y="266" width="196" height="46" rx="6" fill="none"
+              stroke="var(--llm)" stroke-dasharray="4 3"></rect>
+        <text x="598" y="284" text-anchor="middle" font-size="11.5" fill="var(--llm)">was that right?</text>
+        <text x="598" y="300" text-anchor="middle" font-size="10.5"
+              fill="currentColor" fill-opacity="0.6">advises · cannot write</text>
+        <path d="M 472 289 L 498 289" fill="none" stroke="var(--llm)"
+              stroke-dasharray="4 3" marker-end="url(#d-ah)"></path>
+
+        <!-- you -->
+        <rect x="30" y="266" width="196" height="46" rx="6" fill="none" stroke="var(--done)"></rect>
+        <text x="128" y="284" text-anchor="middle" font-size="11.5" fill="var(--done)">you correct it</text>
+        <text x="128" y="300" text-anchor="middle" font-size="10.5"
+              fill="currentColor" fill-opacity="0.6">teaches the next parse</text>
+        <path d="M 226 289 L 246 289" fill="none" stroke="var(--done)" marker-end="url(#d-ah)"></path>
+        <path d="M 128 266 L 128 200 L 540 152" fill="none" stroke="var(--done)"
+              stroke-opacity="0.4" stroke-dasharray="3 4"></path>
+        <text x="150" y="212" font-size="10" fill="var(--done)" fill-opacity="0.75">shown as examples next time</text>
+      </svg>
+      <figcaption>
+        The model appears three times, and only one of those is on the writing path:
+        deciding what you meant. Judging its own work is advisory, and everything about
+        legality, timing and observance is arithmetic. Where the model <em>was</em>
+        given authority to correct records, it measured worse — 0 fixed, 1 broken over
+        89 commands — and was demoted to advice.
+      </figcaption>
+    </figure>
+
+    <h3>Every decision, and who makes it</h3>
+    <table>
+      <thead>
+        <tr><th>Decision</th><th>Decided by</th><th>Can it write?</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Did I hear you right</td><td><span class="tag rules">rules</span> vocabulary lookup</td><td>yes</td></tr>
+        <tr><td>Which parser to trust</td><td><span class="tag rules">rules</span> confidence &#8805; 0.85</td><td>—</td></tr>
+        <tr><td>What you meant — easy case</td><td><span class="tag rules">rules</span> keywords + spaCy</td><td>yes</td></tr>
+        <tr><td>What you meant — everything else</td><td><span class="tag llm">llama</span></td><td>yes</td></tr>
+        <tr><td>Filling gaps the rules left</td><td><span class="tag llm">llama</span> hybrid</td><td>yes</td></tr>
+        <tr><td>Is that plausible</td><td><span class="tag rules">rules</span> 13 guards</td><td>yes — rewrites</td></tr>
+        <tr><td>Is that well-formed</td><td><span class="tag rules">rules</span> schema</td><td>rejects</td></tr>
+        <tr><td>Nothing matched — retry?</td><td><span class="tag llm">llama</span> re-reads it</td><td>yes</td></tr>
+        <tr><td>Naming a nameless event</td><td><span class="tag llm">llama</span></td><td>title only</td></tr>
+        <tr><td>What colour is this</td><td><span class="tag rules">rules</span> keyword score</td><td>yes</td></tr>
+        <tr><td>Which days a series lands on</td><td><span class="tag alm">almanac</span> sundown</td><td>yes</td></tr>
+        <tr><td>Was that right</td><td><span class="tag llm">llama</span> self-check</td><td><strong>no</strong></td></tr>
+        <tr><td>Which past commands to show it</td><td><span class="tag rules">rules</span> similarity</td><td>—</td></tr>
+        <tr><td>Was that actually right</td><td><span class="tag you">you</span> 👍 ✏️ 👎</td><td>yes — teaches</td></tr>
+      </tbody>
+    </table>
+    <p class="note">
+      <strong>The workout planner is the pattern in miniature.</strong> The model
+      proposes dates; a deterministic policy re-places every one of them against
+      observance and training rules. Its own comment says it: <em>the model proposes,
+      the scheduler disposes.</em>
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>It knows when Shabbat is</h2>
+    <p>
+      The part that makes this a personal tool rather than a generic one. Sundown is
+      computed from your latitude and longitude, so a repeating event knows to skip
+      Shabbat and yom tov — and knows that the boundary moves through the year.
+    </p>
+
+    <figure>
+      <svg viewBox="0 0 720 176" role="img"
+           aria-label="Two Friday timelines. In September candle lighting is 18:43, so a 19:00 event falls inside Shabbat. In December candle lighting is 16:20, so the same 19:00 event falls much further inside it, while 17:00 is already inside in December but free in September.">
+        <defs>
+          <marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <!-- hour ticks -->
+        <text x="60" y="24" font-family="IBM Plex Mono, monospace" font-size="10"
+              fill="currentColor" fill-opacity="0.5">15:00</text>
+        <text x="330" y="24" font-family="IBM Plex Mono, monospace" font-size="10"
+              fill="currentColor" fill-opacity="0.5">18:00</text>
+        <text x="600" y="24" font-family="IBM Plex Mono, monospace" font-size="10"
+              fill="currentColor" fill-opacity="0.5">21:00</text>
+
+        <!-- September -->
+        <text x="14" y="66" font-family="IBM Plex Mono, monospace" font-size="10"
+              fill="currentColor" fill-opacity="0.65">4 SEP</text>
+        <line x1="66" y1="62" x2="690" y2="62" stroke="currentColor" stroke-opacity="0.3"></line>
+        <rect x="450" y="50" width="240" height="24" fill="var(--shabbat)" fill-opacity="0.18"></rect>
+        <line x1="450" y1="42" x2="450" y2="82" stroke="var(--shabbat)" stroke-width="2"></line>
+        <text x="456" y="96" font-family="IBM Plex Mono, monospace" font-size="10.5"
+              fill="var(--shabbat)">candles 18:43</text>
+        <circle cx="516" cy="62" r="4.5" fill="var(--verify)"></circle>
+        <text x="526" y="66" font-size="10.5" fill="var(--verify)">19:00 — skipped</text>
+
+        <!-- December -->
+        <text x="14" y="140" font-family="IBM Plex Mono, monospace" font-size="10"
+              fill="currentColor" fill-opacity="0.65">18 DEC</text>
+        <line x1="66" y1="136" x2="690" y2="136" stroke="currentColor" stroke-opacity="0.3"></line>
+        <rect x="240" y="124" width="450" height="24" fill="var(--shabbat)" fill-opacity="0.18"></rect>
+        <line x1="240" y1="116" x2="240" y2="156" stroke="var(--shabbat)" stroke-width="2"></line>
+        <text x="246" y="170" font-family="IBM Plex Mono, monospace" font-size="10.5"
+              fill="var(--shabbat)">candles 16:20</text>
+        <circle cx="330" cy="136" r="4.5" fill="var(--verify)"></circle>
+        <text x="340" y="140" font-size="10.5" fill="var(--verify)">17:00 — skipped</text>
+        <circle cx="150" cy="136" r="4.5" fill="var(--done)"></circle>
+        <text x="160" y="140" font-size="10.5" fill="var(--done)">16:00 — kept</text>
+      </svg>
+      <figcaption>
+        The same clock time falls on different sides of the boundary depending on the
+        season, which is why the rule is computed from sundown rather than the date.
+        Three exceptions: meals are allowed (they are what the day is for, unless it is
+        a fast), a series deliberately anchored on Shabbat keeps it, and nothing is
+        skipped if observance cannot be computed.
+      </figcaption>
+    </figure>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>Where the data lives</h2>
+    <p>
+      All of it outside the repository, in one directory, in formats you can open with
+      ordinary tools. There is no account and no sync service.
+    </p>
+    <table>
+      <thead><tr><th>File</th><th>What it is</th></tr></thead>
+      <tbody>
+        <tr><td class="path">calendar.db</td><td>events, tasks, workouts, timers — 21 tables</td></tr>
+        <tr><td class="path">nlu_memory.db</td><td>every command, and your verdict on it</td></tr>
+        <tr><td class="path">vocab.json</td><td>hand-curated names and places, 374 words</td></tr>
+        <tr><td class="path">trace_bus.jsonl</td><td>the durable log the History view reads back</td></tr>
+        <tr><td class="path">categories.json</td><td>your colours, when you override the defaults</td></tr>
+      </tbody>
+    </table>
+    <p class="note">
+      <strong>The memory is not just a log.</strong> Your corrections become the worked
+      examples the LLM is shown next time — a rejected command is never used as one,
+      and a corrected one is shown with <em>your</em> answer as the target. It is the
+      strongest signal in the system.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2>Nothing leaves the machine</h2>
+    <ul>
+      <li><strong>Whisper</strong> runs on the Apple GPU from a cached model.</li>
+      <li><strong>llama 3.1</strong> answers on <code>localhost:11434</code>.</li>
+      <li><strong>spaCy</strong> and the date recogniser are local models.</li>
+      <li><strong>pyluach</strong> and <strong>astral</strong> compute the Hebrew calendar and sundown in pure Python — no lookup service.</li>
+    </ul>
+    <p>
+      The code contains clients for OpenAI, Anthropic, Gemini and Microsoft Graph, and
+      none are configured. A test blocks every non-loopback socket and fails the build
+      if that ever stops being true — it had already broken once, when Whisper was
+      resolving its model against Hugging Face on every start.
+    </p>
+    <p class="note">
+      The one genuine network dependency is the phone reaching the Mac over Tailscale.
+      That is a link between two of your own machines, not a dependency on a service —
+      but with networking off, the phone cannot reach the brain. The Mac alone needs
+      nothing beyond <code>localhost</code>.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <p class="foot">
+    653 tests · CI green · github.com/GilCaplan/MACalendar
+  </p>
+
+</div>

@@ -138,6 +138,36 @@ change too: it splits "buy a birthday gift for mom and dad" into two tasks, in
 spite of an explicit prompt rule not to. The rule parser gets it right and
 handles that phrasing at 0.95 confidence, so the model rarely sees it.
 
+## Run 6 — 2026-09-02 (89 commands)
+
+**97% correct** after the quick answer, and **97% once settled** — the first run
+where those two are equal. 0 parse errors. First result p50 4.7 s / p95 19.4 s;
+settled p50 17.1 s / p95 39.2 s.
+
+By path: **rule 97%** (n=39, p50 0.0 s), **llm 98%** (n=41, p50 7.8 s),
+**hybrid 89%** (n=9, p50 12.1 s). By area: adversarial/mixed/query/update-delete
+100%, events 97%, tasks 94%, from-chats 93%.
+
+Routing: 39 of 89 commands answered by the rules alone, 50 by the model — a
+44 / 56 split. That is the number the 0.85 threshold actually buys.
+
+What changed before it: the self-check now runs on **every** command rather
+than only low-confidence ones, and it judges what reached the database instead
+of the parser's raw slots. The effect of that second change is the headline
+here — it proposed a correction on 37 of 89 commands, **fixed 0 and broke 0**,
+against a rate of ~96% proposals earlier in the week. It stays advisory
+(`self_check_apply: false`); the run that measured applying its patches fixed 0
+and broke 1.
+
+Settled equalling quick is the point of the run. Previously the self-check cost
+accuracy between the two columns; now it costs nothing and still catches
+confidently-wrong parses at execution time through the escalation path.
+
+**These are the figures the published explainer quotes.** `ASSISTANT_AUDIT.md`
+is overwritten by the next run, so a number cited anywhere durable has to be
+copied here first — `tests/unit/test_artifact_claims.py` checks that the
+artifact's headline still appears in this file.
+
 ## Remaining gaps (ranked, from the 2026-08-26 run)
 
 1. ~~**Rule parser splits multi-event sentences into one**~~ — fixed, see above. ("lunch with Tal on monday at noon and coffee with Ezra on friday at 9" → only lunch). It is confident (0.90), so the LLM never sees it. Fix: lower confidence when a span contains two time expressions, forcing hybrid.

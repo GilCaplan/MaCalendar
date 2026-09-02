@@ -1,0 +1,864 @@
+<title>Reading the Assistant's Mind</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  /* Same tokens as the architecture page — this is its companion, and they
+     are the assistant's own colours from styles.py and thinking_panel.py. */
+  :root {
+    --ground:#0f1013; --surface:#141519; --raised:#1a1b20; --border:#212227;
+    --text:#e6e7ea; --muted:#87878f;
+    --accent:#f5a524; --llm:#a78bfa; --done:#3ecf7f; --verify:#f0a35e; --cold:#6ea8fe;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --ground:#fbfbfa; --surface:#fff; --raised:#f4f4f2; --border:#e1e1de;
+      --text:#17181b; --muted:#63646b;
+      --accent:#a86a06; --llm:#6d45c8; --done:#1d854b; --verify:#a1590d; --cold:#2b5fc4;
+    }
+  }
+  :root[data-theme="light"] {
+    --ground:#fbfbfa; --surface:#fff; --raised:#f4f4f2; --border:#e1e1de;
+    --text:#17181b; --muted:#63646b;
+    --accent:#a86a06; --llm:#6d45c8; --done:#1d854b; --verify:#a1590d; --cold:#2b5fc4;
+  }
+
+  *,*::before,*::after { box-sizing:border-box; }
+  body {
+    background:var(--ground); color:var(--text);
+    font-family:"Public Sans",ui-sans-serif,system-ui,sans-serif;
+    font-size:16px; line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap {
+    max-width:76ch; margin:0 auto;
+    padding:clamp(2.5rem,6vw,5rem) clamp(1.1rem,4vw,2rem) 6rem;
+    display:flex; flex-direction:column; gap:3.25rem;
+  }
+
+  .eyebrow {
+    font-family:"IBM Plex Mono",monospace; font-size:.7rem;
+    letter-spacing:.14em; text-transform:uppercase; color:var(--muted);
+  }
+  h1 {
+    font-family:"Instrument Serif",Georgia,serif; font-weight:400;
+    font-size:clamp(2.5rem,6.5vw,3.9rem); line-height:1.04;
+    letter-spacing:-.015em; margin:0; text-wrap:balance;
+  }
+  h1 em { font-style:italic; color:var(--accent); }
+  .standfirst { color:var(--muted); font-size:1.06rem; max-width:60ch; margin:0; }
+
+  section { display:flex; flex-direction:column; gap:1.05rem; }
+  h2 {
+    font-family:"Instrument Serif",Georgia,serif; font-weight:400;
+    font-size:1.95rem; line-height:1.15; margin:0;
+    letter-spacing:-.01em; text-wrap:balance;
+  }
+  h2 .num {
+    font-family:"IBM Plex Mono",monospace; font-size:.78rem;
+    color:var(--muted); margin-right:.7rem; vertical-align:.35em;
+  }
+  h3 {
+    font-family:"IBM Plex Mono",monospace; font-size:.73rem;
+    letter-spacing:.12em; text-transform:uppercase; color:var(--muted);
+    margin:.6rem 0 0; font-weight:500;
+  }
+  p { margin:0; max-width:66ch; }
+  strong { color:var(--text); font-weight:600; }
+  em.q { font-style:normal; color:var(--accent); }
+
+  code {
+    font-family:"IBM Plex Mono",monospace; font-size:.86em;
+    background:var(--raised); border:1px solid var(--border);
+    border-radius:4px; padding:.08em .36em;
+  }
+  pre {
+    font-family:"IBM Plex Mono",monospace; font-size:.8rem; line-height:1.62;
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:8px; padding:.85rem 1rem; margin:0;
+    overflow-x:auto; color:var(--text);
+  }
+  pre .c { color:var(--muted); }
+  pre .a { color:var(--accent); }
+  pre .l { color:var(--llm); }
+  pre .g { color:var(--done); }
+
+  figure { margin:.4rem 0 0; display:flex; flex-direction:column; gap:.7rem; overflow-x:auto; }
+  figure svg { max-width:100%; height:auto; display:block; color:var(--text); }
+  figcaption { color:var(--muted); font-size:.86rem; max-width:62ch; }
+
+  table { border-collapse:collapse; width:100%; font-size:.89rem; }
+  th,td { text-align:left; padding:.5rem .65rem; border-bottom:1px solid var(--border); vertical-align:top; }
+  th {
+    font-family:"IBM Plex Mono",monospace; font-size:.67rem;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:500;
+  }
+  td.n { font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  td.m { font-family:"IBM Plex Mono",monospace; font-size:.84em; color:var(--muted); }
+
+  ul { margin:0; padding-left:1.1rem; display:flex; flex-direction:column; gap:.4rem; }
+  li { max-width:64ch; }
+  li::marker { color:var(--muted); }
+
+  .note { border-left:2px solid var(--accent); padding:.15rem 0 .15rem 1rem; color:var(--muted); max-width:64ch; }
+  .note strong { color:var(--text); }
+  .warn { border-left-color:var(--verify); }
+
+  .rule { height:1px; background:var(--border); border:0; margin:0; }
+  .foot { color:var(--muted); font-size:.85rem; font-family:"IBM Plex Mono",monospace; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:3px; }
+</style>
+
+<div class="wrap">
+
+  <header style="display:flex;flex-direction:column;gap:1rem">
+    <div class="eyebrow">MACalendar · internals</div>
+    <h1>Reading the<br><em>assistant's mind</em></h1>
+    <p class="standfirst">
+      A voice-driven calendar that runs entirely on one laptop — you speak, and an event
+      or a task appears. This page opens it up: how it decides what you meant, when it
+      trusts a set of rules over a language model, and how it learns the words you use
+      that no dictionary contains.
+    </p>
+  </header>
+
+  <hr class="rule">
+
+  <section>
+    <h2><span class="num">00</span>What it is, in one paragraph</h2>
+    <p>
+      Speech is transcribed on the machine's own GPU. A keyword-and-grammar parser tries
+      to understand the sentence; if it is unsure, a language model running locally reads
+      it instead. Whatever they decide is checked against a list of deterministic sanity
+      rules, written to a SQLite file, and then read back by the model as a second
+      opinion. Nothing is sent anywhere: no account, no API key, no server. The
+      interesting parts are the seams — where one component hands to another, and what
+      happens when it hands over something wrong.
+    </p>
+    <p class="note">
+      It is also <strong>aware of the Jewish calendar</strong>. Sundown is computed from
+      the configured latitude and longitude, so the system knows when Shabbat and
+      festivals begin and end — not as dates, but as moments that shift through the year.
+      Repeating events skip them; a training planner will not schedule a run on one.
+      Section 06 covers how that works.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- 0b ----------------------------------------------------------------- -->
+  <section>
+    <h2><span class="num">00b</span>Three models, and what each one is for</h2>
+    <p>
+      Worth settling early, because the rest of the page keeps referring to them.
+      There are three, they are all small, and they all run on the one machine.
+    </p>
+
+    <table>
+      <thead><tr><th>Model</th><th>Size</th><th>Runs on</th><th>Decides</th></tr></thead>
+      <tbody>
+        <tr><td class="m">Whisper <code>base</code></td><td class="n">74 M</td><td>the laptop's GPU</td><td>sound → words</td></tr>
+        <tr><td class="m">spaCy <code>en_core_web_sm</code></td><td class="n">13 MB</td><td>CPU, in-process</td><td>which word is the verb</td></tr>
+        <tr><td class="m">Llama 3.1 <code>8B</code></td><td class="n">8 B, 4-bit</td><td>a local server on <code>:11434</code></td><td>meaning — and the judging of meaning</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      Two absences are as informative as the three presences. There is
+      <strong>no embedding model</strong>: finding your similar past commands is done
+      with word-overlap arithmetic, not vectors, because a fourth model would have to
+      stay resident to search a few hundred short strings. And there is
+      <strong>no classifier model</strong>: the labels that colour an event or tag a task
+      come from keyword scoring and a personal word list. Both are choices that section 07
+      lists as unmeasured.
+    </p>
+
+    <figure>
+      <svg viewBox="0 0 720 268" role="img"
+           aria-label="Where each model sits. Whisper turns speech into text. spaCy tags the text so the rule parser can read it. The rule parser scores its own confidence and either answers directly or asks Llama. Either way the record is written, and Llama then reviews it on a background thread.">
+        <defs>
+          <marker id="m-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <!-- lane labels -->
+        <text x="16" y="20" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" fill-opacity=".45" letter-spacing="1.2">MODEL 1</text>
+        <text x="180" y="20" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" fill-opacity=".45" letter-spacing="1.2">MODEL 2</text>
+        <text x="344" y="20" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" fill-opacity=".45" letter-spacing="1.2">NO MODEL</text>
+        <text x="536" y="20" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" fill-opacity=".45" letter-spacing="1.2">MODEL 3</text>
+
+        <rect x="16" y="30" width="136" height="52" rx="7" fill="none" stroke="var(--cold)" stroke-width="1.6"></rect>
+        <text x="84" y="52" text-anchor="middle" font-size="12" fill="var(--cold)">Whisper</text>
+        <text x="84" y="69" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".6">speech → text</text>
+
+        <rect x="180" y="30" width="136" height="52" rx="7" fill="none" stroke="var(--cold)" stroke-width="1.6"></rect>
+        <text x="248" y="52" text-anchor="middle" font-size="12" fill="var(--cold)">spaCy</text>
+        <text x="248" y="69" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".6">tags every word</text>
+
+        <rect x="344" y="30" width="152" height="52" rx="7" fill="none" stroke="var(--accent)" stroke-width="1.6"></rect>
+        <text x="420" y="52" text-anchor="middle" font-size="12" fill="var(--accent)">rule parser</text>
+        <text x="420" y="69" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".6">scores itself 0 – 1</text>
+
+        <rect x="536" y="30" width="168" height="52" rx="7" fill="none" stroke="var(--llm)" stroke-width="1.6"></rect>
+        <text x="620" y="52" text-anchor="middle" font-size="12" fill="var(--llm)">Llama 3.1 8B</text>
+        <text x="620" y="69" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".6">reads it properly</text>
+
+        <line x1="152" y1="56" x2="176" y2="56" stroke="currentColor" stroke-opacity=".45" marker-end="url(#m-ah)"></line>
+        <line x1="316" y1="56" x2="340" y2="56" stroke="currentColor" stroke-opacity=".45" marker-end="url(#m-ah)"></line>
+        <path d="M 496 56 L 532 56" fill="none" stroke="var(--llm)" stroke-opacity=".8" stroke-dasharray="4 3" marker-end="url(#m-ah)"></path>
+        <text x="514" y="46" text-anchor="middle" font-size="9.5" fill="var(--llm)">unsure</text>
+
+        <!-- write -->
+        <rect x="344" y="128" width="152" height="46" rx="7" fill="none" stroke="var(--done)" stroke-width="1.6"></rect>
+        <text x="420" y="147" text-anchor="middle" font-size="12" fill="var(--done)">written to the file</text>
+        <text x="420" y="163" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".6">you see it now</text>
+
+        <path d="M 420 82 L 420 124" fill="none" stroke="var(--done)" stroke-opacity=".7" marker-end="url(#m-ah)"></path>
+        <text x="430" y="108" font-size="9.5" fill="currentColor" fill-opacity=".6">sure</text>
+        <path d="M 620 82 L 620 151 L 500 151" fill="none" stroke="var(--llm)" stroke-opacity=".7" marker-end="url(#m-ah)"></path>
+
+        <!-- review -->
+        <rect x="536" y="206" width="168" height="46" rx="7" fill="none" stroke="var(--verify)" stroke-width="1.6" stroke-dasharray="5 3"></rect>
+        <text x="620" y="225" text-anchor="middle" font-size="12" fill="var(--verify)">Llama reviews it</text>
+        <text x="620" y="241" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".6">background — always</text>
+        <path d="M 470 174 L 470 229 L 532 229" fill="none" stroke="var(--verify)" stroke-opacity=".7" marker-end="url(#m-ah)"></path>
+
+        <text x="16" y="229" font-size="10.5" fill="currentColor" fill-opacity=".55">nothing here waits</text>
+        <text x="16" y="245" font-size="10.5" fill="currentColor" fill-opacity=".55">on the review</text>
+      </svg>
+      <figcaption>
+        The path from speech to a saved record. The dashed arrow into Llama is taken only
+        when the rule parser is unsure; the dashed box below is taken every single time.
+      </figcaption>
+    </figure>
+
+    <p>
+      That last box is the part most descriptions of this pattern get wrong, so it is
+      worth stating plainly: <strong>the model reviews every command</strong>, including
+      the ones the rules were completely confident about. A confident wrong answer is
+      precisely the case nothing else would catch.
+    </p>
+
+    <h3>Six jobs, one model</h3>
+    <p>
+      The 8B model is loaded once and stays loaded. It is asked six different questions,
+      with six different prompts, and only three of them happen while you are waiting:
+    </p>
+
+    <table>
+      <thead><tr><th>Job</th><th>When</th><th>You wait?</th></tr></thead>
+      <tbody>
+        <tr><td class="m">cold parse</td><td>the rules scored low, or found nothing at all</td><td class="n">yes</td></tr>
+        <tr><td class="m">hybrid fill</td><td>the rules got some of it; the model is handed those and fills the gaps</td><td class="n">yes</td></tr>
+        <tr><td class="m">title naming</td><td>the parse produced a stub title rather than a real one</td><td class="n">briefly</td></tr>
+        <tr><td class="m">escalation</td><td>the action referred to something that does not exist — the whole sentence is re-read</td><td class="n">yes</td></tr>
+        <tr><td class="m">self-check (rules)</td><td>after a rule-path record is already saved</td><td class="n">no</td></tr>
+        <tr><td class="m">self-check (all)</td><td>after every command, with your past commands in the prompt</td><td class="n">no</td></tr>
+      </tbody>
+    </table>
+
+    <p class="note">
+      <strong>Why so small?</strong> The whole assistant has to sit resident on a laptop
+      that is also being used for other things. The 8B model is pinned in memory
+      permanently so the first command of the day is not slow — which is only a
+      reasonable thing to do <em>because</em> it is 8B. Every design choice on this page
+      is downstream of that: the rules exist so the model is not needed for the easy
+      two-thirds, and the review runs in the background so its cost is invisible.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- 1 ------------------------------------------------------------------ -->
+  <section>
+    <h2><span class="num">01</span>One number decides everything</h2>
+    <p>
+      Every command is scored for confidence before anything happens to it. Above
+      <code>0.85</code> the rules answer it themselves, in about a tenth of a second;
+      below it, the sentence goes to llama first. That threshold routes roughly 44% of
+      commands one way and 56% the other.
+    </p>
+    <p>
+      <strong>It decides who answers first, not who gets the last word.</strong> The
+      event is written either way, and then llama reads <em>every</em> command back —
+      including all of the 44% it never saw. The threshold buys speed, not autonomy.
+    </p>
+
+    <pre><span class="c"># how the number is built — rule_parser.py:_compute_confidence</span>
+base       = <span class="a">required slots filled ÷ required slots</span>   <span class="c"># "did I get everything?"</span>
+           × 0.95   <span class="c">if the date came from regex, not the recogniser</span>
+           × 0.85   <span class="c">if the domain was guessed from the open view</span>
+           × 0.80   <span class="c">if it resolved "it" / "that one" to a past event</span>
+           × 0.70   <span class="c">if two clock times appeared — probably two events</span>
+           + 0.05   <span class="c">per optional slot filled, capped at +0.10</span></pre>
+
+    <figure>
+      <svg viewBox="0 0 720 250" role="img"
+           aria-label="A confidence scale from zero to one. Commands scoring above 0.85 are answered first by the rule parser; below it they go to the LLM first. Either way the LLM reviews the result afterwards. Four real examples are plotted: book gym tomorrow at 7am scores 1.00, remind me to buy milk 0.95, set a meeting 0.32, and lunch at noon and coffee at 9 is skipped entirely.">
+
+        <!-- annotations, each on its own baseline with a leader to its point -->
+        <text x="70" y="26" font-size="10.5" fill="var(--verify)">"lunch at noon and coffee at 9"</text>
+        <text x="70" y="40" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--verify)" fill-opacity=".8">no score at all — two events, one set of slots</text>
+
+        <text x="700" y="74" text-anchor="end" font-size="10.5" fill="currentColor" fill-opacity=".78">"book gym tomorrow at 7am"  1.00</text>
+        <path d="M 686 79 L 672 142" fill="none" stroke="currentColor" stroke-opacity=".28"></path>
+
+        <text x="700" y="99" text-anchor="end" font-size="10.5" fill="currentColor" fill-opacity=".78">"remind me to buy milk"  0.95</text>
+        <path d="M 646 104 L 641 142" fill="none" stroke="currentColor" stroke-opacity=".28"></path>
+
+        <text x="200" y="99" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".78">"set a meeting"  0.32</text>
+        <text x="200" y="113" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" fill-opacity=".5">no date, no time</text>
+        <path d="M 232 104 L 259 142" fill="none" stroke="currentColor" stroke-opacity=".28"></path>
+
+        <!-- threshold -->
+        <line x1="580" y1="122" x2="580" y2="168" stroke="var(--accent)" stroke-width="2"></line>
+        <text x="580" y="134" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--accent)">0.85</text>
+
+        <!-- the scale itself -->
+        <line x1="70" y1="150" x2="670" y2="150" stroke="currentColor" stroke-opacity=".35"></line>
+        <circle cx="670" cy="150" r="5" fill="var(--accent)"></circle>
+        <circle cx="640" cy="150" r="5" fill="var(--accent)"></circle>
+        <circle cx="262" cy="150" r="5" fill="var(--llm)"></circle>
+        <text x="70" y="168" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" fill-opacity=".45">0.0</text>
+        <text x="670" y="168" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" fill-opacity=".45">1.0</text>
+
+        <!-- who answers first, each centred in its own stretch of the scale -->
+        <text x="325" y="192" text-anchor="middle" font-size="10.5" fill="var(--llm)">llama answers first</text>
+        <text x="325" y="206" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--llm)" fill-opacity=".8">7.8 s · 56%</text>
+        <text x="625" y="192" text-anchor="middle" font-size="10.5" fill="var(--accent)">rules answer first</text>
+        <text x="625" y="206" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--accent)" fill-opacity=".8">0.1 s · 44%</text>
+
+        <!-- and the review, spanning both: nothing escapes it -->
+        <rect x="70" y="222" width="600" height="22" rx="5" fill="none" stroke="var(--llm)" stroke-dasharray="4 3"></rect>
+        <text x="370" y="237" text-anchor="middle" font-size="10.5" fill="var(--llm)">llama reviews every command afterwards — whichever side it fell</text>
+      </svg>
+      <figcaption>
+        Real scores from the live parser. The last one never gets a number: the rule
+        parser can hold one event's worth of slots, so a sentence with two raises
+        <code>RuleParserSkip</code> and goes straight to the model rather than filling
+        half of it in. The dashed band is the point — a high score means the answer
+        arrives sooner, not that it goes unchecked.
+      </figcaption>
+    </figure>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2><span class="num">01b</span>Is that formula any good?</h2>
+    <p>
+      The shape is standard. AWS Lex routes to an LLM when NLU confidence falls below a
+      configured threshold; Voiceflow pairs a fine-tuned classifier with Claude the same
+      way, reporting that a threshold of 0.7 lets the small model cover about 80% of
+      requests at roughly 85% accuracy. Confidence-then-fallback is the ordinary design.
+    </p>
+    <p>
+      <strong>The difference is where the number comes from.</strong> Those systems read
+      a probability off a trained model and then <em>calibrate</em> it — Platt scaling,
+      temperature scaling — so that "0.85" actually means "right about 85% of the time".
+      This formula's multipliers were chosen by hand: 0.95, 0.85, 0.80, 0.70, and a
+      threshold that happens to equal one of them. None has been checked against outcomes.
+    </p>
+    <p class="note warn">
+      <strong>Calibration is measurable here and has never been measured.</strong> The
+      audit records both the confidence and whether the command was right, so bucketing
+      by score would show it directly: if commands scoring 0.85–0.90 are right 88% of the
+      time, the number means something. If they are right 97% of the time, the threshold
+      is too cautious and work is being sent to the model for nothing. Either answer is
+      more useful than the formula's current status, which is "plausible, and untested".
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- 2 ------------------------------------------------------------------ -->
+  <section>
+    <h2><span class="num">02</span>How the rules read a sentence</h2>
+    <p>
+      No model. spaCy tags the words, a date recogniser lifts times out, and a table of
+      <strong>76 verb → action mappings</strong> decides what you asked for. Nine of the
+      fifteen actions are reachable this way; the rest always need llama.
+    </p>
+    <p>
+      The verb lookup tries four things in order, and the fourth is where it goes wrong:
+    </p>
+    <pre><span class="c">1.</span> the ROOT verb, if it maps to an action        <span class="g">← "<b>book</b> a haircut tomorrow"</span>
+<span class="c">2.</span> the ROOT verb even if it doesn't, for WH-questions
+<span class="c">3.</span> any VERB or AUX in the span that maps
+<span class="c">4.</span> <span class="a">any token at all — any part of speech —</span>
+   <span class="a">whose lemma maps to an action</span>                 <span class="l">← the trapdoor</span></pre>
+
+    <figure>
+      <svg viewBox="0 0 720 244" role="img"
+           aria-label="Why a command mentioning a person called Mark is misread. The transcript is title-cased, so the tagger marks every word a proper noun and no verb maps to an action. Rule four then matches the token Mark against the completion verb mark, producing complete todo at full confidence, which finds no such task.">
+        <defs>
+          <marker id="i-ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <text x="16" y="26" font-family="IBM Plex Mono, monospace" font-size="11" fill="currentColor" fill-opacity=".55">YOU SAID</text>
+
+        <!-- tokens -->
+        <g font-family="IBM Plex Mono, monospace" font-size="13">
+          <rect x="16" y="40" width="70" height="30" rx="5" fill="none" stroke="currentColor" stroke-opacity=".35"></rect>
+          <text x="51" y="60" text-anchor="middle" fill="currentColor">Call</text>
+          <rect x="94" y="40" width="66" height="30" rx="5" fill="none" stroke="var(--verify)" stroke-width="2"></rect>
+          <text x="127" y="60" text-anchor="middle" fill="var(--verify)">Mark</text>
+          <rect x="168" y="40" width="72" height="30" rx="5" fill="none" stroke="currentColor" stroke-opacity=".35"></rect>
+          <text x="204" y="60" text-anchor="middle" fill="currentColor">about</text>
+          <rect x="248" y="40" width="150" height="30" rx="5" fill="none" stroke="currentColor" stroke-opacity=".35"></rect>
+          <text x="323" y="60" text-anchor="middle" fill="currentColor">the report at 4pm</text>
+        </g>
+
+        <!-- pos row -->
+        <text x="16" y="96" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" fill-opacity=".5">spaCy tags</text>
+        <g font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" fill-opacity=".55">
+          <text x="51" y="112" text-anchor="middle">PROPN</text>
+          <text x="127" y="112" text-anchor="middle">PROPN</text>
+          <text x="204" y="112" text-anchor="middle">ADP</text>
+          <text x="323" y="112" text-anchor="middle">date</text>
+        </g>
+        <text x="420" y="112" font-size="11" fill="currentColor" fill-opacity=".6">no verb anywhere — the title case fools it</text>
+
+        <!-- rules 1-3 fail -->
+        <text x="16" y="146" font-size="11.5" fill="currentColor" fill-opacity=".6">rules 1–3 find nothing</text>
+        <line x1="180" y1="142" x2="238" y2="142" stroke="currentColor" stroke-opacity=".4" stroke-dasharray="3 3" marker-end="url(#i-ah2)"></line>
+
+        <!-- rule 4 fires -->
+        <rect x="248" y="126" width="300" height="34" rx="6" fill="none" stroke="var(--accent)"></rect>
+        <text x="398" y="147" text-anchor="middle" font-size="11.5" fill="var(--accent)">rule 4: any token whose lemma maps</text>
+
+        <path d="M 127 74 L 127 108 L 127 126 L 248 143" fill="none" stroke="var(--verify)" stroke-opacity=".65" marker-end="url(#i-ah2)"></path>
+
+        <!-- result -->
+        <rect x="248" y="180" width="300" height="46" rx="6" fill="none" stroke="var(--verify)"></rect>
+        <text x="398" y="199" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" fill="var(--verify)">complete_todo("call mark about…")</text>
+        <text x="398" y="216" text-anchor="middle" font-size="11" fill="currentColor" fill-opacity=".6">confidence 1.00 · no missing slots</text>
+        <line x1="398" y1="160" x2="398" y2="180" stroke="var(--verify)" marker-end="url(#i-ah2)"></line>
+
+        <text x="566" y="199" font-size="11" fill="currentColor" fill-opacity=".6">("mark" is a</text>
+        <text x="566" y="213" font-size="11" fill="currentColor" fill-opacity=".6">completion verb)</text>
+      </svg>
+      <figcaption>
+        Rule 4 exists so that "mark it done" works when the tagger mistakes the verb for
+        a noun. The cost is that anyone with a name that is also a verb — Mark, Bill,
+        Rose, Summer — triggers it every time, and because every slot it needs is
+        present it scores <strong>1.00</strong> and never consults the model. Better
+        transcription would not help: the perfectly-spelled sentence scores 1.00 too.
+      </figcaption>
+    </figure>
+
+    <p class="note warn">
+      <strong>How it is caught now.</strong> Not by lowering the confidence — that rule
+      is load-bearing. The action runs, matches no such task, and raises
+      <code>TargetNotFound</code>; the command is then re-read by llama, which returns
+      <code>create_event</code>. Being wrong is detected by trying, not by doubting.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- 3 ------------------------------------------------------------------ -->
+  <section>
+    <h2><span class="num">03</span>Thirteen things it checks before writing</h2>
+    <p>
+      Whichever parser answered, the result passes through deterministic guards. Each
+      one exists because something went wrong once. They are the difference between
+      <em class="q">is this parseable</em> and <em class="q">is this plausible</em> — a
+      date in the past parses perfectly and is almost always wrong.
+    </p>
+    <table>
+      <thead><tr><th>What it catches</th><th>The case that caused it</th></tr></thead>
+      <tbody>
+        <tr><td>a date in the past</td><td class="m">LLMs pick <em>last</em> Thursday</td></tr>
+        <tr><td>"at 8pm" filed as the end time</td><td class="m">dinner at 8pm → 18:00–20:00</td></tr>
+        <tr><td>a bare hour that means PM</td><td class="m">"meeting at 4" is not 04:00</td></tr>
+        <tr><td>recurrence words, no recurrence set</td><td class="m">"every friday" parsed as one-off</td></tr>
+        <tr><td>"until" read as inclusive</td><td class="m">a series ran a day too long</td></tr>
+        <tr><td>a weekly series on the wrong day</td><td class="m">"every sunday" starting Wednesday</td></tr>
+        <tr><td>a phantom second event</td><td class="m">hybrid junk titled "event"</td></tr>
+        <tr><td>"the one you just made"</td><td class="m">resolved to a reference, not a title guess</td></tr>
+      </tbody>
+    </table>
+    <p class="note">
+      Every fix is reported in the thinking panel as a <strong>Sanity fixes</strong>
+      line, so a time that moves is a thing you can watch happen rather than a mystery.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- 4 ------------------------------------------------------------------ -->
+  <section>
+    <h2><span class="num">04</span>How it learns you</h2>
+    <p>
+      The part people mean when they ask whether it is "trained on me". It is not
+      fine-tuned — nothing about llama changes. Instead, your four most similar past
+      commands are pasted into the prompt as worked examples, under a header telling the
+      model to match your phrasing and habits.
+    </p>
+
+    <pre><span class="c">USER HISTORY — how this user's past commands were (correctly) interpreted.</span>
+- "Set a meeting for 10 a.m. tomorrow morning" <span class="a">(user-corrected)</span>
+    → {"action": "create_event", "title": "Team Standup", "start_time": "10:00"}
+- "set meaning for tomorrow at 7 p.m. with the team"
+    → {"action": "create_event", "title": "meaning", "start_time": "19:00"}</pre>
+
+    <figure>
+      <svg viewBox="0 0 720 250" role="img"
+           aria-label="The learning loop. A command is recorded in memory with the actions it produced. Your verdict decides its fate: rejected commands are vetoed, corrected ones become the target with a relevance bonus, approved ones get a smaller bonus. On the next similar command the four best-scoring examples are pasted into the prompt.">
+        <defs>
+          <marker id="i-ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <rect x="20" y="26" width="150" height="40" rx="6" fill="none" stroke="currentColor" stroke-opacity=".4"></rect>
+        <text x="95" y="51" text-anchor="middle" font-size="11.5" fill="currentColor">you give a command</text>
+
+        <rect x="20" y="102" width="150" height="40" rx="6" fill="none" stroke="var(--done)"></rect>
+        <text x="95" y="120" text-anchor="middle" font-size="11.5" fill="var(--done)">it is remembered</text>
+        <text x="95" y="134" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" fill-opacity=".55">nlu_memory.db</text>
+        <line x1="95" y1="66" x2="95" y2="102" stroke="currentColor" stroke-opacity=".4" marker-end="url(#i-ah3)"></line>
+
+        <!-- verdict fan -->
+        <text x="230" y="20" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" fill-opacity=".5">YOUR VERDICT DECIDES ITS FATE</text>
+
+        <rect x="230" y="30" width="230" height="34" rx="6" fill="none" stroke="var(--verify)"></rect>
+        <text x="248" y="52" font-size="11.5" fill="var(--verify)">👎 rejected</text>
+        <text x="452" y="52" text-anchor="end" font-size="11" fill="currentColor" fill-opacity=".65">never shown again</text>
+
+        <rect x="230" y="76" width="230" height="34" rx="6" fill="none" stroke="var(--done)" stroke-width="2"></rect>
+        <text x="248" y="98" font-size="11.5" fill="var(--done)">✏️ corrected</text>
+        <text x="452" y="98" text-anchor="end" font-size="11" fill="currentColor" fill-opacity=".65">your answer becomes the target</text>
+
+        <rect x="230" y="122" width="230" height="34" rx="6" fill="none" stroke="currentColor" stroke-opacity=".45"></rect>
+        <text x="248" y="144" font-size="11.5" fill="currentColor">👍 approved</text>
+        <text x="452" y="144" text-anchor="end" font-size="11" fill="currentColor" fill-opacity=".65">+0.05 relevance</text>
+
+        <rect x="230" y="168" width="230" height="34" rx="6" fill="none" stroke="currentColor" stroke-opacity=".25" stroke-dasharray="4 3"></rect>
+        <text x="248" y="190" font-size="11.5" fill="currentColor" fill-opacity=".6">unreviewed</text>
+        <text x="452" y="190" text-anchor="end" font-size="11" fill="currentColor" fill-opacity=".5">used anyway — 48% of the pool</text>
+
+        <path d="M 170 122 L 200 122 L 200 47 L 228 47" fill="none" stroke="currentColor" stroke-opacity=".3" marker-end="url(#i-ah3)"></path>
+        <path d="M 170 122 L 200 122 L 200 93 L 228 93" fill="none" stroke="var(--done)" stroke-opacity=".6" marker-end="url(#i-ah3)"></path>
+        <path d="M 170 122 L 200 122 L 200 139 L 228 139" fill="none" stroke="currentColor" stroke-opacity=".3" marker-end="url(#i-ah3)"></path>
+        <path d="M 170 122 L 200 122 L 200 185 L 228 185" fill="none" stroke="currentColor" stroke-opacity=".2" marker-end="url(#i-ah3)"></path>
+
+        <!-- retrieval -->
+        <rect x="500" y="76" width="196" height="80" rx="6" fill="none" stroke="var(--llm)"></rect>
+        <text x="598" y="100" text-anchor="middle" font-size="11.5" fill="var(--llm)">next similar command</text>
+        <text x="598" y="118" text-anchor="middle" font-size="11" fill="currentColor" fill-opacity=".65">the best 4 are pasted</text>
+        <text x="598" y="134" text-anchor="middle" font-size="11" fill="currentColor" fill-opacity=".65">into llama's prompt</text>
+        <text x="598" y="150" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" fill-opacity=".5">~710 characters, always</text>
+        <line x1="462" y1="110" x2="498" y2="110" stroke="var(--llm)" marker-end="url(#i-ah3)"></line>
+
+        <path d="M 598 156 L 598 222 L 95 222 L 95 66" fill="none" stroke="currentColor" stroke-opacity=".25" stroke-dasharray="4 4" marker-end="url(#i-ah3)"></path>
+        <text x="346" y="238" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".5">and round again</text>
+      </svg>
+      <figcaption>
+        Scoring is 60% word overlap and 40% sequence similarity, plus the verdict bonus.
+        The prompt stays about 710 characters whether you have 100 commands or 20,000 —
+        only four ever go in — so the history growing does not crowd the model.
+      </figcaption>
+    </figure>
+
+    <p class="note warn">
+      <strong>Two flaws worth knowing.</strong> The header claims these were
+      "correctly interpreted", but <strong>48% of the pool has never been reviewed</strong>
+      — <code>success=1</code> only means nothing threw. And the candidate pool is the
+      most recent 2,000 commands, so a correction you made deliberately becomes
+      unreachable after about ten months of ordinary use. The cheapest signal evicts
+      the dearest.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- 5 ------------------------------------------------------------------ -->
+  <section>
+    <h2><span class="num">05</span>How it becomes yours</h2>
+    <p>
+      Nothing about llama changes — no fine-tuning, no weights. What personalises the
+      assistant is four small stores it consults, all of them plain files you can open,
+      edit and delete. This is the part that turns a generic parser into one that knows
+      that a word your dictation keeps mangling is the name of a course you take, and
+      that another is your dog.
+    </p>
+
+    <figure>
+      <svg viewBox="0 0 720 300" role="img"
+           aria-label="What you say passes through four personal stores. The vocabulary fixes misheard words and can carry a label and an expansion. Task tags and event categories decide what a thing is; the category then decides its colour. Command memory supplies worked examples to the model. Corrections feed back into all of them.">
+        <defs>
+          <marker id="p-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <text x="16" y="24" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" fill-opacity=".5" letter-spacing="1.2">WHAT YOU SAID</text>
+        <rect x="16" y="34" width="180" height="34" rx="6" fill="none" stroke="currentColor" stroke-opacity=".4"></rect>
+        <text x="106" y="56" text-anchor="middle" font-size="11.5" fill="currentColor">"Close Trig pset"</text>
+
+        <!-- vocabulary -->
+        <rect x="252" y="26" width="220" height="112" rx="8" fill="none" stroke="var(--accent)"></rect>
+        <text x="362" y="48" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" fill="var(--accent)">vocab.json</text>
+        <text x="362" y="64" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">374 words English does not know</text>
+        <line x1="268" y1="76" x2="456" y2="76" stroke="var(--accent)" stroke-opacity=".3"></line>
+        <text x="268" y="94" font-size="10.5" fill="currentColor" fill-opacity=".8">aliases → fixes the spelling</text>
+        <text x="268" y="112" font-size="10.5" fill="currentColor" fill-opacity=".8">expands_to → explains shorthand</text>
+        <text x="268" y="130" font-size="10.5" fill="var(--done)">label → says what it is</text>
+        <line x1="196" y1="51" x2="250" y2="51" stroke="currentColor" stroke-opacity=".4" marker-end="url(#p-ah)"></line>
+
+        <!-- what is it -->
+        <rect x="252" y="164" width="105" height="58" rx="8" fill="none" stroke="var(--cold)"></rect>
+        <text x="304" y="186" text-anchor="middle" font-size="11" fill="var(--cold)">task tags</text>
+        <text x="304" y="202" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".55">Groceries</text>
+        <text x="304" y="215" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".55">Coursework…</text>
+
+        <rect x="367" y="164" width="105" height="58" rx="8" fill="none" stroke="var(--cold)"></rect>
+        <text x="419" y="186" text-anchor="middle" font-size="11" fill="var(--cold)">categories</text>
+        <text x="419" y="202" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".55">Fitness, Prayer</text>
+        <text x="419" y="215" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".55">Shabbat Meal…</text>
+
+        <path d="M 304 138 L 304 162" fill="none" stroke="var(--done)" marker-end="url(#p-ah)"></path>
+        <path d="M 419 138 L 419 162" fill="none" stroke="var(--done)" marker-end="url(#p-ah)"></path>
+        <text x="486" y="152" font-size="10" fill="var(--done)" fill-opacity=".85">a personal label wins</text>
+
+        <!-- colour -->
+        <rect x="540" y="164" width="164" height="58" rx="8" fill="none" stroke="var(--verify)"></rect>
+        <text x="622" y="186" text-anchor="middle" font-size="11" fill="var(--verify)">the colour you see</text>
+        <text x="622" y="204" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".55">and its alternate shade, so</text>
+        <text x="622" y="216" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".55">neighbours never match</text>
+        <line x1="472" y1="193" x2="538" y2="193" stroke="var(--verify)" marker-end="url(#p-ah)"></line>
+
+        <!-- memory -->
+        <rect x="540" y="46" width="164" height="72" rx="8" fill="none" stroke="var(--llm)"></rect>
+        <text x="622" y="68" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--llm)">nlu_memory.db</text>
+        <text x="622" y="86" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".6">your past commands,</text>
+        <text x="622" y="100" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".6">four of them shown</text>
+        <text x="622" y="112" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".6">to the model each time</text>
+        <line x1="472" y1="82" x2="538" y2="82" stroke="var(--llm)" marker-end="url(#p-ah)"></line>
+
+        <!-- feedback -->
+        <rect x="16" y="248" width="688" height="34" rx="6" fill="none" stroke="var(--done)" stroke-dasharray="4 3"></rect>
+        <text x="360" y="269" text-anchor="middle" font-size="11" fill="var(--done)">every correction you make feeds back into all of them — the only thing here that is truly yours</text>
+        <path d="M 106 68 L 106 265 L 14 265" fill="none" stroke="var(--done)" stroke-opacity=".3" stroke-dasharray="3 4"></path>
+      </svg>
+      <figcaption>
+        Four stores, one idea: the system holds what it has learned about you in files,
+        not in a model. That is why it can be inspected and edited, and why deleting a
+        word actually removes what it knew.
+      </figcaption>
+    </figure>
+
+    <h3>What a personal word can carry</h3>
+    <table>
+      <thead><tr><th>Field</th><th>Means</th><th>Effect on your text</th></tr></thead>
+      <tbody>
+        <tr><td class="m">aliases</td><td>a mishearing to fix<br><span style="color:var(--muted)">"trigger" → "Trig"</span></td><td>rewritten — the wrong form was never what you said</td></tr>
+        <tr><td class="m">expands_to</td><td>shorthand you use<br><span style="color:var(--muted)">pset = problem set</span></td><td><strong>never rewritten</strong> — the model is told, your text stands</td></tr>
+        <tr><td class="m">label</td><td>what it implies<br><span style="color:var(--muted)">Trig → Coursework</span></td><td>none — it labels, silently</td></tr>
+      </tbody>
+    </table>
+    <p>
+      An alias corrects something you did not say, so replacing it loses nothing. An
+      acronym <em>is</em> what you said — expanding it in your task would be editing your
+      words, not correcting them. That distinction is why they are different fields
+      rather than one.
+    </p>
+
+    <h3>Why the labels matter beyond colour</h3>
+    <p>
+      For events a label is mostly a colour: the category picks one, and an alternate
+      shade so two adjacent events are never identical. For tasks it does more work —
+      the label is how you find things, filter them, and see at a glance that half your
+      list is shopping. That is why half of untagged tasks was a real problem and a
+      third of uncoloured events was mostly cosmetic.
+    </p>
+    <p class="note warn">
+      <strong>What is missing.</strong> These three stores still learn separately. The
+      vocabulary knew the course's name for months while the tagger had no idea it
+      meant coursework — that link was only added recently, and nothing yet connects
+      task tags to event categories, so "Running" and "Gym" exist as event labels with
+      no home in the registry and no relationship to "Exercise". A two-level hierarchy
+      is the intended fix and is not built.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- 6 ------------------------------------------------------------------ -->
+  <section>
+    <h2><span class="num">06</span>What it actually knows about time</h2>
+    <p>
+      Sundown is computed from your latitude and longitude with <code>astral</code>, and
+      the Hebrew date from <code>pyluach</code> — both pure Python, no lookup. That makes
+      Shabbat a moving boundary rather than a day of the week.
+    </p>
+    <pre>Fri  4 Sep   candles <span class="a">18:43</span>   →  19:00 falls <span class="l">inside</span> Shabbat
+Fri 18 Dec   candles <span class="a">16:20</span>   →  17:00 falls <span class="l">inside</span>, 16:00 does not
+Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g">out</span></pre>
+    <p>
+      A repeating event skips those windows, with three exceptions that are all about
+      intent: <strong>meals are allowed</strong> because they are what the day is for
+      (unless it is a fast — Yom Kippur is both, and the fast wins); a series
+      <strong>anchored</strong> on Shabbat keeps it, because a Saturday shiur was put
+      there deliberately; and if observance cannot be computed, nothing is skipped,
+      because a series quietly losing days is worse than one landing where it should not.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2><span class="num">06b</span>More than one thing at once</h2>
+    <p>
+      A single sentence can hold two events, and the rule parser cannot: it has one set
+      of slots. Rather than fill half of them it refuses outright — <code>RuleParserSkip</code>
+      — and the sentence goes to llama whole. A softer version of the same instinct is in
+      the score: two clock times in one span multiplies confidence by <strong>0.70</strong>,
+      because "lunch at noon and coffee at 9" is usually two things wearing one sentence.
+    </p>
+    <p>
+      Batching works the other way. Several commands can be sent as one request with each
+      in brackets — <code>[gym tomorrow at 7am] [lunch with Dana at noon]</code> — and the
+      server splits them and parses each alone. That is cheaper rather than dearer,
+      because a short single command often settles on the rules for no model call at all,
+      and the review runs once for the batch instead of once each.
+    </p>
+    <table>
+      <thead><tr><th>Two commands sent as</th><th>LLM calls</th></tr></thead>
+      <tbody>
+        <tr><td>two separate requests</td><td class="n">4</td></tr>
+        <tr><td><code>[one] [two]</code> — split and parsed apart</td><td class="n">3</td></tr>
+        <tr><td>"one and two" — one run-on sentence</td><td class="n">2</td></tr>
+      </tbody>
+    </table>
+    <p class="note">
+      Joining is cheapest and worst: it buys one call by handing the model the run-on
+      sentence it is least reliable on. Brackets are the middle, and the saving is the
+      review, not the parse.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2><span class="num">06c</span>Waiting, and coming back to it</h2>
+    <p>
+      Two different queues, easy to confuse because both are "later".
+    </p>
+    <table>
+      <thead><tr><th>Queue</th><th>What it holds</th><th>Drains when</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>the <strong>session</strong> queue</td>
+          <td class="m">pressing the mic while it is still thinking — the next thing you
+            want to say, or (press again) more of the same sentence</td>
+          <td class="m">the current command finishes</td>
+        </tr>
+        <tr>
+          <td>the <strong>pending</strong> queue</td>
+          <td class="m">a command the model could not be reached for — Ollama down,
+            laptop asleep. Stored with its transcript, never silently dropped</td>
+          <td class="m">a retry loop notices the model is back</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      Neither blocks you. The phone shows a queued command as pending and gets a
+      notification when it finally ran, which is the only reason a command given on a
+      train is still there when the laptop wakes up.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2><span class="num">06d</span>Tasks are not small events</h2>
+    <p>
+      Eight of the fifteen actions are about tasks, and they behave differently from
+      events in ways worth knowing: a task has no time, it has a <em>list</em>, and it
+      can be finished.
+    </p>
+    <table>
+      <thead><tr><th>Property</th><th>Behaviour</th></tr></thead>
+      <tbody>
+        <tr><td>list</td><td class="m">"today" or "general" — where it lives, and what a daily read covers</td></tr>
+        <tr><td>tags</td><td class="m">inferred from the title, or from your own vocabulary</td></tr>
+        <tr><td>due date</td><td class="m">optional, and the only date a task has</td></tr>
+        <tr><td>subtasks</td><td class="m">a task can hold its own list; each completes separately</td></tr>
+        <tr><td>completion</td><td class="m">finished, not deleted — the record survives</td></tr>
+      </tbody>
+    </table>
+    <p>
+      The distinction the parser has to make first is <em>event or task</em>, and it
+      hinges on whether a time was spoken. "Remind me to buy milk" is a task; "buy milk
+      at 6" is an event. That single judgement is why the self-check's routing rules
+      spend most of their words on it.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2><span class="num">06e</span>Reading the day back</h2>
+    <p>
+      Asking is a first-class action, not a search box. <code>query_schedule</code> and
+      <code>query_todos</code> answer in sentences, and because they create nothing they
+      are the one place the self-check may not act — there is no record to correct.
+    </p>
+    <pre>"what do I have on friday"
+  → <span class="g">You have one event Friday, 4 September: Dentist Appointment at 9:00 AM.</span>
+
+"what do I have this week"
+  → <span class="g">You have 6 events this week: Team Standup at 9:30 AM, ...</span></pre>
+    <p>
+      A named day beats the relative scope: <code>scope</code> can only say today,
+      tomorrow or this week, so "friday" used to fall through to today and answer
+      confidently about the wrong day. It now carries an explicit date, and the answer
+      names the day back to you — <em class="q">"Friday, 4 September"</em> — so a
+      misunderstanding is visible in the reply rather than discovered later.
+    </p>
+    <p class="note">
+      The morning briefing is the same query with no question: it reads today's events
+      aloud in order, in one sentence, and says "your schedule is clear" rather than
+      nothing at all when there is nothing.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- 7 ------------------------------------------------------------------ -->
+  <section>
+    <h2><span class="num">07</span>What is measured, and what is not</h2>
+    <p>
+      Worth separating, because the numbers on the architecture page come from one
+      harness that does not exercise everything.
+    </p>
+    <table>
+      <thead><tr><th>Claim</th><th>Evidence</th></tr></thead>
+      <tbody>
+        <tr><td>97% correct</td><td>89-command corpus, run end to end</td></tr>
+        <tr><td>rule 97% · llm 98% · hybrid 89%</td><td>same corpus, split by path</td></tr>
+        <tr><td>self-check catches wrong parses</td><td>15 of 16 you had corrected or rejected</td></tr>
+        <tr><td>applying its fixes hurts</td><td>0 fixed, 1 broken — hence advisory</td></tr>
+        <tr><td>observance boundaries</td><td>35 unit tests against real sundown times</td></tr>
+        <tr style="color:var(--verify)"><td><strong>does your history help at all?</strong></td><td><strong>unmeasured</strong> — the corpus runs with an empty memory</td></tr>
+        <tr style="color:var(--verify)"><td><strong>is four examples the right number?</strong></td><td><strong>unmeasured</strong>, and never tuned</td></tr>
+      </tbody>
+    </table>
+    <p class="note warn">
+      <strong>The gap at the bottom is the point of the next piece of work.</strong>
+      Everything about personalisation — the examples, the verdicts, the number four —
+      has never been measured, because the audit runs against a blank history. Until
+      that changes, every answer about it is an argument rather than a result.
+    </p>
+  </section>
+
+  <hr class="rule">
+  <p class="foot">793 tests · one machine · no network</p>
+
+</div>

@@ -1,0 +1,31 @@
+# Words from the personal vocabulary that MAY appear on a published page.
+#
+# The published explainers are on public URLs. The personal word list is, by
+# construction, the words English does not know about whoever uses this — names
+# of people, places, courses, shorthand. So the rule inverts the usual burden:
+# a vocabulary word found in an artifact is treated as a leak unless it is
+# listed here, and adding a word here is a deliberate act.
+#
+# What belongs here: general terms anyone would recognise, and terms about the
+# Jewish calendar, which is a capability of the system and in scope for the
+# pages. What never belongs here: a name, a place, an institution, a course, or
+# a piece of personal shorthand — however harmless it looks on its own.
+#
+# One word per line, lowercase. Blank lines and # comments ignored.
+
+# Jewish calendar — the pages describe this as a feature, so the terms are needed
+shabbat
+yom kippur
+kippur
+shiur
+
+# Ordinary English that happens to be in the word list
+tomorrow
+
+# Invented examples used throughout the pages
+dentist appointment
+set a meeting
+
+# Tooling named in passing
+claude
+gemini

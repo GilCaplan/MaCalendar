@@ -180,6 +180,31 @@ Three exceptions, each with a reason:
 - **Nothing is skipped if observance cannot be computed.** A series quietly
   losing days is worse than one landing where it should not.
 
+## The published pages are downstream of the code
+
+`DOCUMENTATION/artifacts/*.html` are the explainers published to public URLs,
+and they quote constants from the code — the routing threshold, the confidence
+multipliers, the size of the verb table, how many past commands are retrieved.
+Those drift. The pages claimed 706 tests when there were 793, and a review rate
+that a purge had made wrong months earlier.
+
+**`tests/unit/test_artifact_claims.py` enforces the agreement**, reading each
+value out of the code and asserting the page says the same thing. If you change
+a constant a page quotes, that test goes red and names the file to edit. If you
+add a claim to a page, add its check — a number with no check is a number that
+will be wrong within a month. `DOCUMENTATION/ARTIFACT_BUILDER.md` carries the
+full table and the layering rules.
+
+Two things it also guards, both of which have already gone wrong once:
+
+- **No personal detail on a published page.** The check treats any word in the
+  personal vocabulary as a leak unless it is declared general in
+  `DOCUMENTATION/artifacts/public_words.txt`. Four survived a manual sweep by
+  hiding inside SVG `aria-label`s.
+- **A measured number must cite a run that still exists.** `ASSISTANT_AUDIT.md`
+  is overwritten every run, so conclusions go in `ASSISTANT_AUDIT_SUMMARY.md`
+  and the page cites that.
+
 ## Where the plan lives
 
 `DOCUMENTATION/TASKS.md` is the tracker and carries the current order of play at
