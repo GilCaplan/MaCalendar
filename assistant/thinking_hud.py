@@ -28,8 +28,10 @@ import sys
 from PyQt6.QtCore import (
     QEasingCurve, QEvent, QObject, QPoint, QPropertyAnimation, Qt, QTimer,
 )
-from PyQt6.QtGui import QAction, QCursor
-from PyQt6.QtWidgets import QApplication, QMenu, QVBoxLayout, QWidget
+from PyQt6.QtGui import QAction, QCursor, QIcon
+from PyQt6.QtWidgets import (
+    QApplication, QMenu, QSystemTrayIcon, QVBoxLayout, QWidget,
+)
 
 from assistant import trace_bus
 from assistant.calendar_ui.thinking_panel import PANEL_WIDTH, ThinkingPanel
@@ -120,6 +122,9 @@ class ThinkingHUD(QWidget):
         self._moved = _load_position() is not None
         self._current_run: str | None = None
         self._dismissed_run: str | None = None
+        # Only sticky while something can bring it back — see
+        # allow_reappear_without_tray().
+        self._sticky_hide = True
 
         # Deliberately NOT Qt.Tool: on macOS a tool window hides whenever its
         # application is not the active one, and this app is never active (it
@@ -327,10 +332,29 @@ class ThinkingHUD(QWidget):
                 self.panel.finish(entry.get("result") or {})
 
     def _start(self, run: str | None) -> None:
-        """A new run: show the card, even if the last one was closed."""
+        """A new run has begun. Appear only if appearing is warranted.
+
+        This used to show the card unconditionally, "even if the last one was
+        closed" — so it reappeared for every command, re-parked itself, and
+        faded in over whatever you were doing. Two changes:
+
+        - Already open? Do nothing but keep feeding it. The timeline updates
+          underneath you instead of the window being torn down and rebuilt in
+          front of you.
+        - Closed by hand? Stay closed. Closing it is an instruction, not a
+          per-command dismissal, and it survives until you reopen from the menu.
+
+        The panel is fed either way — panel.begin() runs in apply_entry before
+        this — so a command that happens while the card is closed is still in
+        the history when you next open it.
+        """
         self._current_run = run
         if not self._enabled():
             return
+        if self.isVisible():
+            return                      # already up: update in place
+        if self._dismissed_run is not None and self._sticky_hide:
+            return                      # you closed it; it stays closed
         self._park()
         self.setWindowOpacity(0.0)
         self.show()
@@ -356,8 +380,29 @@ class ThinkingHUD(QWidget):
     # -------------------------------------------------------------- actions
 
     def _on_panel_closed(self) -> None:
-        self._dismissed_run = self._current_run
+        # Sticky until reopened. Previously this only suppressed the run that
+        # was on screen, so the very next command popped the card straight back
+        # up and closing it achieved nothing.
+        self._dismissed_run = self._current_run or "closed"
         self.hide()
+
+    def allow_reappear_without_tray(self) -> None:
+        """Fall back to the old behaviour when there is no menu bar item.
+
+        Sticky hiding is only safe when something can un-hide it. If the tray
+        failed to start, "Hide" going permanent would strand the card until the
+        process restarts, so it reverts to reappearing on the next command.
+        """
+        self._sticky_hide = False
+
+    def reopen(self) -> None:
+        """Show the card again after it was closed, with its history intact."""
+        self._dismissed_run = None
+        self._park()
+        self.show()
+        self._follow_every_space()
+        self._order_front_without_activating()
+        self._fade_to(IDLE_OPACITY)
 
     def _on_retry(self, pending_id: int) -> None:
         """Re-run a command that was queued while the assistant was offline.
@@ -483,6 +528,37 @@ def main(argv: list[str] | None = None) -> int:
     app.setQuitOnLastWindowClosed(False)
 
     hud = ThinkingHUD(config)
+
+    # A menu bar item, because closing the card is now sticky and this app has
+    # no Dock icon and no menu bar of its own — without somewhere to reopen
+    # from, "Hide" would mean "gone until you restart the assistant".
+    tray = None
+    try:
+        from assistant.calendar_ui import icons as _icons
+        tray = QSystemTrayIcon(QIcon(_icons.pixmap("llm", size=18)), app)
+        tray.setToolTip("Assistant thinking")
+        tmenu = QMenu()
+        show_act = QAction("Show thinking card", tmenu)
+        show_act.triggered.connect(hud.reopen)
+        tmenu.addAction(show_act)
+        hide_act = QAction("Hide", tmenu)
+        hide_act.triggered.connect(hud._on_panel_closed)
+        tmenu.addAction(hide_act)
+        tmenu.addSeparator()
+        quit_act = QAction("Quit", tmenu)
+        quit_act.triggered.connect(app.quit)
+        tmenu.addAction(quit_act)
+        tray.setContextMenu(tmenu)
+        # Clicking the icon itself is the obvious gesture; make it the same as
+        # "Show", since a menu you have to open to find one item is friction.
+        tray.activated.connect(
+            lambda reason: hud.reopen()
+            if reason == QSystemTrayIcon.ActivationReason.Trigger else None)
+        tray.show()
+    except Exception as exc:
+        logger.warning("No menu bar item (%s) — the card will reappear on the "
+                       "next command instead of staying hidden", exc)
+        hud.allow_reappear_without_tray()
     reader = _BusReader(hud, args.config)
     timer = QTimer()
     timer.timeout.connect(reader.poll)

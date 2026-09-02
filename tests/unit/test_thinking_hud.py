@@ -168,7 +168,17 @@ def test_a_phone_run_is_labelled_as_the_phone(hud, bus):
     assert "iPhone" in widget.panel._title.text()
 
 
-def test_closing_it_hides_it_and_the_next_command_brings_it_back(hud, bus):
+def test_closing_it_keeps_it_closed(hud, bus):
+    """Reversed deliberately: this used to assert the next command brought the
+    card back, and that was the complaint. Closing it is an instruction, not a
+    dismissal of the run that happens to be on screen — it popping straight
+    back up made closing it pointless. The menu bar item added alongside this
+    is what makes staying closed safe; without one the card reverts to
+    reappearing (see test_hud_history.py).
+
+    Commands that run while it is hidden are still recorded, so opening it
+    later shows what was missed.
+    """
     widget, reader, _ = hud
     bus.publish("iPhone", [_step()], {})
     reader.poll()
@@ -177,6 +187,9 @@ def test_closing_it_hides_it_and_the_next_command_brings_it_back(hud, bus):
 
     bus.publish("iPhone", [_step()], {})
     reader.poll()
+    assert not widget.isVisible()
+
+    widget.reopen()
     assert widget.isVisible()
 
 

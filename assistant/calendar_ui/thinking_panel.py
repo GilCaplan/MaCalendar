@@ -16,6 +16,8 @@ HUD feeds it from `assistant.trace_bus`.
 
 from __future__ import annotations
 
+import datetime as _dt
+
 from PyQt6.QtCore import (
     QEasingCurve, QPoint, QPropertyAnimation, QRect, QSize, Qt, QTimer,
     pyqtSignal,
@@ -31,6 +33,11 @@ from assistant.calendar_ui import styles as _styles
 
 PANEL_WIDTH = 400
 PANEL_HEIGHT = 440
+
+# How many widgets from finished commands to keep behind the current one. Each
+# is a live Qt widget, and roughly seven make up one command, so this is about
+# the last dozen commands — far more than anyone scrolls back through.
+MAX_HISTORY_WIDGETS = 90
 
 # stage -> icon file in calendar_ui/icons (same names the iOS AssistantIcon uses)
 _STAGE_ICONS = {
@@ -530,6 +537,34 @@ class _ResultCard(QFrame):
 
 # ------------------------------------------------------------------- panel
 
+class _RunDivider(QWidget):
+    """Heads each command in the timeline once more than one is shown.
+
+    Without it the steps of three commands run together into one list and you
+    cannot tell where an answer stopped and the next question started.
+    """
+
+    def __init__(self, text: str, theme, parent=None) -> None:
+        super().__init__(parent)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 10, 0, 6)
+        lay.setSpacing(8)
+        self._label = QLabel(text)
+        f = self._label.font()
+        f.setPointSize(max(9, f.pointSize() - 1))
+        self._label.setFont(f)
+        lay.addWidget(self._label)
+        self._line = QFrame()
+        self._line.setFrameShape(QFrame.Shape.HLine)
+        self._line.setFixedHeight(1)
+        lay.addWidget(self._line, 1)
+        self.apply_theme(theme)
+
+    def apply_theme(self, theme) -> None:
+        self._label.setStyleSheet(f"color: {theme.text2};")
+        self._line.setStyleSheet(f"background: {theme.text2}; border: none;")
+
+
 class ThinkingPanel(QFrame):
     """Floating card that mirrors the iOS thinking timeline.
 
@@ -546,6 +581,9 @@ class ThinkingPanel(QFrame):
         self._theme = _Theme(dark)
         self._rows: list[_StepRow] = []
         self._result_card: _ResultCard | None = None
+        # Everything from earlier commands: step rows, dividers, result cards.
+        # Kept only so it can be trimmed and re-themed; nothing reads it back.
+        self._history: list[QWidget] = []
         self._source = "Mac"
         self._minimised = False
         self._finished = True
@@ -650,18 +688,42 @@ class ThinkingPanel(QFrame):
         """
         self._source = label = _source_label(source)
         self._title.setText("Thinking" if label == "Mac" else f"Thinking · from your {label}")
-        for row in self._rows:
-            row.setParent(None)
-            row.deleteLater()
-        self._rows.clear()
+
+        # The timeline used to be wiped here, so the only command you could
+        # ever see was the one running. Glance away while it works and the
+        # answer was gone — and with it any chance of noticing that the thing
+        # it did three commands ago was wrong. Previous commands stay, headed
+        # by a divider, and the card scrolls.
+        if self._rows or self._result_card is not None:
+            when = _dt.datetime.now().strftime("%H:%M")
+            head = "Thinking" if label == "Mac" else f"from your {label}"
+            div = _RunDivider(f"{when} · {head}", self._theme, self._body)
+            self._history.append(div)
+            self._body_lay.insertWidget(self._body_lay.indexOf(self._working), div)
+
+        self._history.extend(self._rows)
         if self._result_card is not None:
-            self._result_card.setParent(None)
-            self._result_card.deleteLater()
-            self._result_card = None
+            self._history.append(self._result_card)
+        self._rows = []
+        self._result_card = None
+        self._trim_history()
+
         self._finished = False
         self._empty.hide()
         self._working.show()
         self._update_count()
+
+    def _trim_history(self) -> None:
+        """Keep the card from growing without limit.
+
+        A fixed-size panel scrolls rather than stretches, so this is about
+        memory and scroll length rather than layout: past some depth nobody is
+        scrolling back that far, and every row is a live widget.
+        """
+        while len(self._history) > MAX_HISTORY_WIDGETS:
+            w = self._history.pop(0)
+            w.setParent(None)
+            w.deleteLater()
 
     def add_step(self, step: dict) -> None:
         if self._finished:      # a late step (self-check) reopens the timeline
@@ -674,7 +736,7 @@ class ThinkingPanel(QFrame):
         row.set_last(True)
         self._rows.append(row)
         # keep the working row and the trailing stretch below the steps
-        self._body_lay.insertWidget(len(self._rows) - 1, row)
+        self._body_lay.insertWidget(self._body_lay.indexOf(self._working), row)
         self._update_count()
         QTimer.singleShot(0, self._scroll_to_bottom)
 
