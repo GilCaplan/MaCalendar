@@ -304,6 +304,55 @@ def _spoken_times(text: str) -> set[str]:
     return out
 
 
+# Words that name no particular thing. "meeting" and "appointment" are real
+# event types but say nothing on their own, and the rule parser reaches for
+# them when it cannot find a better noun. A title *starting* with one is just
+# as unusable as the bare word: "event with yotem" tells you as little.
+_CONTENTLESS_TITLES = {
+    "event", "events", "meeting", "meetings", "set meeting", "appointment",
+    "activity", "session", "thing", "item", "task", "reminder",
+}
+
+# The subset that names nothing at all. "meeting" is a real kind of event and
+# survives being qualified; "event" never does.
+_EMPTY_NOUNS = {"event", "events", "activity", "thing", "item"}
+
+
+def _is_placeholder_title(title: str, cfg) -> bool:
+    """Would this title be useless in a calendar?"""
+    t = (title or "").strip().lower().strip(" .-")
+    if not t:
+        return True
+    configured = {k.lower() for k in getattr(cfg.nlu, "event_keywords", [])}
+    if t in _CONTENTLESS_TITLES | configured:
+        return True
+    # "event with yotem" is as unreadable as "event". But "meeting with Adin"
+    # is a perfectly good title, and so is "Meeting with Ravid at Kems" — a
+    # meeting is a real kind of thing, where an "event" is not. So only the
+    # genuinely empty nouns disqualify a title they lead; the rest have to be
+    # bare to count.
+    #
+    # Worth saying that this rule is doing less than it looks: all 27 generic
+    # titles in a week of flagged commands were bare words. The led-by case is
+    # here because it costs nothing, not because it was measured.
+    first, _, rest = t.partition(" ")
+    return bool(rest) and first in _EMPTY_NOUNS and \
+        rest.split(" ", 1)[0] in ("with", "for", "to", "on", "at", "about", "re")
+
+
+def _fix_title_now(transcript: str, event_id: int, keyword: str) -> "str | None":
+    """Ask the LLM to name the event, and patch it. Returns the new title."""
+    try:
+        new_title = _get_parser().fix_title_async(transcript, keyword)
+        if new_title and new_title.strip().lower() != keyword.strip().lower():
+            get_db().update_event(event_id, title=new_title.strip())
+            logger.info("Title fixed for event %s: %r → %r", event_id, keyword, new_title)
+            return new_title.strip()
+    except Exception as exc:
+        logger.debug("Title fix failed for event %s: %s", event_id, exc)
+    return None
+
+
 def _fix_title_bg(transcript: str, event_id: int, keyword: str) -> None:
     try:
         new_title = _get_parser().fix_title_async(transcript, keyword)
@@ -789,6 +838,31 @@ def create_app() -> Flask:
         else:
             refresh = ""
 
+        if parse_path == "rule":
+            for rtype, rid, act in records:
+                if rtype == "event" and act == "create_event":
+                    ev = get_db().get_event(rid)
+                    if ev and _is_placeholder_title(ev["title"], cfg):
+                        # Fixed before answering, not after. This used to run on
+                        # a daemon thread, so the reply said "Created event
+                        # 'meeting'" and the better title arrived seconds later
+                        # — by which time the answer had been read and judged.
+                        # 22 of the 37 titles on flagged commands were the bare
+                        # word "meeting", every one of them eligible for a fix
+                        # that landed too late to count.
+                        #
+                        # It costs an LLM call on a path whose whole point is
+                        # avoiding one, but only for events the rules could not
+                        # name, and an instant wrong title is worth less than a
+                        # slower right one: a calendar full of "meeting" cannot
+                        # be read back.
+                        better = _fix_title_now(transcript, rid, ev["title"])
+                        if better:
+                            trace.step(RULE, "Named the event",
+                                       f"“{ev['title']}” → “{better}”")
+                            messages = [m.replace(f"'{ev['title']}'", f"'{better}'")
+                                        for m in messages]
+
         response_msg = " ".join(m for m in messages if m)
         logger.info("📱 Response: %s | refresh=%s | parse=%s", response_msg, refresh or "none", parse_path)
 
@@ -809,14 +883,6 @@ def create_app() -> Flask:
         # and hand the iOS app a token it can poll with GET /voice/verify/<token>
         # Rule fast-path parity with the Mac: a placeholder title ("meeting",
         # "set meeting", …) gets a proper title from the LLM in the background.
-        if parse_path == "rule":
-            keywords = {k.lower() for k in cfg.nlu.event_keywords} | {"event", "set meeting", "meeting", "appointment"}
-            for rtype, rid, act in records:
-                if rtype == "event" and act == "create_event":
-                    ev = get_db().get_event(rid)
-                    if ev and ev["title"].strip().lower() in keywords:
-                        _threading.Thread(target=_fix_title_bg, args=(transcript, rid, ev["title"]), daemon=True).start()
-
         trace.step(DONE, "Done", f"{parse_path} path · {trace.total_ms / 1000:.1f} s total", path=parse_path)
         memory_id = _record_memory(cfg, raw_transcript, transcript, parse_path,
                                    [(n, i) for n, i in parsed if n != "unknown"],
