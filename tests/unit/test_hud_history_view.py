@@ -91,6 +91,56 @@ def test_the_history_view_lists_past_commands(qapp, bus):
         hud.close()
 
 
+def test_the_rows_are_actually_readable(qapp, bus):
+    """Counting rows is not seeing them.
+
+    _HistoryRow was first built as a QPushButton with a layout inside it. A
+    button takes its size hint from its text, not from any layout it contains,
+    so all 200 rows existed, reported themselves present, and rendered 15px
+    tall — an empty panel with a full model behind it. The earlier tests
+    counted rows and passed.
+    """
+    from assistant.thinking_hud import ThinkingHUD
+    _write(bus, 4)
+    hud = ThinkingHUD()
+    try:
+        hud.show()
+        qapp.processEvents()
+        hud.panel.toggle_history(True)
+        qapp.processEvents()
+
+        row = hud.panel._hist_rows[0]
+        assert row.isVisible()
+        assert row.geometry().height() > 40, \
+            f"row collapsed to {row.geometry().height()}px — nothing to read"
+        assert "command number 3" in row._said.text(), "the transcript is not shown"
+        assert "did 3" in row._did.text(), "what it did is not shown"
+    finally:
+        hud.close()
+
+
+def test_clicking_a_row_opens_that_command(qapp, bus):
+    """The rows have to be clickable, not merely present."""
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtTest import QTest
+
+    from assistant.thinking_hud import ThinkingHUD
+    _write(bus, 4)
+    hud = ThinkingHUD()
+    try:
+        hud.show()
+        qapp.processEvents()
+        hud.panel.toggle_history(True)
+        qapp.processEvents()
+
+        QTest.mouseClick(hud.panel._hist_rows[1], Qt.MouseButton.LeftButton)
+        qapp.processEvents()
+        assert not hud.panel._showing_history, "clicking a row did not open it"
+        assert hud.panel.step_count == 1
+    finally:
+        hud.close()
+
+
 def test_opening_a_past_command_replays_its_steps(qapp, bus):
     from assistant.thinking_hud import ThinkingHUD
     _write(bus, 3)

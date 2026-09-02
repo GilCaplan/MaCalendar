@@ -541,8 +541,16 @@ class _ResultCard(QFrame):
 
 # ------------------------------------------------------------------- panel
 
-class _HistoryRow(QPushButton):
-    """One past command in the history list: what you said, what it did."""
+class _HistoryRow(QFrame):
+    """One past command in the history list: what you said, what it did.
+
+    A QFrame rather than a QPushButton. A button's sizeHint comes from its
+    text, not from any layout put inside it, so building one as a container
+    collapsed every row to 15px — two hundred of them, present and correct and
+    showing nothing at all.
+    """
+
+    clicked = pyqtSignal()
 
     def __init__(self, entry: dict, theme, parent=None) -> None:
         super().__init__(parent)
@@ -555,33 +563,40 @@ class _HistoryRow(QPushButton):
         where = "" if src == "Mac" else f" · {src}"
 
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFlat(True)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)   # or :hover never fires
         lay = QVBoxLayout(self)
         lay.setContentsMargins(8, 6, 8, 6)
         lay.setSpacing(2)
 
-        self._when = QLabel(f"{when}{where}")
+        self._when = QLabel(f"{when}{where}", self)
         f = self._when.font(); f.setPointSize(max(9, f.pointSize() - 2)); self._when.setFont(f)
         lay.addWidget(self._when)
 
-        self._said = QLabel(said if len(said) < 70 else said[:69] + "…")
+        self._said = QLabel(said if len(said) < 70 else said[:69] + "…", self)
         self._said.setWordWrap(True)
         lay.addWidget(self._said)
 
-        self._did = QLabel(did if len(did) < 80 else did[:79] + "…")
+        self._did = QLabel(did if len(did) < 90 else did[:89] + "…", self)
         self._did.setWordWrap(True)
         f = self._did.font(); f.setPointSize(max(9, f.pointSize() - 1)); self._did.setFont(f)
         lay.addWidget(self._did)
 
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
         self.apply_theme(theme)
 
+    def mouseReleaseEvent(self, event) -> None:   # noqa: N802 - Qt naming
+        if event.button() == Qt.MouseButton.LeftButton and self.rect().contains(event.pos()):
+            self.clicked.emit()
+        super().mouseReleaseEvent(event)
+
     def apply_theme(self, theme) -> None:
-        self._when.setStyleSheet(f"color: {theme.text2};")
-        self._said.setStyleSheet(f"color: {theme.text}; font-weight: 600;")
-        self._did.setStyleSheet(f"color: {theme.text2};")
+        self._when.setStyleSheet(f"color: {theme.text2}; background: transparent;")
+        self._said.setStyleSheet(f"color: {theme.text}; background: transparent; font-weight: 600;")
+        self._did.setStyleSheet(f"color: {theme.text2}; background: transparent;")
         self.setStyleSheet(
-            f"QPushButton {{ border: none; border-radius: 6px; text-align: left; }}"
-            f"QPushButton:hover {{ background: {theme.surface}; }}")
+            f"_HistoryRow {{ border: none; border-radius: 6px; background: transparent; }}"
+            f"_HistoryRow:hover {{ background: {theme.surface}; }}"
+        )
 
 
 class _RunDivider(QWidget):
