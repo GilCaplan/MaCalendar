@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS todos (
     source_event_id INTEGER,
     created_at      TEXT    NOT NULL,
     completed_at    TEXT    NOT NULL DEFAULT '',
-    position        INTEGER NOT NULL DEFAULT 0
+    position        INTEGER NOT NULL DEFAULT 0,
+    quantity        INTEGER NOT NULL DEFAULT 1
 )
 """
 
@@ -48,6 +49,7 @@ _TODO_MIGRATIONS = [
     "ALTER TABLE todos ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]'",
     "ALTER TABLE events ADD COLUMN category TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE todos ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'",
+    "ALTER TABLE todos ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1",
     # Version stamp, so a client that edited a task while disconnected can say
     # which version it was working from (see PATCH /todos/<id>).
     "ALTER TABLE todos ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''",
@@ -1269,6 +1271,7 @@ class CalendarDB:
         source: str = "manual",
         source_event_id: Optional[int] = None,
         tags: Optional[List[str]] = None,
+        quantity: int = 1,
     ) -> int:
         """Insert a new todo item. Returns the new row id."""
         tags_json = self._encode_tags(tags or [])
@@ -1281,8 +1284,9 @@ class CalendarDB:
                 """
                 INSERT INTO todos
                     (title, list, completed, priority, due_date, notes,
-                     source, source_event_id, created_at, updated_at, completed_at, position, tags)
-                VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?, '', ?, ?)
+                     source, source_event_id, created_at, updated_at, completed_at,
+                     position, tags, quantity)
+                VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?)
                 """,
                 (
                     title,
@@ -1296,6 +1300,7 @@ class CalendarDB:
                     _utcnow_iso(),      # a version for clients to quote back
                     max_pos + 1,
                     tags_json,
+                    max(1, int(quantity or 1)),
                 ),
             )
             return cur.lastrowid
@@ -1364,12 +1369,17 @@ class CalendarDB:
 
     def update_todo(self, todo_id: int, **fields) -> None:
         _memory_feedback("todo", todo_id, "corrected", {k: v for k, v in fields.items() if k in ("title", "list_name", "tags")})
-        allowed = {"title", "list", "completed", "priority", "due_date", "notes", "completed_at", "attachments", "tags"}
+        allowed = {"title", "list", "completed", "priority", "due_date", "notes", "completed_at", "attachments", "tags", "quantity"}
         if "list_name" in fields and "list" not in fields:   # API clients send list_name
             fields["list"] = fields.pop("list_name")
         updates = {k: v for k, v in fields.items() if k in allowed}
         if "tags" in updates:
             updates["tags"] = self._encode_tags(updates["tags"])
+        if "quantity" in updates:
+            try:
+                updates["quantity"] = max(1, int(updates["quantity"]))
+            except (TypeError, ValueError):
+                del updates["quantity"]
         if not updates:
             return
         set_clause = ", ".join(f"{k} = ?" for k in updates)

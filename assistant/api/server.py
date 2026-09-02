@@ -2039,6 +2039,14 @@ def create_app() -> Flask:
         if not title:
             return jsonify({"error": "Missing 'title' field", "code": 400}), 400
         db = get_db()
+        # A count typed into the title works the same as one spoken: "pasta x5"
+        # is one task for five, not a task literally called "pasta x5".
+        from assistant.intent.quantity import split_quantity
+        title, parsed_qty = split_quantity(title)
+        try:
+            quantity = max(1, int(data.get("quantity") or parsed_qty))
+        except (TypeError, ValueError):
+            quantity = parsed_qty
         tags = data.get("tags") or []
         if not tags:
             # Client didn't say — server-side "tag mode", else infer from the
@@ -2056,6 +2064,7 @@ def create_app() -> Flask:
             due_date=data.get("due_date", ""),
             notes=data.get("notes", ""),
             tags=tags,
+            quantity=quantity,
         )
         return jsonify({"id": todo_id}), 201
 

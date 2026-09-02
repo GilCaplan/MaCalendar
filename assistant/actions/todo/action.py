@@ -93,6 +93,8 @@ class CreateTodoAction(BaseAction):
         "extract ALL tasks into the 'titles' array. "
         "One item per title: 'buy chicken and rice' is ['buy chicken', 'buy rice'] — "
         "repeat the shared verb, and NEVER summarise several items into one title. "
+        "A quantity is NOT a repeat: 'pasta times 5' is ONE title, ['buy pasta'], "
+        "never the same title five times. "
         "Supports priority ('high priority', 'urgent') and due date ('due Friday', 'by April 20')."
     )
     intent_model: ClassVar[Type[BaseIntent]] = CreateTodoIntent
@@ -109,7 +111,9 @@ class CreateTodoAction(BaseAction):
                     "'buy chicken and rice' → ['buy chicken', 'buy rice']; "
                     "'call mom and dad' → ['call mom', 'call dad']. "
                     "Never invent a summary title for a list of items "
-                    "(chicken and rice is NOT 'buy groceries')."
+                    "(chicken and rice is NOT 'buy groceries'). "
+                    "Never repeat a title to express how many: 'pasta x5' is "
+                    "['buy pasta'] once — the count is read from the words."
                 ),
             },
             "list_name": {
@@ -165,7 +169,7 @@ class CreateTodoAction(BaseAction):
 
         created = []
         applied: list[list[str]] = []
-        for title in intent.titles:
+        for index, title in enumerate(intent.titles):
             if said:
                 tags = list(said)
             elif auto_tag:
@@ -174,15 +178,17 @@ class CreateTodoAction(BaseAction):
                 tags = suggest_tags(title, palette)
             else:
                 tags = []
+            qty = intent.quantity_for(index)
             todo_id = db.create_todo(
                 title=title,
                 list_name=intent.list_name,
                 priority=intent.priority,
                 due_date=intent.due_date or "",
                 tags=tags,
+                quantity=qty,
             )
             context_memory.update_todo(todo_id, title)
-            created.append(title)
+            created.append(f"{title} ×{qty}" if qty > 1 else title)
             applied.append(tags)
 
         list_label = "Today" if intent.list_name == "today" else "General"

@@ -239,8 +239,9 @@ struct TasksView: View {
             allTags: tags,
             onToggle: { toggle(todo) },
             onDelete: { delete(todo) },
-            onSave:   { title, priority, dueDate, newTags in
-                save(todo, title: title, priority: priority, dueDate: dueDate, tags: newTags)
+            onSave:   { title, priority, dueDate, newTags, quantity in
+                save(todo, title: title, priority: priority, dueDate: dueDate,
+                     tags: newTags, quantity: quantity)
             }
         )
         .onDrag { NSItemProvider(object: "\(todo.id)" as NSString) }
@@ -479,15 +480,21 @@ struct TasksView: View {
         return true
     }
 
-    private func save(_ todo: Todo, title: String, priority: String, dueDate: String, tags newTags: [String]) {
+    private func save(_ todo: Todo, title: String, priority: String, dueDate: String,
+                      tags newTags: [String], quantity: Int = 1) {
         // Optimistic local update
         if let i = todos.firstIndex(where: { $0.id == todo.id }) {
             todos[i].title    = title
             todos[i].priority = priority
             todos[i].dueDate  = dueDate
             todos[i].tags     = newTags
+            todos[i].quantity = max(1, quantity)
         }
-        Task { try? await api.updateTodo(id: todo.id, title: title, priority: priority, dueDate: dueDate, tags: newTags) }
+        Task {
+            try? await api.updateTodo(id: todo.id, title: title, priority: priority,
+                                      dueDate: dueDate, tags: newTags,
+                                      quantity: max(1, quantity))
+        }
     }
 
     /// Pull calendar events into the task list (the Mac's "Sync Today" button).

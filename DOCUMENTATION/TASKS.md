@@ -67,6 +67,7 @@ Running list of user-reported issues and feature requests, with status. Update w
 | 60 | Few-shot pool: prefer verified examples, and stop recency from evicting corrections | todo | `assistant/intent/parser.py` `_few_shot_for` |
 | 61 | Three iOS fixes committed but **not installed on the device** — poll storm, counter history sheet, speech continuing after it was turned off | todo | `xcrun devicectl device install app` |
 | 62 | Explainer artifacts: big-picture done; internals page still needs genericising, a first-time-reader rewrite, and interactive figures | in progress | `DOCUMENTATION/ARTIFACT_BUILDER.md` |
+| 63 | **"pasta times 5" made five identical tasks.** Neither parse path could represent a count, so the only way the LLM could say "five" was to repeat the title five times — and five identical rows mean ticking one tells you nothing. Counts are now read from the words, repeats are folded, and the number shows on the task row | done 2026-09-02 | `assistant/intent/quantity.py`, `todos.quantity`, `TaskRowView.swift`, `todo_view.py` |
 
 ## How we are working right now
 

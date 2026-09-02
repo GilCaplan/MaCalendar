@@ -11,6 +11,10 @@ from assistant.actions.base import BaseIntent
 
 class CreateTodoIntent(BaseIntent):
     titles: List[str] = []
+    # One count per title, same order. Filled by the validator below, never by
+    # the model — asking the LLM for a parallel array invited it to return one
+    # of a different length.
+    quantities: List[int] = []
     list_name: str = "today"   # 'today' | 'general'
     priority: str = "none"     # 'none' | 'low' | 'medium' | 'high'
     due_date: Optional[str] = None
@@ -31,6 +35,28 @@ class CreateTodoIntent(BaseIntent):
         if not self.titles:
             raise ValueError("titles list cannot be empty")
         return self
+
+    @model_validator(mode="after")
+    def fold_quantities(self) -> "CreateTodoIntent":
+        """Read counts out of the titles, and fold repeats into one task.
+
+        Covers both ways a quantity arrived as duplication: the LLM emitting
+        the same title five times for "pasta times 5", and a count left inside
+        a single title. Runs after require_titles, so titles is non-empty.
+        """
+        from assistant.intent.quantity import collapse_repeats
+        titles, quantities = collapse_repeats(self.titles)
+        if titles:
+            object.__setattr__(self, "titles", titles)
+            object.__setattr__(self, "quantities", quantities)
+        return self
+
+    def quantity_for(self, index: int) -> int:
+        """The count for titles[index], defaulting to 1."""
+        try:
+            return max(1, int(self.quantities[index]))
+        except (IndexError, TypeError, ValueError):
+            return 1
 
 
 class CompleteTodoIntent(BaseIntent):

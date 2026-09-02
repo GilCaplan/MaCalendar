@@ -30,10 +30,11 @@ struct TaskRowView: View {
     var allTags: [TodoTag]
     var onToggle: () -> Void
     var onDelete: () -> Void
-    var onSave: (String, String, String, [String]) -> Void  // title, priority, dueDate, tags
+    var onSave: (String, String, String, [String], Int) -> Void  // title, priority, dueDate, tags, quantity
 
     @State private var isExpanded = false
     @State private var editTitle: String
+    @State private var editQuantity: Int
     @State private var editPriority: String
     @State private var editDueDate: Date?
     @State private var editTags: [String]
@@ -48,13 +49,14 @@ struct TaskRowView: View {
          allTags: [TodoTag] = [],
          onToggle: @escaping () -> Void,
          onDelete: @escaping () -> Void,
-         onSave: @escaping (String, String, String, [String]) -> Void) {
+         onSave: @escaping (String, String, String, [String], Int) -> Void) {
         self.todo = todo
         self.allTags = allTags
         self.onToggle = onToggle
         self.onDelete = onDelete
         self.onSave = onSave
         _editTitle    = State(initialValue: todo.title)
+        _editQuantity = State(initialValue: max(1, todo.quantity))
         _editPriority = State(initialValue: todo.priority)
         _editDueDate  = State(initialValue: Self.dateFormatter.date(from: todo.dueDate))
         _editTags     = State(initialValue: todo.tags)
@@ -78,10 +80,31 @@ struct TaskRowView: View {
                 .buttonStyle(.plain)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(todo.title)
-                        .font(.system(size: settings.fontTasks))
-                        .strikethrough(todo.isDone)
-                        .foregroundColor(todo.isDone ? .secondary : .primary)
+                    // Title and count share a line: the count is part of what
+                    // the task says, so putting it on its own row would read as
+                    // a second, unrelated fact about the task.
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(todo.title)
+                            .font(.system(size: settings.fontTasks))
+                            .strikethrough(todo.isDone)
+                            .foregroundColor(todo.isDone ? .secondary : .primary)
+
+                        if let label = todo.quantityLabel {
+                            Text(label)
+                                .font(.system(size: settings.fontTasks - 2,
+                                              weight: .semibold,
+                                              design: .rounded))
+                                .monospacedDigit()
+                                .foregroundColor(settings.accentColor)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 1)
+                                .background(
+                                    Capsule().fill(settings.accentColor.opacity(0.15))
+                                )
+                                .opacity(todo.isDone ? 0.5 : 1)
+                                .accessibilityLabel("quantity \(todo.quantity)")
+                        }
+                    }
 
                     if !todo.tags.isEmpty && !isExpanded {
                         HStack(spacing: 4) {
@@ -142,6 +165,19 @@ struct TaskRowView: View {
                         }
                     }
 
+                    // Quantity — the parser reads counts out of speech, and
+                    // when it reads one wrong this is the only way to fix it.
+                    HStack(spacing: 6) {
+                        Text("Quantity")
+                            .font(.system(size: settings.fontTasks - 2))
+                            .foregroundColor(.secondary)
+                        Stepper(value: $editQuantity, in: 1...99) {
+                            Text(editQuantity > 1 ? "×\(editQuantity)" : "one")
+                                .font(.system(size: settings.fontTasks - 1))
+                                .monospacedDigit()
+                        }
+                    }
+
                     // Priority picker
                     HStack(spacing: 6) {
                         Text("Priority")
@@ -198,6 +234,7 @@ struct TaskRowView: View {
         .onChange(of: todo) { newTodo in
             guard !isExpanded else { return }
             editTitle    = newTodo.title
+            editQuantity = max(1, newTodo.quantity)
             editPriority = newTodo.priority
             editDueDate  = Self.dateFormatter.date(from: newTodo.dueDate)
             editTags     = newTodo.tags
@@ -221,7 +258,7 @@ struct TaskRowView: View {
         if isExpanded {
             // Collapsing — persist edits
             let dueDateStr = editDueDate.map { Self.dateFormatter.string(from: $0) } ?? ""
-            onSave(editTitle, editPriority, dueDateStr, editTags)
+            onSave(editTitle, editPriority, dueDateStr, editTags, editQuantity)
         }
         withAnimation(.easeInOut(duration: 0.2)) {
             isExpanded.toggle()

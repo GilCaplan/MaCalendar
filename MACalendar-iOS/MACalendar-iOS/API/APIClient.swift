@@ -431,13 +431,14 @@ class APIClient: ObservableObject {
 
     func updateTodo(id: Int, title: String? = nil, list: String? = nil,
                     priority: String? = nil, dueDate: String? = nil,
-                    tags: [String]? = nil) async throws {
+                    tags: [String]? = nil, quantity: Int? = nil) async throws {
         var fields: [String: Any] = [:]
         if let title    { fields["title"]    = title }
         if let list     { fields["list_name"] = list }
         if let priority { fields["priority"] = priority }
         if let dueDate  { fields["due_date"] = dueDate }
         if let tags     { fields["tags"]     = tags }
+        if let quantity { fields["quantity"] = max(1, quantity) }
         guard !fields.isEmpty else { return }
         do {
             _ = try await request("/todos/\(id)", method: "PATCH", body: fields)

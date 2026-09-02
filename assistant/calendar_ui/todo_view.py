@@ -872,6 +872,7 @@ class TodoItemWidget(QWidget):
 
     toggled      = pyqtSignal(int, bool)  # (todo_id, new_completed_state)
     edited       = pyqtSignal(int, str)   # (todo_id, new_title)
+    quantity_changed = pyqtSignal(int, int)  # (todo_id, new_quantity)
     deleted      = pyqtSignal(int)        # (todo_id,)
     detail_saved = pyqtSignal()           # any field in detail panel auto-saved
 
@@ -935,6 +936,15 @@ class TodoItemWidget(QWidget):
         self._label.setCursor(Qt.CursorShape.IBeamCursor)
         self._label.mousePressEvent = self._start_edit  # type: ignore[assignment]
         title_row.addWidget(self._label)
+
+        # How many of the thing, when it is more than one. It sits on the title
+        # row rather than the metadata row below: a count is part of what the
+        # task says, not a fact about it like a due date.
+        self._qty_chip = QLabel()
+        self._qty_chip.setObjectName("qty_chip")
+        self._qty_chip.setToolTip("How many")
+        title_row.addWidget(self._qty_chip)
+        self._refresh_quantity()
 
         self._editor = QLineEdit(self._todo["title"])
         self._editor.setObjectName("todo_editor")
@@ -1175,6 +1185,15 @@ class TodoItemWidget(QWidget):
             f"color: {expand_color}; font-size: 12px;"
         )
 
+        # The count reads as a quiet accent pill, not as another word in the
+        # title — it should be findable at a glance down a long list without
+        # competing with the task name.
+        self._qty_chip.setStyleSheet(
+            f"color: {BLUE}; font-size: {max(9, self._font_size - 2)}px;"
+            f" font-weight: 600; padding: 1px 6px;"
+            f" border: 1px solid {BLUE}; border-radius: 8px;"
+        )
+
         if not self._todo["completed"]:
             self._label.setStyleSheet(f"color: {text_color}; font-size: {self._font_size}px;")
 
@@ -1250,14 +1269,30 @@ class TodoItemWidget(QWidget):
         self._editor.setFocus()
         self._editor.selectAll()
 
+    def _refresh_quantity(self) -> None:
+        """Show the count, or nothing at all when there is only one."""
+        try:
+            qty = max(1, int(self._todo.get("quantity") or 1))
+        except (TypeError, ValueError):
+            qty = 1
+        self._qty_chip.setText(f"×{qty}" if qty > 1 else "")
+        self._qty_chip.setVisible(qty > 1)
+
     def _commit_edit(self) -> None:
         if not self._editing:
             return
         self._editing = False
-        new_title = self._editor.text().strip()
-        if new_title and new_title != self._todo["title"]:
+        typed = self._editor.text().strip()
+        # "pasta x5" typed here means the same as spoken: one task, five of them.
+        from assistant.intent.quantity import split_quantity
+        new_title, qty = split_quantity(typed)
+        if new_title and (new_title != self._todo["title"] or qty > 1):
             self._todo["title"] = new_title
             self._label.setText(new_title)
+            if qty > 1:
+                self._todo["quantity"] = qty
+                self._refresh_quantity()
+                self.quantity_changed.emit(self._todo["id"], qty)
             self.edited.emit(self._todo["id"], new_title)
         self._editor.hide()
         self._label.show()
@@ -1403,6 +1438,7 @@ class TodoListWidget(QWidget):
             widget = TodoItemWidget(todo, self._db, dark=self._dark, font_size=self._font_size)
             widget.toggled.connect(self._on_toggled)
             widget.edited.connect(self._on_edited)
+            widget.quantity_changed.connect(self._on_quantity_changed)
             widget.deleted.connect(self._on_deleted)
             # detail_saved fires when notes/subtasks auto-save; the panel writes
             # directly to DB so no list rebuild is needed — skip todo_changed to
@@ -1526,6 +1562,10 @@ class TodoListWidget(QWidget):
         todo = self._db.get_todo(todo_id)
         if todo and todo.get("source_event_id"):
             self._db.update_event(todo["source_event_id"], title=new_title)
+        QTimer.singleShot(0, self.todo_changed.emit)
+
+    def _on_quantity_changed(self, todo_id: int, quantity: int) -> None:
+        self._db.update_todo(todo_id, quantity=quantity)
         QTimer.singleShot(0, self.todo_changed.emit)
 
     def _on_deleted(self, todo_id: int) -> None:

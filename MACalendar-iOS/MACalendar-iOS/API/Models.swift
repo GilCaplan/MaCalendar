@@ -53,22 +53,27 @@ struct Todo: Identifiable, Codable, Equatable {
     var priority: String
     var dueDate: String
     var tags: [String]
+    /// How many of the thing. "buy pasta times 5" is one task with quantity 5,
+    /// not five identical tasks — which is what it used to be.
+    var quantity: Int = 1
 
     /// The Mac's version stamp, quoted back on an edit so a change made from a
     /// stale copy is refused rather than silently overwriting a newer one.
     var updatedAt: String? = nil
 
     enum CodingKeys: String, CodingKey {
-        case id, title, list, completed, priority, tags
+        case id, title, list, completed, priority, tags, quantity
         case dueDate = "due_date"
         case updatedAt = "updated_at"
     }
 
     init(id: Int, title: String, list: String, completed: Int,
-         priority: String, dueDate: String, tags: [String] = []) {
+         priority: String, dueDate: String, tags: [String] = [],
+         quantity: Int = 1) {
         self.id = id; self.title = title; self.list = list
         self.completed = completed; self.priority = priority
         self.dueDate = dueDate; self.tags = tags
+        self.quantity = max(1, quantity)
     }
 
     // Tolerant decode: older cached JSON (and older servers) have no `tags`.
@@ -81,9 +86,15 @@ struct Todo: Identifiable, Codable, Equatable {
         priority  = try c.decodeIfPresent(String.self, forKey: .priority) ?? "none"
         dueDate   = try c.decodeIfPresent(String.self, forKey: .dueDate)  ?? ""
         tags      = try c.decodeIfPresent([String].self, forKey: .tags)   ?? []
+        // Absent from older servers and from every row cached before the
+        // column existed, so a missing value means one, not zero.
+        quantity  = max(1, try c.decodeIfPresent(Int.self, forKey: .quantity) ?? 1)
     }
 
     var isDone: Bool { completed != 0 }
+
+    /// Shown next to the title only when there is more than one.
+    var quantityLabel: String? { quantity > 1 ? "×\(quantity)" : nil }
 
     func hasTag(_ name: String) -> Bool {
         tags.contains { $0.caseInsensitiveCompare(name) == .orderedSame }
