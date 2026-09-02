@@ -684,9 +684,9 @@ def create_app() -> Flask:
                                  and not messages)
                     _replacement = None
                     if _eligible:
-                        trace.step(RULE, "Rule parser matched nothing",
+                        trace.step(RULE, "Nothing matched — rechecking",
                                    f"{action_name.replace('_', ' ')} found no target "
-                                   "— asking the LLM instead", ok=False)
+                                   "— asking the LLM instead")
                         try:
                             _retried = parser.parse(transcript) or []
                         except Exception as _e:
