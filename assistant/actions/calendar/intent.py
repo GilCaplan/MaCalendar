@@ -71,12 +71,26 @@ class CalendarIntent(BaseIntent):
     @field_validator("start_time", "end_time", mode="after")
     @classmethod
     def time_must_be_hhmm(cls, v: Any) -> Any:
-        """Normalise '9 AM', '12:00 PM', '9.30pm', '0915' → 'HH:MM'; reject anything else."""
+        """Normalise '9 AM', '12:00 PM', '9.30pm', '0915', '230pm' → 'HH:MM'.
+
+        The compact-with-meridiem form is what speech recognition actually
+        hands back: "today at 2:30PM" is transcribed "at 230PM", and both
+        '230pm' and '1130am' used to raise here. The colon is the only thing
+        the older patterns had to find the minutes by, so '230pm' backtracked
+        to nothing and the whole parse was thrown away.
+
+        A meridiem is required for that third form on purpose. Bare '230' is
+        genuinely ambiguous — 2:30, or 02:30 written badly — and the existing
+        four-digit rule already reads '0230'. Guessing between them is how you
+        get an event at the wrong time of day.
+        """
         if v is None:
             return None
         import re as _re
         t = str(v).strip().lower().replace(".", ":")
-        m = _re.fullmatch(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm|a:m|p:m)?", t) or _re.fullmatch(r"(\d{2})(\d{2})()", t)
+        m = (_re.fullmatch(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm|a:m|p:m)?", t)
+             or _re.fullmatch(r"(\d{2})(\d{2})()", t)
+             or _re.fullmatch(r"(\d{1,2})(\d{2})\s*(am|pm|a:m|p:m)", t))
         if not m:
             raise ValueError(f"time must be HH:MM, got {v!r}")
         h, mm, ap = int(m.group(1)), int(m.group(2) or 0), (m.group(3) or "").replace(":", "")

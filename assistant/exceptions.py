@@ -63,3 +63,19 @@ class GraphAPIError(AssistantError):
 
 class EventBuildError(AssistantError):
     """Cannot build a valid calendar event from the parsed intent."""
+
+
+class TargetNotFound(Exception):
+    """An action ran, understood its slots, and matched nothing in the data.
+
+    Deliberately NOT an AssistantError: nothing went wrong, and the pipeline's
+    AssistantError handler would report it as a failure and abort the whole
+    command. This is a *result* — "no task called that" — carried as an
+    exception only so the pipeline can tell it apart from a string that means
+    the action did something. `message` is what the user hears if nothing
+    better comes along.
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message

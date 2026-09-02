@@ -4,6 +4,7 @@ import datetime as _dt_module
 from typing import ClassVar, List, Optional, Type
 
 from assistant.actions import register
+from assistant.exceptions import TargetNotFound
 from assistant.actions.base import BaseAction, BaseIntent
 from assistant.actions.calendar.intent import CalendarIntent, DeleteEventIntent, QueryScheduleIntent, UpdateEventIntent
 from assistant.intent.context import context_memory
@@ -111,14 +112,14 @@ class UpdateEventAction(BaseAction):
             if intent.match_title and intent.match_title.lower() in _ANAPHORS:
                 return "I can't do that. I don't remember the last event."
             if intent.match_title:
-                return f"I couldn't find an event matching '{intent.match_title}'."
+                raise TargetNotFound(f"I couldn't find an event matching '{intent.match_title}'.")
             parts = []
             if intent.match_start_time:
                 parts.append(f"at {intent.match_start_time}")
             if intent.match_date:
                 parts.append(f"on {intent.match_date}")
             info = " " + " ".join(parts) if parts else ""
-            return f"I couldn't find an event{info}."
+            raise TargetNotFound(f"I couldn't find an event{info}.")
 
         updates: dict = {}
         if intent.new_title:      updates["title"] = intent.new_title
@@ -196,14 +197,14 @@ class DeleteEventAction(BaseAction):
             if intent.match_title and intent.match_title.lower() in _ANAPHORS:
                 return "I can't do that. I don't remember the last event."
             if intent.match_title:
-                return f"I couldn't find an event matching '{intent.match_title}'."
+                raise TargetNotFound(f"I couldn't find an event matching '{intent.match_title}'.")
             parts = []
             if intent.match_start_time:
                 parts.append(f"at {intent.match_start_time}")
             if intent.match_date:
                 parts.append(f"on {intent.match_date}")
             info = " " + " ".join(parts) if parts else ""
-            return f"I couldn't find an event{info}."
+            raise TargetNotFound(f"I couldn't find an event{info}.")
 
         db.delete_event(event["id"])
         context_memory.clear_event()

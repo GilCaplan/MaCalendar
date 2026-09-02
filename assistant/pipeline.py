@@ -26,6 +26,7 @@ from assistant.exceptions import (
     OllamaTimeoutError,
     OllamaUnavailableError,
     ParseError,
+    TargetNotFound,
 )
 from assistant.intent.parser import IntentParser, UnknownIntent
 from assistant.intent.rule_parser import (
@@ -588,7 +589,35 @@ class Pipeline:
             try:
                 self._set_status(STATUS_PROCESSING, f"⚙️ Executing {action_name.replace('_', ' ')}…")
                 _ev_before, _td_before = _ctx_mem.last_event_id, _ctx_mem.last_todo_id
-                result_text = action_cls().execute(intent, self.config)
+                try:
+                    result_text = action_cls().execute(intent, self.config)
+                except TargetNotFound as nf:
+                    # The rules were confident enough to skip the LLM, filled
+                    # every slot, and then matched nothing. That combination
+                    # usually means the *action* was wrong rather than the
+                    # target missing — "Walk Mark Stalk at 2:30" parsed as
+                    # complete_todo because "mark" is a completion verb. The
+                    # rule parser has no way to notice; only running it does.
+                    # So spend the LLM call now that we know the cheap path
+                    # produced nothing.
+                    retry = self._retry_after_no_match(
+                        transcript, trace,
+                        eligible=(_parse_method == "rule" and len(valid) == 1 and not results),
+                        failed_action=action_name, message=nf.message,
+                    )
+                    if retry is None:
+                        results.append(nf.message)
+                        trace.step(EXECUTE, action_name.replace("_", " ").title(),
+                                   nf.message, ok=False)
+                        continue
+                    valid = retry
+                    _parse_method = "rule→llm"
+                    action_name, intent = valid[0]
+                    action_cls = self.registry.get(action_name)
+                    if action_cls is None:
+                        results.append(nf.message)
+                        continue
+                    result_text = action_cls().execute(intent, self.config)
                 results.append(result_text)
                 if _ctx_mem.last_event_id != _ev_before and _ctx_mem.last_event_id is not None:
                     _memory_records.append(("event", _ctx_mem.last_event_id, action_name))
@@ -1142,6 +1171,60 @@ class Pipeline:
         from assistant import trace_bus
         trace_bus.publish_step(self._trace_run, {"stage": stage, "title": title,
                                                  "detail": detail, "ms": 0, "at_ms": 0, "ok": ok})
+
+    def _retry_after_no_match(self, transcript, trace, *, eligible: bool,
+                              failed_action: str, message: str):
+        """Re-parse with the LLM after a fast-path action matched nothing.
+
+        Returns a replacement action list, or None to keep the original
+        "I couldn't find ..." answer.
+
+        Only the rule fast path is retried, and only when it produced exactly
+        one action that has executed nothing. Both conditions matter:
+
+        - Re-parsing an LLM result with the same LLM just asks the same
+          question twice.
+        - The retry re-parses the whole transcript, so if an earlier action in
+          the list had already succeeded, running the new list would repeat it.
+          Two identical events is a worse outcome than one honest "not found".
+
+        A retry that comes back with the same action is discarded: the LLM
+        agreeing that this is a complete_todo means the task genuinely is not
+        there, and saying so is the right answer.
+        """
+        from assistant.trace import RULE, LLM
+
+        if not eligible or self._parser is None:
+            return None
+
+        trace.step(RULE, "Rule parser matched nothing",
+                   f"{failed_action.replace('_', ' ')} found no target — asking the LLM instead",
+                   ok=False)
+        self._set_status(STATUS_PROCESSING, "💭 Rethinking with AI…")
+        try:
+            retried = self._parser.parse(transcript)
+        except (LLMUnavailableError, OllamaUnavailableError, ParseError) as e:
+            logger.info("🖥️ No-match retry unavailable (%s) — keeping the rule answer", e)
+            trace.step(LLM, f"LLM ({self.config.llm_engine})",
+                       f"Unavailable ({e}) — keeping the original answer", ok=False)
+            return None
+
+        replacement = [(n, i) for n, i in (retried or [])
+                       if n != "unknown" and not isinstance(i, UnknownIntent)]
+        if not replacement:
+            trace.step(LLM, f"LLM ({self.config.llm_engine})",
+                       "Nothing recognisable either — keeping the original answer", ok=False)
+            return None
+        if len(replacement) == 1 and replacement[0][0] == failed_action:
+            trace.step(LLM, f"LLM ({self.config.llm_engine})",
+                       f"Agrees it is {failed_action.replace('_', ' ')} — the target really is missing",
+                       ok=False)
+            return None
+
+        trace.step(LLM, f"LLM ({self.config.llm_engine})",
+                   "Re-read it as " + ", ".join(n.replace("_", " ") for n, _ in replacement))
+        logger.info("🖥️ No-match retry: %s → %s", failed_action, [n for n, _ in replacement])
+        return replacement
 
     def _trace_result(self, **fields) -> None:
         """Close the trace with the result card payload (may be empty)."""

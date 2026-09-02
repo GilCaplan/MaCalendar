@@ -6,6 +6,7 @@ import re
 from typing import ClassVar, List, Optional, Type
 
 from assistant.actions import register
+from assistant.exceptions import TargetNotFound
 from assistant.actions.base import BaseAction, BaseIntent
 from assistant.actions.todo.intent import (
     AddSubtaskIntent,
@@ -235,7 +236,7 @@ class CompleteTodoAction(BaseAction):
         if todo is None:
             if intent.match_title.lower().strip() in _ANAPHORS:
                 return "I don't remember the last task."
-            return f"I couldn't find a task matching '{intent.match_title}'."
+            raise TargetNotFound(f"I couldn't find a task matching '{intent.match_title}'.")
 
         context_memory.update_todo(todo["id"], todo["title"])
         if intent.complete:
@@ -278,7 +279,7 @@ class DeleteTodoAction(BaseAction):
         if todo is None:
             if intent.match_title.lower().strip() in _ANAPHORS:
                 return "I don't remember the last task."
-            return f"I couldn't find a task matching '{intent.match_title}'."
+            raise TargetNotFound(f"I couldn't find a task matching '{intent.match_title}'.")
 
         db.delete_subtasks_for_todo(todo["id"])
         db.delete_todo(todo["id"])
@@ -347,7 +348,7 @@ class UpdateTodoAction(BaseAction):
         if todo is None:
             if intent.match_title.lower().strip() in _ANAPHORS:
                 return "I don't remember the last task."
-            return f"I couldn't find a task matching '{intent.match_title}'."
+            raise TargetNotFound(f"I couldn't find a task matching '{intent.match_title}'.")
 
         updates: dict = {}
         if intent.new_title:                        updates["title"] = intent.new_title
@@ -419,7 +420,7 @@ class AddSubtaskAction(BaseAction):
 
         parent = _find_todo(db, intent.parent_title)
         if parent is None:
-            return f"I couldn't find a task matching '{intent.parent_title}'."
+            raise TargetNotFound(f"I couldn't find a task matching '{intent.parent_title}'.")
 
         # Same rule as the task list itself: "chicken and rice" is two steps.
         titles = split_items(intent.subtask_title) or [intent.subtask_title]
@@ -469,11 +470,11 @@ class CompleteSubtaskAction(BaseAction):
 
         parent = _find_todo(db, intent.parent_title)
         if parent is None:
-            return f"I couldn't find a task matching '{intent.parent_title}'."
+            raise TargetNotFound(f"I couldn't find a task matching '{intent.parent_title}'.")
 
         subtask = _find_subtask(db, parent["id"], intent.subtask_title)
         if subtask is None:
-            return f"I couldn't find a subtask matching '{intent.subtask_title}' under '{parent['title']}'."
+            raise TargetNotFound(f"I couldn't find a subtask matching '{intent.subtask_title}' under '{parent['title']}'.")
 
         db.update_subtask(subtask["id"], completed=int(intent.complete))
         context_memory.update_todo(parent["id"], parent["title"])
@@ -514,11 +515,11 @@ class DeleteSubtaskAction(BaseAction):
 
         parent = _find_todo(db, intent.parent_title)
         if parent is None:
-            return f"I couldn't find a task matching '{intent.parent_title}'."
+            raise TargetNotFound(f"I couldn't find a task matching '{intent.parent_title}'.")
 
         subtask = _find_subtask(db, parent["id"], intent.subtask_title)
         if subtask is None:
-            return f"I couldn't find a subtask matching '{intent.subtask_title}' under '{parent['title']}'."
+            raise TargetNotFound(f"I couldn't find a subtask matching '{intent.subtask_title}' under '{parent['title']}'.")
 
         db.delete_subtask(subtask["id"])
         context_memory.update_todo(parent["id"], parent["title"])
