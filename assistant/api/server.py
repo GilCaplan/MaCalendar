@@ -89,6 +89,41 @@ def _get_rule_parser():
     return _rule_parser
 
 
+
+_WEEKDAY_WORDS = {
+    "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4,
+    "saturday": 5, "sunday": 6,
+    "mon": 0, "tue": 1, "tues": 1, "wed": 2, "thu": 3, "thur": 3, "thurs": 3,
+    "fri": 4, "sat": 5, "sun": 6,
+}
+
+# Cadences the data model cannot express. recurrence is one of daily,
+# weekly or monthly, so each of these gets silently rounded to something
+# else and produces a confidently wrong series: "every other tuesday"
+# became a single event, "twice a week" became once a week on the wrong
+# day. Saying so is better than approximating without mentioning it.
+_UNSUPPORTED_CADENCE = [
+    (r"\bevery\s+other\b|\bfortnight|\bbi-?weekly\b|\balternate\s+\w+days?\b",
+     "every other week"),
+    (r"\b(twice|three times|3 times|two times)\s+(a|per)\s+(week|day|month)\b",
+     "more than once a period"),
+    (r"\bevery\s+(weekday|week\s?day)\b", "weekdays only"),
+    (r"\bevery\s+\w+day\s+and\s+\w+day\b", "two days a week"),
+]
+
+def _named_weekdays(text: str) -> set:
+    """Weekday numbers named in the text, for anchoring a weekly series."""
+    import re as _re2
+    return {n for w, n in _WEEKDAY_WORDS.items()
+            if _re2.search(rf"\b{w}s?\b", text)}
+
+def _unsupported_cadence(text: str) -> "str | None":
+    import re as _re2
+    for pat, label in _UNSUPPORTED_CADENCE:
+        if _re2.search(pat, text):
+            return label
+    return None
+
 def _run_server_verify(token: str, transcript: str, rule_result, executed=None,
                        records=None, memory_id=None) -> None:
     """Background self-check for a voice command (any parse path).
@@ -863,6 +898,23 @@ def create_app() -> Flask:
                             messages = [m.replace(f"'{ev['title']}'", f"'{better}'")
                                         for m in messages]
 
+        # Cadences the model cannot represent are approximated silently, and the
+        # approximation is always wrong in a way you would not accept if told:
+        # "every other tuesday" became one event, "every weekday" put prayer on
+        # Shabbat. It still does what it can — refusing outright would be worse
+        # than a series you can edit — but it says what it did.
+        _cadence = _unsupported_cadence(transcript.lower())
+        if _cadence and any(n == "create_event" for n, _ in parsed):
+            _made = next((i for n, i in parsed if n == "create_event"), None)
+            _as = getattr(_made, "recurrence", None) or "one-off"
+            messages.append(
+                f"Note: I can only repeat daily, weekly or monthly, so "
+                f"\u201c{_cadence}\u201d became {_as} — adjust it if that is wrong."
+            )
+            trace.step(VALIDATE, "Cadence approximated",
+                       f"{_cadence} → {_as}; the model has no way to express the first",
+                       ok=False)
+
         response_msg = " ".join(m for m in messages if m)
         logger.info("📱 Response: %s | refresh=%s | parse=%s", response_msg, refresh or "none", parse_path)
 
@@ -975,6 +1027,7 @@ def create_app() -> Flask:
     _RECUR_WORDS = [(r"\bevery\s*day\b|\bdaily\b", "daily"), (r"\bevery\s+\w+day\b|\bweekly\b|\b(?:mon|tues|wednes|thurs|fri|satur|sun)days\b", "weekly"),
                     (r"\bevery\s+month\b|\bmonthly\b", "monthly")]
     _JUNK_TITLES = {"task", "tasks", "todo", "event", "events", "reminder", "list", "item", "items"}
+
 
     _WD = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6,
            "mon": 0, "tue": 1, "tues": 1, "wed": 2, "thu": 3, "thur": 3, "thurs": 3, "fri": 4, "sat": 5, "sun": 6}
@@ -1118,6 +1171,25 @@ def create_app() -> Flask:
                         pass
                 if recur and not getattr(intent, "recurrence", None):
                     intent.recurrence = recur; fixes.append(f"recurrence={recur}")
+
+                # A weekly series has to start on the day it names. "standup
+                # every sunday and tuesday at 9am" produced two series both
+                # beginning today, a Wednesday — 106 events, not one of them on
+                # a Sunday or a Tuesday. The recurrence was right and the anchor
+                # was whatever the model happened to pick.
+                if getattr(intent, "recurrence", None) == "weekly":
+                    named = _named_weekdays(tl)
+                    try:
+                        dd = _dt.date.fromisoformat(str(intent.date))
+                    except (TypeError, ValueError):
+                        dd = None
+                    if named and dd is not None and dd.weekday() not in named:
+                        # Whichever named day comes soonest, counting today.
+                        ahead = min((w - today.weekday()) % 7 for w in named)
+                        anchored = today + _dt.timedelta(days=ahead)
+                        fixes.append(f"date {intent.date}→{anchored.isoformat()} "
+                                     f"(weekly series must start on the day it names)")
+                        intent.date = anchored.isoformat()
                 # A time the speaker introduced with "at" is when the thing
                 # STARTS. The model sometimes files it as the end and invents an
                 # earlier start — "dinner with Danny at 8 pm" came out 18:00–20:00.
