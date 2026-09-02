@@ -135,6 +135,13 @@ class ThinkingHUD(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.setWindowTitle("Assistant thinking")
+        # Read-only until you deliberately use it. The card is something you
+        # glance at while working in something else, so nothing inside it may
+        # accept the keyboard: its buttons still take clicks, but a click never
+        # moves the caret out of whatever you were typing in. Without this,
+        # clicking anywhere on the card — or the card merely appearing under a
+        # pointer — pulled focus and the next keystroke went into the void.
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(SHADOW_MARGIN, SHADOW_MARGIN, SHADOW_MARGIN, SHADOW_MARGIN)
@@ -144,6 +151,7 @@ class ThinkingHUD(QWidget):
         self.panel.resized.connect(self._fit)
         lay.addWidget(self.panel)
         self.panel.show()          # the panel hides itself on construction
+        self._make_read_only()
 
         self._drag = _DragFilter(self)
         self.panel.header_widget.installEventFilter(self._drag)
@@ -196,6 +204,31 @@ class ThinkingHUD(QWidget):
         except Exception as exc:
             logger.debug("Could not make the HUD span Spaces: %s", exc)
 
+    def _order_front_without_activating(self) -> None:
+        """Put the card in front without making this app frontmost.
+
+        Cocoa's orderFront_ does exactly that; Qt's raise_() goes through
+        makeKeyAndOrderFront on some paths and takes the keyboard with it.
+        Best effort — without pyobjc the window is already top-most from
+        WindowStaysOnTopHint, it simply may not jump above a sibling.
+        """
+        if QApplication.platformName() != "cocoa":
+            return
+        try:
+            import ctypes
+
+            import objc
+            from AppKit import NSFloatingWindowLevel
+
+            view = objc.objc_object(c_void_p=ctypes.c_void_p(int(self.winId())))
+            window = view.window()
+            if window is None:
+                return
+            window.setLevel_(NSFloatingWindowLevel)
+            window.orderFront_(None)
+        except Exception as exc:
+            logger.debug("Could not order the HUD front without activating: %s", exc)
+
     def _fade_to(self, opacity: float) -> None:
         self._fade.stop()
         self._fade.setStartValue(self.windowOpacity())
@@ -219,9 +252,25 @@ class ThinkingHUD(QWidget):
         """Is there room for the card anywhere near where it was left?"""
         return area.width() >= self.width() and area.height() >= self.height()
 
+    def _make_read_only(self) -> None:
+        """Stop anything inside the card from accepting the keyboard.
+
+        setFocusPolicy on the window alone does not reach its children, and a
+        QPushButton defaults to StrongFocus — so clicking Close or Retry took
+        the caret out of whatever was being typed. Buttons still receive their
+        clicks; they just never become the focus widget.
+
+        Re-run whenever the panel grows, because trace steps are added as they
+        arrive and a widget built after construction would miss the sweep.
+        """
+        self.panel.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        for child in self.panel.findChildren(QWidget):
+            child.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
     def _fit(self) -> None:
         self.setFixedSize(self.panel.width() + 2 * SHADOW_MARGIN,
                           self.panel.height() + 2 * SHADOW_MARGIN)
+        self._make_read_only()
         self._park()
 
     def _park(self) -> None:
@@ -288,7 +337,13 @@ class ThinkingHUD(QWidget):
         # The NSWindow only exists once shown, and macOS resets the behaviour
         # when a window is re-shown, so this is re-applied on every appearance.
         self._follow_every_space()
-        self.raise_()
+        # Deliberately NOT raise_(). On macOS raising a window from an app that
+        # is not frontmost pulls the whole app forward, which is what made the
+        # card steal the keyboard mid-sentence: you speak a command, the card
+        # appears, and the next thing you type goes nowhere. WindowStaysOnTopHint
+        # already keeps it above everything, so raising bought nothing and cost
+        # the thing the class docstring promises.
+        self._order_front_without_activating()
         self.panel.show()
         # Under the pointer already? Then the user is looking at it; otherwise
         # it settles at the idle translucency and stays out of the way.
