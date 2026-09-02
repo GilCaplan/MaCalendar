@@ -109,6 +109,15 @@ struct VoiceButton: View {
             }
         }
         .disabled(status == .thinking || status == .speaking)
+        // Turning "speak replies" off should stop the sentence already being
+        // read, not just suppress the next one. The guards at the call sites
+        // are checked before an utterance starts, so an in-flight reply
+        // carried on talking after the switch was flipped.
+        // Single-argument form: the two-argument onChange is iOS 17+, and this
+        // project's deployment target is lower.
+        .onChange(of: settings.speakReplies) { on in
+            if !on { player.stop() }
+        }
         .sheet(isPresented: $showThinking) {
             ThinkingView(
                 steps: steps,
@@ -190,6 +199,12 @@ struct VoiceButton: View {
                     recorder.stopWordsEnabled = settings.stopWordsEnabled
                     recorder.silenceStopSeconds = settings.silenceStopEnabled ? settings.silenceStopSeconds : 0
                     recorder.onAutoStop = { [self] in finishRecording() }
+                    // Stop talking before listening. The synthesizer holds the
+                    // audio session in .playback, so a reply still being read
+                    // out talks over the recording and the session is in the
+                    // wrong category for the microphone. player.stop() was only
+                    // wired to the cancel path.
+                    player.stop()
                     status = .recording
                     recorder.start()
                 }
@@ -234,12 +249,14 @@ struct VoiceButton: View {
 
     private func redo() {
         countdownTask?.cancel(); pendingAudio = nil
+        player.stop()
         status = .recording
         recorder.start()
     }
 
     private func addMore() {
         countdownTask?.cancel(); pendingAudio = nil
+        player.stop()
         status = .recording
         recorder.start(resume: true)      // keeps what was already said
     }
