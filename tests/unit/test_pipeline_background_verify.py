@@ -223,6 +223,9 @@ def test_tier3_major_undoes_and_reexecutes(registry_with_fakes, sample_config, f
         "parameters": {"titles": ["magsha meme bagru progress update with rina"]},
         "speech": "Actually made that a todo instead.",
     }
+    parser.parse.return_value = [
+        ("create_todo", CreateTodoIntent(titles=["magsha meme bagru progress update with rina"]))
+    ]
     pipeline = _FakePipeline(registry_with_fakes, sample_config, parser)
     fake_db.get_event.return_value = {"title": "rina", "date": "2026-04-08"}
 
@@ -256,6 +259,10 @@ def test_tier3_major_undoes_create_event_before_redo(registry_with_fakes, sample
         "parameters": {"titles": ["visit my friend tal with naor"]},
         "speech": "",
     }
+    # The verdict only triggers; the parser authors the replacement.
+    parser.parse.return_value = [
+        ("create_todo", CreateTodoIntent(titles=["visit my friend tal with naor"]))
+    ]
     pipeline = _FakePipeline(registry_with_fakes, sample_config, parser)
     fake_db.get_event.return_value = {"title": "event", "date": "2026-04-16"}
 
@@ -278,18 +285,22 @@ def test_tier3_major_undoes_create_event_before_redo(registry_with_fakes, sample
 
 
 def test_tier3_invalid_correction_params_does_not_undo(registry_with_fakes, sample_config, fake_db):
-    """If the LLM's correction has invalid, unrecoverable params (create_todo with
-    no titles — unlike create_event, there's no keyword/rule-parser fallback for
-    an empty todo title list), the original fast-path record must survive —
-    validate the correction BEFORE destroying anything.
+    """A correction that cannot be authored must leave the original record alone.
+
+    The verifier's own parameters are no longer trusted — the parser writes the
+    replacement — so the unrecoverable case is now a re-parse that comes back
+    with nothing usable. Either way the rule is the same: never destroy a
+    record the user already has on the strength of a correction we cannot
+    actually build.
     """
     parser = MagicMock()
     parser.verify_fast_path_async.return_value = {
         "severity": "major",
         "action": "create_todo",
-        "parameters": {"titles": []},  # invalid — CreateTodoIntent requires titles
+        "parameters": {"titles": []},
         "speech": "",
     }
+    parser.parse.return_value = []   # nothing recognisable came back
     pipeline = _FakePipeline(registry_with_fakes, sample_config, parser)
     fake_db.get_event.return_value = {"title": "appointment", "date": "2026-04-14"}
 
@@ -350,3 +361,82 @@ def test_background_fix_title_skips_when_event_deleted(registry_with_fakes, samp
     pipeline._background_fix_title("some transcript", 12, "meeting")
 
     fake_db.update_event.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# The verdict is a trigger, not an instruction
+# ---------------------------------------------------------------------------
+
+def test_a_major_verdict_the_parser_disagrees_with_changes_nothing(
+        registry_with_fakes, sample_config, fake_db):
+    """The false alarm this guard exists for.
+
+    Measured against real commands, the verifier wanted to redo a correct
+    complete_todo ("mark the report as finished") as update_todo. Acting on
+    that would undo work the user asked for. When the parser re-reads the
+    transcript and lands on what already ran, the verdict is discarded.
+    """
+    parser = MagicMock()
+    parser.verify_fast_path_async.return_value = {
+        "severity": "major",
+        "action": "update_todo",
+        "parameters": {"match_title": "the report"},
+        "speech": "I think that was an update.",
+    }
+    parser.parse.return_value = [("complete_todo", None)]   # agrees with what ran
+    pipeline = _FakePipeline(registry_with_fakes, sample_config, parser)
+    fake_db.get_todo.return_value = {"title": "the report"}
+
+    rule_result = _rule_result("complete_todo", {"match_title": "the report"})
+    snapshot = {"actions": [("complete_todo", None)], "todo_id": 3,
+                "todo_title": "the report"}
+
+    pipeline._background_verify("mark the report as finished", rule_result, snapshot)
+
+    fake_db.delete_todo.assert_not_called()
+    fake_db.delete_event.assert_not_called()
+    fake_db.update_todo.assert_not_called()
+    pipeline._tts.speak.assert_not_called()
+
+
+def test_an_ambiguous_multi_action_reparse_changes_nothing(
+        registry_with_fakes, sample_config, fake_db):
+    """Undo-and-redo replaces one record with one record. Two is not that."""
+    parser = MagicMock()
+    parser.verify_fast_path_async.return_value = {
+        "severity": "major", "action": "create_todo",
+        "parameters": {"titles": ["x"]}, "speech": "",
+    }
+    parser.parse.return_value = [
+        ("create_event", None), ("create_todo", CreateTodoIntent(titles=["x"])),
+    ]
+    pipeline = _FakePipeline(registry_with_fakes, sample_config, parser)
+    fake_db.get_event.return_value = {"title": "thing", "date": "2026-04-16"}
+
+    rule_result = _rule_result("create_event", {"title": "thing"})
+    snapshot = {"actions": [("create_event", None)], "event_id": 11,
+                "event_title": "thing", "event_date": "2026-04-16"}
+
+    pipeline._background_verify("do a thing and also another thing", rule_result, snapshot)
+
+    fake_db.delete_event.assert_not_called()
+
+
+def test_a_reparse_that_raises_changes_nothing(registry_with_fakes, sample_config, fake_db):
+    """Ollama falling over mid-verify must not cost the user their event."""
+    parser = MagicMock()
+    parser.verify_fast_path_async.return_value = {
+        "severity": "major", "action": "create_todo",
+        "parameters": {"titles": ["x"]}, "speech": "",
+    }
+    parser.parse.side_effect = RuntimeError("ollama died")
+    pipeline = _FakePipeline(registry_with_fakes, sample_config, parser)
+    fake_db.get_event.return_value = {"title": "thing", "date": "2026-04-16"}
+
+    rule_result = _rule_result("create_event", {"title": "thing"})
+    snapshot = {"actions": [("create_event", None)], "event_id": 12,
+                "event_title": "thing", "event_date": "2026-04-16"}
+
+    pipeline._background_verify("book a thing", rule_result, snapshot)
+
+    fake_db.delete_event.assert_not_called()

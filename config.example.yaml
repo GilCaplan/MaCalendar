@@ -57,10 +57,22 @@ claude:
 # 1 = simple yes/no before each action
 confirmation_level: 1
 
-# Background LLM re-check of every fast-path result. Off: four audit runs had it
-# proposing a correction on ~96% of commands and fixing none, while adding ~14 s
-# to each command. Set true to re-enable.
-verify_fast_path: false
+# Background LLM re-check of every fast-path result. Runs on a daemon thread
+# after the record is already written, so it costs the user no latency.
+#
+# It was off because it proposed a correction on ~96% of commands and fixed
+# none. The cause was that it judged the rule parser's raw slots instead of the
+# validated intent: every create_event carries end_time="" before defaults are
+# applied, so the verifier dutifully "fixed" an end time that was already
+# right. It now sees what actually reached the database, and the same
+# measurement gives 0 corrections on 10 correct fast-path commands while still
+# catching 3 of 3 confidently-wrong parses.
+#
+# The verdict only decides *whether* to change something. The replacement is
+# written by the full parser, and if the parser agrees with what already ran
+# the verdict is discarded — the verifier is a good detector and an unreliable
+# author. Set false to go back to trusting the rules unchecked.
+verify_fast_path: true
 
 audio:
   sample_rate: 16000

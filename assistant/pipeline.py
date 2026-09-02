@@ -768,18 +768,36 @@ class Pipeline:
             logger.debug("🖥️ Background title fix failed: %s", exc)
 
     def _background_verify(self, transcript: str, rule_result, snapshot: dict) -> None:
-        """Daemon thread: LLM judges the fast-path result in three tiers.
+        """Daemon thread: the LLM reviews what the fast path just did.
 
-        Tier 1 — ok:    Silent. Rule parser was right.
-        Tier 2 — minor: Silently PATCH the existing record with corrected fields.
+        Two stages, deliberately separate, because they are different questions
+        and the model is good at one and bad at the other:
+
+          1. CLASSIFY — "is this right, or does it need changing?" A yes/no
+             judgement. Measured on commands the rules get confidently wrong,
+             this caught every one.
+          2. AUTHOR — "then what should it be?" Only reached when stage 1 says
+             change it. The verifier's own answer to this is not used: asked
+             inline it proposed create_todo for "Walk Mark's dog today at
+             2:30PM", which has a time and is an event. The full parser is
+             asked instead, and if the parser lands on what already ran, stage
+             1 was a false alarm and nothing is touched.
+
+        Applied as three tiers:
+
+        Tier 1 — ok:    Rule parser was right. Nothing changes.
+        Tier 2 — minor: PATCH the existing record with corrected fields.
                         Speaks a brief correction only when audibly meaningful.
-        Tier 3 — major: Completely wrong action/entity.
-                        Undo the fast-path record (if it was a create), then
-                        re-execute with the LLM-corrected intent.
+        Tier 3 — major: Wrong action/entity. Undo the fast-path record (if it
+                        was a create), then re-execute the authored intent.
 
         Before applying any correction, checks if the user already modified the
         record (manual edit, another voice command, etc.). If so, skips the
         correction — the user's change acts as implicit feedback.
+
+        Every outcome publishes a trace step, including agreement. A check that
+        happens invisibly is one the user cannot trust or overrule: the panel
+        has to be able to say "I looked at this and left it alone".
         """
         from assistant.db import get_db
 
@@ -803,13 +821,26 @@ class Pipeline:
                 )
                 return
 
+        action_names = [name for name, _ in snapshot.get("actions", [])]
+        _ran = ", ".join(n.replace("_", " ") for n in action_names) or "the command"
+
+        # --- Stage 1: classify — leave it, or change it? --------------------
+        self._trace_late_step("verify", "Self-check",
+                              f"Re-reading {_ran} with the LLM…")
         correction = self._parser.verify_fast_path_async(transcript, rule_result)
         if correction is None:
-            return  # tier 1 — confirmed correct, silent
+            # Tier 1. Said out loud in the trace rather than silently: this is
+            # the common case, and it is the evidence that the check ran.
+            self._trace_late_step("verify", "Self-check",
+                                  f"Checked {_ran} — correct, left alone")
+            return
 
         severity = correction.get("severity", "major")
         speech = correction.get("speech", "")
-        action_names = [name for name, _ in snapshot.get("actions", [])]
+        self._trace_late_step(
+            "verify", "Self-check",
+            f"Flagged as {severity}" + (f": {speech}" if speech else "") + " — working out the fix",
+            ok=False)
 
         # ---------------------------------------------------------------
         # Guard: did the user already change the record?
@@ -821,6 +852,8 @@ class Pipeline:
                 "🖥️ Background verify: user already changed record — skipping correction, "
                 "treating as implicit feedback that rule parser was wrong for: %r", transcript
             )
+            self._trace_late_step("verify", "Self-check",
+                                  "You had already edited this — left your version alone")
             return
 
         # Log the mistake scenario before applying any correction
@@ -855,6 +888,8 @@ class Pipeline:
         if severity == "minor":
             patch = correction.get("patch", {})
             if not patch:
+                self._trace_late_step("verify", "Self-check",
+                                      "Nothing concrete to change — kept the original")
                 return
             applied = False
             event_id = snapshot.get("event_id")
@@ -887,20 +922,64 @@ class Pipeline:
         if not corrected_action:
             return
 
-        # Validate the corrected intent BEFORE undoing anything — if the LLM
-        # returned bad parameters (e.g. empty title) we must not destroy the
-        # original record that the user already has.
+        # The verifier is a good detector and an unreliable author. Measured on
+        # parses the rules get confidently wrong, it spotted every one — and
+        # then proposed create_todo for "Walk Mark's dog today at 2:30PM",
+        # which has a time and is plainly an event, and wanted to redo a
+        # correct complete_todo as update_todo. The full parser gets both
+        # right. So the verdict is used only as the trigger, and the parser
+        # writes the replacement.
+        #
+        # This is also the last safety gate before an undo: if the parser
+        # agrees with what already ran, the verdict was a false alarm and the
+        # record must be left alone. Without it a wrong "major" deletes an
+        # event the user correctly asked for.
+        try:
+            reparsed = self._parser.parse(transcript)
+        except Exception as exc:
+            logger.info("🖥️ Correction re-parse failed (%s) — leaving the record alone", exc)
+            self._trace_late_step("verify", "Self-check",
+                                  f"Couldn't work out a fix ({exc}) — kept the original", ok=False)
+            return
+        replacement = [(n, i) for n, i in (reparsed or [])
+                       if n != "unknown" and not isinstance(i, UnknownIntent)]
+        if not replacement:
+            logger.info("🖥️ Correction re-parse produced nothing — leaving the record alone")
+            self._trace_late_step("verify", "Self-check",
+                                  "No better reading found — kept the original", ok=False)
+            return
+        if [n for n, _ in replacement] == action_names:
+            logger.info(
+                "🖥️ Background verify: parser agrees with %s — treating the verdict as a "
+                "false alarm and keeping the record", action_names)
+            self._trace_late_step("verify", "Self-check",
+                                  f"Second opinion agrees with {_ran} — false alarm, kept it")
+            return
+        if len(replacement) > 1:
+            logger.info("🖥️ Correction re-parse returned %d actions — too ambiguous to "
+                        "undo and redo automatically", len(replacement))
+            self._trace_late_step("verify", "Self-check",
+                                  "Fix was ambiguous — kept the original rather than guess",
+                                  ok=False)
+            return
+
+        corrected_action, intent = replacement[0]
+        corrected_params = intent.model_dump() if hasattr(intent, "model_dump") else {}
+        logger.info("🖥️ Correction authored by the parser: %s → %s",
+                    action_names, corrected_action)
+
         action_cls = self.registry.get(corrected_action)
         if action_cls is None:
             logger.warning("🖥️ Correction action %r not in registry", corrected_action)
             return
 
-        # If the LLM returned an empty title for create_event, try to recover
-        # it before bailing: prefer the rule parser's title, then keyword fallback.
-        if corrected_action == "create_event" and not corrected_params.get("title"):
+        # `intent` came back validated from the parser, so there is nothing to
+        # re-validate — but an empty title still has to be recovered before it
+        # reaches the calendar: prefer the rule parser's title, then a keyword.
+        if corrected_action == "create_event" and not getattr(intent, "title", ""):
             _rule_title = rule_result.raw_slots.get("create_event", {}).get("title") or ""
             if _rule_title:
-                corrected_params["title"] = _rule_title
+                intent.title = _rule_title
                 logger.info("🖥️ Filled empty correction title from rule parser: %r", _rule_title)
             else:
                 # Keyword fallback: first calendar-type noun in transcript
@@ -911,23 +990,19 @@ class Pipeline:
                 _transcript_lower = transcript.lower()
                 for _kw in _CAL_TITLE_WORDS:
                     if _kw in _transcript_lower:
-                        corrected_params["title"] = _kw.capitalize()
+                        intent.title = _kw.capitalize()
                         logger.info(
                             "🖥️ Filled empty correction title from keyword fallback: %r",
-                            corrected_params["title"],
+                            intent.title,
                         )
                         break
 
-        try:
-            intent = action_cls.intent_model.model_validate(corrected_params)
-        except Exception as exc:
-            logger.warning(
-                "🖥️ Major correction params invalid — skipping undo+redo: %s", exc
-            )
+        if corrected_action == "create_event" and not getattr(intent, "title", ""):
+            logger.warning("🖥️ Correction has no usable title — skipping undo+redo")
             self._append_scenario_bug(
                 transcript,
                 issue_type="correction_failed",
-                details=f"LLM correction action={corrected_action!r} had invalid params: {exc}",
+                details=f"Re-parse gave action={corrected_action!r} with no title",
                 extra={"Corrected params": corrected_params},
             )
             return
