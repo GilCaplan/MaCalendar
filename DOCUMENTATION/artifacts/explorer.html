@@ -340,6 +340,15 @@
       <text x="681" y="310" text-anchor="middle" font-size="8" font-weight="600">private mesh VPN</text>
       <text x="681" y="322" text-anchor="middle" font-size="7.5" fill="var(--muted)">words ↔ results</text>
     </g>
+
+    <g data-panel="queue" role="button" tabindex="0"
+       aria-label="When the host is away: three queues hold work until the link or the language model comes back.">
+      <path d="M 681 342 L 681 350" stroke="var(--line)" stroke-width="1.2" marker-end="url(#mi)"/>
+      <rect class="frame" x="634" y="350" width="98" height="36" rx="6" fill="none"
+            stroke="var(--line)" stroke-dasharray="4 3"/>
+      <text x="683" y="365" text-anchor="middle" font-size="8.5" font-weight="600">when the host</text>
+      <text x="683" y="377" text-anchor="middle" font-size="8" fill="var(--muted)">is away: 3 queues</text>
+    </g>
     <g id="clients"></g>
 
     <!-- ============ THE INTERNET, NEVER ============ -->
@@ -975,7 +984,7 @@ series_id   NULL
   },
 
   queue: {
-    tag:"speaking to nothing", title:"When the host is away", z:[820,300,1.6],
+    tag:"speaking to nothing", title:"When the host is away", z:[683,368,2.4],
     sum:`<p>Three queues, at two different points. A device holds what it cannot send; the host holds what it cannot yet understand.</p>
     <p class="figs">sound is kept &#183; meaning is decided later</p>`,
     more:`<div class="tblwrap"><table>
