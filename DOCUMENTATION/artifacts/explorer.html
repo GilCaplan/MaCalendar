@@ -153,9 +153,7 @@
       <rect class="frame" x="117" y="176" width="114" height="124" rx="6" fill="var(--panel)" stroke="var(--model)" stroke-width="1.5"/>
       <text x="174" y="198" text-anchor="middle" font-size="11" font-weight="600" fill="var(--model)">model server</text>
       <text x="174" y="218" text-anchor="middle" font-size="9.5" fill="var(--muted)">Llama 3.1 8B</text>
-      <text x="174" y="233" text-anchor="middle" font-size="9.5" fill="var(--muted)">4-bit · pinned</text>
       <text x="174" y="248" text-anchor="middle" font-size="9.5" fill="var(--muted)">5.8 GB resident</text>
-      <text x="174" y="270" text-anchor="middle" font-size="8.5" fill="var(--muted)">always warm</text>
     </g>
 
     <!-- THE BRAIN frame + header -->
@@ -163,7 +161,6 @@
     <g data-panel="brain" role="button" tabindex="0" aria-label="The brain: the one process that parses and executes every command from both devices.">
       <rect class="frame" x="250" y="128" width="205" height="42" rx="8" fill="transparent" stroke="transparent"/>
       <text x="352" y="150" text-anchor="middle" font-size="13.5" font-weight="600" letter-spacing="1.4" fill="var(--amber)">THE BRAIN</text>
-      <text x="352" y="164" text-anchor="middle" font-size="8.5" fill="var(--muted)">one process — parses &amp; executes everything</text>
     </g>
 
     <!-- pipeline chain, steps 2..7 -->
@@ -219,7 +216,6 @@
       <rect class="frame" x="478" y="128" width="122" height="82" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.5"/>
       <line x1="478" y1="144" x2="600" y2="144" stroke="var(--line)"/>
       <circle cx="488" cy="136" r="2" fill="var(--muted)"/><circle cx="496" cy="136" r="2" fill="var(--muted)"/>
-      <text x="539" y="140" text-anchor="middle" font-size="8" fill="var(--muted)">the app you look at</text>
       <!-- the tabs, because five domains is what this window actually is -->
       <rect x="484" y="150" width="26" height="11" rx="2" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width=".8"/>
       <text x="497" y="158.5" text-anchor="middle" font-size="6.5" fill="var(--amber)">month</text>
@@ -239,18 +235,28 @@
       </g>
       <rect x="524" y="171" width="14" height="6" rx="1.5" fill="var(--amber)" opacity=".75"/>
       <rect x="560" y="182" width="14" height="6" rx="1.5" fill="var(--model)" opacity=".7"/>
-      <text x="539" y="207" text-anchor="middle" font-size="8.5" fill="var(--muted)">draws · records · posts — parses nothing</text>
     </g>
 
     <!-- thinking panel: floats past the laptop frame -->
-    <g data-panel="hud" role="button" tabindex="0" aria-label="The thinking panel: a floating card that talks to nothing and tails a log file.">
+    <g data-panel="hud" role="button" tabindex="0" aria-label="The review panel: a floating card listing every step the system took for a command, with its timings. It talks to nothing and reads a log file.">
       <rect x="524" y="236" width="116" height="64" rx="6" fill="var(--shadow)" opacity=".5"/>
       <rect class="frame" x="520" y="232" width="116" height="64" rx="6" fill="var(--panel)" stroke="var(--line)" stroke-width="1.5"/>
       <line x1="520" y1="246" x2="636" y2="246" stroke="var(--line)"/>
       <circle cx="529" cy="239" r="2" fill="var(--amber)"/>
-      <text x="578" y="262" text-anchor="middle" font-size="10.5" font-weight="600">thinking panel</text>
-      <text x="578" y="276" text-anchor="middle" font-size="8.5" fill="var(--muted)">floats over everything</text>
-      <text x="578" y="288" text-anchor="middle" font-size="8.5" fill="var(--muted)">talks to nothing</text>
+      <text x="578" y="242" text-anchor="middle" font-size="9" font-weight="600">review panel</text>
+      <!-- show the steps rather than describing them: this is what it is FOR -->
+      <g font-size="6.5" fill="var(--muted)">
+        <circle cx="530" cy="256" r="2" fill="var(--good)"/>
+        <text x="537" y="258.5">heard</text>
+        <text x="630" y="258.5" text-anchor="end">0.4s</text>
+        <circle cx="530" cy="267" r="2" fill="var(--good)"/>
+        <text x="537" y="269.5">corrected 1 word</text>
+        <circle cx="530" cy="278" r="2" fill="var(--amber)"/>
+        <text x="537" y="280.5">rules · 1.00</text>
+        <text x="630" y="280.5" text-anchor="end">0.1s</text>
+        <circle cx="530" cy="289" r="2" fill="var(--good)"/>
+        <text x="537" y="291.5">wrote event</text>
+      </g>
     </g>
     <!-- tails -->
     <line x1="556" y1="404" x2="576" y2="302" stroke="var(--muted)" stroke-dasharray="3 3" marker-end="url(#mi)"/>
@@ -261,19 +267,16 @@
     <g data-panel="write" role="button" tabindex="0" aria-label="The calendar database file: the single source of truth.">
       <path class="frame" d="M 252 406 L 332 406 L 342 416 L 342 444 L 252 444 Z" fill="var(--panel)" stroke="var(--line)" stroke-width="1.5"/>
       <text x="297" y="424" text-anchor="middle" font-size="9">calendar db</text>
-      <text x="297" y="437" text-anchor="middle" font-size="8" fill="var(--muted)">the truth</text>
     </g>
     <g data-panel="learn" role="button" tabindex="0" aria-label="Step 8: the command memory file. Every command, what it produced, and your verdict.">
       <path class="frame" d="M 362 406 L 442 406 L 452 416 L 452 444 L 362 444 Z" fill="var(--panel)" stroke="var(--line)" stroke-width="1.5"/>
       <text x="407" y="424" text-anchor="middle" font-size="9">memory db</text>
-      <text x="407" y="437" text-anchor="middle" font-size="8" fill="var(--muted)">your history</text>
       <circle cx="366" cy="406" r="7.5" fill="var(--amber)"/>
       <text x="366" y="409.5" text-anchor="middle" font-size="9" font-weight="600" fill="var(--bg)">8</text>
     </g>
-    <g data-panel="hud" role="button" tabindex="0" aria-label="The trace log: JSON lines the brain appends and the thinking panel tails.">
+    <g data-panel="hud" role="button" tabindex="0" aria-label="The trace log: JSON lines the brain appends and the review panel tails.">
       <path class="frame" d="M 472 406 L 552 406 L 562 416 L 562 444 L 472 444 Z" fill="var(--panel)" stroke="var(--line)" stroke-width="1.5"/>
       <text x="517" y="424" text-anchor="middle" font-size="9">trace log</text>
-      <text x="517" y="437" text-anchor="middle" font-size="8" fill="var(--muted)">the thinking</text>
     </g>
 
     <!-- mic on the base = step 1 -->
@@ -297,7 +300,6 @@
       <!-- what the two arrows actually travel over -->
       <rect x="636" y="322" width="90" height="30" rx="5" fill="var(--panel)" stroke="var(--line)" stroke-dasharray="3 2"/>
       <text x="681" y="334" text-anchor="middle" font-size="8" font-weight="600">private mesh VPN</text>
-      <text x="681" y="345" text-anchor="middle" font-size="7.5" fill="var(--muted)">your two machines only</text>
     </g>
 
     <!-- ============ THE PHONE ============ -->
@@ -310,13 +312,10 @@
       <rect x="803" y="201" width="6" height="11" rx="3" fill="var(--amber)"/>
       <path d="M 798 210 a 8 8 0 0 0 16 0" fill="none" stroke="var(--amber)" stroke-width="1.5"/>
       <line x1="806" y1="218" x2="806" y2="222" stroke="var(--amber)" stroke-width="1.5"/>
-      <text x="806" y="243" text-anchor="middle" font-size="8.5" fill="var(--muted)">records — decides nothing</text>
       <rect x="752" y="258" width="108" height="46" rx="5" fill="var(--panel)" stroke="var(--line)"/>
       <text x="806" y="277" text-anchor="middle" font-size="9.5" font-weight="600">local copy</text>
-      <text x="806" y="292" text-anchor="middle" font-size="8.5" fill="var(--muted)">works offline</text>
       <rect x="752" y="318" width="108" height="46" rx="5" fill="var(--panel)" stroke="var(--line)"/>
       <text x="806" y="337" text-anchor="middle" font-size="9.5" font-weight="600">voice queue</text>
-      <text x="806" y="352" text-anchor="middle" font-size="8.5" fill="var(--muted)">sound, not actions</text>
       <rect x="752" y="384" width="108" height="26" rx="13" fill="transparent" stroke="var(--line)"/>
       <text x="806" y="401" text-anchor="middle" font-size="9" fill="var(--amber)">source: "ios"</text>
       <line x1="783" y1="474" x2="829" y2="474" stroke="var(--line)" stroke-width="2.5" stroke-linecap="round"/>
@@ -528,14 +527,13 @@ const P = {
     <p>The same rule decides what voice reaches: speech is good at "book the dentist Thursday at four" and poor at "log the last forty minutes to the third project". Where a screen is the better instrument, there is only a screen.</p>`
   },
   hud: {
-    tag:"on the laptop", name:"thinking", title:"The thinking panel",
+    tag:"on the laptop", name:"thinking", title:"The review panel",
     z:[560,300,2.2],
-    sum:`<p>Shows the reasoning as it happens — and talks to nothing. It reads a log file the brain appends to.</p>
+    sum:`<p>Every step the system took for a command, with its timings — so a wrong answer can be traced to the step that caused it rather than guessed at.</p>
     <p class="figs">floats over anything · works with the calendar closed</p>`,
-    more:`<p>That non-connection is the feature. Because it holds no link to any process, it can
-    float over a full-screen app with the calendar closed — and a command spoken to the phone in
-    another room still streams onto the laptop's screen, because the brain writes the same lines
-    wherever the words came from.</p>`
+    more:`<p>It is a separate application that <strong>talks to nothing</strong>. The brain appends one JSON line per step to a log file; this reads that file. Choosing a file over a connection buys three things at once: it floats above a full-screen app with the calendar shut, a command spoken to the phone shows up here without either device knowing about the other, and the log is the durable record its history view reads back.</p>
+    <p>Each run lists what was heard, which words the vocabulary changed, which parser answered and with what confidence, what was written, and what the model said when it reviewed the result afterwards. Steps that failed are marked, so "it put it on the wrong day" becomes a question with an answer.</p>
+    <p>The history is searchable and filterable — by device, by kind, by outcome — and commands from scripts are labelled as such so they do not get mistaken for things you actually asked for.</p>`
   },
   link: {
     tag:"between the devices", name:"link", title:"One field of difference",
