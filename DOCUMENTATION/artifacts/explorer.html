@@ -91,6 +91,10 @@
             padding:4px 10px 4px 0; letter-spacing:.04em;}
   #pbody td{border-bottom:1px solid var(--faint); padding:5px 10px 5px 0; vertical-align:top;}
   #pbody .tblwrap{overflow-x:auto;}
+  #pbody pre{background:var(--codebg); border:1px solid var(--line); border-radius:6px;
+             padding:10px 12px; overflow-x:auto; margin:0 0 14px;}
+  #pbody pre code{background:none; border:0; padding:0; font-size:12px; line-height:1.65;
+                  white-space:pre; display:block;}
   #pbody svg{max-width:100%; height:auto; display:block; margin:2px 0 14px;}
   #pbody svg text{font-family:'IBM Plex Mono',ui-monospace,monospace; fill:var(--ink);}
   #pbody figcaption{font:400 11.5px/1.5 'IBM Plex Mono',monospace; color:var(--muted);
@@ -137,11 +141,12 @@
   <h1>Under the Lid</h1>
   <p class="lede">A voice-driven calendar assistant that runs entirely on one host laptop, with thin
   surfaces attached over a private link — a phone in practice, as many as you like in principle.
-  You speak; an event appears. No account, no API key, nothing sent to any company — and
+  You speak and an event appears — or you type it, which works just as well. No account, no API key, nothing sent to any company — and
   <strong>one brain</strong>: every command, from every surface, is understood and executed by a
   single process on the host. Everything else in the drawing is thin.</p>
-  <p class="stats"><b>3</b> local models &nbsp;·&nbsp; <b>15</b> actions &nbsp;·&nbsp;
-  <b>0</b> requests to the internet</p>
+  <p class="stats">
+    <b>3</b> local models &nbsp;&#183;&nbsp; <b>0</b> requests to the internet
+  </p>
 </header>
 
 <div class="stagewrap">
@@ -292,7 +297,7 @@
       <circle cx="366" cy="406" r="7.5" fill="var(--amber)"/>
       <text x="366" y="409.5" text-anchor="middle" font-size="9" font-weight="600" fill="var(--bg)">8</text>
     </g>
-    <g data-panel="hud" role="button" tabindex="0" aria-label="The trace log: JSON lines the brain appends and the review panel tails.">
+    <g data-panel="tracelog" role="button" tabindex="0" aria-label="The trace log: JSON lines the brain appends and the review panel tails.">
       <path class="frame" d="M 472 406 L 552 406 L 562 416 L 562 444 L 472 444 Z" fill="var(--panel)" stroke="var(--line)" stroke-width="1.5"/>
       <text x="517" y="424" text-anchor="middle" font-size="9">trace log</text>
     </g>
@@ -420,6 +425,8 @@
   <button data-go="write"><b>6</b>write</button>
   <button data-go="review"><b>7</b>review</button>
   <button data-go="learn"><b>8</b>learn</button>
+  <button data-go="batch">several at once</button>
+  <button data-go="queue">host away</button>
 </nav>
 
 <script>
@@ -429,7 +436,27 @@ const P = {
     z:[352,256,1.9],
     sum:`<p>One process understands and executes everything. The host's own window and every attached surface are thin clients — <strong>none of them contains a parser</strong>.</p>
     <p class="figs">15 actions · 101 endpoints · ~34,000 lines · a test suite</p>`,
-    more:`<p>It was not always this way. The calendar window once carried its own private copy of
+    more:`<p>"Fifteen things it can do" is literal: an action is one verb the assistant knows, and
+    nothing outside this list can be asked for. Adding a sixteenth means adding a directory, not
+    editing the pipeline.</p>
+    <table>
+      <thead><tr><th>What</th><th>n</th><th>The verbs</th></tr></thead>
+      <tbody>
+        <tr><td class="m">events</td><td class="n">4</td><td>create &#183; update &#183; delete &#183; ask what is on</td></tr>
+        <tr><td class="m">tasks</td><td class="n">8</td><td>create &#183; update &#183; complete &#183; delete &#183; ask &#183; and the same four again for sub-tasks</td></tr>
+        <tr><td class="m">training</td><td class="n">2</td><td>write a routine &#183; place it on real dates</td></tr>
+        <tr><td class="m">clarify</td><td class="n">1</td><td>say it did not understand, rather than guess</td></tr>
+      </tbody>
+    </table>
+    <p>The shape of that table is itself a finding. Tasks take twice as many verbs as events
+    because a task has a lifecycle &mdash; it can be completed, un-completed, and carry children
+    that do the same &mdash; while an event only exists or does not. And the fifteenth is the one
+    that does nothing: a system that cannot say "I did not follow that" has to invent something
+    instead.</p>
+    <p>Only nine of the fifteen can be reached by the rules. The rest &mdash; anything involving
+    sub-tasks or training &mdash; always goes to the model, because the sentences that ask for
+    them are too varied for a verb table to catch.</p>
+    <p>It was not always this way. The calendar window once carried its own private copy of
     the whole pipeline. The two copies drifted, and every fix had to be written twice or the
     surfaces would disagree about what a sentence meant. Collapsing to one brain is the decision
     everything else on this page leans on: a behaviour that exists, exists once, and the phone
@@ -525,10 +552,9 @@ const P = {
     z:[300,376,2.3],
     sum:`<p>Written to a file on the disk, and the answer comes straight back. Nothing waits.</p>
     <p class="figs">one SQLite file · yours, on your machine</p>`,
-    more:`<p>One file, twenty-one tables. The calendar is the smallest part of it — events and tasks are two tables among timers, counters, courses, assignments, training plans, tags and sub-tasks. The voice pipeline touches the first few; the rest are filled by the screens.</p>
+    more:`<p>One file, twenty-one tables. Events and tasks are two of them, among timers, counters, courses, assignments and training plans. The voice pipeline touches the first few; the screens fill the rest.</p>
     <svg viewBox="0 0 380 208" role="img" aria-label="The nineteen columns of one event row, grouped by what fills them: nine come from what you said, three the system decides, three are bookkeeping, and four exist only for syncing with a hosted calendar.">
   <text x="0" y="11" font-size="9" fill="var(--muted)">ONE EVENT ROW · 19 COLUMNS</text>
-
   <rect x="0" y="20" width="380" height="52" rx="4" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.2"/>
   <text x="7" y="33" font-size="8.5" fill="var(--amber)">FROM WHAT YOU SAID — 9</text>
   <g font-size="8.5">
@@ -536,29 +562,50 @@ const P = {
     <text x="160" y="47">end_time</text><text x="222" y="47">attendees</text><text x="286" y="47">location</text>
     <text x="7" y="62">description</text><text x="80" y="62">recurrence</text><text x="152" y="62">recurrence_end</text>
   </g>
-
   <rect x="0" y="80" width="184" height="40" rx="4" fill="none" stroke="var(--model)" stroke-width="1.2"/>
   <text x="7" y="93" font-size="8.5" fill="var(--model)">THE SYSTEM DECIDES — 3</text>
   <g font-size="8.5"><text x="7" y="110">category</text><text x="62" y="110">color</text><text x="106" y="110">series_id</text></g>
-
   <rect x="196" y="80" width="184" height="40" rx="4" fill="none" stroke="var(--line)" stroke-width="1.2"/>
   <text x="203" y="93" font-size="8.5" fill="var(--muted)">BOOKKEEPING — 3</text>
   <g font-size="8.5"><text x="203" y="110">id</text><text x="222" y="110">created_at</text><text x="290" y="110">updated_at</text></g>
-
   <rect x="0" y="128" width="380" height="40" rx="4" fill="none" stroke="var(--line)" stroke-width="1.2" stroke-dasharray="3 2"/>
   <text x="7" y="141" font-size="8.5" fill="var(--muted)">ONLY IF YOU CONNECT A HOSTED CALENDAR — 4</text>
   <g font-size="8.5" fill="var(--muted)">
     <text x="7" y="158">source</text><text x="52" y="158">external_id</text>
     <text x="124" y="158">external_source</text><text x="216" y="158">sync_dirty</text>
-  
-
-    </g>
-
-  <text x="0" y="188" font-size="8.5" fill="var(--muted)">a task row is the same shape: 16 columns, 6 of them yours</text>
-  <text x="0" y="201" font-size="8.5" fill="var(--muted)">— title, list, priority, due_date, tags, quantity</text>
+  </g>
+  <text x="0" y="190" font-size="8.5" fill="var(--muted)">most of a row is empty most of the time — an event with no</text>
+  <text x="0" y="202" font-size="8.5" fill="var(--muted)">guests, no place and no repeat leaves twelve columns blank</text>
 </svg>
-<figcaption>Understanding the sentence fills nine of nineteen columns. The rest is the system's own work.</figcaption><p>Two of those groups are worth noticing. <strong>The system decides three columns</strong> — what kind of thing this is, therefore what colour, and whether it belongs to a repeating series — none of which you said. And <strong>four exist only for syncing</strong> with a hosted calendar, which is off unless you connect one; on a machine that never does, they are dead weight carried so the feature can exist at all.</p>
-    <p>A repeating event is not a rule stored once. Each occurrence is an ordinary row sharing a <code>series_id</code>, so every query in the system stays a plain date lookup that knows nothing about recurrence — and a day that should be skipped is simply never written.</p>`
+<figcaption>Understanding the sentence fills nine of nineteen columns. The rest is the system's own work.</figcaption><p>Spoken aloud, <em>"lunch with Sam on Thursday at one"</em> becomes a row that is mostly
+    empty:</p>
+<pre><code>title       "Lunch with Sam"
+date        "2026-09-10"
+start_time  "13:00"
+end_time    "14:00"    &lt;- assumed
+category    "Social"   &lt;- inferred
+color       "#c2708a"  &lt;- follows
+attendees   ""
+location    ""
+description ""
+recurrence  ""
+series_id   NULL
+</code></pre>
+    <p>Four of those were never in the sentence. The end time is a default; the two below it are
+    the system classifying its own record so the calendar can colour it.</p>
+
+    <p>A task is the same idea, and only six of its sixteen columns are ever yours:</p>
+<pre><code>title     "buy pasta"
+list      "today"
+quantity  5          &lt;- "times five"
+tags      ["Groceries"]
+priority  "none"
+completed 0
+</code></pre>
+    <p>Both late additions came from the same kind of failure. <code>quantity</code> exists
+    because there was no way to say "five of these", so a count could only be written as five
+    identical tasks &mdash; and ticking one of those tells you nothing. <code>tags</code> is
+    inferred when you do not say one, which is why the word list carries labels at all.</p>`
   },
   review: {
     tag:"step 7 of 8", name:"review", title:"The model reads everything — afterwards",
@@ -613,11 +660,29 @@ const P = {
   window: {
     tag:"on the laptop", name:"window", title:"The calendar window",
     z:[539,169,2.4],
-    sum:`<p>The application you actually look at — calendar, tasks, timer, coursework. It draws and it records. <strong>It parses nothing.</strong></p>
+    sum:`<p>The application you actually look at — calendar, tasks, timer, coursework. Everything the assistant can do, you can also do by hand here. <strong>It parses nothing.</strong></p>
     <p class="figs">most of the ~34,000 lines live here</p>`,
-    more:`<p>Worth saying plainly, because the drawing makes the brain look like the whole system: by volume, this window <em>is</em> the project. Five domains of screens, direct editing, drag and drop, colour rules, stacking overlapping events.</p>
-    <p>What it does not have is a parser. It once did — the window carried its own copy of the whole pipeline, the two drifted, and every fix had to be written twice or the two surfaces disagreed. It now posts text to the brain exactly as the phone does, and about 1,200 lines of duplicated understanding were deleted.</p>
-    <p>The same rule decides what voice reaches: speech is good at "book the dentist Thursday at four" and poor at "log the last forty minutes to the third project". Where a screen is the better instrument, there is only a screen.</p>`
+    more:`<p>Worth saying plainly, because the drawing puts the brain at the centre: <strong>speaking is
+    optional.</strong> Every record the assistant creates can be created, edited and deleted
+    directly — type a title, drag an event to another hour, tick a task, pick a colour, set a
+    repeat. Nothing about the system assumes you used your voice, and nothing is second-class if
+    you did not.</p>
+
+    <p>The two routes meet at the same place. A typed event and a spoken one produce the same row,
+    take the same thirteen checks, and are edited the same way afterwards — because the screen and
+    the brain both write through one path. That is also why a correction made by hand counts as
+    feedback: the system cannot tell, and does not need to, whether you fixed a title because the
+    parser got it wrong or because you changed your mind.</p>
+
+    <p>Some things are deliberately screen-only. Speech is good at "book the dentist Thursday at
+    four" and poor at "log the last forty minutes to the third project and split the session".
+    Where a screen is the better instrument, there is only a screen — which is why voice reaches
+    the calendar and tasks fully, training partly, and the timer and coursework not at all.</p>
+
+    <p>What this window does not have is a parser. It once did — it carried its own copy of the
+    whole pipeline, the two drifted, and every fix had to be written twice or the two surfaces
+    disagreed. It now posts text to the brain exactly as a phone does, and about 1,200 lines of
+    duplicated understanding were deleted.</p>`
   },
   hud: {
     tag:"on the laptop", name:"thinking", title:"The review panel",
@@ -716,6 +781,72 @@ const P = {
     reach further. It has already caught one regression — a library quietly fetching its model
     from the internet on every start.</p>`
   },
+  tracelog: {
+    tag:"on disk", title:"The trace log", z:[500,436,2.2],
+    sum:`<p>One line of JSON per step, appended as the work happens. It is how the review panel
+    knows anything, and the only record of <em>why</em> a command went the way it did.</p>
+    <p class="figs">append-only &#183; survives a crash &#183; readable with any text editor</p>`,
+    more:`<p>A finished run looks like this &mdash; one object, one command:</p>
+    <pre><code>{"run": "run-8f3a",
+ "source": "ios",
+ "steps": [
+  {"stage":"vocab",  "ms":2,   "ok":true},
+  {"stage":"rule",   "ms":96,  "ok":true},
+  {"stage":"execute","ms":11,  "ok":true},
+  {"stage":"verify", "ms":6210,"ok":true}
+ ],
+ "result": {"message":"...","memory_id":417}}
+</code></pre>
+    <p>Two things follow from it being a file rather than a connection. The review panel can be
+    closed, crashed or started late and still show the whole history, because the record is on
+    disk and not in anyone's memory. And a command spoken to a phone appears on the host's screen
+    without either device knowing the other exists &mdash; one writes, the other reads.</p>
+    <p><code>source</code> is stamped on every run and defaults to <code>"test"</code> rather than
+    to a real device, so a script that forgets to identify itself is filtered out of the history
+    instead of quietly becoming part of what you appear to have asked for.</p>`
+  },
+
+  batch: {
+    tag:"more than one at a time", title:"Several things at once", z:[420,300,1.6],
+    sum:`<p>One sentence can hold two events, and the rule parser has only one set of slots. Rather
+    than fill half of them it refuses outright and hands the whole sentence to the model.</p>
+    <p class="figs">refusing beats guessing at the second half</p>`,
+    more:`<p>Three different situations, deliberately handled differently:</p>
+    <p><strong>Two events in one sentence.</strong> "lunch at noon and coffee at nine" gets no
+    confidence score at all &mdash; the parser detects that it cannot represent the sentence and
+    raises rather than returning a half-filled answer. A softer version of the same instinct lives
+    in the score: two clock times in one span multiply confidence by 0.70, because a second time
+    is usually a second event.</p>
+    <p><strong>Several commands in one go.</strong> They can be sent bracketed &mdash;
+    <code>[gym tomorrow at 7am] [call the dentist at four]</code> &mdash; and the host splits them
+    and parses each apart. Parsing them separately is more accurate than parsing them joined,
+    because each gets its own slots and its own score.</p>
+    <p><strong>Several items in one task.</strong> "buy chicken and rice" is two tasks, not one,
+    with the verb shared out. The hard part is the conjunctions that are not separators: "a gift
+    for mum and dad" is one errand, and "fish and chips" is one thing to buy.</p>
+    <p>Whatever the shape, each resulting record is written, checked and remembered on its own.
+    There is no such thing as a half-executed command &mdash; if the third of four fails, the
+    first two stand and the failure is reported against the third.</p>`
+  },
+
+  queue: {
+    tag:"speaking to nothing", title:"When the host is away", z:[820,300,1.6],
+    sum:`<p>Speak with the host unreachable and the recording is kept, not the decision. It is
+    transcribed and understood on reconnect, against the calendar as it is then.</p>
+    <p class="figs">sound is kept &#183; meaning is decided later</p>`,
+    more:`<p>This is the right way round, and it is worth saying why. A queued command could have
+    been stored as "create an event on Thursday" &mdash; already decided. Storing the sound
+    instead means it is re-decided when it finally runs, with whatever the calendar looks like by
+    then. An instruction is a thing you meant, not a diff you computed.</p>
+    <p>The consequences are all small and all deliberate. A flush that several things ask for at
+    once &mdash; reconnecting, opening the app, the poll loop &mdash; is guarded, because replaying
+    the same audio twice would create the event twice. The result arrives as a notification rather
+    than silently: a calendar changing on its own from something you said an hour ago is worse
+    than the command not running. And a queued edit the host refuses &mdash; a change to a record
+    that has since moved, a delete of something already gone &mdash; is dropped and reported
+    rather than left at the head of the queue blocking everything behind it.</p>`
+  },
+
   bench: {
     tag:"beside the machine", name:"bench", title:"How it is kept honest", z:[500,622,1.35],
     sum:`<p>Written notes carry the decisions; tests fail the build when the code and the notes
@@ -740,7 +871,7 @@ const P = {
   }
 };
 const ORDER = ["brain","hear","correct","parse","route","check","write","review","learn",
-               "models","window","hud","link","phone","sun","cloud","bench"];
+               "models","window","hud","tracelog","batch","queue","link","phone","sun","cloud","bench"];
 
 const stage = document.getElementById("stage");
 const world = document.getElementById("world");
