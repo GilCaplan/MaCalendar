@@ -145,7 +145,7 @@
   <strong>one brain</strong>: every command, from every surface, is understood and executed by a
   single process on the host. Everything else in the drawing is thin.</p>
   <p class="stats">
-    <b>3</b> local models &nbsp;&#183;&nbsp; <b>0</b> requests to the internet
+    <b>3</b> local models &nbsp;&#183;&nbsp; <b>0</b> accounts, keys or services &nbsp;&#183;&nbsp; the only traffic is between your own devices
   </p>
 </header>
 
@@ -220,7 +220,8 @@
 
     <!-- route <-> model server -->
     <line x1="248" y1="256" x2="210" y2="256" stroke="var(--muted)" marker-start="url(#mi)" marker-end="url(#mi)"/>
-    <text x="229" y="246" text-anchor="middle" font-size="8" fill="var(--muted)">unsure</text>
+    <text x="229" y="241" text-anchor="middle" font-size="8" fill="var(--muted)">when</text>
+      <text x="229" y="252" text-anchor="middle" font-size="8" fill="var(--muted)">unsure</text>
     <text x="229" y="272" text-anchor="middle" font-size="8" fill="var(--muted)">7.8 s</text>
 
     <!-- answer to calendar window -->
@@ -284,7 +285,7 @@
     </g>
     <!-- tails -->
     <line x1="540" y1="404" x2="548" y2="302" stroke="var(--muted)" stroke-dasharray="3 3" marker-end="url(#mi)"/>
-    <text x="576" y="360" font-size="8" fill="var(--muted)">tails</text>
+    <text x="576" y="360" font-size="8" fill="var(--muted)">reads</text>
 
     <!-- three files on disk -->
     <g data-panel="write" role="button" tabindex="0" aria-label="The calendar database file: the single source of truth.">
@@ -331,7 +332,7 @@
       <path d="M 675 63 h 31 a 8.5 8.5 0 0 0 3 -16.5 a 11.5 11.5 0 0 0 -22 -4.5 a 9 9 0 0 0 -12 8.5 a 6.8 6.8 0 0 0 0 12.5 z"
             fill="none" stroke="var(--muted)" stroke-width="1.5"/>
       <line x1="664" y1="79" x2="716" y2="26" stroke="var(--ink)" stroke-width="3"/>
-      <text x="690" y="106" text-anchor="middle" font-size="9.5" fill="var(--muted)">the internet — never</text>
+      <text x="690" y="106" text-anchor="middle" font-size="9.5" fill="var(--muted)">no cloud service</text>
     </g>
 
     <!-- ============ THE SUN ============ -->
@@ -774,12 +775,23 @@ completed 0
   cloud: {
     tag:"ground rule", name:"internet", title:"Never",
     z:[690,62,2.2],
-    sum:`<p>No account, no key, no cloud transcription. A test fails the build if anything reaches the internet.</p>
-    <p class="figs">every model runs from a local file</p>`,
-    more:`<p>This is enforced, not promised: a test in the suite blocks every network connection
-    that is not the machine talking to itself, and fails the build if any code path tries to
-    reach further. It has already caught one regression — a library quietly fetching its model
-    from the internet on every start.</p>`
+    sum:`<p>No account, no API key, no cloud transcription. Every model runs from a file on the disk, and the host never reaches out to anything.</p>
+    <p class="figs">a test fails the build if it ever does</p>`,
+    more:`<p>Enforced rather than promised: a test in the suite blocks every connection that is not the
+    machine talking to itself, and fails the build if any code path tries to reach further. It has
+    already caught one regression &mdash; a library quietly fetching its model over the internet on
+    every start, which nobody noticed because the wifi was always on.</p>
+    <p><strong>Worth stating precisely, because "offline" is usually an overclaim.</strong> The
+    host makes no outbound request at all: transcription, understanding, the calendar arithmetic
+    and sundown are computed here, from files that are already here. What does use a network is the
+    link between your devices &mdash; a phone reaching its own host is real traffic over a real
+    connection, and if it goes over the internet rather than the room's wifi, it goes over the
+    internet.</p>
+    <p>The distinction that matters is who is on the other end. No third party is asked anything,
+    holds anything, or can be down. Turn the network off entirely and the host still works; only
+    the second device loses its way home.</p>
+    <p>There is one door, and it is shut by default: an opt-in sync with a hosted calendar. Nothing
+    reaches a company unless you configure that and connect an account.</p>`
   },
   tracelog: {
     tag:"on disk", title:"The trace log", z:[500,436,2.2],
@@ -1067,13 +1079,31 @@ function renderClients(){
   let note = document.getElementById("czero");
   if (clients.length === 0){
     if (!note){
-      note = document.createElementNS(NS, "text");
+      // Drawn as a box like the surfaces it replaces, rather than as loose
+      // text: an empty slot is a state of the system, not a caption about it.
+      note = document.createElementNS(NS, "g");
       note.id = "czero";
-      note.setAttribute("x", 862); note.setAttribute("y", 322);
-      note.setAttribute("text-anchor", "middle");
-      note.setAttribute("font-size", "9.5");
-      note.setAttribute("fill", "var(--muted)");
-      note.textContent = "none attached — the host works alone";
+      const box = document.createElementNS(NS, "rect");
+      box.setAttribute("x", 762); box.setAttribute("y", 288);
+      box.setAttribute("width", 200); box.setAttribute("height", 62);
+      box.setAttribute("rx", 8);
+      box.setAttribute("fill", "none");
+      box.setAttribute("stroke", "var(--line)");
+      box.setAttribute("stroke-dasharray", "5 4");
+      note.appendChild(box);
+      const mk = (y, size, fill, weight, str) => {
+        const t = document.createElementNS(NS, "text");
+        t.setAttribute("x", 862); t.setAttribute("y", y);
+        t.setAttribute("text-anchor", "middle");
+        t.setAttribute("font-size", size);
+        t.setAttribute("fill", fill);
+        if (weight) t.setAttribute("font-weight", weight);
+        t.textContent = str;
+        note.appendChild(t);
+      };
+      mk(312, "9.5", "var(--ink)", "600", "no devices attached");
+      mk(326, "8", "var(--muted)", null, "nothing is connected to the host");
+      mk(340, "8", "var(--muted)", null, "which still works on its own");
       cliG.appendChild(note);
     }
   } else if (note) note.remove();
