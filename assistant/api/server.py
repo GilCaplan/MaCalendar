@@ -844,10 +844,10 @@ def create_app() -> Flask:
         messages: list[str] = []
         action_names: list[str] = []
         refresh_set: set[str] = set()
-        records: list[tuple[str, int, str]] = []
+        records: list[tuple[str, int, str, int]] = []
         ctx = ContextMemory()
 
-        for action_name, intent in parsed:
+        for idx, (action_name, intent) in enumerate(parsed):
             if action_name == "unknown":
                 logger.warning("📱 Unknown intent for transcript: %s", transcript)
                 messages.append("Sorry, I didn't understand that.")
@@ -910,9 +910,9 @@ def create_app() -> Flask:
                 messages.append(result or "")
                 action_names.append(action_name)
                 if ctx.last_event_id != ev_before and ctx.last_event_id is not None:
-                    records.append(("event", ctx.last_event_id, action_name))
+                    records.append(("event", ctx.last_event_id, action_name, idx))
                 if ctx.last_todo_id != td_before and ctx.last_todo_id is not None:
-                    records.append(("todo", ctx.last_todo_id, action_name))
+                    records.append(("todo", ctx.last_todo_id, action_name, idx))
                 trace.step(EXECUTE, action_name.replace("_", " ").title(), result or "done")
                 if "event" in action_name:
                     refresh_set.add("events")
@@ -931,7 +931,7 @@ def create_app() -> Flask:
             refresh = ""
 
         if parse_path == "rule":
-            for rtype, rid, act in records:
+            for rtype, rid, act, _idx in records:
                 if rtype == "event" and act == "create_event":
                     ev = get_db().get_event(rid)
                     if ev and _is_placeholder_title(ev["title"], cfg):

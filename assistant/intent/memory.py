@@ -82,10 +82,19 @@ CREATE TABLE IF NOT EXISTS examples (
     confidence    REAL    NOT NULL DEFAULT -1
 );
 CREATE TABLE IF NOT EXISTS example_records (
-    example_id  INTEGER NOT NULL,
-    record_type TEXT    NOT NULL,      -- 'event' | 'todo'
-    record_id   INTEGER NOT NULL,
-    action      TEXT    NOT NULL,
+    example_id   INTEGER NOT NULL,
+    record_type  TEXT    NOT NULL,      -- 'event' | 'todo'
+    record_id    INTEGER NOT NULL,
+    action       TEXT    NOT NULL,
+    -- Position of this record's action within the example's actions_json.
+    -- A batch of several same-type actions ("book gym, then a meeting, then
+    -- dinner") produces several example_records rows with the same action
+    -- string; without the index, an edit to any one of them could only be
+    -- matched back to actions_json by action *type*, which matched — and
+    -- overwrote — every same-typed action in the batch. -1 marks rows written
+    -- before this column existed, which are deliberately left unmatchable
+    -- rather than guessed at.
+    action_index INTEGER NOT NULL DEFAULT -1,
     PRIMARY KEY (example_id, record_type, record_id)
 );
 CREATE TABLE IF NOT EXISTS pending (
@@ -149,6 +158,9 @@ class CommandMemory:
         existing = {r[1] for r in c.execute("PRAGMA table_info(examples)")}
         if "confidence" not in existing:
             c.execute("ALTER TABLE examples ADD COLUMN confidence REAL NOT NULL DEFAULT -1")
+        existing_records = {r[1] for r in c.execute("PRAGMA table_info(example_records)")}
+        if "action_index" not in existing_records:
+            c.execute("ALTER TABLE example_records ADD COLUMN action_index INTEGER NOT NULL DEFAULT -1")
 
     def _conn(self) -> sqlite3.Connection:
         c = sqlite3.connect(self._path, timeout=5)
@@ -160,12 +172,15 @@ class CommandMemory:
     def record(self, *, transcript: str, raw_transcript: str = "", source: str = "mac",
                parse_path: str = "", actions: Iterable[tuple[str, Any]] = (),
                result: str = "", success: bool = True, llm_ms: int = 0,
-               total_ms: int = 0, records: Iterable[tuple[str, int, str]] = (),
+               total_ms: int = 0, records: Iterable[tuple[str, int, str, int]] = (),
                confidence: float = -1.0) -> int:
         """Store one command. ``actions`` = (action_name, intent|dict) pairs.
 
-        ``records`` = (record_type, record_id, action) for rows the command
-        created/changed — used to link later edits back as feedback.
+        ``records`` = (record_type, record_id, action, action_index) for rows
+        the command created/changed — used to link later edits back as
+        feedback. ``action_index`` is that action's position in ``actions``,
+        so a later edit to one record in a multi-action batch can be matched
+        back to the one action it came from, not every action of that type.
         """
         acts = []
         for name, intent in actions:
@@ -186,9 +201,9 @@ class CommandMemory:
                  float(confidence)),
             )
             ex_id = int(cur.lastrowid)
-            for rtype, rid, action in records:
-                c.execute("INSERT OR IGNORE INTO example_records VALUES (?,?,?,?)",
-                          (ex_id, rtype, int(rid), action))
+            for rtype, rid, action, action_index in records:
+                c.execute("INSERT OR IGNORE INTO example_records VALUES (?,?,?,?,?)",
+                          (ex_id, rtype, int(rid), action, int(action_index)))
         return ex_id
 
     def set_feedback(self, example_id: int, feedback: str,
@@ -215,8 +230,8 @@ class CommandMemory:
         """
         with self._lock, self._conn() as c:
             row = c.execute(
-                "SELECT e.id, e.ts, e.actions_json, e.correction_json, r.action FROM example_records r "
-                "JOIN examples e ON e.id = r.example_id "
+                "SELECT e.id, e.ts, e.actions_json, e.correction_json, r.action, r.action_index "
+                "FROM example_records r JOIN examples e ON e.id = r.example_id "
                 "WHERE r.record_type=? AND r.record_id=? ORDER BY e.ts DESC LIMIT 1",
                 (record_type, int(record_id)),
             ).fetchone()
@@ -224,14 +239,20 @@ class CommandMemory:
                 return None
             correction = None
             if feedback == FEEDBACK_CORRECTED:
-                base = json.loads(row["correction_json"] or row["actions_json"])
                 clean = {k: v for k, v in (changed_fields or {}).items()
                          if k not in ("color", "updated_at", "sync_dirty") and v is not None}
                 if not clean:
                     return None
-                for act in base:
-                    if act.get("action") == row["action"]:
-                        act.setdefault("parameters", {}).update(clean)
+                base = json.loads(row["correction_json"] or row["actions_json"])
+                idx = row["action_index"]
+                # A batch can hold several actions of the same type ("book gym,
+                # then a meeting"). Matching by type alone once applied one
+                # edit's fields to every same-typed action in the batch. Only
+                # act when the index unambiguously names the one action this
+                # record came from — refuse rather than guess at the rest.
+                if idx is None or not (0 <= idx < len(base)) or base[idx].get("action") != row["action"]:
+                    return None
+                base[idx].setdefault("parameters", {}).update(clean)
                 correction = base
             c.execute(
                 "UPDATE examples SET feedback=?, correction_json=COALESCE(?, correction_json) WHERE id=?",

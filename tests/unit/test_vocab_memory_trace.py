@@ -167,7 +167,7 @@ def test_identical_transcript_not_returned(memory):
 
 def test_implicit_feedback_from_record_edit_and_delete(memory):
     ex = memory.record(transcript="walk kyra at 3", actions=[("create_event", _ev("Walk kyra"))],
-                       records=[("event", 42, "create_event")])
+                       records=[("event", 42, "create_event", 0)])
     assert memory.feedback_for_record("event", 42, "corrected", {"title": "Walk Kyra", "color": "#fff"}) == ex
     row = memory.get(ex)
     assert row["feedback"] == "corrected"
@@ -180,6 +180,37 @@ def test_implicit_feedback_from_record_edit_and_delete(memory):
     assert memory.feedback_for_record("event", 999, "rejected") is None
     memory.feedback_for_record("event", 42, "rejected")
     assert memory.retrieve("walk kyra at 4") == []
+
+
+def test_correcting_one_record_in_a_batch_leaves_the_others_alone(memory):
+    # "book gym at 6, then a meeting at 9, then dinner at 7" — three
+    # create_event actions in one example. Editing the meeting used to
+    # overwrite all three with the meeting's fields, because the match was
+    # by action type ("create_event") with nothing to say which of the three
+    # a given edit belonged to.
+    ex = memory.record(
+        transcript="gym, a meeting, and dinner",
+        actions=[("create_event", _ev("Gym", "06:00")),
+                 ("create_event", _ev("Meeting", "09:00")),
+                 ("create_event", _ev("Dinner", "19:00"))],
+        records=[("event", 1, "create_event", 0),
+                 ("event", 2, "create_event", 1),
+                 ("event", 3, "create_event", 2)],
+    )
+    assert memory.feedback_for_record("event", 2, "corrected", {"title": "Team sync"}) == ex
+    row = memory.get(ex)
+    titles = [a["parameters"]["title"] for a in row["correction"]]
+    assert titles == ["Gym", "Team sync", "Dinner"]
+
+    # a legacy row with no recorded index (-1, pre-migration) refuses to
+    # guess rather than repeat the bug
+    legacy = memory.record(
+        transcript="two calls",
+        actions=[("create_event", _ev("Call A")), ("create_event", _ev("Call B"))],
+        records=[("event", 10, "create_event", -1), ("event", 11, "create_event", -1)],
+    )
+    assert memory.feedback_for_record("event", 11, "corrected", {"title": "Call B fixed"}) is None
+    assert memory.get(legacy)["feedback"] == "none"
 
 
 def test_explicit_feedback_and_stats(memory):
