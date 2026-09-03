@@ -182,8 +182,11 @@ def _run_locked(text, trace, source, current_view, trace_run,
                                      f"({reentries}/{_crosscheck.MAX_REENTRIES})")
                 _deep_parse(state, cfg)
             else:
-                state.messages.append(
-                    "I'm not sure I caught every part of that — worth a glance.")
+                # Budget spent with a MISSING ask still open — flag it.
+                # (Advisory extras alone don't merit alarming the speaker.)
+                if any(f.type == "missing" for f in state.findings):
+                    state.messages.append(
+                        "I'm not sure I caught every part of that — worth a glance.")
             _commit(state, cfg)
             _label.run(state, cfg)
     except AssistantError as e:
@@ -336,11 +339,15 @@ def _deep_parse(state: EngineState, cfg) -> None:
 
 def _loop_target(state: EngineState) -> "str | None":
     """The earliest stage the findings blame, or None when there is nothing
-    to loop for. Only stages whose re-run rebuilds intents are loopable —
-    re-running the field rules on the SAME objects would double-apply them."""
-    loopable = {"segment", "generate"}
+    to loop for. Only MISSING findings earn a loop: a re-run can recover an
+    ask that was merged away, but it cannot un-produce an extra (segment is
+    under-split-biased, so an "extra" is far more often the matcher's
+    artefact than real over-production — run 8 measured 39 loop storms, most
+    of them exactly that). Extras stay advisory findings. Only stages whose
+    re-run rebuilds intents are loopable — re-running the field rules on the
+    SAME objects would double-apply them."""
     for f in state.findings:
-        if f.blamed_stage in loopable:
+        if f.type == "missing" and f.blamed_stage in ("segment", "generate"):
             return "segment"   # a segment re-run rebuilds everything after it
     return None
 
@@ -425,10 +432,18 @@ def _background_verify(state: EngineState, cfg) -> "dict | None":
     _crosscheck.run(state, cfg)
     for f in state.findings:
         if f.type == "missing":
-            made = _commit_missing_ask(state, cfg, f)
-            if made:
-                speech.append(made)
-                refresh.update(("events", "todos"))
+            # Run 8's lesson, same as the old verifier's: the check PROPOSES
+            # far more than it should apply — four commands were broken by
+            # confident duplicate adds ("add eggs" vs the row "buy eggs").
+            # Additive lands only under self_check_apply; advisory otherwise.
+            if getattr(cfg, "self_check_apply", False):
+                made = _commit_missing_ask(state, cfg, f)
+                if made:
+                    speech.append(made)
+                    refresh.update(("events", "todos"))
+            else:
+                severity = "major"
+                speech.append(f"Worth a look: {f.detail}.")
         elif f.type == "extra":
             if getattr(cfg, "self_check_apply", False):
                 undone = _remove_extra(state, f)

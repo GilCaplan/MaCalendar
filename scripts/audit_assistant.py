@@ -272,6 +272,10 @@ def build_corpus(seed: int = 7) -> list[dict]:
 
     # --- adversarial -------------------------------------------------------
     C.append({"area": "adversarial", "shape": "ambiguous/no-time", "text": "set a meeting with Tal", "expect": [("clarify|create_event", {})]})
+    C.append({"area": "adversarial", "shape": "observance-gate", "text": "book a gym session this saturday at 10 am",
+              "expect": [], "reply_contains": "didn't book"})
+    C.append({"area": "adversarial", "shape": "observance-meal-ok", "text": "shabbat dinner this friday at 7:30 pm",
+              "expect": [("create_event", {"start_time": "19:30"})]})
     C.append({"area": "adversarial", "shape": "task-not-event", "text": "remind me to call Ravid", "expect": [("create_todo", {"titles_contain": ["Ravid"]})]})
     C.append({"area": "adversarial", "shape": "event-not-task", "text": "remind me about the dentist tomorrow at 9 am", "expect": [("create_event", {"date": d(1), "start_time": "09:00"})]})
     C.append({"area": "adversarial", "shape": "misheard-names", "text": "meet Ravid at the french bakery in Jerusalem after shacharis at 9 am tomorrow",
@@ -282,14 +286,14 @@ def build_corpus(seed: int = 7) -> list[dict]:
     # --- realistic phrasings lifted from the user's own chats ----------------
     chat = [
         ("coffee friday 9:15 at the French Bakery with Ravid", [("create_event", {"date": next_wd(4), "start_time": "09:15", "title_contains": "Ravid"})]),
-        ("Kems tomorrow at 8 with Ravid and Ezra", [("create_event", {"date": d(1), "start_time": "20:00"})]),
+        ("Kems on tuesday at 8 with Ravid and Ezra", [("create_event", {"date": next_wd(1), "start_time": "20:00"})]),   # weekday-pinned: a Friday 8pm would (rightly) hit the observance gate
         ("pregame at our place wednesday 8:30 pm", [("create_event", {"date": next_wd(2), "start_time": "20:30", "title_contains": "pregame"})]),
         ("bowling tuesday night for Rei's birthday", [("create_event", {"date": next_wd(1), "title_contains": "bowling"})]),
         ("zoom with Alon thursday at 3 pm", [("create_event", {"date": next_wd(3), "start_time": "15:00", "title_contains": "Alon"})]),
         ("lunch 12:30 with Tal on campus tomorrow", [("create_event", {"date": d(1), "start_time": "12:30", "title_contains": "Tal"})]),
         ("tennis wednesday at 17:30", [("create_event", {"date": next_wd(2), "start_time": "17:30", "title_contains": "tennis"})]),
         ("pick up the package from Parcel Home on Hazayit on friday", [("create_todo|create_event", {})]),
-        ("night shift tomorrow from 8 pm to 6 am", [("create_event", {"date": d(1), "start_time": "20:00"})]),
+        ("night shift on wednesday from 8 pm to 6 am", [("create_event", {"date": next_wd(2), "start_time": "20:00"})]),   # weekday-pinned: see above
         ("Netivim zoom 1800-2000 tonight", [("create_event", {"date": d(0), "start_time": "18:00", "end_time": "20:00"})]),
         ("Shabbat lunch at Ravid's this saturday 12:30", [("create_event", {"date": next_wd(5), "start_time": "12:30"})]),
         ("meeting with Guri moved from 9:30 to 9 on wednesday", [("create_event|update_event", {})]),
@@ -304,7 +308,12 @@ def build_corpus(seed: int = 7) -> list[dict]:
     for i in range(12):
         p, pl, t = rnd.choice(people), rnd.choice(places), rnd.choice(topics)
         hh = rnd.choice([9, 10, 11, 13, 14, 15, 16, 17, 19]); mm = rnd.choice(["00", "30"])
-        wd = rnd.randrange(7); disp = f"{hh if hh <= 12 else hh - 12}{':' + mm if mm != '00' else ''} {'am' if hh < 12 else 'pm'}"
+        wd = rnd.randrange(7)
+        # Friday evening / Shabbat land in the observance gate's territory —
+        # that policy is asserted by its own cases; these measure parsing.
+        if wd == 5 or (wd == 4 and hh >= 17):
+            wd = (wd + 2) % 7
+        disp = f"{hh if hh <= 12 else hh - 12}{':' + mm if mm != '00' else ''} {'am' if hh < 12 else 'pm'}"
         text = rnd.choice([f"meeting with {p} on {WD_NAMES[wd]} at {disp} about {t}",
                            f"set {t} with {p} at {pl} on {WD_NAMES[wd]} at {disp}",
                            f"{WD_NAMES[wd]} {disp} {t} with {p}"])
@@ -415,6 +424,12 @@ def _check(case: dict, resp: dict, db) -> tuple[bool, list[str], dict]:
             if any(f["db_event_absent"].lower() in e["title"].lower() for e in events):
                 problems.append(f"'{f['db_event_absent']}' still in DB")
                 exp_hit[idx] = False
+
+    # A case can pin the REPLY rather than a DB effect — the observance gate's
+    # correct answer is a refusal that explains itself, not a row.
+    want_reply = case.get("reply_contains")
+    if want_reply and want_reply.lower() not in (resp.get("message") or "").lower():
+        problems.append(f"reply lacks '{want_reply}': {resp.get('message', '')[:120]!r}")
 
     counts = {
         "expected": len(exp),

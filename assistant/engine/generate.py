@@ -23,7 +23,11 @@ item's own words — never another item's.
 
 from __future__ import annotations
 
+import logging
+
 from assistant.engine.state import EngineState, Item
+
+logger = logging.getLogger(__name__)
 
 _parser = None
 _rule_parser = None
@@ -169,10 +173,26 @@ def _parse_item(item: Item, state: EngineState, cfg) -> "list | None":
 
 
 def run(state: EngineState, cfg) -> EngineState:
+    from assistant.exceptions import LLMTimeoutError, LLMUnavailableError, ParseError
+
     out: list = []
     for item in state.items:
-        got = _parse_item(item, state, cfg)   # AssistantError propagates: the
-        if not got:                           # orchestrator owns offline queueing
+        try:
+            got = _parse_item(item, state, cfg)
+        except (LLMUnavailableError, LLMTimeoutError):
+            raise            # the orchestrator owns offline queueing
+        except ParseError as e:
+            # One unreadable item must not kill its neighbours (a validation
+            # error on "bowling tuesday night" once took the whole command
+            # down). Honest per-item failure; the rest still executes.
+            logger.warning("Item %s failed to parse: %s", item.id, e)
+            state.add_fix("generate", "item_parse_failed", item.text[:40], "",
+                          note=str(e)[:120])
+            state.messages.append(
+                f"Sorry, I couldn't read this part: “{item.text[:60]}”.")
+            out.append(item)
+            continue
+        if not got:
             out.append(item)
             continue
         if len(got) == 1:

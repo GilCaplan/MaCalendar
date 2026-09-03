@@ -104,10 +104,28 @@ Rules, in order of importance:
    "buy a gift for mom and dad" is one errand.
 4. Split only when two independent requests are joined: "book gym at 7 and
    remind me to buy milk" is two.
-5. Copy the speaker's own words into each item's text — never rephrase,
-   summarise or invent words.
+5. Copy the speaker's own words into each item's text. A date or deadline
+   said once for the whole list may be repeated into each item; beyond that,
+   never rephrase, summarise or invent words.
 6. kind: "event" books or changes something on the calendar, "task" is a
    to-do, "review" asks what is scheduled.
+7. A list of tasks after a colon or "and" IS several items when each part is
+   its own instruction: "add tasks: submit the grades, prepare the slides"
+   is two tasks. But a list of THINGS for one verb stays one item ("buy
+   milk, eggs and bread" — the assistant splits shopping lists itself).
+
+Examples:
+"book gym tomorrow at 7am and remind me to buy milk"
+→ {"items": [{"kind": "event", "text": "book gym tomorrow at 7am"},
+             {"kind": "task", "text": "remind me to buy milk"}]}
+"add tasks: submit the Haxaga grades, prepare Netivim slides"
+→ {"items": [{"kind": "task", "text": "submit the Haxaga grades"},
+             {"kind": "task", "text": "prepare Netivim slides"}]}
+"meeting with Tal and Ravid at Kems tomorrow evening"
+→ {"items": [{"kind": "event", "text": "meeting with Tal and Ravid at Kems tomorrow evening"}]}
+"two tasks due tomorrow: buy groceries and return the library book"
+→ {"items": [{"kind": "task", "text": "buy groceries due tomorrow"},
+             {"kind": "task", "text": "return the library book due tomorrow"}]}
 
 Return JSON: {"items": [{"kind": ..., "text": ...}, ...]}"""
 
