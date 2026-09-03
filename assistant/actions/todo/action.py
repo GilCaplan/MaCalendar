@@ -24,26 +24,58 @@ from assistant.intent.list_split import split_items
 
 _ANAPHORS = {"it", "that", "this", "the task", "that task", "the last one", "the last task"}
 
+# Mirrors calendar/action.py's _STOP_WORDS (kept as a separate copy rather than
+# a shared import — the two matchers evolve independently, same as the rest of
+# this module boundary). Filtering these out is what stops a title that is
+# ALL filler ("do the thing") from carrying any weight, and stops two
+# completely unrelated titles that happen to share only "the" or "a" from
+# ever registering as a match.
+_STOP_WORDS = {
+    "a", "an", "the", "my", "i", "of", "to", "in", "on", "at", "for",
+    "it", "is", "be", "was", "and", "or", "that", "this",
+}
+
+
+def _content_words(text: str) -> set[str]:
+    """Tokenize for matching, without possessives fragmenting into noise.
+
+    `\\w+` alone splits "Mark's" into {"mark", "s"} and "Ori's" into
+    {"ori", "s"} — two titles sharing nothing but that stray "s" token used
+    to be enough to "win" a match with no floor beyond > 0 (a real incident:
+    "walk mark's dog" matched and completed "Check Ori's Haxaga Assignments").
+    Stripping the "'s" before tokenizing removes the token that carried none
+    of the actual meaning.
+    """
+    return set(re.findall(r"\w+", re.sub(r"'s\b", "", text.lower())))
+
 
 def _find_todo(db, match_title: str) -> Optional[dict]:
     """
     Find the best-matching todo by title.
     Resolves anaphoric pronouns via context memory.
     Uses token-based fuzzy scoring identical to the calendar _find_event pattern.
+
+    Refuses (returns None) rather than guesses when nothing distinctive was
+    named at all — completing, deleting or renaming the wrong task on a
+    coincidental one-word overlap is worse than answering "not found".
     """
     if match_title.lower().strip() in _ANAPHORS:
         if context_memory.last_todo_id is not None:
             return db.get_todo(context_memory.last_todo_id)
         return None
 
-    needle_words = set(re.findall(r"\w+", match_title.lower()))
+    raw_needle_words = _content_words(match_title)
+    needle_words = raw_needle_words - _STOP_WORDS
+    if not needle_words:
+        return None
+
     todos = db.get_todos(include_completed=True)
 
     best_match = None
     best_score = 0
 
     for todo in todos:
-        title_words = set(re.findall(r"\w+", todo["title"].lower()))
+        title_words = _content_words(todo["title"]) - _STOP_WORDS
         overlap = len(needle_words & title_words)
 
         clean_needle = match_title.lower().replace("-", " ")
@@ -59,13 +91,16 @@ def _find_todo(db, match_title: str) -> Optional[dict]:
 
 
 def _find_subtask(db, todo_id: int, subtask_title: str) -> Optional[dict]:
-    """Find the best-matching subtask under a given todo."""
+    """Find the best-matching subtask under a given todo. Same possessive/
+    stop-word handling as _find_todo, and the same reasoning for it."""
     subtasks = db.get_subtasks(todo_id)
-    needle_words = set(re.findall(r"\w+", subtask_title.lower()))
+    needle_words = _content_words(subtask_title) - _STOP_WORDS
+    if not needle_words:
+        return None
     best_match = None
     best_score = 0
     for s in subtasks:
-        title_words = set(re.findall(r"\w+", s["title"].lower()))
+        title_words = _content_words(s["title"]) - _STOP_WORDS
         overlap = len(needle_words & title_words)
         clean_needle = subtask_title.lower().replace("-", " ")
         clean_title = s["title"].lower().replace("-", " ")

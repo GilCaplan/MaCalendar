@@ -79,3 +79,20 @@ def test_anaphor_with_no_memory_returns_none(db):
     _add_todo(db, "Buy groceries")
     result = _find_todo(db, "it")
     assert result is None
+
+
+def test_possessives_dont_collide_on_a_stray_apostrophe_s(db):
+    """A real incident: "walk mark's dog" matched and completed "Check Ori's
+    Haxaga Assignments". \\w+ alone splits "Mark's" into {"mark","s"} and
+    "Ori's" into {"ori","s"} — two titles sharing nothing but that stray "s"
+    token was enough to "win" with no floor beyond > 0.
+    """
+    _add_todo(db, "Check Ori's Haxaga Assignments")
+    result = _find_todo(db, "walk mark's dog")
+    assert result is None
+
+
+def test_a_title_that_is_only_stop_words_refuses_rather_than_guesses(db):
+    _add_todo(db, "Buy groceries")
+    result = _find_todo(db, "the it")
+    assert result is None
