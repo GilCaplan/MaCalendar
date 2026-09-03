@@ -47,8 +47,16 @@ import urllib.request
 COMMIT = "6e495bf0d371d18b611398f205bf53ddb9b1ad5d"
 URL = (f"https://raw.githubusercontent.com/xliuhw/NLU-Evaluation-Data/{COMMIT}/"
        "AnnotatedData/NLU-Data-Home-Domain-Annotated-All.csv")
-FIXTURE = (pathlib.Path(__file__).resolve().parents[1] / "DOCUMENTATION" / "experiments"
-           / "memory_scaling" / "hwu64_sample.json")
+EXP_DIR = pathlib.Path(__file__).resolve().parents[1] / "DOCUMENTATION" / "experiments" / "memory_scaling"
+FIXTURE = EXP_DIR / "hwu64_sample.json"           # raw fetch + sample — provenance/license record
+DATASET_DIR = EXP_DIR / "dataset"                 # what actually gets replayed — see write_histories()
+
+#: Each size is one *history*: a self-contained, ordered (input, timestamp)
+#: sequence that means something on its own — not a slice that only makes
+#: sense next to the others. Nested by construction (history_300 starts with
+#: every row of history_60) purely so building the larger ones doesn't
+#: recompute what a smaller one already covers; each file still stands alone.
+TIERS = [60, 300, 1000, 3000]
 
 #: (scenario, intent) buckets to draw from, and roughly how much weight each
 #: gets relative to the others — proportional to how often it occurs in the
@@ -101,10 +109,44 @@ def build_sample(n: int, rows: list[dict]) -> list[dict]:
     rnd.shuffle(sample)
     sample = sample[:n]
     now = time.time()
+    # Monotonic with tier_rank — rank 1 is the oldest, rank n the most recent —
+    # so "replay in rank order" and "replay in timestamp order" are the same
+    # thing. Independently-random timestamps (the first version of this) let
+    # the two disagree, which matters once "run every input at its given
+    # timestamp" is the actual definition of what a history *is*.
+    span = HISTORY_SPAN_DAYS * 86400
     for i, row in enumerate(sample):
         row["tier_rank"] = i + 1
-        row["ts"] = now - rnd.uniform(0, HISTORY_SPAN_DAYS * 86400)
+        row["ts"] = now - span * (1 - (i + 1) / len(sample))
     return sample
+
+
+def write_histories(sample: list[dict], source_note: str, source_url: str) -> None:
+    """Split the raw sample into self-contained history/<N>.json files.
+
+    Each one is the complete dataset for one run: an ordered list of
+    (input, timestamp) pairs and nothing else — no reference to the raw
+    fixture or to any other history file. Replaying history_N.json's rows,
+    in order, through the real assistant against a fresh scratch DB is
+    what "the dataset" means here; the resulting DB is that history's
+    dummy_N.db (built by scripts/build_memory_scaling_pool.py).
+    """
+    DATASET_DIR.mkdir(parents=True, exist_ok=True)
+    ordered = sorted(sample, key=lambda r: r["tier_rank"])
+    for n in TIERS:
+        if n > len(ordered):
+            continue
+        rows = ordered[:n]
+        out = DATASET_DIR / f"history_{n}.json"
+        out.write_text(json.dumps({
+            "name": f"history_{n}",
+            "n": len(rows),
+            "source": source_note,
+            "source_url": source_url,
+            "rows": [{"seq": i + 1, "text": r["text"], "ts": r["ts"]}
+                     for i, r in enumerate(rows)],
+        }, indent=1, ensure_ascii=False))
+        print(f"wrote {out} ({len(rows)} rows)")
 
 
 def main() -> None:
@@ -137,15 +179,18 @@ def main() -> None:
             print("no fixture written yet")
         return
 
+    source_note = "HWU-64 (Liu, Eshghi, Swietojanski & Rieser, IWSDS 2019), CC BY 4.0"
+    source_url = f"https://github.com/xliuhw/NLU-Evaluation-Data/tree/{COMMIT}"
     FIXTURE.parent.mkdir(parents=True, exist_ok=True)
     FIXTURE.write_text(json.dumps({
-        "source": "HWU-64 (Liu, Eshghi, Swietojanski & Rieser, IWSDS 2019), CC BY 4.0",
-        "source_url": f"https://github.com/xliuhw/NLU-Evaluation-Data/tree/{COMMIT}",
+        "source": source_note,
+        "source_url": source_url,
         "seed": SEED,
         "history_span_days": HISTORY_SPAN_DAYS,
         "rows": sample,
     }, indent=1, ensure_ascii=False))
     print(f"wrote {FIXTURE}")
+    write_histories(sample, source_note, source_url)
 
 
 if __name__ == "__main__":

@@ -21,9 +21,10 @@ Resumable: re-running skips any (scenario, intent, text) already present in
 the output db, so an interrupted overnight build picks back up rather than
 starting over. Progress is logged every 25 rows.
 
-    python -m scripts.build_memory_scaling_pool                     # build/resume the full pool
-    python -m scripts.build_memory_scaling_pool --limit 60           # smoke test
-    python -m scripts.build_memory_scaling_pool --slice-tiers        # (re)export the nested tier dbs from the pool
+    python -m scripts.fetch_hwu64_sample                              # writes dataset/history_<N>.json
+    python -m scripts.build_memory_scaling_pool                       # replay history_3000.json (build/resume)
+    python -m scripts.build_memory_scaling_pool --limit 60             # smoke test
+    python -m scripts.build_memory_scaling_pool --slice-tiers          # write output/dummy_<N>.db per history
 """
 from __future__ import annotations
 
@@ -42,7 +43,9 @@ sys.path.insert(0, str(ROOT))
 
 EXP_DIR = ROOT / "DOCUMENTATION" / "experiments" / "memory_scaling"
 FIXTURE = EXP_DIR / "hwu64_sample.json"
-POOL_DB = EXP_DIR / "pool_full.db"
+DATASET_DIR = EXP_DIR / "dataset"     # self-contained history_<N>.json inputs — see fetch_hwu64_sample.py
+OUTPUT_DIR = EXP_DIR / "output"       # dummy_<N>.db — what replaying history_<N>.json produces
+POOL_DB = EXP_DIR / "pool_full.db"    # working copy the build accumulates into; not itself a deliverable
 LOG = EXP_DIR / "build.log"
 TIERS = [60, 300, 1000, 3000]
 
@@ -73,25 +76,24 @@ def _ensure_pool_schema() -> None:
             c.execute("ALTER TABLE examples ADD COLUMN tier_rank INTEGER")
 
 
-def _already_built() -> set[tuple[str, str, str]]:
+def _already_built() -> set[str]:
     if not POOL_DB.exists():
         return set()
     with sqlite3.connect(POOL_DB) as c:
         try:
-            rows = c.execute("SELECT source, notes, transcript FROM examples").fetchall()
+            rows = c.execute(
+                "SELECT transcript FROM examples WHERE tier_rank IS NOT NULL").fetchall()
         except sqlite3.OperationalError:
             return set()
-    # scenario/intent were stashed in `notes` as "scenario:intent" — see build()
-    return {(notes.split(":", 1)[0], notes.split(":", 1)[1], transcript)
-            for _src, notes, transcript in rows if notes and ":" in notes}
+    return {t for (t,) in rows}
 
 
 def build(limit: int | None) -> None:
     EXP_DIR.mkdir(parents=True, exist_ok=True)
-    if not FIXTURE.exists():
-        raise SystemExit(f"no fixture at {FIXTURE} — run scripts.fetch_hwu64_sample first")
-    data = json.loads(FIXTURE.read_text())
-    rows = sorted(data["rows"], key=lambda r: r["tier_rank"])
+    hist_path = DATASET_DIR / f"history_{max(TIERS)}.json"
+    if not hist_path.exists():
+        raise SystemExit(f"no {hist_path} — run scripts.fetch_hwu64_sample first")
+    rows = json.loads(hist_path.read_text())["rows"]  # already ordered by seq/ts
     if limit:
         rows = rows[:limit]
 
@@ -119,8 +121,7 @@ def build(limit: int | None) -> None:
     built = skipped = failed = 0
     t0 = time.time()
     for row in rows:
-        key = (row["scenario"], row["intent"], row["text"])
-        if key in done:
+        if row["text"] in done:
             skipped += 1
             continue
         try:
@@ -133,8 +134,8 @@ def build(limit: int | None) -> None:
             failed += 1
             _log(f"  ! {type(e).__name__}: {e} on {row['text'][:60]!r}")
             continue
-        # stamp the synthetic history timestamp + scenario/intent tag onto the
-        # row memory.record() just inserted (it used time.time() at insert time).
+        # stamp the history's timestamp + sequence position onto the row
+        # memory.record() just inserted (it used time.time() at insert time).
         # Guarded by matching the transcript back — a request that produced no
         # example row at all (rather than a different one) must not mis-tag
         # whatever the last row happened to be.
@@ -142,8 +143,8 @@ def build(limit: int | None) -> None:
             last = c.execute(
                 "SELECT id, transcript FROM examples ORDER BY id DESC LIMIT 1").fetchone()
             if last and last[1] == row["text"]:
-                c.execute("UPDATE examples SET ts=?, notes=?, tier_rank=? WHERE id=?",
-                          (row["ts"], f"{row['scenario']}:{row['intent']}", row["tier_rank"], last[0]))
+                c.execute("UPDATE examples SET ts=?, tier_rank=? WHERE id=?",
+                          (row["ts"], row["seq"], last[0]))
             else:
                 _log(f"  ! could not confirm the inserted row for {row['text'][:60]!r} — "
                      f"left unstamped, will retry on resume")
@@ -160,17 +161,42 @@ def build(limit: int | None) -> None:
 
 
 def slice_tiers() -> None:
-    """Export nested tier_rank<=N copies of the pool for --memory-source."""
+    """For each history_<N>.json in dataset/, export the matching dummy_<N>.db.
+
+    dummy_<N>.db = the result of replaying history_<N>.json's rows, in order,
+    through the real assistant. It's cut from the accumulated POOL_DB rather
+    than rebuilt from scratch per history (they're nested by construction —
+    history_300 starts with every row of history_60 — so this avoids redoing
+    live parser calls that were already made), but verified against the
+    dataset file it's supposed to correspond to before being trusted.
+    """
     if not POOL_DB.exists():
         raise SystemExit(f"no pool at {POOL_DB} yet")
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     for n in TIERS:
-        out = EXP_DIR / f"pool_{n}.db"
+        hist_path = DATASET_DIR / f"history_{n}.json"
+        if not hist_path.exists():
+            print(f"skip {n}: no {hist_path.name} — run fetch_hwu64_sample first")
+            continue
+        history = json.loads(hist_path.read_text())
+
+        out = OUTPUT_DIR / f"dummy_{n}.db"
         shutil.copyfile(POOL_DB, out)
         with sqlite3.connect(out) as c:
             c.execute("DELETE FROM examples WHERE tier_rank IS NULL OR tier_rank > ?", (n,))
             c.execute("DELETE FROM example_records WHERE example_id NOT IN (SELECT id FROM examples)")
-            (n_left,) = c.execute("SELECT COUNT(*) FROM examples").fetchone()
-        print(f"{out.name}: {n_left} rows (target {n})")
+            got = [r[0] for r in c.execute(
+                "SELECT transcript FROM examples ORDER BY tier_rank").fetchall()]
+
+        want = [r["text"] for r in history["rows"]]
+        if got != want:
+            out.unlink()
+            missing = len(want) - len(got)
+            print(f"REFUSING to write dummy_{n}.db: only {len(got)}/{len(want)} of "
+                  f"history_{n}.json's rows have been built yet (build is still running, "
+                  f"or hasn't reached row {n - missing} — re-run --slice-tiers once it has)")
+            continue
+        print(f"{out.name}: {len(got)} rows, matches history_{n}.json exactly")
 
 
 if __name__ == "__main__":

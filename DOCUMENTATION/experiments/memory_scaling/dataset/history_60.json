@@ -1,0 +1,308 @@
+{
+ "name": "history_60",
+ "n": 60,
+ "source": "HWU-64 (Liu, Eshghi, Swietojanski & Rieser, IWSDS 2019), CC BY 4.0",
+ "source_url": "https://github.com/xliuhw/NLU-Evaluation-Data/tree/6e495bf0d371d18b611398f205bf53ddb9b1ad5d",
+ "rows": [
+  {
+   "seq": 1,
+   "text": "I need to add pasta and milk to the grocery list.",
+   "ts": 1772919865.932584
+  },
+  {
+   "seq": 2,
+   "text": "Can you create a new list in my podcast?",
+   "ts": 1772925049.932584
+  },
+  {
+   "seq": 3,
+   "text": "what's next in my calendar?",
+   "ts": 1772930233.932584
+  },
+  {
+   "seq": 4,
+   "text": "When do I need to pay the bills?",
+   "ts": 1772935417.932584
+  },
+  {
+   "seq": 5,
+   "text": "PDA, Remind me of the event in my calendar.",
+   "ts": 1772940601.932584
+  },
+  {
+   "seq": 6,
+   "text": "What events do I have for this coming week?",
+   "ts": 1772945785.932584
+  },
+  {
+   "seq": 7,
+   "text": "Please delete the list Gift Ideas For My Wife and play me some sad music.",
+   "ts": 1772950969.932584
+  },
+  {
+   "seq": 8,
+   "text": "Remove all the events on my calendar",
+   "ts": 1772956153.932584
+  },
+  {
+   "seq": 9,
+   "text": "Erase all the events.",
+   "ts": 1772961337.932584
+  },
+  {
+   "seq": 10,
+   "text": "Delete the shopping trip I have scheduled March 23rd",
+   "ts": 1772966521.932584
+  },
+  {
+   "seq": 11,
+   "text": "Add my sister visiting to my family calender.",
+   "ts": 1772971705.932584
+  },
+  {
+   "seq": 12,
+   "text": "Do I have any time free on Tuesday for a 2 hour meeting with Ken?",
+   "ts": 1772976889.932584
+  },
+  {
+   "seq": 13,
+   "text": "Whats going on in my calendar",
+   "ts": 1772982073.932584
+  },
+  {
+   "seq": 14,
+   "text": "Ok Google, set meeting for Mar 30, 2017 at 9 am",
+   "ts": 1772987257.932584
+  },
+  {
+   "seq": 15,
+   "text": "What are my plans for today?",
+   "ts": 1772992441.932584
+  },
+  {
+   "seq": 16,
+   "text": "Set event on repeat",
+   "ts": 1772997625.932584
+  },
+  {
+   "seq": 17,
+   "text": "Remove the item from list",
+   "ts": 1773002809.932584
+  },
+  {
+   "seq": 18,
+   "text": "Format data from calendar",
+   "ts": 1773007993.932584
+  },
+  {
+   "seq": 19,
+   "text": "Add vodka to my party shopping list",
+   "ts": 1773013177.932584
+  },
+  {
+   "seq": 20,
+   "text": "Can you tell me my weekly list?",
+   "ts": 1773018361.932584
+  },
+  {
+   "seq": 21,
+   "text": "12th July is Bola's birthday and my calender to be updated with this date",
+   "ts": 1773023545.932584
+  },
+  {
+   "seq": 22,
+   "text": "Schedule a meeting with John Connor tomorrow, at eight in the morning.",
+   "ts": 1773028729.932584
+  },
+  {
+   "seq": 23,
+   "text": "Clear all events from my calendar for next week",
+   "ts": 1773033913.932584
+  },
+  {
+   "seq": 24,
+   "text": "My calender is to be updated with all RCCG March event.",
+   "ts": 1773039097.932584
+  },
+  {
+   "seq": 25,
+   "text": "Remind me of the meeting with my Teacher today by 5pm.",
+   "ts": 1773044281.932584
+  },
+  {
+   "seq": 26,
+   "text": "Replace the furniture with electronics on the list.",
+   "ts": 1773049465.932584
+  },
+  {
+   "seq": 27,
+   "text": "Remove the grocery list from my active lists.",
+   "ts": 1773054649.932584
+  },
+  {
+   "seq": 28,
+   "text": "PDA do I have any tasks today?",
+   "ts": 1773059833.932584
+  },
+  {
+   "seq": 29,
+   "text": "add a new event to my calendar",
+   "ts": 1773065017.932584
+  },
+  {
+   "seq": 30,
+   "text": "NOTE DOWN THIS EVENT ON MY CALENDAR.",
+   "ts": 1773070201.932584
+  },
+  {
+   "seq": 31,
+   "text": "PDA can you give me a 10 minute timer.",
+   "ts": 1773075385.932584
+  },
+  {
+   "seq": 32,
+   "text": "Add an appointment with my dentist for 10 a.m. next Monday.",
+   "ts": 1773080569.932584
+  },
+  {
+   "seq": 33,
+   "text": "Add yoga to my calendar for friday.",
+   "ts": 1773085753.932584
+  },
+  {
+   "seq": 34,
+   "text": "Set meeting with Joanna on Saturday 4 pm.",
+   "ts": 1773090937.932584
+  },
+  {
+   "seq": 35,
+   "text": "Add this one also.",
+   "ts": 1773096121.932584
+  },
+  {
+   "seq": 36,
+   "text": "create an event with location 'home' and with event 'new year's eve'",
+   "ts": 1773101305.932584
+  },
+  {
+   "seq": 37,
+   "text": "what are my engagements today?",
+   "ts": 1773106489.932584
+  },
+  {
+   "seq": 38,
+   "text": "Delete next event on calendar",
+   "ts": 1773111673.932584
+  },
+  {
+   "seq": 39,
+   "text": "Please remove the next event on my calender",
+   "ts": 1773116857.932584
+  },
+  {
+   "seq": 40,
+   "text": "Remind me about my anniversary in advance.",
+   "ts": 1773122041.932584
+  },
+  {
+   "seq": 41,
+   "text": "Please delete samantha's party.",
+   "ts": 1773127225.932584
+  },
+  {
+   "seq": 42,
+   "text": "set repeat event in calendar",
+   "ts": 1773132409.932584
+  },
+  {
+   "seq": 43,
+   "text": "When will my meeting with Sandy occur?",
+   "ts": 1773137593.932584
+  },
+  {
+   "seq": 44,
+   "text": "Set a event that will happen everyday.",
+   "ts": 1773142777.932584
+  },
+  {
+   "seq": 45,
+   "text": "I need to arrange a meeting with Jack.",
+   "ts": 1773147961.932584
+  },
+  {
+   "seq": 46,
+   "text": "May i know my future schedules?",
+   "ts": 1773153145.932584
+  },
+  {
+   "seq": 47,
+   "text": "Olly, anything else left on the list?",
+   "ts": 1773158329.932584
+  },
+  {
+   "seq": 48,
+   "text": "What do I have going on today from 2-4 PM?",
+   "ts": 1773163513.932584
+  },
+  {
+   "seq": 49,
+   "text": "Put reminder to call Pawel tomorrow",
+   "ts": 1773168697.932584
+  },
+  {
+   "seq": 50,
+   "text": "I'm going to the theater on Friday at 7 with Dave. Can you add that to my calendar?",
+   "ts": 1773173881.932584
+  },
+  {
+   "seq": 51,
+   "text": "Remove all data from my calendar.",
+   "ts": 1773179065.932584
+  },
+  {
+   "seq": 52,
+   "text": "Alter Lunch Event to repeat every Friday",
+   "ts": 1773184249.932584
+  },
+  {
+   "seq": 53,
+   "text": "alexa add monas wedding even to my calendar for tuesday",
+   "ts": 1773189433.932584
+  },
+  {
+   "seq": 54,
+   "text": "add date and time in calender with these people",
+   "ts": 1773194617.932584
+  },
+  {
+   "seq": 55,
+   "text": "set event date in calendar with ohers",
+   "ts": 1773199801.932584
+  },
+  {
+   "seq": 56,
+   "text": "what is the date for the event scheduled on the 20th of february alexa",
+   "ts": 1773204985.932584
+  },
+  {
+   "seq": 57,
+   "text": "Tell me what's happening this week.",
+   "ts": 1773210169.932584
+  },
+  {
+   "seq": 58,
+   "text": "My daughter's anniversary is Thursday.  Send me a reminder",
+   "ts": 1773215353.932584
+  },
+  {
+   "seq": 59,
+   "text": "hey siri make sure my calendar is completely clear tomorrow",
+   "ts": 1773220537.932584
+  },
+  {
+   "seq": 60,
+   "text": "I WANT YOU TO REMEBER ME TO TAKE MY RAIN COAT BECAUSE IT MAY RAIN.",
+   "ts": 1773225721.932584
+  }
+ ]
+}
