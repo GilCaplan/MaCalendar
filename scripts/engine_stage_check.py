@@ -208,9 +208,44 @@ def _cases_generate(cfg):
 
 
 def _cases_crosscheck(cfg):
-    def placeholder():
-        return False, "crosscheck is a contract placeholder — its build is gated on these cases"
-    return [("NOT BUILT: extraction + blame routing", True, placeholder)]
+    """Extraction quality against seeded mistakes: the check must notice a
+    dropped ask and an invented row, and stay quiet when all is covered."""
+    from types import SimpleNamespace
+    from assistant.engine import crosscheck
+
+    def _ev(id, title, text=""):
+        return _item("event", text or title, id=id, action="create_event",
+                     intent=SimpleNamespace(title=title))
+
+    def _td(id, title, text=""):
+        return _item("task", text or title, id=id, action="create_todo",
+                     intent=SimpleNamespace(title=title))
+
+    def clean():
+        st = _items_state([_ev("item_1", "gym", "book gym tomorrow at 7am"),
+                           _td("item_2", "buy milk")])
+        st.raw_text = "book gym tomorrow at 7am and remind me to buy milk"
+        crosscheck.run(st, cfg)
+        return st.findings == [], f"{[(f.type, f.detail) for f in st.findings]}"
+
+    def dropped_ask():
+        st = _items_state([_ev("item_1", "gym", "book gym tomorrow at 7am")])
+        st.raw_text = "book gym tomorrow at 7am and remind me to buy milk"
+        crosscheck.run(st, cfg)
+        ok = [f.type for f in st.findings] == ["missing"]
+        return ok, f"{[(f.type, f.detail) for f in st.findings]}"
+
+    def invented_row():
+        st = _items_state([_td("item_1", "buy milk"),
+                           _td("item_2", "buy groceries")])
+        st.raw_text = "add buy milk to my shopping list"
+        crosscheck.run(st, cfg)
+        ok = [(f.type, f.item_id) for f in st.findings] == [("extra", "item_2")]
+        return ok, f"{[(f.type, f.item_id, f.detail) for f in st.findings]}"
+
+    return [("all asks covered → quiet", True, clean),
+            ("a dropped ask is noticed", True, dropped_ask),
+            ("an invented row is noticed", True, invented_row)]
 
 
 STAGES = {

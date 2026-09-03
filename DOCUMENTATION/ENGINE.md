@@ -149,9 +149,15 @@ best attempt, say so, mark the memory record uncertain. On the fast track this
 stage patches the committed answer — **tiered**: additive fixes silent,
 destructive corrections visible with one-tap revert. It owns what used to be
 four bolt-ons: the background verify, both placeholder-title fixers, the
-not-found second opinion. *Status: contract placeholder — records nothing,
-loops nothing, patches nothing. Its build (sequencing phase 3) is gated on
-`scripts/engine_stage_check.py --stage crosscheck`.*
+not-found second opinion (the last still lives in commit until this stage
+absorbs it). *Status: live. Foreground: extraction + diff + loop-back run
+pre-commit, budget honoured, exhaustion admitted in the reply. Background
+(fast track): verify token issued, placeholder titles renamed (minor), a
+missing ask parsed and committed additively (minor), an extra row reported as
+major — ADVISORY unless `self_check_apply` is on, because the old always-on
+verifier measurably proposed far more than it fixed (78 proposals, 0 fixes,
+2026-08-28); the one-tap revert affordance is client work, queued. Gate:
+`engine_stage_check --stage crosscheck`.*
 
 ## The response contract (unchanged from the old brain)
 

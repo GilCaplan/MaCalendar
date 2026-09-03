@@ -108,20 +108,42 @@ def run_transcript(text: str, trace: Any = None, source: str = "ios",
 
     # -- fast track ---------------------------------------------------------
     try:
-        fast = _generate.fast_propose(state, cfg)
-        if not fast:
+        fast = cfg.engine.fast_track and _generate.fast_propose(state, cfg)
+        if fast:
+            _validate.run_objects(state, cfg)
+            _commit(state, cfg)
+            _label.run(state, cfg)
+            # The deep track runs BEHIND the instant answer: extraction-based
+            # cross-check against what was just committed, patches through the
+            # verify-token contract the clients already speak.
+            _start_background_verify(state, cfg)
+        else:
             # -- deep track, foreground -------------------------------------
-            _segment.run(state, cfg)
-            _decompose.run(state, cfg)
-            _validate.run(state, cfg)
-            _generate.run(state, cfg)
+            _deep_parse(state, cfg)
+            # Step 6 runs BEFORE anything is written: findings loop execution
+            # back to the blamed stage (fresh intents each time, so the
+            # field rules cannot double-apply), at most MAX_REENTRIES total.
+            reentries = 0
+            while reentries < _crosscheck.MAX_REENTRIES:
+                _crosscheck.run(state, cfg)
+                loop_to = _loop_target(state)
+                if loop_to is None:
+                    break
+                reentries += 1
+                state.retries[loop_to] = state.retries.get(loop_to, 0) + 1
+                if state.trace:
+                    from assistant.trace import VERIFY
+                    state.trace.step(VERIFY, "Looping back",
+                                     f"re-running from {loop_to} "
+                                     f"({reentries}/{_crosscheck.MAX_REENTRIES})")
+                _deep_parse(state, cfg)
+            else:
+                state.messages.append(
+                    "I'm not sure I caught every part of that — worth a glance.")
+            _commit(state, cfg)
+            _label.run(state, cfg)
     except AssistantError as e:
         return _parse_error_response(state, cfg, e)
-
-    _validate.run_objects(state, cfg)
-    _commit(state, cfg)
-    _label.run(state, cfg)
-    _crosscheck.run(state, cfg)
 
     # -- bookkeeping: reply, memory, logs, trace bus ------------------------
     response_msg = " ".join(m for m in state.messages if m)
@@ -253,6 +275,172 @@ def _commit(state: EngineState, cfg) -> None:
         state.refresh = "both"
     elif refresh_set:
         state.refresh = refresh_set.pop()
+
+
+def _deep_parse(state: EngineState, cfg) -> None:
+    """Steps 2→5 + the field rules — the deep track's parse half, re-runnable:
+    items are rebuilt from scratch each time (fresh intents, so no field rule
+    can apply twice), and any loop-back mistakes are already on the state for
+    the stages' prompts."""
+    state.items = []
+    _segment.run(state, cfg)
+    _decompose.run(state, cfg)
+    _validate.run(state, cfg)
+    _generate.run(state, cfg)
+    _validate.run_objects(state, cfg)
+
+
+def _loop_target(state: EngineState) -> "str | None":
+    """The earliest stage the findings blame, or None when there is nothing
+    to loop for. Only stages whose re-run rebuilds intents are loopable —
+    re-running the field rules on the SAME objects would double-apply them."""
+    loopable = {"segment", "generate"}
+    for f in state.findings:
+        if f.blamed_stage in loopable:
+            return "segment"   # a segment re-run rebuilds everything after it
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Fast track's background verify — the deep track running behind the answer
+# ---------------------------------------------------------------------------
+
+def _verify_store():
+    """The token store the clients poll (GET /voice/verify/<token>). It lives
+    with the HTTP layer; both sides import lazily so neither owns the other at
+    import time."""
+    from assistant.api.server import _verify_store as store, _verify_lock as lock
+    return store, lock
+
+
+def _start_background_verify(state: EngineState, cfg) -> None:
+    """Issue a verify token and run the cross-check behind the instant answer.
+
+    Patch tiers, applied here when the check disagrees:
+      • additive (a missing ask): parsed and committed, minor severity —
+        "I also added …".
+      • title (a placeholder like "meeting"): renamed in place, minor.
+      • destructive (an extra row): honoured only when `self_check_apply`
+        says so — the old always-on verifier measurably proposed far more
+        than it fixed, so removal ships ADVISORY: said, not done.
+    """
+    reconcile = getattr(cfg.engine, "reconcile", "always")
+    if reconcile == "uncertain" and state.rule_confidence >= 0.95:
+        return
+    import uuid
+
+    token = str(uuid.uuid4())
+    store, lock = _verify_store()
+    import time as _t
+    with lock:
+        store[token] = {"ready": False, "correction": None, "expires": _t.time() + 120}
+    state.verify_token = token
+
+    def _work() -> None:
+        try:
+            correction = _background_verify(state, cfg)
+        except Exception as e:
+            logger.debug("Background verify failed: %s", e)
+            correction = None
+        with lock:
+            if token in store:
+                store[token]["ready"] = True
+                store[token]["correction"] = correction or {"ok": True}
+
+    threading.Thread(target=_work, daemon=True, name="crosscheck-bg").start()
+
+
+def _background_verify(state: EngineState, cfg) -> "dict | None":
+    """The check itself, on the worker thread. Returns the correction payload
+    for the verify endpoint (None = agreed)."""
+    from assistant.engine.validate import is_placeholder_title
+
+    speech: list[str] = []
+    refresh: set = set()
+    severity = "minor"
+
+    # A placeholder title ("meeting") is renamed before anything else — 22 of
+    # 37 flagged titles in a week were the bare word "meeting".
+    for ex in state.executed:
+        if not (ex.ok and ex.record and ex.record[0] == "event"
+                and ex.record[2] == "create_event"):
+            continue
+        from assistant.db import get_db
+        ev = get_db().get_event(ex.record[1])
+        if ev and is_placeholder_title(ev["title"], cfg):
+            try:
+                better = _generate._get_parser(cfg).fix_title_async(
+                    state.text, ev["title"])
+            except Exception:
+                better = None
+            if better and better.strip().lower() != ev["title"].strip().lower():
+                get_db().update_event(ex.record[1], title=better.strip())
+                speech.append(f"I named it “{better.strip()}”.")
+                refresh.add("events")
+
+    _crosscheck.run(state, cfg)
+    for f in state.findings:
+        if f.type == "missing":
+            made = _commit_missing_ask(state, cfg, f)
+            if made:
+                speech.append(made)
+                refresh.update(("events", "todos"))
+        elif f.type == "extra":
+            if getattr(cfg, "self_check_apply", False):
+                undone = _remove_extra(state, f)
+                if undone:
+                    severity = "major"
+                    speech.append(undone)
+                    refresh.update(("events", "todos"))
+            else:
+                severity = "major"
+                speech.append(f"Worth a look: {f.detail}.")
+
+    if not speech:
+        return None
+    both = "both" if len(refresh) > 1 else (refresh.pop() if refresh else "")
+    return {"ok": False, "severity": severity, "patch": {},
+            "speech": " ".join(speech), "refresh": both}
+
+
+def _commit_missing_ask(state: EngineState, cfg, finding) -> "str | None":
+    """An ask the fast parse dropped: parse just its words and commit it."""
+    import re as _re
+    m = _re.search(r"“(.+?)”", finding.detail)
+    if not m:
+        return None
+    words = m.group(1)
+    from assistant.engine.state import Item
+    sub = EngineState(raw_text=words, text=words, source=state.source,
+                      current_view=state.current_view, mode="background")
+    sub.items = [Item(id="item_1", kind="other", text=words)]
+    try:
+        _generate.run(sub, cfg)
+        _validate.run_objects(sub, cfg)
+        _commit(sub, cfg)
+    except Exception:
+        return None
+    done = [m2 for m2 in sub.messages if m2]
+    if any(ex.ok for ex in sub.executed):
+        return "I first missed part of that — " + " ".join(done)
+    return None
+
+
+def _remove_extra(state: EngineState, finding) -> "str | None":
+    """Delete a committed row the words never asked for (self_check_apply on)."""
+    from assistant.db import get_db
+    for ex in state.executed:
+        if ex.item_id == finding.item_id and ex.ok and ex.record:
+            kind, row_id = ex.record[0], ex.record[1]
+            try:
+                if kind == "event":
+                    get_db().delete_event(row_id)
+                    return "I removed an event I created by mistake."
+                get_db().delete_todo(row_id)
+                return "I removed a task I created by mistake."
+            except Exception:
+                return None
+    return None
 
 
 def _recheck_not_found(state: EngineState, cfg, item) -> "tuple | None":

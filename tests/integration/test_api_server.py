@@ -80,12 +80,18 @@ def app_client(tmp_path, monkeypatch, sample_config, isolated_registry):
     monkeypatch.setattr(db_module, "get_db", lambda: db)
     monkeypatch.setattr(server_module, "get_db", lambda: db)
     monkeypatch.setattr(server_module, "load_config", lambda *a, **kw: sample_config)
+    # The engine reads its own config (it must never import the HTTP layer),
+    # so the brain needs the same mock.
+    import assistant.engine as engine_module
+    monkeypatch.setattr(engine_module, "load_config", lambda: sample_config)
 
     # Reset module-level lazy singletons so each test gets a clean registry/parser
     # built against the mocked config, rather than reusing state from a prior test.
-    monkeypatch.setattr(server_module, "_registry", None)
-    monkeypatch.setattr(server_module, "_parser", None)
-    monkeypatch.setattr(server_module, "_rule_parser", None)
+    import assistant.engine.generate as engine_generate
+    import assistant.engine.llm as engine_llm
+    monkeypatch.setattr(engine_generate, "_parser", None)
+    monkeypatch.setattr(engine_generate, "_rule_parser", None)
+    monkeypatch.setattr(engine_llm, "_parser", None)
     monkeypatch.setattr(server_module, "_stt", None)
 
     app = server_module.create_app()
@@ -130,7 +136,6 @@ def test_voice_text_create_todo_rule_fast_path(app_client):
     assert any("milk" in t["title"].lower() for t in todos)
 
 
-@pytest.mark.skip(reason="verify_token returns when engine step 6 (crosscheck) is built")
 def test_voice_text_create_event_rule_fast_path(app_client, sample_config):
     client, db = app_client
     # The verify token is what this asserts, so ask for it explicitly rather than
@@ -187,7 +192,6 @@ def test_voice_verify_unknown_token_returns_404(app_client):
     assert resp.status_code == 404
 
 
-@pytest.mark.skip(reason="verify_token returns when engine step 6 (crosscheck) is built")
 def test_voice_verify_pending_before_ready(app_client, sample_config):
     """Immediately after a rule-path response, the verify token exists but the
     background thread almost certainly hasn't finished — poll returns pending.
