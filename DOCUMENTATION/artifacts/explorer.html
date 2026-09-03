@@ -550,7 +550,11 @@ const P = {
     </table></div>
     <p>The mixed row is nine commands — read small samples gently. And the threshold buys speed,
     not autonomy: even a command the rules answered is re-read by the model afterwards
-    (step&nbsp;7).</p>`
+    (step&nbsp;7).</p>
+    <p>The score is stored with the command. Keeping it is what makes the line itself checkable:
+    with enough judged commands you can group them by the score they were given and see how often
+    each group turned out right, which is the only way to know whether 0.85 sits in the right
+    place.</p>`
   },
   check: {
     tag:"step 5 of 8", name:"check", title:"Thirteen sober questions",
@@ -623,7 +627,11 @@ series_id   NULL
     made there. Everything since has run identically either way.</p>
 
     <p>A repeating event is stored as ordinary rows sharing a series id, so every query stays a
-    plain date lookup and a day that should be skipped is simply never written.</p>`
+    plain date lookup and a day that should be skipped is simply never written.</p>
+    <p>A task also carries a count. Asked for five of something, a model with no way to say
+    "five" writes the task five times, and five identical rows make it impossible to tell which
+    one you ticked. Counts are read from the words instead &mdash; an explicit multiplier, or a
+    number after a verb that implies buying a quantity &mdash; and stored in one column.</p>`
   },
   review: {
     tag:"step 7 of 8", name:"review", title:"The model reads everything — afterwards",
@@ -654,7 +662,12 @@ series_id   NULL
 
     <p>On the next similar command the four closest past ones are pasted into the prompt. A
     correction outranks an approval; a rejection is never shown again. The model itself is
-    unchanged &mdash; what changes is the company its prompt keeps.</p>`
+    unchanged &mdash; what changes is the company its prompt keeps.</p>
+    <p>Whether this helps is now measurable and has been measured once: the corpus replayed with
+    retrieval on and off, under otherwise identical conditions, scored 98% and 97%. That gap is a
+    single command, and the path where examples enter the prompt scored 100% both ways &mdash; so
+    the honest reading is that this corpus cannot tell, because the part memory affects is already
+    at ceiling. Answering it needs commands the model gets wrong without help.</p>`
   },
   models: {
     tag:"on the laptop", name:"models", title:"Three models, one machine",
