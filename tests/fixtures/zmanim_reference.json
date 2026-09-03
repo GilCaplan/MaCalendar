@@ -1,0 +1,302 @@
+{
+  "_source": "https://www.hebcal.com/home/1663/zmanim-halachic-times-api",
+  "_licence": "Hebcal content is CC-BY-4.0",
+  "_fetched": "2026-09-02",
+  "_note": "Local wall-clock times. tzeit85deg is nightfall at 8.5 degrees of solar depression, the same definition assistant/observance.py uses.",
+  "locations": {
+    "Jerusalem": {
+      "latitude": 31.7683,
+      "longitude": 35.2137,
+      "timezone": "Asia/Jerusalem",
+      "times": {
+        "2026-01-02": {
+          "sunrise": "06:41:40",
+          "sunset": "16:47:26",
+          "tzeit85deg": "17:27:11",
+          "tzeit7083deg": "17:19:57"
+        },
+        "2026-03-20": {
+          "sunrise": "05:44:33",
+          "sunset": "17:51:53",
+          "tzeit85deg": "18:28:12",
+          "tzeit7083deg": "18:21:28"
+        },
+        "2026-03-27": {
+          "sunrise": "06:35:30",
+          "sunset": "18:56:44",
+          "tzeit85deg": "19:33:13",
+          "tzeit7083deg": "19:26:27"
+        },
+        "2026-06-19": {
+          "sunrise": "05:34:05",
+          "sunset": "19:49:42",
+          "tzeit85deg": "20:32:17",
+          "tzeit7083deg": "20:24:12"
+        },
+        "2026-09-04": {
+          "sunrise": "06:17:27",
+          "sunset": "19:01:13",
+          "tzeit85deg": "19:38:09",
+          "tzeit7083deg": "19:31:17"
+        },
+        "2026-10-30": {
+          "sunrise": "05:55:30",
+          "sunset": "16:52:20",
+          "tzeit85deg": "17:29:35",
+          "tzeit7083deg": "17:22:45"
+        },
+        "2026-12-18": {
+          "sunrise": "06:35:39",
+          "sunset": "16:38:25",
+          "tzeit85deg": "17:18:21",
+          "tzeit7083deg": "17:11:05"
+        }
+      }
+    },
+    "Jerusalem": {
+      "latitude": 31.7683,
+      "longitude": 35.2137,
+      "timezone": "Asia/Jerusalem",
+      "times": {
+        "2026-01-02": {
+          "sunrise": "06:39:19",
+          "sunset": "16:47:03",
+          "tzeit85deg": "17:26:36",
+          "tzeit7083deg": "17:19:23"
+        },
+        "2026-03-20": {
+          "sunrise": "05:43:12",
+          "sunset": "17:50:30",
+          "tzeit85deg": "18:26:38",
+          "tzeit7083deg": "18:19:57"
+        },
+        "2026-03-27": {
+          "sunrise": "06:34:16",
+          "sunset": "18:55:14",
+          "tzeit85deg": "19:31:33",
+          "tzeit7083deg": "19:24:48"
+        },
+        "2026-06-19": {
+          "sunrise": "05:33:47",
+          "sunset": "19:47:15",
+          "tzeit85deg": "20:29:34",
+          "tzeit7083deg": "20:21:32"
+        },
+        "2026-09-04": {
+          "sunrise": "06:16:24",
+          "sunset": "18:59:32",
+          "tzeit85deg": "19:36:18",
+          "tzeit7083deg": "19:29:28"
+        },
+        "2026-10-30": {
+          "sunrise": "05:53:35",
+          "sunset": "16:51:32",
+          "tzeit85deg": "17:28:36",
+          "tzeit7083deg": "17:21:48"
+        },
+        "2026-12-18": {
+          "sunrise": "06:33:16",
+          "sunset": "16:38:04",
+          "tzeit85deg": "17:17:47",
+          "tzeit7083deg": "17:10:33"
+        }
+      }
+    },
+    "New York": {
+      "latitude": 40.7128,
+      "longitude": -74.006,
+      "timezone": "America/New_York",
+      "times": {
+        "2026-01-02": {
+          "sunrise": "07:20:08",
+          "sunset": "16:40:19",
+          "tzeit85deg": "17:25:31",
+          "tzeit7083deg": "17:17:22"
+        },
+        "2026-03-20": {
+          "sunrise": "06:59:16",
+          "sunset": "19:08:12",
+          "tzeit85deg": "19:48:49",
+          "tzeit7083deg": "19:41:16"
+        },
+        "2026-03-27": {
+          "sunrise": "06:47:40",
+          "sunset": "19:15:36",
+          "tzeit85deg": "19:56:30",
+          "tzeit7083deg": "19:48:53"
+        },
+        "2026-06-19": {
+          "sunrise": "05:24:40",
+          "sunset": "20:30:16",
+          "tzeit85deg": "21:20:53",
+          "tzeit7083deg": "21:11:04"
+        },
+        "2026-09-04": {
+          "sunrise": "06:26:03",
+          "sunset": "19:23:14",
+          "tzeit85deg": "20:04:47",
+          "tzeit7083deg": "19:57:01"
+        },
+        "2026-10-30": {
+          "sunrise": "07:24:03",
+          "sunset": "17:54:39",
+          "tzeit85deg": "18:36:25",
+          "tzeit7083deg": "18:28:47"
+        },
+        "2026-12-18": {
+          "sunrise": "07:14:52",
+          "sunset": "16:30:30",
+          "tzeit85deg": "17:16:00",
+          "tzeit7083deg": "17:07:48"
+        }
+      }
+    },
+    "London": {
+      "latitude": 51.5074,
+      "longitude": -0.1278,
+      "timezone": "Europe/London",
+      "times": {
+        "2026-01-02": {
+          "sunrise": "08:05:59",
+          "sunset": "16:03:18",
+          "tzeit85deg": "17:01:21",
+          "tzeit7083deg": "16:51:06"
+        },
+        "2026-03-20": {
+          "sunrise": "06:03:21",
+          "sunset": "18:13:31",
+          "tzeit85deg": "19:03:11",
+          "tzeit7083deg": "18:53:55"
+        },
+        "2026-03-27": {
+          "sunrise": "05:47:23",
+          "sunset": "18:25:20",
+          "tzeit85deg": "19:15:34",
+          "tzeit7083deg": "19:06:08"
+        },
+        "2026-06-19": {
+          "sunrise": "04:42:48",
+          "sunset": "21:21:03",
+          "tzeit85deg": "22:35:57",
+          "tzeit7083deg": "22:20:09"
+        },
+        "2026-09-04": {
+          "sunrise": "06:17:46",
+          "sunset": "19:40:15",
+          "tzeit85deg": "20:31:54",
+          "tzeit7083deg": "20:22:07"
+        },
+        "2026-10-30": {
+          "sunrise": "06:50:20",
+          "sunset": "16:37:09",
+          "tzeit85deg": "17:28:35",
+          "tzeit7083deg": "17:19:15"
+        },
+        "2026-12-18": {
+          "sunrise": "08:01:53",
+          "sunset": "15:52:15",
+          "tzeit85deg": "16:50:52",
+          "tzeit7083deg": "16:40:32"
+        }
+      }
+    },
+    "Sydney": {
+      "latitude": -33.8688,
+      "longitude": 151.2093,
+      "timezone": "Australia/Sydney",
+      "times": {
+        "2026-01-02": {
+          "sunrise": "05:48:13",
+          "sunset": "20:09:36",
+          "tzeit85deg": "20:53:02",
+          "tzeit7083deg": "20:44:45"
+        },
+        "2026-03-20": {
+          "sunrise": "06:57:56",
+          "sunset": "19:06:57",
+          "tzeit85deg": "19:43:55",
+          "tzeit7083deg": "19:37:04"
+        },
+        "2026-03-27": {
+          "sunrise": "07:03:15",
+          "sunset": "18:57:27",
+          "tzeit85deg": "19:34:21",
+          "tzeit7083deg": "19:27:32"
+        },
+        "2026-06-19": {
+          "sunrise": "06:59:28",
+          "sunset": "16:53:25",
+          "tzeit85deg": "17:34:17",
+          "tzeit7083deg": "17:26:52"
+        },
+        "2026-09-04": {
+          "sunrise": "06:10:08",
+          "sunset": "17:39:02",
+          "tzeit85deg": "18:16:10",
+          "tzeit7083deg": "18:09:20"
+        },
+        "2026-10-30": {
+          "sunrise": "05:57:06",
+          "sunset": "19:21:00",
+          "tzeit85deg": "20:00:23",
+          "tzeit7083deg": "19:52:59"
+        },
+        "2026-12-18": {
+          "sunrise": "05:39:21",
+          "sunset": "20:03:48",
+          "tzeit85deg": "20:47:34",
+          "tzeit7083deg": "20:39:13"
+        }
+      }
+    },
+    "Toronto": {
+      "latitude": 43.6532,
+      "longitude": -79.3832,
+      "timezone": "America/Toronto",
+      "times": {
+        "2026-01-02": {
+          "sunrise": "07:51:06",
+          "sunset": "16:52:24",
+          "tzeit85deg": "17:40:13",
+          "tzeit7083deg": "17:31:37"
+        },
+        "2026-03-20": {
+          "sunrise": "07:20:34",
+          "sunset": "19:29:59",
+          "tzeit85deg": "20:12:34",
+          "tzeit7083deg": "20:04:40"
+        },
+        "2026-03-27": {
+          "sunrise": "07:07:56",
+          "sunset": "19:38:25",
+          "tzeit85deg": "20:21:21",
+          "tzeit7083deg": "20:13:21"
+        },
+        "2026-06-19": {
+          "sunrise": "05:35:43",
+          "sunset": "21:02:15",
+          "tzeit85deg": "21:57:04",
+          "tzeit7083deg": "21:46:18"
+        },
+        "2026-09-04": {
+          "sunrise": "06:44:40",
+          "sunset": "19:47:32",
+          "tzeit85deg": "20:31:14",
+          "tzeit7083deg": "20:23:03"
+        },
+        "2026-10-30": {
+          "sunrise": "07:50:46",
+          "sunset": "18:10:54",
+          "tzeit85deg": "18:54:45",
+          "tzeit7083deg": "18:46:45"
+        },
+        "2026-12-18": {
+          "sunrise": "07:46:08",
+          "sunset": "16:42:16",
+          "tzeit85deg": "17:30:27",
+          "tzeit7083deg": "17:21:48"
+        }
+      }
+    }
+  }
+}

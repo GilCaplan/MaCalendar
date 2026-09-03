@@ -160,6 +160,44 @@
 
   <hr class="rule">
 
+  <section>
+    <h2><span class="num">01b</span>How much of it there is</h2>
+    <p>
+      "A voice-driven calendar" undersells it, and the undersell matters, because most of
+      the decisions later on only make sense at the real scale. What is actually here:
+    </p>
+
+    <table>
+      <thead><tr><th>Domain</th><th>What it holds</th><th>Reachable by voice?</th></tr></thead>
+      <tbody>
+        <tr><td class="m">calendar</td><td>events, repeating series, colour categories, guests</td><td>yes</td></tr>
+        <tr><td class="m">tasks</td><td>lists, tags, sub-tasks, quantities, due dates</td><td>yes</td></tr>
+        <tr><td class="m">training</td><td>exercises, templates, plans, logged sessions</td><td>partly</td></tr>
+        <tr><td class="m">coursework</td><td>courses and assignments, linked to calendar entries</td><td>no — screen only</td></tr>
+        <tr><td class="m">time tracking</td><td>timers, sessions, tally counters, earnings</td><td>no — screen only</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      Fifteen actions, a hundred endpoints, roughly 34,000 lines. The voice layer that the
+      rest of this page describes reaches <strong>two and a half of those five
+      domains</strong> — and that is a drawn line, not an unfinished one. Speech is good at
+      "book the dentist Thursday at four" and bad at "start the timer on the third project
+      and log the last forty minutes to it retroactively". Where a screen is the better
+      instrument, there is only a screen.
+    </p>
+
+    <p class="note">
+      The consequence worth carrying forward: <strong>the parser is one entry point into
+      the data, not the owner of it.</strong> Every domain above is also edited directly, on
+      two devices, sometimes while disconnected. That is why the last few sections are
+      about rows, versions and conflicts rather than about language — a good deal of the
+      hard engineering here sits downstream of the sentence, not inside it.
+    </p>
+  </section>
+
+  <hr class="rule">
+
   <!-- 0b ----------------------------------------------------------------- -->
   <section>
     <h2><span class="num">02</span>Three models, and what each one is for</h2>
@@ -731,6 +769,80 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
   <hr class="rule">
 
   <section>
+    <h2><span class="num">09b</span>The model proposes, arithmetic disposes</h2>
+    <p>
+      The most useful pattern in the system shows up where language models are weakest:
+      planning six weeks of training around a calendar of festivals whose boundaries move
+      with the sun.
+    </p>
+    <p>
+      A model is genuinely good at the shape of such a plan — how hard, how often, in what
+      order, what a sensible week looks like. It is reliably bad at the dates, because
+      nothing in its training tells it which Tuesday is a fast day. A model that has
+      confidently scheduled a hard session on one is not a hypothetical; it is the default
+      behaviour of any model that has not been told.
+    </p>
+
+    <figure>
+      <svg viewBox="0 0 720 168" role="img"
+           aria-label="The propose-dispose split. The model proposes a plan with dates attached. Every proposed date is then re-placed by deterministic code against computed availability. What reaches the calendar is the model's shape on the arithmetic's dates.">
+        <defs>
+          <marker id="pd-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+        <rect x="16" y="34" width="196" height="60" rx="8" fill="none" stroke="var(--llm)" stroke-width="1.6"></rect>
+        <text x="114" y="58" text-anchor="middle" font-size="12.5" fill="var(--llm)">the model proposes</text>
+        <text x="114" y="76" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".6">shape, order, intensity</text>
+
+        <rect x="262" y="34" width="196" height="60" rx="8" fill="none" stroke="var(--accent)" stroke-width="1.6"></rect>
+        <text x="360" y="58" text-anchor="middle" font-size="12.5" fill="var(--accent)">arithmetic disposes</text>
+        <text x="360" y="76" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".6">every date re-placed</text>
+
+        <rect x="508" y="34" width="196" height="60" rx="8" fill="none" stroke="var(--done)" stroke-width="1.6"></rect>
+        <text x="606" y="58" text-anchor="middle" font-size="12.5" fill="var(--done)">what gets written</text>
+        <text x="606" y="76" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".6">its shape, our dates</text>
+
+        <line x1="212" y1="64" x2="258" y2="64" stroke="currentColor" stroke-opacity=".45" marker-end="url(#pd-ah)"></line>
+        <line x1="458" y1="64" x2="504" y2="64" stroke="currentColor" stroke-opacity=".45" marker-end="url(#pd-ah)"></line>
+        <text x="235" y="54" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".55">dates</text>
+        <text x="481" y="54" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".55">legal</text>
+
+        <text x="360" y="132" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">a proposal is advisory · a placement is not</text>
+      </svg>
+      <figcaption>
+        The model never writes a date. It writes a plan, and the dates are decided by code
+        that cannot be argued with.
+      </figcaption>
+    </figure>
+
+    <p>
+      So the two are separated by force. The model's output is a <em>proposal</em>, and
+      every date in it is re-placed by deterministic code against computed availability
+      before anything is written. What lands on the calendar is the model's judgement about
+      training and the arithmetic's judgement about days.
+    </p>
+
+    <h3>The same line, drawn twice</h3>
+    <p>
+      One more split sits inside the deterministic half, and it is what keeps that half
+      honest: <strong>what is computed and what is merely preferred live in different
+      modules.</strong> Whether a day is available is not negotiable and is calculated.
+      Whether two hard sessions may fall on consecutive days is a preference someone can
+      reasonably disagree with. Mixing them would let a preference quietly override a
+      boundary — so they are not editable in the same file.
+    </p>
+
+    <p class="note">
+      Generalised, this is the shape the whole system uses. The routing threshold in
+      section 03 is the same idea at the scale of one sentence: let the model do the part
+      that needs judgement, and never let it do the part that has a right answer.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
     <h2><span class="num">10</span>More than one thing at once</h2>
     <p>
       A single sentence can hold two events, and the rule parser cannot: it has one set
@@ -1207,6 +1319,31 @@ tzeit (it ends)   = dusk at 8.5° below the horizon   <span class="c">configurab
       sundown, the evening was never Saturday's to give.
     </p>
 
+    <h3>How we know the arithmetic is right</h3>
+    <p>
+      Computing a time rather than fetching one has an obvious hazard: it is
+      unfalsifiable on its own. A wrong sundown looks exactly like a right one until
+      something independent disagrees, and by then a season of Friday evenings has been
+      filed on the wrong side of the boundary.
+    </p>
+    <p>
+      So the published times were fetched <em>once</em>, from a reference that states
+      nightfall using the same definition — the same degrees of solar depression — and
+      checked in as a fixture. The comparison then runs offline, for ever:
+    </p>
+
+<pre>126 comparisons · 6 cities · 7 dates across a year · 3 times each
+worst disagreement: <span class="a">28 seconds</span></pre>
+
+    <p>
+      Every one of these times is displayed and acted on to the minute, so agreement
+      inside half a minute means the computed answer and the published one are the same
+      answer. The cities are chosen to break things rather than to pass: a southern
+      latitude catches a hemisphere assumption, a negative longitude catches a dropped
+      sign, and two of the dates sit either side of a daylight-saving changeover. A
+      fixture of convenient dates near home would prove nothing.
+    </p>
+
     <p class="note">
       <strong>The model is not consulted here, ever.</strong> It may propose a date; whether
       that date is available is decided by this code, deterministically. And if the
@@ -1384,6 +1521,6 @@ tzeit (it ends)   = dusk at 8.5° below the horizon   <span class="c">configurab
   </section>
 
   <hr class="rule">
-  <p class="foot">802 tests · one machine · no network</p>
+  <p class="foot">888 tests · one machine · no network</p>
 
 </div>

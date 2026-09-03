@@ -18,6 +18,7 @@ shabbat
 yom kippur
 kippur
 shiur
+fast day
 
 # Ordinary English that happens to be in the word list
 tomorrow

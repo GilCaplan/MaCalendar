@@ -70,6 +70,7 @@ Running list of user-reported issues and feature requests, with status. Update w
 | 63 | **"pasta times 5" made five identical tasks.** Neither parse path could represent a count, so the only way the LLM could say "five" was to repeat the title five times — and five identical rows mean ticking one tells you nothing. Counts are now read from the words, repeats are folded, and the number shows on the task row | done 2026-09-02 | `assistant/intent/quantity.py`, `todos.quantity`, `TaskRowView.swift`, `todo_view.py` |
 | 64 | **Sundown was computed for a hardcoded place.** `ObservanceSettings` defaults and the `observance:` config block held the same values but nothing connected them, so any call without an explicit settings object — including the recurrence Shabbat skipping — ignored the configuration | done 2026-09-03 | `observance.current_settings()`, `tests/unit/test_observance_settings.py` |
 | 65 | Device location: the phone reports its coordinates so sundown follows you, with manual override in settings | todo | builds on 64 |
+| 66 | Sundown verified against published times rather than trusted: fetched once from an authority, checked in, compared offline. 126 comparisons over 6 cities, worst disagreement 28 s — no fix needed | done 2026-09-03 | `scripts/fetch_zmanim_reference.py`, `tests/unit/test_zmanim_accuracy.py` |
 
 ## How we are working right now
 
