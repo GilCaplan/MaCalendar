@@ -45,6 +45,8 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import functools
+import json
+import os
 from typing import List, Literal, Optional, Tuple
 
 from astral import LocationInfo
@@ -138,6 +140,61 @@ DEFAULT_SETTINGS = ObservanceSettings()
 
 _settings_cache: "ObservanceSettings | None" = None
 
+#: Where a device's reported position is kept. Outside the repository with the
+#: other personal stores, and honoured over config.yaml — the configured place
+#: is where you usually are, this is where you are now.
+LOCATION_PATH = os.environ.get("MACALENDAR_LOCATION") or os.path.expanduser(
+    "~/.assistant_tools/location.json")
+
+
+def set_location(latitude: float, longitude: float, timezone: str,
+                 city: str = "", source: str = "device") -> "ObservanceSettings":
+    """Record where sundown should be computed for, and use it from now on.
+
+    Sundown drifts by more than three hours across a year in one place, and by
+    hours again between places, so a calendar that skips Shabbat is wrong the
+    moment you travel. The coordinates come from the device that knows them.
+
+    Refuses anything outside the possible range rather than storing it: a
+    latitude of 200 does not fail loudly later, it silently computes a sunset
+    that never happens and every day becomes available.
+    """
+    lat, lon = float(latitude), float(longitude)
+    if not (-90.0 <= lat <= 90.0) or not (-180.0 <= lon <= 180.0):
+        raise ValueError(f"impossible coordinates: {lat}, {lon}")
+    if not str(timezone).strip():
+        raise ValueError("a timezone is required — a position with no clock is not a place")
+
+    payload = {"latitude": lat, "longitude": lon, "timezone": str(timezone).strip(),
+               "city": str(city or "").strip(), "source": source,
+               "set_at": datetime.datetime.now().isoformat(timespec="seconds")}
+    path = LOCATION_PATH
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+    os.replace(tmp, path)              # never leave a half-written location
+    return reload_settings()
+
+
+def get_location() -> "dict | None":
+    """The stored position, or None when nothing has ever reported one."""
+    try:
+        with open(LOCATION_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) and "latitude" in data else None
+
+
+def clear_location() -> "ObservanceSettings":
+    """Forget the reported position and fall back to the configured place."""
+    try:
+        os.remove(LOCATION_PATH)
+    except OSError:
+        pass
+    return reload_settings()
+
 
 def settings_from_config(cfg=None) -> ObservanceSettings:
     """Build settings from config.yaml's `observance:` block.
@@ -168,11 +225,16 @@ def settings_from_config(cfg=None) -> ObservanceSettings:
             return fallback
 
     d = DEFAULT_SETTINGS
+    # A device that has reported where it is outranks the configured place:
+    # the config says where you usually are, the device says where you are.
+    # Only the position is taken from it — how long before candle lighting a
+    # session must end is a preference, not a fact about the sky.
+    here = get_location() or {}
     return ObservanceSettings(
-        latitude=getattr(ob, "latitude", d.latitude),
-        longitude=getattr(ob, "longitude", d.longitude),
-        timezone=getattr(ob, "timezone", d.timezone),
-        city=getattr(ob, "city", d.city),
+        latitude=here.get("latitude") or getattr(ob, "latitude", d.latitude),
+        longitude=here.get("longitude") or getattr(ob, "longitude", d.longitude),
+        timezone=here.get("timezone") or getattr(ob, "timezone", d.timezone),
+        city=here.get("city") or getattr(ob, "city", d.city),
         tzeit_depression=getattr(ob, "tzeit_depression", d.tzeit_depression),
         candle_lighting_minutes=getattr(ob, "candle_lighting_minutes", d.candle_lighting_minutes),
         erev_buffer_minutes=getattr(ob, "erev_buffer_minutes", d.erev_buffer_minutes),

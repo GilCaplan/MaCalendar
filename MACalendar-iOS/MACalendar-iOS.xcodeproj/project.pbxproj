@@ -44,6 +44,7 @@
 		AA00001C000000000000001A /* LiveSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00001C000000000000001B /* LiveSessionView.swift */; };
 		AA00001D000000000000001A /* SessionHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00001D000000000000001B /* SessionHistoryView.swift */; };
 		AA00001E000000000000001A /* WorkoutStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00001E000000000000001B /* WorkoutStatsView.swift */; };
+		E2B71CDD3565402A9538CB7E /* DeviceLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E447FB4142E7405F98384DBA /* DeviceLocation.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -86,6 +87,7 @@
 		AA00001C000000000000001B /* LiveSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSessionView.swift; sourceTree = "<group>"; };
 		AA00001D000000000000001B /* SessionHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionHistoryView.swift; sourceTree = "<group>"; };
 		AA00001E000000000000001B /* WorkoutStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutStatsView.swift; sourceTree = "<group>"; };
+		E447FB4142E7405F98384DBA /* DeviceLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceLocation.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -112,6 +114,7 @@
 			children = (
 				AA000001000000000000001B /* MACalendarApp.swift */,
 				AA000013000000000000001B /* LocalStore.swift */,
+				E447FB4142E7405F98384DBA /* DeviceLocation.swift */,
 				AA000014000000000000001B /* HebrewDate.swift */,
 				AA000016000000000000001B /* Theme.swift */,
 				AA000017000000000000001B /* CourseStore.swift */,
@@ -277,6 +280,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E2B71CDD3565402A9538CB7E /* DeviceLocation.swift in Sources */,
 				AA000001000000000000001A /* MACalendarApp.swift in Sources */,
 				AA000002000000000000001A /* ContentView.swift in Sources */,
 				AA000003000000000000001A /* APIClient.swift in Sources */,

@@ -331,6 +331,14 @@ struct ContentView: View {
                 settings.vocabOnboardingDone = true
             }
 
+            // Tell the host where we are, so sundown is computed for here
+            // rather than for wherever it was configured. One reading, only
+            // when it has moved far enough to change an answer, and only to
+            // your own host.
+            if settings.followMyLocation {
+                DeviceLocation.shared.refresh(using: api)
+            }
+
             unreviewed = await api.unreviewedCount()
 
             // Wire the Workout store up to the network layer once, so its

@@ -2512,6 +2512,56 @@ def create_app() -> Flask:
         db.update_workout_plan_item(item_id, **(request.get_json(silent=True) or {}))
         return jsonify(db.get_workout_plan_item(item_id))
 
+    @app.get("/observance/location")
+    def observance_location_get():
+        """Where sundown is currently computed for, and where that came from."""
+        from assistant import observance as ob
+        here = ob.get_location()
+        settings = ob.current_settings()
+        return jsonify({
+            "in_use": {"latitude": settings.latitude, "longitude": settings.longitude,
+                       "timezone": settings.timezone, "city": settings.city},
+            "source": "device" if here else "config",
+            "reported": here,
+        })
+
+    @app.post("/observance/location")
+    def observance_location_set():
+        """A device reporting where it is.
+
+        Sundown moves by hours between places, so a repeating event that skips
+        Shabbat is wrong the moment you travel — the boundary it is avoiding is
+        computed for somewhere you are not. The device that knows its position
+        says so, and everything downstream follows without being told.
+        """
+        from assistant import observance as ob
+        body = request.get_json(silent=True) or {}
+        try:
+            settings = ob.set_location(
+                latitude=body["latitude"], longitude=body["longitude"],
+                timezone=body.get("timezone") or "",
+                city=body.get("city", ""),
+                source=(body.get("source") or "device"),
+            )
+        except (KeyError, TypeError):
+            return jsonify({"error": "latitude, longitude and timezone are required",
+                            "code": 400}), 400
+        except ValueError as exc:
+            return jsonify({"error": str(exc), "code": 400}), 400
+        logger.info("📍 Location set to %s (%.4f, %.4f)",
+                    settings.city or "an unnamed place", settings.latitude, settings.longitude)
+        return jsonify({"latitude": settings.latitude, "longitude": settings.longitude,
+                        "timezone": settings.timezone, "city": settings.city})
+
+    @app.delete("/observance/location")
+    def observance_location_clear():
+        """Forget the reported position and go back to the configured place."""
+        from assistant import observance as ob
+        settings = ob.clear_location()
+        return jsonify({"latitude": settings.latitude, "longitude": settings.longitude,
+                        "timezone": settings.timezone, "city": settings.city,
+                        "source": "config"})
+
     @app.get("/observance")
     def observance_range():
         """Training availability per day: what is blocked, and which windows remain.

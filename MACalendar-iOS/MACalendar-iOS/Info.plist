@@ -80,5 +80,7 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Sundown is computed for wherever you are, so repeating events skip Shabbat and festivals at the right hour when you travel. Your position stays on your own devices.</string>
 </dict>
 </plist>

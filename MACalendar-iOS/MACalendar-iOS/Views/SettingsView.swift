@@ -159,6 +159,29 @@ struct SettingsView: View {
                             Text("Hebrew dates use gematria letters (e.g. כ״ט תשרי). Holidays begin at sundown the evening before their main day.")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
+
+                            Divider().padding(.vertical, 2)
+
+                            Toggle("Sundown follows this device", isOn: $settings.followMyLocation)
+                                .onChange(of: settings.followMyLocation) { on in
+                                    if on {
+                                        DeviceLocation.shared.refresh(using: api)
+                                    } else {
+                                        Task { try? await api.clearObservanceLocation() }
+                                    }
+                                }
+
+                            Text(settings.followMyLocation
+                                 ? "Candle lighting and nightfall are computed for wherever you are. Your position is sent to your own host and nowhere else, once, when it has moved far enough to matter."
+                                 : "Sundown uses the place configured on your host. Turn this on when you travel — the same clock time falls on different sides of Shabbat in different places.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+
+                            if !DeviceLocation.shared.status.isEmpty {
+                                Text(DeviceLocation.shared.status)
+                                    .font(.caption2)
+                                    .foregroundColor(settings.accentColor)
+                            }
                         }
                         .padding(.top, 4)
                     }

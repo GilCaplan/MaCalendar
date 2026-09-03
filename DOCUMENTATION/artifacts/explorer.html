@@ -444,7 +444,7 @@ const P = {
     tag:"the thesis", name:"the brain", title:"One brain",
     z:[352,256,1.9],
     sum:`<p>One process understands and executes everything. The host's own window and every attached surface are thin clients — <strong>none of them contains a parser</strong>.</p>
-    <p class="figs">15 actions · 101 endpoints · ~34,000 lines · a test suite</p>`,
+    <p class="figs">15 actions · 104 endpoints · ~35,491 lines · a test suite</p>`,
     more:`<p>"Fifteen things it can do" is literal: an action is one verb the assistant knows, and
     nothing outside this list can be asked for. Adding a sixteenth means adding a directory, not
     editing the pipeline.</p>
@@ -470,7 +470,7 @@ const P = {
     surfaces would disagree about what a sentence meant. Collapsing to one brain is the decision
     everything else on this page leans on: a behaviour that exists, exists once, and the phone
     gets it for free.</p>
-    <p>Five domains live behind those 101 endpoints — calendar, tasks, training, coursework,
+    <p>Five domains live behind those 104 endpoints — calendar, tasks, training, coursework,
     time-tracking — and voice reaches only the first two and a half. Where a screen is the better
     instrument, there is only a screen.</p>
     <p>One small tell of the design: a caller that does not label its source is treated as a test,
@@ -678,7 +678,7 @@ completed 0
     tag:"on the laptop", name:"window", title:"The calendar window",
     z:[539,169,2.4],
     sum:`<p>The application you actually look at — calendar, tasks, timer, coursework. Everything the assistant can do, you can also do by hand here. <strong>It parses nothing.</strong></p>
-    <p class="figs">most of the ~34,000 lines live here</p>`,
+    <p class="figs">most of the ~35,491 lines live here</p>`,
     more:`<p>Worth saying plainly, because the drawing puts the brain at the centre: <strong>speaking is
     optional.</strong> Every record the assistant creates can be created, edited and deleted
     directly — type a title, drag an event to another hour, tick a task, pick a colour, set a
@@ -786,7 +786,16 @@ completed 0
     for — unless the day is a fast, where a meal is the one thing that must not be booked. A
     series deliberately anchored on the day it would skip keeps it; skipping every instance would
     hollow it out. And if the times cannot be computed, nothing is skipped at all — a series
-    quietly losing days is worse than one landing where it should not.</p>`
+    quietly losing days is worse than one landing where it should not.</p>
+    <p><strong>Which place, though.</strong> Sundown moves by hours between cities as well as by
+    three hours across a year, so a repeating event that skips Shabbat is wrong the moment you
+    travel &mdash; the boundary it is avoiding was computed somewhere you are not, and nothing
+    about the wrong answer looks wrong.</p>
+    <p>So a device can say where it is, and everything downstream follows without being told. It
+    is off until you turn it on, takes one reading rather than watching you, and reports again
+    only when you have moved far enough to change an answer. Only the position comes from the
+    device: how long before candle lighting a session must finish is a preference, not a fact
+    about the sky, and stays where the other preferences are.</p>`
   },
   cloud: {
     tag:"ground rule", name:"internet", title:"Never",

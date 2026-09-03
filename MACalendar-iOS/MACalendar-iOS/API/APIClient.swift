@@ -753,6 +753,24 @@ class APIClient: ObservableObject {
 
     // MARK: - Vocabulary (STT auto-correct)
 
+    // MARK: - Where sundown is computed for
+
+    /// Tell the host where this device is. Only the position — how long before
+    /// candle lighting a session must finish is a preference set on the host,
+    /// not a fact a phone knows.
+    func setObservanceLocation(latitude: Double, longitude: Double,
+                               timezone: String, city: String = "") async throws {
+        _ = try await request("/observance/location", method: "POST", body: [
+            "latitude": latitude, "longitude": longitude,
+            "timezone": timezone, "city": city, "source": "ios",
+        ])
+    }
+
+    /// Forget it and go back to the place configured on the host.
+    func clearObservanceLocation() async throws {
+        _ = try await request("/observance/location", method: "DELETE")
+    }
+
     func vocab() async throws -> VocabState {
         try decode(VocabState.self, from: try await request("/vocab"))
     }

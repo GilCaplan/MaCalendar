@@ -15,6 +15,14 @@ class AppSettings: ObservableObject {
     @Published var theme: String {
         didSet { UserDefaults.standard.set(theme, forKey: "userTheme") }
     }
+    /// Whether this device tells the host where it is, so sundown is computed
+    /// for here rather than for the place set in the host's configuration.
+    /// Off by default: it is an improvement, not a requirement, and asking for
+    /// a position on first launch without a reason is rude.
+    @Published var followMyLocation: Bool {
+        didSet { UserDefaults.standard.set(followMyLocation, forKey: "followMyLocation") }
+    }
+
     @Published var accentColorHex: String {
         didSet { UserDefaults.standard.set(accentColorHex, forKey: "accentColorHex") }
     }
@@ -117,6 +125,7 @@ class AppSettings: ObservableObject {
     }
 
     init() {
+        self.followMyLocation = UserDefaults.standard.bool(forKey: "followMyLocation")
         self.speakReplies = UserDefaults.standard.object(forKey: "speakReplies") == nil
             ? true : UserDefaults.standard.bool(forKey: "speakReplies")
         self.stopWordsEnabled = UserDefaults.standard.object(forKey: "stopWordsEnabled") == nil

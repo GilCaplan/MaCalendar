@@ -25,6 +25,7 @@ All endpoints are served by the Mac at `http://<tailscale-ip>:8080`; the iOS app
 | `GET` | `/vocab` |  |
 | `POST` | `/vocab` |  |
 | `DELETE` | `/vocab/<path:word>` |  |
+| `PATCH` | `/vocab/<path:word>` | Edit a word the settings screens are showing. |
 | `POST` | `/vocab/alias` | Teach a correction: {"wrong": "Kyira", "right": "Kyra"}. |
 | `POST` | `/vocab/bulk` | Add many words at once: {"words": ["Kyra", ...]} |
 | `POST` | `/vocab/import` | Mine vocabulary candidates. Body: {"text": "..."} (WhatsApp export / notes) |
@@ -185,6 +186,9 @@ All endpoints are served by the Mac at `http://<tailscale-ip>:8080`; the iOS app
 | Method | Path | What it does |
 |---|---|---|
 | `GET` | `/observance` | Training availability per day: what is blocked, and which windows remain. |
+| `DELETE` | `/observance/location` | Forget the reported position and go back to the configured place. |
+| `GET` | `/observance/location` | Where sundown is currently computed for, and where that came from. |
+| `POST` | `/observance/location` | A device reporting where it is. |
 
 ## /config
 
