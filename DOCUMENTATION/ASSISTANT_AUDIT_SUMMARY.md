@@ -168,6 +168,63 @@ is overwritten by the next run, so a number cited anywhere durable has to be
 copied here first — `tests/unit/test_artifact_claims.py` checks that the
 artifact's headline still appears in this file.
 
+## Run 7 — 2026-09-03 — the first time the memory was measured at all
+
+Every previous run replayed the corpus against an **empty** command history,
+because the harness pointed `MACALENDAR_MEMORY_DB` at a fresh temporary file.
+So every claim about personalisation was untested by construction, and nothing
+said so. `--memory` replays against a copy of the real history; `--memory-k 0`
+turns retrieval off under otherwise identical conditions.
+
+Both arms, same code, same corpus, same machine, minutes apart:
+
+| | memory ON (k=4) | memory OFF (k=0) |
+|---|---:|---:|
+| **overall** | **98%** | **97%** |
+| rule path | 97% (n=39) | 97% (n=39) |
+| llm path | 100% (n=41) | 100% (n=42) |
+| hybrid path | 89% (n=9) | 75% (n=8) |
+
+**The honest conclusion is that this did not measure what it was built to
+measure.** The reason is in the third row: the LLM path is the only place
+few-shot examples enter the prompt, and it scores **100% in both arms**. There
+is no headroom. A corpus on which the affected path is already perfect cannot
+detect an improvement to it, and would only detect harm.
+
+What the other rows are worth:
+
+- **rule path, identical.** Expected — retrieval never touches it. A useful
+  negative control: it says the two runs were otherwise comparable.
+- **hybrid, 89% vs 75%.** Do not read this. The n differs (9 vs 8), so a
+  command changed parse path between runs; the buckets do not contain the same
+  commands, and at n=8 one command is 12 points.
+- **overall, one command.** 98% against 97% is a single command out of 89, and
+  it is the one that moved buckets.
+
+So: **no measurable effect, and the instrument cannot currently detect one.**
+That is a finding about the harness as much as about the feature, and it was
+worth two runs to learn — the alternative was continuing to argue about `k`.
+
+### What would actually answer the question
+
+The corpus is the wrong instrument for this. It is built from commands chosen
+to exercise the parser, and the parser is at ceiling on the path that matters.
+Measuring the memory needs commands the model gets *wrong* without help — which
+means selecting them from the real history's failures rather than from a
+hand-written corpus, and holding each out of the memory it is being tested
+against.
+
+Until that exists, `k=4` versus `k=0` is not a decision the data supports
+either way, and the reasonable thing is to leave it where it is.
+
+### Also confirmed this run
+
+- Self-check proposed a correction on 39 of 89, **fixed 0, broke 0** — the
+  same result as every run since it was demoted to advisory. It stays advisory.
+- Routing split unchanged at 39 rule / 50 model, so the 0.85 threshold is
+  sending the same proportion each way as it did in run 6.
+- No parse errors in either arm.
+
 ## Remaining gaps (ranked, from the 2026-08-26 run)
 
 1. ~~**Rule parser splits multi-event sentences into one**~~ — fixed, see above. ("lunch with Tal on monday at noon and coffee with Ezra on friday at 9" → only lunch). It is confident (0.90), so the LLM never sees it. Fix: lower confidence when a span contains two time expressions, forcing hybrid.
