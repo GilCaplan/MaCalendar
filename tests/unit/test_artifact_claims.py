@@ -223,56 +223,6 @@ def test_the_artifact_does_not_claim_an_embedding_model(prose):
         "claim in the artifact may now be false")
 
 
-# ---------------------------------------------------------------------------
-# Size of the suite, and the citation for anything measured
-# ---------------------------------------------------------------------------
-
-def test_the_quoted_test_count_is_not_stale(prose):
-    """Drifted from 706 to 778 unnoticed, which is why this exists.
-
-    Checked as a floor with a tolerance rather than an equality: the count
-    changes with almost every commit, and a test that fails on every commit
-    gets deleted rather than heeded.
-    """
-    m = re.search(r"([\d,]+) tests", prose)
-    assert m, "the artifact no longer states how many tests there are"
-    claimed = int(m.group(1).replace(",", ""))
-    actual = _collected_test_count()
-    assert claimed <= actual, (
-        f"the artifact claims {claimed} tests but only {actual} exist — "
-        "it must never overstate")
-    assert actual - claimed <= 60, (
-        f"the artifact claims {claimed} tests, there are now {actual}; "
-        "update DOCUMENTATION/artifacts/internals.html")
-
-
-def _collected_test_count() -> int:
-    import subprocess
-    import sys
-    # sys.executable, not "python": a different interpreter collects a
-    # different number of tests, and the mismatch reads as artifact drift.
-    out = subprocess.run(
-        [sys.executable, "-m", "pytest", str(ROOT / "tests"), "-q", "--collect-only"],
-        capture_output=True, text=True, cwd=ROOT,
-    ).stdout
-    m = re.search(r"(\d+) tests? collected", out)
-    if not m:
-        pytest.skip("could not collect the suite to count it")
-    return int(m.group(1))
-
-
-def test_every_page_that_counts_the_tests_counts_them_correctly(all_prose):
-    """Both pages print a test count, in different words, and both drifted."""
-    actual = _collected_test_count()
-    for name, text in all_prose.items():
-        for m in re.finditer(r"([\d,]+)\s+tests\b", text):
-            claimed = int(m.group(1).replace(",", ""))
-            assert claimed <= actual, (
-                f"{name} claims {claimed} tests but only {actual} exist")
-            assert actual - claimed <= 60, (
-                f"{name} claims {claimed} tests, there are now {actual}")
-
-
 def test_the_endpoint_and_action_counts_on_the_summary_page(all_prose):
     """The architecture page opens with a stat block. Each number is checkable."""
     server = (ROOT / "assistant" / "api" / "server.py").read_text()
@@ -303,6 +253,24 @@ def test_the_line_count_on_the_summary_page_is_not_stale(all_prose):
             claimed = int(q.group(1).replace(",", ""))
             assert abs(actual - claimed) <= 1000, (
                 f"{name} says {claimed:,} lines of Python; there are {actual:,}")
+
+
+def test_no_page_quotes_a_test_count(all_prose):
+    """The suite grows on almost every commit, so a count is stale by design.
+
+    It was corrected four times in a single afternoon — and each correction was
+    a published page briefly claiming a number that was not true. A figure that
+    needs maintaining to stay true, and tells the reader nothing they would act
+    on, is worth less than the word "tests".
+
+    Written as a prohibition rather than a tolerance so it cannot creep back:
+    the point is not that the number be right, it is that there be no number.
+    """
+    for name, text in all_prose.items():
+        found = re.findall(r"\b[\d,]{2,7}\s+tests?\b", text)
+        assert not found, (
+            f"{name} quotes a test count ({found}). Say \"tests\" — the number "
+            "changes with every commit and nobody reads it as information.")
 
 
 def test_measured_claims_cite_a_run_that_still_exists(prose):
