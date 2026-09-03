@@ -26,12 +26,74 @@ import re
 from assistant.engine.state import EngineState, Item
 
 _TIME = r"\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)?"
-# "… at 9am and 2:30pm", "… at 9 and at 14:30" — a list of times for one
-# activity. The times must be adjacent in the sentence; anything wordier is
-# left for the LLM decomposition pass (a later, gated build).
+# "… at 9am and 2:30pm", "… at 9 and at 14:30", "… at 9 and again at 2:30" —
+# a list of times for one activity, adjacent in the sentence. Wordier phrasings
+# fall through to the LLM pass below.
 _TIME_LIST_RE = re.compile(
-    rf"\bat\s+({_TIME})(?:\s*,\s*(?:and\s+)?|\s+and\s+)(?:at\s+)?({_TIME})\b",
+    rf"\bat\s+({_TIME})(?:\s*,\s*(?:and\s+)?|\s+and\s+(?:again\s+|then\s+)?)(?:at\s+)?({_TIME})\b",
     re.IGNORECASE)
+
+_DECOMPOSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "parts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"text": {"type": "string"}},
+                "required": ["text"],
+            },
+        },
+    },
+    "required": ["parts"],
+}
+
+_DECOMPOSE_SYSTEM = """One spoken request books the SAME activity at more than one time \
+("walk the dog at 9am and again at 2:30pm" = two walks). Rewrite it as one \
+complete request per occurrence, each with exactly one time, copying the \
+speaker's own words. If it is really a single occurrence — or you are not \
+sure — return it unchanged as one part. Never invent words, times or \
+activities. Return JSON: {"parts": [{"text": ...}, ...]}"""
+
+
+# An actual clock-time mention: "at 9", "2:30", "7pm" — NOT a bare number,
+# which is far more often a date ("the 19th").
+_TIME_MENTION_RE = re.compile(
+    r"\b(?:at|around|about)\s+\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)?"
+    r"|\b\d{1,2}:\d{2}\b"
+    r"|\b\d{1,2}\s*(?:am|pm|a\.m\.|p\.m\.)\b", re.IGNORECASE)
+
+
+def _llm_split_times(item: Item, state, cfg) -> "list[Item] | None":
+    """The wordier shapes the regex refuses. Self-skipping: only an event item
+    whose words carry two or more clock-time mentions is worth a call."""
+    from assistant.engine import llm as _llm
+
+    mentions = _TIME_MENTION_RE.findall(item.text)
+    if len(mentions) < 2:
+        return None
+    if " and " not in item.text.lower():
+        return None
+    # "from 6 to 8" is a RANGE — two mentions, one event. Only more mentions
+    # than the range accounts for makes this worth a look.
+    if re.search(rf"\bfrom\s+{_TIME}\s*(?:to|until|till)\s+\d", item.text,
+                 re.IGNORECASE) and len(mentions) <= 2:
+        return None
+    system = _DECOMPOSE_SYSTEM
+    if state.mistakes:
+        system += "\n\nOn a previous attempt at THIS command you made these " \
+                  "mistakes — do not repeat them:\n- " + "\n- ".join(state.mistakes)
+    try:
+        out, ms = _llm.call_json(cfg, system, f"The request: {item.text}", _DECOMPOSE_SCHEMA)
+        state.llm_ms += ms
+    except Exception:
+        return None
+    parts = [str(d.get("text", "")).strip() for d in (out.get("parts") or [])
+             if isinstance(d, dict) and str(d.get("text", "")).strip()]
+    if len(parts) < 2 or any(len(p.split()) < 2 for p in parts):
+        return None
+    return [Item(id=f"{item.id}-{j}", kind=item.kind, text=p, slots=dict(item.slots))
+            for j, p in enumerate(parts, start=1)]
 
 
 def _split_times(item: Item) -> "list[Item] | None":
@@ -73,9 +135,9 @@ def run(state: EngineState, cfg) -> EngineState:
     for item in state.items:
         subs = None
         if item.kind == "event":
-            subs = _split_times(item)
+            subs = _split_times(item) or _llm_split_times(item, state, cfg)
             if subs:
-                split_notes.append(f"{item.id}: two times → two events")
+                split_notes.append(f"{item.id}: {len(subs)} times → {len(subs)} events")
         elif item.kind == "task":
             subs = _split_tasks(item)
             if subs:

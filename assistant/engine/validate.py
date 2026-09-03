@@ -315,11 +315,55 @@ def _observance_verdict(intent, cfg) -> "str | None":
 # The two passes
 # ---------------------------------------------------------------------------
 
+_REPAIR_SCHEMA = {
+    "type": "object",
+    "properties": {"text": {"type": "string"}},
+    "required": ["text"],
+}
+
+_REPAIR_SYSTEM = """A speech transcriber garbled part of a voice command to a \
+calendar assistant. Clean it MINIMALLY: remove cut-off fragments and \
+stutters, fix obvious transcription grammar. Never add words, names, dates, \
+times or meaning that are not already there — if unsure, leave it exactly as \
+is. Return JSON: {"text": ...}"""
+
+# Signs of a genuinely mangled transcript: a cut-off fragment ("I need a b-"),
+# a stuttered word ("the the meeting"), stray non-word runs. Ordinary casual
+# grammar is NOT mangled and must not be "improved".
+_MANGLED_RE = re.compile(r"\b\w+-(?:\s|$)|\b(\w+)\s+\1\b", re.IGNORECASE)
+
+
+def _repair_text(item, state: EngineState, cfg) -> None:
+    """rule: text_repair — deterministic cleanup first, one LLM rewrite only
+    when the words are clearly damaged."""
+    # Stutters collapse for free: "the the meeting" → "the meeting".
+    dedoubled = re.sub(r"\b(\w+)(\s+\1\b)+", r"\1", item.text, flags=re.IGNORECASE)
+    if dedoubled != item.text:
+        state.add_fix("validate", "text_repair", item.text, dedoubled, note="stutter")
+        item.text = dedoubled
+    if not _MANGLED_RE.search(item.text):
+        return
+    from assistant.engine import llm as _llm
+    try:
+        out, ms = _llm.call_json(cfg, _REPAIR_SYSTEM,
+                                 f"The garbled command: {item.text}", _REPAIR_SCHEMA)
+        state.llm_ms += ms
+    except Exception:
+        return
+    fixed = str(out.get("text", "")).strip()
+    # A rewrite that grew the text invented content; one that emptied it ate
+    # the command. Either way the original stands.
+    if fixed and fixed != item.text and \
+            len(fixed.split()) <= len(item.text.split()):
+        state.add_fix("validate", "text_repair", item.text, fixed, note="garbled")
+        item.text = fixed
+
+
 def run(state: EngineState, cfg) -> EngineState:
     """Pre-generation, item level: format hygiene and text repair."""
     from assistant.trace import VALIDATE
 
-    repaired = 0
+    fixes_before = len(state.fixes)
     for item in state.items:
         cleaned = item.text.strip().strip("[]").strip()
         # Collapse doubled whitespace Whisper leaves around cut words.
@@ -327,9 +371,11 @@ def run(state: EngineState, cfg) -> EngineState:
         if cleaned != item.text:
             state.add_fix("validate", "text_tidy", item.text, cleaned)
             item.text = cleaned
-            repaired += 1
+        _repair_text(item, state, cfg)
+    repaired = len(state.fixes) - fixes_before
     if state.trace and repaired:
-        state.trace.step(VALIDATE, "Tidied", f"{repaired} item(s) cleaned")
+        state.trace.step(VALIDATE, "Tidied", f"{repaired} repair(s): "
+                         + "; ".join(f.human() for f in state.fixes[fixes_before:]))
     return state
 
 

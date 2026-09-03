@@ -64,11 +64,17 @@ def test_a_mixed_command_asks_the_client_to_refresh_both_surfaces(client):
     assert body["refresh"] == "both", body["refresh"]
 
 
-def test_a_list_of_things_to_buy_stays_one_action(client):
-    """Several titles inside one create, not several creates — the split happens
-    inside the action, where the conjunction rules live."""
+def test_a_list_of_things_to_buy_makes_exactly_its_items(client):
+    """"buy milk and buy bread" is two tasks — never one merged row, never an
+    invented "buy groceries". The split is the engine's decompose stage now
+    (one create per item, so feedback attaches to the right row); what is
+    pinned here is the OUTCOME: exactly these rows, nothing merged."""
     _, actions = _say(client, "add buy milk and buy bread to my list")
-    assert actions == ["create_todo"], actions
+    assert actions and set(actions) == {"create_todo"}, actions
+    from assistant.db import get_db
+    titles = sorted(t["title"].lower() for t in get_db().get_todos(include_completed=True))
+    assert not any(" and " in t for t in titles), titles
+    assert any("milk" in t for t in titles) and any("bread" in t for t in titles), titles
 
 
 def test_every_record_from_one_sentence_is_written(client, tmp_path):

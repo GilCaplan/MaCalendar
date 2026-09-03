@@ -81,15 +81,19 @@ delimiters first (brackets, coalescing wrapper, configured separator), LLM
 segmentation only after they found nothing, **biased to under-split** — a
 wrong merge gets two more chances (steps 3 and 6); a wrong split of "meeting
 with Tal and Ravid" is immediate garbage. This is the pipeline's single point
-of failure and carries the densest tests. *Status: deterministic splits live;
-LLM segmentation is this stage's build gate.*
+of failure and carries the densest tests. *Status: live — deterministic splits
+plus self-skipping LLM segmentation (a compound hint in the words is required
+before the model is consulted; a split producing a fragment is refused). Gate:
+`engine_stage_check --stage segment`.*
 
 ### 3 · decompose (`decompose.py` · trace `rule` · tests `test_engine_decompose.py`)
 Reads `items`; may replace an item with sub-items (`item_N-M`, depth ≤ 2) and
 fill `item.slots`. Two times joined by "and" → two events; task lists ride
 `intent/list_split.py` (verb handed down, idioms respected); counts ride
-`intent/quantity.py` — "buy 5 apples" is ONE task of (apples, 5). *Status:
-deterministic decomposition live; LLM pass for ambiguous items at its gate.*
+`intent/quantity.py` — "buy 5 apples" is ONE task of (apples, 5). *Status: live —
+deterministic shapes plus a self-skipping LLM pass for wordier double-times
+(two clock-time mentions required; ranges excluded). Gate:
+`engine_stage_check --stage decompose`.*
 
 ### 4 · validate (`validate.py` · trace `validate` · tests `test_engine_validate.py`)
 Two passes, both contract:

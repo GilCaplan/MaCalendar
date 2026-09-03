@@ -33,6 +33,12 @@ _os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 # pin above exists for. A test that builds the app wants the routes, never the
 # models.
 _os.environ.setdefault("MACALENDAR_NO_WARMUP", "1")
+# Unit tests must never reach a live model, even on a dev machine where Ollama
+# happens to be up: the engine's LLM stages (segment, decompose, repair) are
+# self-skipping and treat transport failure as "keep the deterministic
+# reading", so refusing here keeps the suite fast and deterministic. Tests of
+# the LLM paths monkeypatch assistant.engine.llm.call_json instead.
+_os.environ.setdefault("MACALENDAR_LLM_DISABLED", "1")
 
 _SCRATCH = _tempfile.mkdtemp(prefix="macalendar-tests-")
 for _var, _name in (("MACALENDAR_DB", "calendar.db"),
