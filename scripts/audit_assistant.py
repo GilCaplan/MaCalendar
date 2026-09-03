@@ -36,6 +36,37 @@ sys.path.insert(0, ROOT)
 _TMP = tempfile.mkdtemp(prefix="macal_audit_")
 os.environ["MACALENDAR_DB"] = os.path.join(_TMP, "calendar.db")
 os.environ["MACALENDAR_MEMORY_DB"] = os.path.join(_TMP, "memory.db")
+
+# --- the memory-aware mode -----------------------------------------------
+# The audit has always run against an EMPTY command history, which means every
+# claim about personalisation has been unmeasured: whether the four retrieved
+# examples help at all, whether four is the right number, whether a corrected
+# example beats a recent one. None of that can be seen when there is nothing
+# to retrieve.
+#
+# `--memory` replays the corpus against a COPY of the real history, so the
+# personalisation layer is actually exercised. Read from argv rather than from
+# argparse because these paths are set at import time and argparse runs far too
+# late — the same reason the other stores are redirected up here.
+_WANT_MEMORY = "--memory" in sys.argv
+if _WANT_MEMORY:
+    _real_memory = os.path.expanduser("~/.assistant_tools/nlu_memory.db")
+    if os.path.exists(_real_memory):
+        import shutil as _sh
+        _sh.copyfile(_real_memory, os.environ["MACALENDAR_MEMORY_DB"])
+        print(f"memory: replaying against a copy of the real history "
+              f"({os.path.getsize(_real_memory) // 1024} KB)")
+    else:
+        print("memory: --memory given but there is no history to copy")
+
+# `--memory-k N` overrides how many examples are retrieved, which is the whole
+# A/B: k=0 answers "is the memory helping at all", and only then is "is four
+# the right number" a sensible question to ask.
+for _i, _arg in enumerate(sys.argv):
+    if _arg == "--memory-k" and _i + 1 < len(sys.argv):
+        os.environ["MACALENDAR_MEMORY_K"] = sys.argv[_i + 1]
+    elif _arg.startswith("--memory-k="):
+        os.environ["MACALENDAR_MEMORY_K"] = _arg.split("=", 1)[1]
 os.environ["MACALENDAR_NO_WARMUP"] = "1"
 # The trace bus is the durable record the thinking card's History reads back.
 # Without this the audit publishes 89 synthetic commands into it on every run,
@@ -522,6 +553,12 @@ def write_report(data: dict, path: str, args) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--area"); ap.add_argument("--limit", type=int)
+    ap.add_argument("--memory", action="store_true",
+                    help="replay against a copy of the real command history, so the "
+                         "personalisation layer is exercised instead of ignored")
+    ap.add_argument("--memory-k", type=int, metavar="N",
+                    help="how many past examples to retrieve (0 turns the memory off, "
+                         "which is the comparison worth running first)")
     ap.add_argument("--audio", action="store_true")
     ap.add_argument("--out", default="DOCUMENTATION/ASSISTANT_AUDIT.md")
     args = ap.parse_args()

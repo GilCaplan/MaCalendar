@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import datetime
 import json
 import logging
@@ -120,6 +121,15 @@ class IntentParser:
 
     def _few_shot_for(self, transcript: str) -> str:
         k = getattr(self.config.nlu, "memory_examples", 0)
+        # The audit overrides this to compare k=0 against k=4 — the first
+        # question is not "is four right" but "is the memory helping at all",
+        # and that is a one-line change rather than an experiment.
+        override = os.environ.get("MACALENDAR_MEMORY_K")
+        if override:
+            try:
+                k = int(override)
+            except ValueError:
+                pass
         if not k:
             return ""
         try:

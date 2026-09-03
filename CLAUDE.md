@@ -104,6 +104,20 @@ without changing it. Re-run it after a parser change: twice now a fix has
 quietly regressed something else, and the corpus caught it. It takes ~25 min
 now that the self-check runs on every command, not the ~10 it used to.
 
+**The corpus alone measures the parser, not the personalisation.** By default
+the audit points the command memory at an empty file, so the few-shot examples
+have nothing to retrieve and every claim about them is untested. Add
+`--memory` to replay against a *copy* of the real history, and `--memory-k N`
+to change how many examples are retrieved:
+
+    python -m scripts.audit_assistant --memory                 # as it really is
+    python -m scripts.audit_assistant --memory --memory-k 0    # with memory off
+
+Run those two against each other before tuning anything. The first question is
+not whether four examples is the right number, it is whether the memory helps
+at all — noisy examples measurably hurt a model this size, and over half the
+pool has never been reviewed by a human.
+
 Keep the conclusions in `DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md` — the
 generated report is overwritten on every run.
 
