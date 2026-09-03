@@ -303,6 +303,35 @@ def test_the_models_are_placed_in_the_right_processes(all_prose):
             "the other two came to look like they lived in the model server")
 
 
+def test_the_multi_item_title_cap_is_current(all_prose):
+    """The explorer states the cap on how many titles one split can produce.
+
+    Read from source rather than asserted, because it is exactly the kind of
+    number that moves in a refactor without anyone thinking to update a page
+    three files away.
+
+    Checked against the phrase itself, not against "does this number appear
+    anywhere on the page" — a first version of this test asked the weaker
+    question, and a page with dozens of unrelated numbers on it (0.70, 7.8s,
+    ...) made a bare digit-anywhere check pass no matter what the real cap
+    was. The point of a claims test is to fail on a wrong number; one that
+    cannot fail is not a test.
+    """
+    src = (ROOT / "assistant" / "intent" / "rule_parser.py").read_text()
+    m = re.search(r"return split_items\(body, drop=_PRONOUN_TITLES\)\[:(\d+)\]", src)
+    assert m, "the multi-item title split no longer caps itself the way this test expects"
+    cap = int(m.group(1))
+    words = {8: "eight", 9: "nine", 10: "ten", 12: "twelve"}
+    expected = words.get(cap, str(cap))
+    for name, text in all_prose.items():
+        found = re.search(r"capped at (\w+) items?", text)
+        if not found:
+            continue
+        assert found.group(1) == expected, (
+            f"{name} says \"capped at {found.group(1)} items\", which does not "
+            f"match the {cap} in rule_parser.py")
+
+
 def test_the_table_and_column_counts_are_current(all_prose):
     """Quoted as words on the page, so they cannot be caught by a number scan."""
     import sqlite3

@@ -871,24 +871,57 @@ series_id   NULL
       </tbody>
     </table></div>
 
-    <p><strong>An event and a task travel the fast path together.</strong> They are different
-    actions with different slots, so both fit at once and the rules answer in a tenth of a second
-    &mdash; then tell the client to refresh both surfaces.</p>
+    <h3>Splitting a sentence into actions</h3>
+    <p>"Book gym tomorrow and remind me to buy milk" is found by spaCy's dependency parse: it
+    locates the sentence's ROOT verb, then any other verb attached to that root as a conjunct
+    &mdash; "book" and "remind", joined by "and" &mdash; and cuts the sentence into one span per
+    verb. Each span is then routed to an action independently, which is how "an event and a task"
+    reaches the rules together: by the time slots are being filled, they are no longer one
+    sentence.</p>
 
-    <p><strong>Two events do not.</strong> The rules hold one set of event slots, so a second one
-    has nowhere to go; rather than fill half of them the sentence goes to the model whole. Two
-    clock times in one span also lower confidence, since a second time usually means a second
-    event.</p>
+    <p>The dependency parse is not always usable. spaCy frequently mistags a bare imperative
+    followed by a bare noun as a noun phrase rather than a verb &mdash; "schedule meeting
+    tomorrow" comes back with the ROOT marked as the noun "meeting", hiding "schedule" from the
+    verb search entirely. When fewer than two verbs are found this way, a second pass falls back
+    to a fixed vocabulary: the same verbs the rule table already knows (the lemmas in
+    <code>INTENT_MAP</code>), matched only where they are sentence-initial or immediately follow
+    "and"/"or". That position restriction is deliberate &mdash; without it, a verb appearing
+    mid-clause for an ordinary reason would be misread as a second command.</p>
 
-    <p><strong>A list stays one action.</strong> "buy milk and bread" produces a single create with
-    several titles rather than several creates, because the difficulty is in the conjunctions that
-    join rather than separate &mdash; "a gift for mum and dad" is one errand.</p>
+    <p><strong>Two events do not split this way.</strong> "Lunch at noon and coffee at nine" has
+    no verb at all for either method to find, so it stays one span, attempted as one event. Filling
+    its slots then finds two clock times where a single event expects one; that specific shape
+    multiplies confidence by 0.70 rather than raising an error, which is normally enough on its own
+    to drop the score below the line and send the sentence to the model whole &mdash; the model
+    decides there are two events, the rule parser never does.</p>
 
-    <p>Several unrelated commands can also be sent bracketed &mdash;
-    <code>[gym tomorrow at 7am] [call the dentist at four]</code> &mdash; and are parsed apart, so
-    each gets its own slots and score. The replies join into one answer: named while there are
-    few, counted past three. If the third of four fails, the first two stand and the fourth is
-    still attempted.</p>`
+    <h3>Splitting a title into items</h3>
+    <p>"Buy milk and bread" stays one action with two titles, and the split happens inside that
+    action's own field, by a small set of string rules rather than by spaCy: commas always
+    separate; "and" separates unless a preposition just before it already opened a phrase the
+    conjunction is joining ("a gift for mum and dad" is one errand, not two), or the pair is a
+    known idiom ("fish and chips"). Whichever verb headed the first item is then shared across the
+    rest, so the second item reads "buy bread" rather than the bare word "bread". The same rules
+    split a sub-task's title the same way, and either list is capped at ten items.</p>
+
+    <p>The language model does the equivalent job on its own path, but by instruction rather than
+    by code: told explicitly, in its prompt, to emit one title per item and never invent a
+    collective one. The rule path enforces this structurally; the model path relies on it following
+    the rule it was given.</p>
+
+    <h3>Splitting a request into commands, before any of this runs</h3>
+    <p>Several unrelated commands can be sent bracketed &mdash;
+    <code>[gym tomorrow at 7am] [call the dentist at four]</code> &mdash; and are pulled apart
+    before parsing starts, each going through the same rules-then-model attempt on its own. That is
+    what makes batching cheaper rather than more expensive: a short single command usually settles
+    on the rules alone, where the joined sentence would have needed the model to untangle it, and
+    the background review that follows runs once per request rather than once per command &mdash;
+    three batched commands cost one review instead of three. Brackets were chosen because "and" was
+    not available: it already means something inside a command ("meeting with Sam and Alex" is one
+    event).</p>
+
+    <p>The replies join into one answer: named while there are few, counted past three. If the
+    third of four fails, the first two stand and the fourth is still attempted.</p>`
   },
 
   queue: {
