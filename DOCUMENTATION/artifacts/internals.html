@@ -104,6 +104,18 @@
   .note strong { color:var(--text); }
   .warn { border-left-color:var(--verify); }
 
+.layer {
+    display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap;
+    margin: 3.2rem 0 -.4rem; padding-bottom: .5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .layer span {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .72rem; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--accent); font-weight: 500;
+  }
+  .layer em { font-style: normal; font-size: .82rem; color: var(--muted); }
+
   .rule { height:1px; background:var(--border); border:0; margin:0; }
   .foot { color:var(--muted); font-size:.85rem; font-family:"IBM Plex Mono",monospace; }
   :focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:3px; }
@@ -124,8 +136,10 @@
 
   <hr class="rule">
 
-  <section>
-    <h2><span class="num">00</span>What it is, in one paragraph</h2>
+    <p class="layer"><span>What it is</span><em>one paragraph you can stop after</em></p>
+
+<section>
+    <h2><span class="num">01</span>What it is, in one paragraph</h2>
     <p>
       Speech is transcribed on the machine's own GPU. A keyword-and-grammar parser tries
       to understand the sentence; if it is unsure, a language model running locally reads
@@ -140,7 +154,7 @@
       the configured latitude and longitude, so the system knows when Shabbat and
       festivals begin and end — not as dates, but as moments that shift through the year.
       Repeating events skip them; a training planner will not schedule a run on one.
-      Section 06 covers how that works.
+      Section 09 covers how that works.
     </p>
   </section>
 
@@ -148,7 +162,7 @@
 
   <!-- 0b ----------------------------------------------------------------- -->
   <section>
-    <h2><span class="num">00b</span>Three models, and what each one is for</h2>
+    <h2><span class="num">02</span>Three models, and what each one is for</h2>
     <p>
       Worth settling early, because the rest of the page keeps referring to them.
       There are three, they are all small, and they all run on the one machine.
@@ -271,8 +285,10 @@
   <hr class="rule">
 
   <!-- 1 ------------------------------------------------------------------ -->
-  <section>
-    <h2><span class="num">01</span>One number decides everything</h2>
+    <p class="layer"><span>How it decides</span><em>one section per decision, in the order it makes them</em></p>
+
+<section>
+    <h2><span class="num">03</span>One number decides everything</h2>
     <p>
       Every command is scored for confidence before anything happens to it. Above
       <code>0.85</code> the rules answer it themselves, in about a tenth of a second;
@@ -346,7 +362,7 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
   <hr class="rule">
 
   <section>
-    <h2><span class="num">01b</span>Is that formula any good?</h2>
+    <h2><span class="num">04</span>Is that formula any good?</h2>
     <p>
       The shape is standard. AWS Lex routes to an LLM when NLU confidence falls below a
       configured threshold; Voiceflow pairs a fine-tuned classifier with Claude the same
@@ -374,7 +390,7 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
 
   <!-- 2 ------------------------------------------------------------------ -->
   <section>
-    <h2><span class="num">02</span>How the rules read a sentence</h2>
+    <h2><span class="num">05</span>How the rules read a sentence</h2>
     <p>
       No model. spaCy tags the words, a date recogniser lifts times out, and a table of
       <strong>76 verb → action mappings</strong> decides what you asked for. Nine of the
@@ -462,7 +478,7 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
 
   <!-- 3 ------------------------------------------------------------------ -->
   <section>
-    <h2><span class="num">03</span>Thirteen things it checks before writing</h2>
+    <h2><span class="num">06</span>Thirteen things it checks before writing</h2>
     <p>
       Whichever parser answered, the result passes through deterministic guards. Each
       one exists because something went wrong once. They are the difference between
@@ -492,7 +508,7 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
 
   <!-- 4 ------------------------------------------------------------------ -->
   <section>
-    <h2><span class="num">04</span>How it learns you</h2>
+    <h2><span class="num">07</span>How it learns you</h2>
     <p>
       The part people mean when they ask whether it is "trained on me". It is not
       fine-tuned — nothing about llama changes. Instead, your four most similar past
@@ -579,7 +595,7 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
 
   <!-- 5 ------------------------------------------------------------------ -->
   <section>
-    <h2><span class="num">05</span>How it becomes yours</h2>
+    <h2><span class="num">08</span>How it becomes yours</h2>
     <p>
       Nothing about llama changes — no fine-tuning, no weights. What personalises the
       assistant is four small stores it consults, all of them plain files you can open,
@@ -690,8 +706,10 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
   <hr class="rule">
 
   <!-- 6 ------------------------------------------------------------------ -->
-  <section>
-    <h2><span class="num">06</span>What it actually knows about time</h2>
+    <p class="layer"><span>Where it gets interesting</span><em>the cases that only exist because the parts meet</em></p>
+
+<section>
+    <h2><span class="num">09</span>What it actually knows about time</h2>
     <p>
       Sundown is computed from your latitude and longitude with <code>astral</code>, and
       the Hebrew date from <code>pyluach</code> — both pure Python, no lookup. That makes
@@ -713,7 +731,7 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
   <hr class="rule">
 
   <section>
-    <h2><span class="num">06b</span>More than one thing at once</h2>
+    <h2><span class="num">10</span>More than one thing at once</h2>
     <p>
       A single sentence can hold two events, and the rule parser cannot: it has one set
       of slots. Rather than fill half of them it refuses outright — <code>RuleParserSkip</code>
@@ -746,7 +764,7 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
   <hr class="rule">
 
   <section>
-    <h2><span class="num">06c</span>Waiting, and coming back to it</h2>
+    <h2><span class="num">11</span>Waiting, and coming back to it</h2>
     <p>
       Two different queues, easy to confuse because both are "later".
     </p>
@@ -777,7 +795,7 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
   <hr class="rule">
 
   <section>
-    <h2><span class="num">06d</span>Tasks are not small events</h2>
+    <h2><span class="num">12</span>Tasks are not small events</h2>
     <p>
       Eight of the fifteen actions are about tasks, and they behave differently from
       events in ways worth knowing: a task has no time, it has a <em>list</em>, and it
@@ -804,7 +822,7 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
   <hr class="rule">
 
   <section>
-    <h2><span class="num">06e</span>Reading the day back</h2>
+    <h2><span class="num">13</span>Reading the day back</h2>
     <p>
       Asking is a first-class action, not a search box. <code>query_schedule</code> and
       <code>query_todos</code> answer in sentences, and because they create nothing they
@@ -831,9 +849,380 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
 
   <hr class="rule">
 
-  <!-- 7 ------------------------------------------------------------------ -->
+  <hr class="rule">
+
+  <!-- 08 ----------------------------------------------------------------- -->
+    <p class="layer"><span>Down to the metal</span><em>the shapes, the wire format, the process model</em></p>
+
+<section>
+    <h2><span class="num">14</span>One request, end to end</h2>
+    <p>
+      Everything above happens inside a single HTTP request. Both clients — the
+      desktop app and the phone — are thin: they capture audio, transcribe it, and
+      post the text. Neither contains a parser. This is the whole contract:
+    </p>
+
+<pre><span class="c">POST /voice/text</span>
+{
+  "transcript":   "book gym tomorrow at 7am",
+  "source":       "mac" | "ios" | "test",   <span class="c">← the ONLY difference between clients</span>
+  "current_view": "month",                  <span class="c">← disambiguates "delete that"</span>
+  "trace_run":    "run-8f3a"                <span class="c">← optional; joins a live trace stream</span>
+}
+
+<span class="c">200 OK</span>
+{
+  "message":     "Added Gym tomorrow at 7:00 AM.",   <span class="c">← spoken aloud</span>
+  "actions":     [{"action": "create_event", "parameters": {...}}],
+  "refresh":     "switch_month",             <span class="c">← view the client should show</span>
+  "parse":       "rule" | "hybrid" | "llm" | "error",
+  "corrections": [...],                      <span class="c">← vocabulary rewrites applied</span>
+  "trace":       [ ...stages... ],
+  "memory_id":   417                         <span class="c">← the row a 👍/👎 later attaches to</span>
+}</pre>
+
+    <p>
+      <code>source</code> carries more weight than it looks. It labels the trace, the
+      vocabulary corrections and the command memory — and it <strong>defaults to
+      <code>"test"</code></strong>, not to a real client. That default is deliberate and was
+      once the other way round, which made an afternoon of scripted testing
+      indistinguishable from real use in the history the model learns from. Forgetting
+      to label a script is now harmless; forgetting to label a real client is obvious.
+    </p>
+
+    <h3>What runs on which thread</h3>
+    <p>
+      The response returns as soon as the record is written. Two things then keep
+      running on daemon threads, which is why the self-check costs no latency:
+    </p>
+
+    <figure>
+      <svg viewBox="0 0 720 234" role="img"
+           aria-label="A timeline of one request. On the request thread: vocabulary, rule parse, validate, execute, and respond — about 100 milliseconds. The response returns there. Two daemon threads continue afterwards: the self-check, taking several seconds, and the memory write. The client already has its answer.">
+        <defs>
+          <marker id="t-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <text x="16" y="20" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" fill-opacity=".5" letter-spacing="1.1">REQUEST THREAD</text>
+        <line x1="16" y1="30" x2="704" y2="30" stroke="currentColor" stroke-opacity=".18"></line>
+
+        <rect x="16"  y="40" width="74" height="30" rx="5" fill="none" stroke="var(--accent)"></rect>
+        <text x="53"  y="59" text-anchor="middle" font-size="10.5" fill="var(--accent)">vocab</text>
+        <rect x="96"  y="40" width="88" height="30" rx="5" fill="none" stroke="var(--accent)"></rect>
+        <text x="140" y="59" text-anchor="middle" font-size="10.5" fill="var(--accent)">rule parse</text>
+        <rect x="190" y="40" width="82" height="30" rx="5" fill="none" stroke="var(--accent)"></rect>
+        <text x="231" y="59" text-anchor="middle" font-size="10.5" fill="var(--accent)">validate</text>
+        <rect x="278" y="40" width="82" height="30" rx="5" fill="none" stroke="var(--done)"></rect>
+        <text x="319" y="59" text-anchor="middle" font-size="10.5" fill="var(--done)">execute</text>
+        <rect x="366" y="40" width="92" height="30" rx="5" fill="none" stroke="var(--done)" stroke-width="1.8"></rect>
+        <text x="412" y="59" text-anchor="middle" font-size="10.5" fill="var(--done)">respond</text>
+
+        <path d="M 412 74 L 412 96" fill="none" stroke="var(--done)" stroke-opacity=".8" marker-end="url(#t-ah)"></path>
+        <text x="422" y="92" font-size="10" fill="var(--done)">client has its answer · ~0.1 s</text>
+
+        <text x="16" y="130" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" fill-opacity=".5" letter-spacing="1.1">DAEMON THREADS — nothing waits on these</text>
+        <line x1="16" y1="140" x2="704" y2="140" stroke="currentColor" stroke-opacity=".18" stroke-dasharray="4 3"></line>
+
+        <rect x="366" y="150" width="230" height="30" rx="5" fill="none" stroke="var(--verify)" stroke-dasharray="5 3"></rect>
+        <text x="481" y="169" text-anchor="middle" font-size="10.5" fill="var(--verify)">self-check — several seconds</text>
+
+        <rect x="366" y="190" width="150" height="30" rx="5" fill="none" stroke="var(--llm)" stroke-dasharray="5 3"></rect>
+        <text x="441" y="209" text-anchor="middle" font-size="10.5" fill="var(--llm)">write to memory</text>
+
+        <line x1="412" y1="96" x2="412" y2="146" stroke="currentColor" stroke-opacity=".25" stroke-dasharray="2 3"></line>
+      </svg>
+      <figcaption>
+        The rule path in full. On the model path the top row is the same shape but the
+        parse box takes seconds instead of milliseconds — the bottom row is unchanged.
+      </figcaption>
+    </figure>
+
+    <p class="note">
+      Because the self-check finishes after the response, it cannot change what you were
+      told. It writes its verdict into the trace, and — when configured to — an edit to
+      the record. That asymmetry is why it is safe to run it on everything.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- 09 ----------------------------------------------------------------- -->
   <section>
-    <h2><span class="num">07</span>What is measured, and what is not</h2>
+    <h2><span class="num">15</span>The shapes the pieces pass each other</h2>
+    <p>
+      Three types carry everything. Knowing them is most of knowing the codebase.
+    </p>
+
+    <h3>What the rules hand over</h3>
+<pre><span class="c">@dataclass</span>
+class RuleParseResult:
+    confidence:     float            <span class="c">← the number section 03 is about</span>
+    intents:        list[tuple[str, BaseIntent]]
+    missing_slots:  list[str]        <span class="c">← non-empty ⇒ never fast-pathed</span>
+    raw_slots:      dict             <span class="c">{action: {slot: value}}</span>
+    transcript:     str
+    routed_to_llm:  bool
+    dropped_spans:  int              <span class="c">← parts it could not route at all</span></pre>
+
+    <p>
+      Two fields decide routing, not one. A result is answered directly only when
+      <code>confidence &gt;= 0.85</code> <em>and</em> <code>missing_slots</code> is empty —
+      a high score with a hole in it still goes to the model.
+      <code>dropped_spans</code> is the quieter signal: it counts parts of the sentence the
+      rules never accounted for, which is how a half-understood command is told apart
+      from a fully-understood one.
+    </p>
+
+    <h3>What validation is</h3>
+    <p>
+      Every action declares a Pydantic model, and that model is where the domain rules
+      live — not in the parser, and not in the executor. A spoken time reaching
+      <code>CalendarIntent</code> as <code>"230PM"</code> is normalised to
+      <code>"14:30"</code> by a field validator; one reaching it as <code>"99:99"</code>
+      is rejected outright, and the rejection is what triggers a re-parse. The parser
+      cannot produce an invalid record because the type will not hold one.
+    </p>
+
+    <h3>How an action is defined</h3>
+    <p>
+      Adding a capability means adding a directory, not editing the pipeline. Every action
+      declares four things, and the third and fourth are the interesting ones:
+    </p>
+
+<pre>class CreateTodoAction(BaseAction):
+    action_name:       "create_todo"
+    description:       <span class="c">prose the model reads to decide when to use it</span>
+    intent_model:      CreateTodoIntent
+    parameters_schema: <span class="c">a JSON Schema fragment</span>
+
+    def execute(self, intent, config) -&gt; str:   <span class="c">returns what gets spoken</span></pre>
+
+    <p>
+      <code>description</code> and <code>parameters_schema</code> are not documentation.
+      They are concatenated into the system prompt and into the JSON schema the model is
+      constrained to emit — so <strong>the registry generates the prompt</strong>. An
+      action's prose about when to use it is, literally, how the model learns to use it.
+      That is also why prompt-engineering in this system means editing a class attribute
+      next to the code it describes.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- 10 ----------------------------------------------------------------- -->
+  <section>
+    <h2><span class="num">16</span>What the model is actually sent</h2>
+    <p>
+      Not a question in English. Four pieces are assembled, and the last one is what makes
+      the output parseable rather than hopeful:
+    </p>
+
+    <table>
+      <thead><tr><th>Piece</th><th>Built from</th><th>Roughly</th></tr></thead>
+      <tbody>
+        <tr><td class="m">action catalogue</td><td>every registered action's <code>description</code> + schema</td><td class="n">~4k tokens</td></tr>
+        <tr><td class="m">today's date table</td><td>rebuilt when the date changes, cached in between</td><td class="n">small</td></tr>
+        <tr><td class="m">your past commands</td><td>the four most similar, from memory</td><td class="n">~710 chars</td></tr>
+        <tr><td class="m">the transcript</td><td>after vocabulary correction</td><td class="n">one line</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      The catalogue dominates, and it is identical between calls — which is the point. The
+      date table is rebuilt <em>only</em> when the day changes, so the long prefix stays
+      byte-identical and the model's prefix cache keeps hitting. When that cache is missed
+      the same call takes 30–60 seconds instead of 8; an early version had the context
+      window set below the prompt's own length, so every single call overflowed and
+      re-processed the whole thing.
+    </p>
+
+    <h3>The output is constrained, not requested</h3>
+<pre>POST localhost:11434/api/chat
+{
+  "model":  "llama3.1:8b",
+  "format":  { ...JSON Schema assembled from the registry... },  <span class="c">← the model CANNOT emit prose</span>
+  "stream":  false,
+  "keep_alive": -1,                       <span class="c">← never unload between commands</span>
+  "options": { "temperature": 0.1, "num_ctx": 8192 }
+}</pre>
+
+    <p>
+      <code>format</code> is a grammar constraint at sampling time, not an instruction — the
+      model is unable to produce a token that would break the schema. So the failure mode
+      is a <em>valid</em> object with wrong values, never a parse error, which is exactly
+      why the layer after this one exists. The self-check runs the same way but at
+      <code>temperature 0.0</code>: a judgement that varies between runs is not a judgement.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- 11 ----------------------------------------------------------------- -->
+  <section>
+    <h2><span class="num">17</span>When the thing you named does not exist</h2>
+    <p>
+      A parse can be perfectly well-formed and still refer to nothing. "Mark the dentist
+      appointment done" is a valid <code>complete_todo</code> — but if there is no such
+      task, executing it is not an error, it is a <em>miss</em>. The two need different
+      handling, and conflating them is how a confidently-wrong rule parse used to reach
+      the user as "I couldn't find…".
+    </p>
+
+<pre>class AssistantError(Exception):        <span class="c">something broke</span>
+    ├── STTError, OllamaError, ParseError, ...
+
+class TargetNotFound(Exception):        <span class="c">nothing broke — the target isn't there</span>
+    <span class="c">deliberately NOT an AssistantError</span></pre>
+
+    <p>
+      That inheritance gap is load-bearing. <code>TargetNotFound</code> is caught
+      separately and triggers <strong>escalation</strong>: the sentence goes back to the
+      model with the failed interpretation attached, and is re-read from scratch. It is
+      the safety net under the confidence score — the case where the rules were sure, and
+      wrong, and the only evidence is that reality disagreed.
+    </p>
+
+    <p class="note">
+      <strong>Escalation is not retry.</strong> The command is re-parsed, not re-run. If
+      the second reading also matches nothing, the answer is "I couldn't find it" and the
+      slot stays empty. For a delete, an empty slot is the <em>correct</em> outcome:
+      guessing which record was meant is worse than admitting the miss.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- 12 ----------------------------------------------------------------- -->
+  <section>
+    <h2><span class="num">18</span>Four processes, one log, no shared memory</h2>
+    <p>
+      What runs on the machine, and how the parts that never call each other still stay in
+      step:
+    </p>
+
+    <table>
+      <thead><tr><th>Process</th><th>Job</th><th>Talks to</th></tr></thead>
+      <tbody>
+        <tr><td class="m">the model server</td><td>holds the 8B model resident</td><td>listens on localhost</td></tr>
+        <tr><td class="m">the API</td><td><strong>parses and executes everything</strong></td><td>the model server, the database</td></tr>
+        <tr><td class="m">the desktop app</td><td>draws the calendar; records audio</td><td>the API, over HTTP</td></tr>
+        <tr><td class="m">the thinking display</td><td>shows reasoning as it happens</td><td><strong>nothing</strong></td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      The last row is the interesting one. The floating panel that shows the assistant
+      thinking has no connection to the process doing the thinking. The API appends
+      newline-delimited JSON to a file; the panel tails it. That is the entire integration:
+    </p>
+
+<pre>{"kind": "trace", "run": "run-8f3a", "source": "ios", "ts": 1788376902.4,
+ "steps": [
+   {"stage": "vocab",    "detail": "No corrections needed",   "ms": 2,    "ok": true},
+   {"stage": "rule",     "detail": "create_event @ 1.00",     "ms": 96,   "ok": true},
+   {"stage": "execute",  "detail": "Added Gym tomorrow 7 AM", "ms": 11,   "ok": true},
+   {"stage": "verify",   "detail": "agrees — no change",      "ms": 6210, "ok": true}
+ ],
+ "result": {"transcript": "...", "message": "...", "actions": [...], "memory_id": 417}}</pre>
+
+    <p>
+      Choosing a file over a socket buys three things at once: the panel floats over a
+      full-screen app with the calendar closed, a command spoken to the phone is visible on
+      the desktop without either knowing about the other, and the log is the durable record
+      the history view reads back. A crashed reader loses nothing; a restarted one catches up.
+    </p>
+
+    <h3>The failure this shape causes</h3>
+    <p>
+      Only the API reloads itself when its code changes. The desktop app and the thinking
+      panel do not, and the phone needs a reinstall — so a change can be live in the brain
+      and stale in three places at once. "It had no effect" is, more often than not, this.
+    </p>
+
+    <p class="note">
+      One more constraint the process model imposes: two model loads on separate threads
+      segfault the interpreter. The test suite pins the numerical library to one thread to
+      avoid it, and the API refuses to warm its models up when running under test — a test
+      that builds the app wants its routes, not its weights.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- 13 ----------------------------------------------------------------- -->
+  <section>
+    <h2><span class="num">19</span>Sundown, computed rather than looked up</h2>
+    <p>
+      Section 09 said the system knows when Shabbat begins. This is how, because it is two
+      independent questions answered by two different means — and conflating them is the
+      classic way to get it wrong.
+    </p>
+
+    <table>
+      <thead><tr><th>Question</th><th>Answered by</th><th>Nature of the answer</th></tr></thead>
+      <tbody>
+        <tr><td class="m">Which days are holy?</td><td>the fixed rabbinic calendar, computed</td><td>exact — it is arithmetic</td></tr>
+        <tr><td class="m">At what time?</td><td>solar position from your coordinates</td><td>astronomical, ±1–2 min</td></tr>
+      </tbody>
+    </table>
+
+<pre><span class="c"># which days — computed from the calendar's own arithmetic, not a lookup table</span>
+HebrewDate.from_pydate(date).festival(israel=True, include_working_days=False)
+    → a name only when work is forbidden; <span class="a">None</span> on intermediate festival days
+
+<span class="c"># what time — solar geometry at the configured latitude and longitude</span>
+sunset            = <span class="a">astral</span>.sun(observer, date)["sunset"]
+candle_lighting   = sunset − 18 min          <span class="c">configurable</span>
+tzeit (it ends)   = dusk at 8.5° below the horizon   <span class="c">configurable</span></pre>
+
+    <p>
+      <code>include_working_days=False</code> is doing real work: the alternative call
+      returns a name on the intermediate days of a long festival too, which would blank out
+      an entire free week as though it were a holiday. The distinction between a day when
+      work is forbidden and a day merely inside a festival is the one the whole module is
+      built on.
+    </p>
+
+    <h3>Why a date is not enough</h3>
+<pre>Friday          sunset   candles   ends (Sat)   gap
+2 Jan           16:47     16:29      17:28      40 min
+26 Jun          19:51     19:32      20:33      43 min
+18 Dec          16:38     16:20      17:18      40 min</pre>
+
+    <p>
+      Over three hours of drift across the year. A 19:00 event on a Friday is comfortably
+      outside the boundary in June and well inside it in December — so a rule written
+      against dates alone is wrong for a whole season, silently, in the direction that
+      books things where they should not be.
+    </p>
+
+    <h3>Two slots per day, not one</h3>
+    <p>
+      A day here runs sundown to sundown, so every civil date is modelled as two
+      independently governed halves: the daytime is governed by that date's own status, and
+      <strong>the evening by the following date's</strong>. This is why a Saturday night can
+      be free in one week and blocked in the next — if another festival day begins at
+      sundown, the evening was never Saturday's to give.
+    </p>
+
+    <p class="note">
+      <strong>The model is not consulted here, ever.</strong> It may propose a date; whether
+      that date is available is decided by this code, deterministically. And if the
+      computation cannot be done at all — an unreachable configuration, an out-of-range date
+      — <em>nothing is skipped</em>. A series that quietly loses days is worse than one that
+      lands somewhere it should not, because the second is visible and the first is not.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- 7 ------------------------------------------------------------------ -->
+    <p class="layer"><span>What is not known</span><em>last, because it only means something now</em></p>
+
+<section>
+    <h2><span class="num">20</span>What is measured, and what is not</h2>
     <p>
       Worth separating, because the numbers on the architecture page come from one
       harness that does not exercise everything.

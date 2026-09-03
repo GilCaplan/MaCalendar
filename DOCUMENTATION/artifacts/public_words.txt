@@ -29,3 +29,8 @@ set a meeting
 # Tooling named in passing
 claude
 gemini
+
+# A keyword argument in the Hebrew-calendar library's public API, shown in a
+# code sample: festival(israel=True) selects the one-day festival schedule.
+# A country name, not a fact about anyone.
+israel
