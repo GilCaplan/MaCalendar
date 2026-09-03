@@ -40,6 +40,23 @@ FEEDBACK_SKIPPED = "skipped"     # dismissed from the review list without a verd
 # counts as feedback on that command.
 FEEDBACK_WINDOW_SEC = 24 * 3600
 
+#: How long after a failed command a retry still counts as the same attempt.
+#: Long enough to delete the wrong thing and say it again; short enough that
+#: the next unrelated command an hour later is not read as a correction.
+REFORMULATION_WINDOW_SEC = 180
+#: A retry has to be spoken, which takes time. A gap under this means the two
+#: rows were written together — imported history, or a batch — not a person
+#: reacting to a wrong answer.
+REFORMULATION_MIN_GAP_SEC = 2.0
+#: Below this many characters a transcript carries no information to compare;
+#: "Execute." against "Execute a" scores 0.88 and means nothing.
+REFORMULATION_MIN_CHARS = 15
+#: How alike the two have to be. Below this they are different commands that
+#: happened to follow each other; at 1.0 they are identical, which means the
+#: speaker simply repeated themselves and taught nothing.
+REFORMULATION_MIN_SIMILARITY = 0.70
+REFORMULATION_MAX_SIMILARITY = 0.995
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS examples (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -222,6 +239,84 @@ class CommandMemory:
             )
             logger.info("Memory feedback %s on example %s (%s #%s)", feedback, row["id"], record_type, record_id)
             return int(row["id"])
+
+    def find_reformulations(self, *, limit: int = 500) -> list[dict[str, Any]]:
+        """Pairs where a command failed and the speaker immediately said it again.
+
+        This is a correction the user has already given, for free, by the only
+        means anyone actually uses: doing it again. It costs them nothing and
+        it is the most reliable signal in the store, because a retry is an
+        unambiguous statement that the first attempt was wrong.
+
+        A pair qualifies when all of these hold:
+
+          * the first was rejected — deleted, or thumbed down. Without that it
+            is just two similar commands, and people do repeat themselves;
+          * the second came within REFORMULATION_WINDOW_SEC, from the same
+            surface, and was not itself rejected;
+          * the two are similar, but not identical. Identical means the speaker
+            repeated themselves verbatim, which tells us the recognition was
+            the problem and not the wording, and teaches nothing about either.
+
+        Returns the pairs; it does not act on them. Deciding is `learn_from_reformulations`.
+        """
+        # Queried directly rather than through recent(), which trims the row
+        # and drops actions_json — the field this needs most. Reading it from
+        # there returned nothing and every pair was silently discarded.
+        with self._conn() as c:
+            rows = [dict(r) for r in c.execute(
+                "SELECT id, ts, source, transcript, feedback, actions_json, correction_json "
+                "FROM examples ORDER BY ts DESC LIMIT ?", (limit,))]
+        rows.sort(key=lambda r: r["ts"])
+        out: list[dict[str, Any]] = []
+        for first, second in zip(rows, rows[1:]):
+            if first.get("feedback") != FEEDBACK_REJECTED:
+                continue
+            if second.get("feedback") == FEEDBACK_REJECTED:
+                continue                       # the retry failed too; it teaches nothing
+            gap = second["ts"] - first["ts"]
+            if not REFORMULATION_MIN_GAP_SEC <= gap <= REFORMULATION_WINDOW_SEC:
+                continue
+            if not (second.get("actions_json") or "").strip("[] \n"):
+                continue                       # the retry produced nothing to learn
+            if (first.get("source") or "") != (second.get("source") or ""):
+                continue
+            a, b = _norm(first["transcript"]), _norm(second["transcript"])
+            if len(a) < REFORMULATION_MIN_CHARS or len(b) < REFORMULATION_MIN_CHARS:
+                continue
+            score = difflib.SequenceMatcher(None, a, b).ratio()
+            if not REFORMULATION_MIN_SIMILARITY <= score <= REFORMULATION_MAX_SIMILARITY:
+                continue
+            out.append({
+                "wrong_id": first["id"], "right_id": second["id"],
+                "wrong": first["transcript"], "right": second["transcript"],
+                "similarity": round(score, 3),
+                "gap_sec": round(gap, 1),
+                "actions_json": second.get("actions_json") or "[]",
+            })
+        return out
+
+    def learn_from_reformulations(self, *, dry_run: bool = False) -> list[dict[str, Any]]:
+        """Turn those pairs into corrections the model will actually see.
+
+        The failed command keeps its rejection — it was rejected — but gains
+        the retry's actions as what it *should* have produced. That is exactly
+        the shape an explicit "fix this" produces, so it feeds the existing
+        retrieval weighting with no further plumbing.
+
+        Idempotent: a pair already carrying a correction is left alone, so this
+        can run on every command without accumulating anything.
+        """
+        applied = []
+        for pair in self.find_reformulations():
+            existing = self.get(pair["wrong_id"]) or {}
+            if existing.get("correction"):
+                continue
+            if not dry_run:
+                self.set_feedback(pair["wrong_id"], FEEDBACK_CORRECTED,
+                                  correction=json.loads(pair["actions_json"]))
+            applied.append(pair)
+        return applied
 
     def records_for(self, example_id: int) -> list[dict[str, Any]]:
         """(record_type, record_id, action) rows this command created/changed."""

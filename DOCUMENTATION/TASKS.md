@@ -75,6 +75,7 @@ Running list of user-reported issues and feature requests, with status. Update w
 | 68 | Third explainer: an explorable drawing rather than 6,600 words of prose | in review | `DOCUMENTATION/artifacts/explorer.html` |
 | 69 | Explorer: the trace log opened the review panel's text (both carried the same panel id); storage panel too long to read; nothing described how several events in one sentence, or a queue of recordings, are handled | done 2026-09-03 | `DOCUMENTATION/artifacts/explorer.html` |
 | 70 | Explorer named the deciding process "the brain" and the model host "model server", so a reader concluded the server held all three models. It holds one — spaCy and Whisper load inside the deciding process, which the drawing hid | done 2026-09-03 | `explorer.html`, `test_artifact_claims.py` |
+| 71 | **Reformulation mining**: when a command is deleted and a near-identical one succeeds moments later, the pair is a correction the user already gave for free. Runs after every command, on a daemon thread. Finds nothing in the current history — the loose version found three pairs and two were nonsense | done 2026-09-03 | `assistant/intent/memory.py` |
 
 ## How we are working right now
 

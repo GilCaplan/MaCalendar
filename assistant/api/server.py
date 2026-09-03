@@ -966,6 +966,23 @@ def create_app() -> Flask:
                                    source=source,
                                    confidence=float(scored) if scored is not None else -1.0)
 
+        # A retry is a correction the speaker already gave, by doing it again.
+        # Runs here because a pair only completes when the second command
+        # arrives, and on a daemon thread because nothing waits on it — the
+        # answer has already gone back. Idempotent, so repeating it is free.
+        def _mine_reformulations() -> None:
+            try:
+                from assistant.intent.memory import get_memory
+                for pair in get_memory().learn_from_reformulations():
+                    logger.info("Learned from a retry: %r -> %r (%.0fs apart)",
+                                pair["wrong"][:48], pair["right"][:48], pair["gap_sec"])
+            except Exception as exc:                 # never let this affect a command
+                logger.debug("Reformulation pass failed: %s", exc)
+
+        if not _no_bg and getattr(cfg.nlu, "memory_enabled", True):
+            _threading.Thread(target=_mine_reformulations, daemon=True,
+                              name="reformulations").start()
+
         # Background self-check: the LLM re-reasons over the transcript, what
         # ran, and this user's history, and fixes the record if it disagrees.
         #
