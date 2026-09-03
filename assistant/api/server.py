@@ -1220,6 +1220,10 @@ def create_app() -> Flask:
         n_events = sum(1 for n, _ in parsed if n == "create_event")
         n_todos = sum(1 for n, _ in parsed if n == "create_todo")
         rel = _relative_dates(transcript)
+        # Captured BEFORE the loop below starts overwriting dates in place —
+        # evidence of whether the model already told events apart, not
+        # whether they still look that way partway through this pass.
+        _orig_event_dates = {getattr(i, "date", None) for n, i in parsed if n == "create_event"}
         ev_idx = 0
         td_idx = 0
         for name, intent in parsed:
@@ -1241,10 +1245,19 @@ def create_app() -> Flask:
             if name == "create_event":
                 d = getattr(intent, "date", None)
                 # Deterministic relative dates beat the model's guess: one phrase → all
-                # events; N phrases for N events → positional.
+                # events; N phrases for N events → positional. But "one phrase" only
+                # means "every event" when the model *also* gave every event the same
+                # date — if it already told them apart (typically via its own absolute-
+                # date parsing, e.g. "the 17th of September"), that's evidence it
+                # resolved distinct dates correctly, and collapsing them onto one
+                # relative phrase corrupts the ones the relative-date reader never even
+                # saw. A real command: "...walk Moxdog next week... the 17th of
+                # September... the 19th of September..." — "Tuesday" (bare, said twice)
+                # was the only relative phrase, and it silently overwrote two already-
+                # correct absolute dates onto the Tuesday date.
                 if rel and not recur:
                     if len(set(rel)) == 1:
-                        want = rel[0]                      # "tomorrow … tomorrow" → every event
+                        want = rel[0] if len(_orig_event_dates) <= 1 else None
                     else:
                         want = rel[ev_idx] if ev_idx < len(rel) and len(rel) == n_events else None
                     if want and d != want:

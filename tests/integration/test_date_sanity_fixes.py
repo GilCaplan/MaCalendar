@@ -128,6 +128,30 @@ def test_a_morning_event_is_not_dragged_into_the_afternoon(client):
     assert "6:30 AM" in message, message
 
 
+def test_a_relative_date_repeated_for_two_events_does_not_swallow_a_third(client):
+    """Real incident: "walk the dog Tuesday at 9am, walk the dog Tuesday at
+    2:30pm, and [event] on the 17th of September" created all three on the
+    same Tuesday. "Tuesday" (bare, no "next"/"this") was said twice, both
+    resolving to the same date, which used to be read as "one relative
+    phrase → apply to every event" — silently overwriting the third event's
+    already-correct absolute date from a phrase the relative-date reader
+    never even looks at (a month name skips its bare-ordinal branch on
+    purpose). The fix: only collapse onto one date when the model itself
+    also defaulted every event to the same date — not when it already told
+    them apart via its own date parsing.
+    """
+    import datetime as _dt
+    today = _dt.date.today()
+    month_after_next = (today.replace(day=1) + _dt.timedelta(days=62)).strftime("%B")
+    message = _create(
+        client,
+        f"add gym on tuesday at 6am and add yoga on tuesday at 7pm and "
+        f"add my conference on the 20th of {month_after_next} at 9am",
+    )["message"]
+    assert f"{month_after_next[:3]} 20" in message, (
+        f"the conference's absolute date got overwritten by the repeated 'tuesday': {message}")
+
+
 def test_task_deadlines_get_the_same_date_resolution_as_events(client):
     """Only events had deterministic relative-date resolution, so "due next
     monday" was left as whatever the model guessed — a Sunday."""
