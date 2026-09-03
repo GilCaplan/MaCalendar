@@ -954,10 +954,17 @@ def create_app() -> Flask:
         # Rule fast-path parity with the Mac: a placeholder title ("meeting",
         # "set meeting", …) gets a proper title from the LLM in the background.
         trace.step(DONE, "Done", f"{parse_path} path · {trace.total_ms / 1000:.1f} s total", path=parse_path)
+        # The rule parser's own score, kept rather than discarded. It is what the
+        # routing decision turns on, and without it there is no way to ask later
+        # whether 0.85 is in the right place — you cannot bucket outcomes by a
+        # number you never wrote down. -1 means the rules never scored this one:
+        # they refused the sentence outright, or it arrived already parsed.
+        scored = getattr(rule_result, "confidence", None)
         memory_id = _record_memory(cfg, raw_transcript, transcript, parse_path,
                                    [(n, i) for n, i in parsed if n != "unknown"],
                                    response_msg, _success, llm_ms, trace, records,
-                                   source=source)
+                                   source=source,
+                                   confidence=float(scored) if scored is not None else -1.0)
 
         # Background self-check: the LLM re-reasons over the transcript, what
         # ran, and this user's history, and fixes the record if it disagrees.
@@ -1301,7 +1308,8 @@ def create_app() -> Flask:
             return {}
 
     def _record_memory(cfg, raw, transcript, parse_path, actions, result, success,
-                       llm_ms, trace, records, *, source: str = "ios") -> int | None:
+                       llm_ms, trace, records, *, source: str = "ios",
+                       confidence: float = -1.0) -> int | None:
         if not getattr(cfg.nlu, "memory_enabled", True):
             return None
         try:
@@ -1310,6 +1318,7 @@ def create_app() -> Flask:
                 transcript=transcript, raw_transcript=raw, source=source,
                 parse_path=parse_path, actions=actions, result=result,
                 success=success, llm_ms=llm_ms, total_ms=trace.total_ms, records=records,
+                confidence=confidence,
             )
         except Exception as e:
             logger.warning("📱 Memory record failed: %s", e)

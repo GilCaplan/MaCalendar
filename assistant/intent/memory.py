@@ -55,7 +55,14 @@ CREATE TABLE IF NOT EXISTS examples (
     correction_json TEXT,
     notes         TEXT    NOT NULL DEFAULT '',
     llm_ms        INTEGER NOT NULL DEFAULT 0,
-    total_ms      INTEGER NOT NULL DEFAULT 0
+    total_ms      INTEGER NOT NULL DEFAULT 0,
+    -- What the rule parser scored itself before anything ran. -1 when it never
+    -- produced a score (it refused the sentence outright, or the command came
+    -- in already parsed). Stored because the routing decision turns on this
+    -- number and there was previously no way to ask, afterwards, whether the
+    -- threshold was in the right place: the score was computed, used, and
+    -- discarded on every command.
+    confidence    REAL    NOT NULL DEFAULT -1
 );
 CREATE TABLE IF NOT EXISTS example_records (
     example_id  INTEGER NOT NULL,
@@ -118,6 +125,13 @@ class CommandMemory:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with self._conn() as c:
             c.executescript(_SCHEMA)
+            self._migrate(c)
+
+    def _migrate(self, c: sqlite3.Connection) -> None:
+        """Add columns the shipped schema gained after this file was created."""
+        existing = {r[1] for r in c.execute("PRAGMA table_info(examples)")}
+        if "confidence" not in existing:
+            c.execute("ALTER TABLE examples ADD COLUMN confidence REAL NOT NULL DEFAULT -1")
 
     def _conn(self) -> sqlite3.Connection:
         c = sqlite3.connect(self._path, timeout=5)
@@ -129,7 +143,8 @@ class CommandMemory:
     def record(self, *, transcript: str, raw_transcript: str = "", source: str = "mac",
                parse_path: str = "", actions: Iterable[tuple[str, Any]] = (),
                result: str = "", success: bool = True, llm_ms: int = 0,
-               total_ms: int = 0, records: Iterable[tuple[str, int, str]] = ()) -> int:
+               total_ms: int = 0, records: Iterable[tuple[str, int, str]] = (),
+               confidence: float = -1.0) -> int:
         """Store one command. ``actions`` = (action_name, intent|dict) pairs.
 
         ``records`` = (record_type, record_id, action) for rows the command
@@ -147,9 +162,11 @@ class CommandMemory:
         with self._lock, self._conn() as c:
             cur = c.execute(
                 "INSERT INTO examples (ts, source, raw_transcript, transcript, parse_path, "
-                "actions_json, result, success, llm_ms, total_ms) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                "actions_json, result, success, llm_ms, total_ms, confidence) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                 (time.time(), source, raw_transcript or transcript, transcript, parse_path,
-                 json.dumps(acts, ensure_ascii=False), result, int(success), llm_ms, total_ms),
+                 json.dumps(acts, ensure_ascii=False), result, int(success), llm_ms, total_ms,
+                 float(confidence)),
             )
             ex_id = int(cur.lastrowid)
             for rtype, rid, action in records:
