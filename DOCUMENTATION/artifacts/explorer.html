@@ -343,32 +343,41 @@
     <g id="clients"></g>
 
     <!-- ============ THE INTERNET, NEVER ============ -->
-    <g data-panel="cloud" role="button" tabindex="0" aria-label="Two connections the system could make, each drawn as an open switch: the language model is set to the local one rather than a hosted one, and calendar sync has no sources connected.">
+    <g data-panel="cloud" role="button" tabindex="0" aria-label="Two choices the system could make, each drawn as two boxes with the one actually chosen marked: the language model runs locally rather than hosted, and calendar sync connects to nothing rather than to a hosted calendar.">
       <rect x="670" y="6" width="180" height="152" fill="transparent"/>
       <path class="frame" d="M 662 44 h 40 a 10.5 10.5 0 0 0 4 -21 a 14 14 0 0 0 -28 -6 a 11 11 0 0 0 -15 10 a 8.5 8.5 0 0 0 -1 17 z"
             fill="none" stroke="var(--muted)" stroke-width="1.4" stroke-dasharray="4 3"/>
       <text x="686" y="37" text-anchor="middle" font-size="7.5" fill="var(--muted)">elsewhere</text>
 
-      <!-- one trunk, two switches stacked on it -->
-      <line x1="686" y1="63" x2="686" y2="74" stroke="var(--muted)" stroke-width="1.2"/>
+      <!-- row 1: language model — this box, not that one -->
+      <line x1="686" y1="63" x2="686" y2="70" stroke="var(--muted)" stroke-width="1.2"/>
+      <circle cx="686" cy="71.5" r="1.5" fill="var(--muted)"/>
+      <line x1="686" y1="71.5" x2="669" y2="76" stroke="var(--muted)" stroke-width="1"/>
+      <line x1="686" y1="71.5" x2="725" y2="76" stroke="var(--muted)" stroke-width="1"/>
 
-      <g font-size="7.5" fill="var(--muted)">
-        <!-- switch 1: open, terminal to terminal -->
-        <circle cx="686" cy="76" r="2" fill="none" stroke="var(--muted)" stroke-width="1.2"/>
-        <line x1="686" y1="78" x2="672" y2="92" stroke="var(--ink)" stroke-width="1.6"/>
-        <circle cx="686" cy="98" r="2" fill="none" stroke="var(--muted)" stroke-width="1.2"/>
-        <text x="696" y="84" text-anchor="start" font-weight="600" fill="var(--ink)">language model</text>
-        <text x="696" y="94" text-anchor="start" fill-opacity=".85">set to: local</text>
+      <rect x="642" y="76" width="54" height="18" rx="4" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.2"/>
+      <path d="M 648 85 l 2.5 3 l 5.5 -6" fill="none" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="683" y="88" text-anchor="middle" font-size="7.5" font-weight="600" fill="var(--amber)">local</text>
 
-        <line x1="686" y1="100" x2="686" y2="116" stroke="var(--muted)" stroke-width="1.2"/>
+      <rect x="698" y="76" width="54" height="18" rx="4" fill="none" stroke="var(--line)" stroke-width="1.2" stroke-dasharray="3 2"/>
+      <text x="725" y="88" text-anchor="middle" font-size="7.5" fill="var(--muted)">hosted</text>
 
-        <!-- switch 2: the same symbol, same reading -->
-        <circle cx="686" cy="118" r="2" fill="none" stroke="var(--muted)" stroke-width="1.2"/>
-        <line x1="686" y1="120" x2="672" y2="134" stroke="var(--ink)" stroke-width="1.6"/>
-        <circle cx="686" cy="140" r="2" fill="none" stroke="var(--muted)" stroke-width="1.2"/>
-        <text x="696" y="126" text-anchor="start" font-weight="600" fill="var(--ink)">calendar sync</text>
-        <text x="696" y="136" text-anchor="start" fill-opacity=".85">0 sources connected</text>
-      </g>
+      <text x="686" y="104" text-anchor="middle" font-size="7" fill="var(--muted)">language model</text>
+
+      <!-- row 2: calendar sync — same pattern, same reading -->
+      <line x1="686" y1="106" x2="686" y2="112" stroke="var(--muted)" stroke-width="1.2"/>
+      <circle cx="686" cy="113.5" r="1.5" fill="var(--muted)"/>
+      <line x1="686" y1="113.5" x2="671" y2="118" stroke="var(--muted)" stroke-width="1"/>
+      <line x1="686" y1="113.5" x2="729" y2="118" stroke="var(--muted)" stroke-width="1"/>
+
+      <rect x="642" y="118" width="58" height="18" rx="4" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.2"/>
+      <path d="M 648 127 l 2.5 3 l 5.5 -6" fill="none" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="685" y="130" text-anchor="middle" font-size="7.5" font-weight="600" fill="var(--amber)">no sync</text>
+
+      <rect x="702" y="118" width="54" height="18" rx="4" fill="none" stroke="var(--line)" stroke-width="1.2" stroke-dasharray="3 2"/>
+      <text x="729" y="130" text-anchor="middle" font-size="7.5" fill="var(--muted)">hosted</text>
+
+      <text x="686" y="146" text-anchor="middle" font-size="7" fill="var(--muted)">calendar sync</text>
     </g>
 
     <!-- ============ THE SUN ============ -->
