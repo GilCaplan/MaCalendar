@@ -343,13 +343,23 @@
     <g id="clients"></g>
 
     <!-- ============ THE INTERNET, NEVER ============ -->
-    <g data-panel="cloud" role="button" tabindex="0" aria-label="The internet: never contacted. No account, no API key; every model runs from a local copy.">
-      <rect x="640" y="8" width="100" height="106" fill="transparent"/>
-      <circle class="frame" cx="690" cy="52" r="38" fill="transparent" stroke="var(--muted)" stroke-width="2"/>
-      <path d="M 675 63 h 31 a 8.5 8.5 0 0 0 3 -16.5 a 11.5 11.5 0 0 0 -22 -4.5 a 9 9 0 0 0 -12 8.5 a 6.8 6.8 0 0 0 0 12.5 z"
-            fill="none" stroke="var(--muted)" stroke-width="1.5"/>
-      <line x1="664" y1="79" x2="716" y2="26" stroke="var(--ink)" stroke-width="3"/>
-      <text x="690" y="106" text-anchor="middle" font-size="9.5" fill="var(--muted)">no cloud service</text>
+    <g data-panel="cloud" role="button" tabindex="0" aria-label="Two connections the system can make and does not: a hosted language model instead of the local one, and a sync with a hosted calendar. Both are settings, and neither is configured.">
+      <rect x="608" y="6" width="166" height="112" fill="transparent"/>
+      <path class="frame" d="M 668 44 h 40 a 10.5 10.5 0 0 0 4 -21 a 14 14 0 0 0 -28 -6 a 11 11 0 0 0 -15 10 a 8.5 8.5 0 0 0 -1 17 z"
+            fill="none" stroke="var(--muted)" stroke-width="1.4" stroke-dasharray="4 3"/>
+      <text x="691" y="37" text-anchor="middle" font-size="7.5" fill="var(--muted)">elsewhere</text>
+
+      <g font-size="7.5" fill="var(--muted)" text-anchor="middle">
+        <line x1="646" y1="52" x2="646" y2="68" stroke="var(--muted)" stroke-dasharray="2 3" stroke-opacity=".6"/>
+        <line x1="640" y1="62" x2="652" y2="62" stroke="var(--ink)" stroke-width="1.6"/>
+        <text x="646" y="82">hosted model</text>
+        <text x="646" y="92" fill-opacity=".7">off</text>
+
+        <line x1="736" y1="52" x2="736" y2="68" stroke="var(--muted)" stroke-dasharray="2 3" stroke-opacity=".6"/>
+        <line x1="730" y1="62" x2="742" y2="62" stroke="var(--ink)" stroke-width="1.6"/>
+        <text x="736" y="82">calendar sync</text>
+        <text x="736" y="92" fill-opacity=".7">off</text>
+      </g>
     </g>
 
     <!-- ============ THE SUN ============ -->
@@ -454,36 +464,27 @@ const P = {
     z:[352,256,1.9],
     sum:`<p>One process understands and executes everything. The host's own window and every attached surface are thin clients — <strong>none of them contains a parser</strong>.</p>
     <p class="figs">15 actions · 104 endpoints · ~35,491 lines · a test suite</p>`,
-    more:`<p>"Fifteen things it can do" is literal: an action is one verb the assistant knows, and
-    nothing outside this list can be asked for. Adding a sixteenth means adding a directory, not
-    editing the pipeline.</p>
+    more:`<p>One process holds the pipeline and two of the three models: the speech model and the grammar
+    tagger both load inside it. The language model runs beside it and answers when asked.</p>
+
+    <p>An action is one verb the assistant knows, and the list is closed &mdash; fifteen of them.
+    Adding a sixteenth means adding a directory, not editing the pipeline.</p>
     <table>
-      <thead><tr><th>What</th><th>n</th><th>The verbs</th></tr></thead>
+      <thead><tr><th>Domain</th><th>n</th><th>Verbs</th></tr></thead>
       <tbody>
         <tr><td class="m">events</td><td class="n">4</td><td>create &#183; update &#183; delete &#183; ask what is on</td></tr>
-        <tr><td class="m">tasks</td><td class="n">8</td><td>create &#183; update &#183; complete &#183; delete &#183; ask &#183; and the same four again for sub-tasks</td></tr>
+        <tr><td class="m">tasks</td><td class="n">8</td><td>the same four, plus the same four again for sub-tasks</td></tr>
         <tr><td class="m">training</td><td class="n">2</td><td>write a routine &#183; place it on real dates</td></tr>
-        <tr><td class="m">clarify</td><td class="n">1</td><td>say it did not understand, rather than guess</td></tr>
+        <tr><td class="m">clarify</td><td class="n">1</td><td>say it did not follow, instead of guessing</td></tr>
       </tbody>
     </table>
-    <p>The shape of that table is itself a finding. Tasks take twice as many verbs as events
-    because a task has a lifecycle &mdash; it can be completed, un-completed, and carry children
-    that do the same &mdash; while an event only exists or does not. And the fifteenth is the one
-    that does nothing: a system that cannot say "I did not follow that" has to invent something
-    instead.</p>
-    <p>Only nine of the fifteen can be reached by the rules. The rest &mdash; anything involving
-    sub-tasks or training &mdash; always goes to the model, because the sentences that ask for
-    them are too varied for a verb table to catch.</p>
-    <p>It was not always this way. The calendar window once carried its own private copy of
-    the whole pipeline. The two copies drifted, and every fix had to be written twice or the
-    surfaces would disagree about what a sentence meant. Collapsing to one brain is the decision
-    everything else on this page leans on: a behaviour that exists, exists once, and the phone
-    gets it for free.</p>
-    <p>Five domains live behind those 104 endpoints — calendar, tasks, training, coursework,
-    time-tracking — and voice reaches only the first two and a half. Where a screen is the better
-    instrument, there is only a screen.</p>
-    <p>One small tell of the design: a caller that does not label its source is treated as a test,
-    so a stray development request can never masquerade as a command you actually gave.</p>`
+    <p>Tasks take twice as many verbs as events because a task has a lifecycle &mdash; it can be
+    completed, un-completed, and carry children that do the same &mdash; while an event either
+    exists or does not.</p>
+
+    <p>Nine of the fifteen can be reached by the rules alone. Anything involving sub-tasks or
+    training goes to the model, because the sentences that ask for them vary too much for a verb
+    table.</p>`
   },
   hear: {
     tag:"step 1 of 8", name:"hear", title:"It hears locally",
@@ -504,8 +505,8 @@ const P = {
   correct: {
     tag:"step 2 of 8", name:"correct", title:"374 words the dictionary doesn't know",
     z:[352,190,2.9],
-    sum:`<p>374 personal words the dictionary does not have. Each can fix a mishearing, expand shorthand, or carry a label.</p>
-    <p class="figs">a fixed mishearing is remembered — next time it is an exact hit</p>`,
+    sum:`<p>A personal word list of 374 entries. Each can fix a mishearing, expand shorthand, or carry a label the rest of the system uses.</p>
+    <p class="figs">a fixed mishearing is remembered &mdash; next time it is an exact hit</p>`,
     more:`<ul>
       <li><strong>Fix a mishearing.</strong> The transcript is rewritten and the wrong form remembered, so the next one is an exact hit.</li>
       <li><strong>Expand shorthand.</strong> Never substituted into your words — that would edit what you said. It rides along as context.</li>
@@ -519,8 +520,8 @@ const P = {
   parse: {
     tag:"step 3 of 8", name:"parse", title:"Rules first",
     z:[352,222,2.9],
-    sum:`<p>Keyword rules read the sentence first, with no large model at all — then score their own confidence.</p>
-    <p class="figs">76 verbs · 9 of the 15 actions reachable this way</p>`,
+    sum:`<p>Keyword rules read the sentence first and score how well they understood it. This step is arithmetic on words, and takes about a tenth of a second.</p>
+    <p class="figs">76 verbs &#183; 9 of the 15 actions reachable this way</p>`,
     more:`<p>The score starts at the fraction of required slots filled, then pays for its
     doubts:</p>
     <div class="tblwrap"><table>
@@ -577,16 +578,7 @@ const P = {
     z:[300,376,2.3],
     sum:`<p>Written to a file on the disk, and the answer comes straight back. Which table depends on which action the parse chose &mdash; an event and a task take the same route here.</p>
     <p class="figs">one SQLite file &#183; yours, on your machine</p>`,
-    more:`<p><strong>There is no step that sorts tasks from events.</strong> It is a
-    reasonable thing to expect &mdash; a filter somewhere deciding which kind of thing this is
-    &mdash; but the decision was already made, further back. Understanding the sentence produces
-    <em>an action</em>, one of fifteen, and "create an event" and "create a task" are two of them.
-    By the time anything is written, the choice is not a question any more.</p>
-    <p>That is why the steps in the drawing are drawn once rather than twice. Correcting words,
-    parsing, routing, the thirteen checks, the write, the review &mdash; every one of them runs the
-    same way whichever action came out. What differs is which table the action writes to, and how
-    it phrases the sentence it says back.</p>
-    <p>One file, twenty-one tables. Events and tasks are two of them, among timers, counters, courses, assignments and training plans. The voice pipeline touches the first few; the screens fill the rest.</p>
+    more:`<p>One file, twenty-one tables. Events and tasks are two of them, alongside timers, counters, courses, assignments and training plans.</p>
     <svg viewBox="0 0 380 208" role="img" aria-label="The nineteen columns of one event row, grouped by what fills them: nine come from what you said, three the system decides, three are bookkeeping, and four exist only for syncing with a hosted calendar.">
   <text x="0" y="11" font-size="9" fill="var(--muted)">ONE EVENT ROW · 19 COLUMNS</text>
   <rect x="0" y="20" width="380" height="52" rx="4" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.2"/>
@@ -611,8 +603,7 @@ const P = {
   <text x="0" y="190" font-size="8.5" fill="var(--muted)">most of a row is empty most of the time — an event with no</text>
   <text x="0" y="202" font-size="8.5" fill="var(--muted)">guests, no place and no repeat leaves twelve columns blank</text>
 </svg>
-<figcaption>Understanding the sentence fills nine of nineteen columns. The rest is the system's own work.</figcaption><p>Spoken aloud, <em>"lunch with Sam on Thursday at one"</em> becomes a row that is mostly
-    empty:</p>
+<figcaption>Understanding the sentence fills nine of nineteen columns. The rest is the system's own work.</figcaption><p>Spoken aloud, <em>"lunch with Sam on Thursday at one"</em> fills nine of nineteen columns:</p>
 <pre><code>title       "Lunch with Sam"
 date        "2026-09-10"
 start_time  "13:00"
@@ -621,25 +612,18 @@ category    "Social"   &lt;- inferred
 color       "#c2708a"  &lt;- follows
 attendees   ""
 location    ""
-description ""
 recurrence  ""
 series_id   NULL
 </code></pre>
-    <p>Four of those were never in the sentence. The end time is a default; the two below it are
-    the system classifying its own record so the calendar can colour it.</p>
+    <p>The end time is a default and the two below it are the system classifying its own record so
+    the calendar can colour it. A task is the same idea across sixteen columns, six of them yours.</p>
 
-    <p>A task is the same idea, and only six of its sixteen columns are ever yours:</p>
-<pre><code>title     "buy pasta"
-list      "today"
-quantity  5          &lt;- "times five"
-tags      ["Groceries"]
-priority  "none"
-completed 0
-</code></pre>
-    <p>Both late additions came from the same kind of failure. <code>quantity</code> exists
-    because there was no way to say "five of these", so a count could only be written as five
-    identical tasks &mdash; and ticking one of those tells you nothing. <code>tags</code> is
-    inferred when you do not say one, which is why the word list carries labels at all.</p>`
+    <p>Which table depends on which action the parse chose. There is no step that sorts tasks from
+    events &mdash; understanding the sentence produced one of fifteen actions, and the choice was
+    made there. Everything since has run identically either way.</p>
+
+    <p>A repeating event is stored as ordinary rows sharing a series id, so every query stays a
+    plain date lookup and a day that should be skipped is simply never written.</p>`
   },
   review: {
     tag:"step 7 of 8", name:"review", title:"The model reads everything — afterwards",
@@ -657,28 +641,20 @@ completed 0
     z:[397,400,2.4],
     sum:`<p>Your corrections come back as worked examples in the next prompt. The model itself never changes.</p>
     <p class="figs">4 most similar past commands · no fine-tuning</p>`,
-    more:`<p>Your verdicts weight what the model is shown. A correction outranks an approval; a rejection
-    is never shown again. The model itself is unchanged &mdash; what changes is the company its
-    prompt keeps.</p>
+    more:`<p>Every command is kept with what it produced and what you made of it.</p>
+    <p>Most verdicts are given by doing rather than pressing. Deleting something the assistant made
+    counts as a rejection; editing it counts as a correction, with the fields you changed merged in
+    to form what the parse should have produced.</p>
 
-    <p>Most verdicts are not buttons. Delete something the assistant made and that is a rejection;
-    edit it and that is a correction, with the fields you changed merged back in to form what the
-    parse <em>should</em> have produced. The explicit thumbs exist, but behaviour is the stronger
-    signal because it costs nothing to give.</p>
+    <p>The strongest signal is the retry. A command that is deleted and immediately said again in
+    different words has already been corrected &mdash; the second version is what the first one
+    meant. Those pairs are found automatically, and checked before they are believed: the timing
+    and wording must fit, and the model is asked whether it really was a retry rather than two
+    things you both wanted.</p>
 
-    <p><strong>The strongest signal of all is the retry.</strong> When a command produces the wrong
-    thing, gets deleted, and is immediately said again in different words, the second version is
-    what the first one meant &mdash; a correction already made, by the only means anyone actually
-    uses. Those pairs are found and turned into corrections automatically.</p>
-
-    <p>They are also treated with suspicion, because the cost of getting one wrong is high: a bad
-    correction is pasted into future prompts as an example of how you speak. A pair only counts if
-    the first was actually rejected, the gap is long enough to have been spoken, the two are
-    similar but not identical &mdash; a word-for-word repeat blames the recognition, not the
-    wording &mdash; and the retry itself succeeded. Then the model is asked whether it really was
-    a retry rather than two things you both wanted, and if it cannot answer, the pair is refused.
-    Run over a week of real use these rules find nothing, which is the correct answer for a week
-    of real use.</p>`
+    <p>On the next similar command the four closest past ones are pasted into the prompt. A
+    correction outranks an approval; a rejection is never shown again. The model itself is
+    unchanged &mdash; what changes is the company its prompt keeps.</p>`
   },
   models: {
     tag:"on the laptop", name:"models", title:"Three models, one machine",
@@ -697,27 +673,20 @@ completed 0
     z:[539,169,2.4],
     sum:`<p>The application you actually look at — calendar, tasks, timer, coursework. Everything the assistant can do, you can also do by hand here. <strong>It parses nothing.</strong></p>
     <p class="figs">most of the ~35,491 lines live here</p>`,
-    more:`<p>Worth saying plainly, because the drawing puts the brain at the centre: <strong>speaking is
-    optional.</strong> Every record the assistant creates can be created, edited and deleted
-    directly — type a title, drag an event to another hour, tick a task, pick a colour, set a
-    repeat. Nothing about the system assumes you used your voice, and nothing is second-class if
-    you did not.</p>
+    more:`<p>Speaking is one way in. Everything the assistant creates can be created, edited and deleted
+    here directly &mdash; type a title, drag an event to another hour, tick a task, set a repeat.</p>
 
-    <p>The two routes meet at the same place. A typed event and a spoken one produce the same row,
-    take the same thirteen checks, and are edited the same way afterwards — because the screen and
-    the brain both write through one path. That is also why a correction made by hand counts as
-    feedback: the system cannot tell, and does not need to, whether you fixed a title because the
-    parser got it wrong or because you changed your mind.</p>
+    <p>Both routes meet at the same place. A typed event and a spoken one produce the same row,
+    take the same thirteen checks, and are edited the same way afterwards, because the screen and
+    the assistant write through one path. It is also why a correction made by hand counts as
+    feedback.</p>
 
-    <p>Some things are deliberately screen-only. Speech is good at "book the dentist Thursday at
-    four" and poor at "log the last forty minutes to the third project and split the session".
-    Where a screen is the better instrument, there is only a screen — which is why voice reaches
+    <p>Some things are screen-only by design. Speech suits "book the dentist Thursday at four" and
+    not "log the last forty minutes to the third project and split the session", so voice reaches
     the calendar and tasks fully, training partly, and the timer and coursework not at all.</p>
 
-    <p>What this window does not have is a parser. It once did — it carried its own copy of the
-    whole pipeline, the two drifted, and every fix had to be written twice or the two surfaces
-    disagreed. It now posts text to the brain exactly as a phone does, and about 1,200 lines of
-    duplicated understanding were deleted.</p>`
+    <p>This window holds no parser. It once did, the two copies drifted, and every fix had to be
+    written twice; it now posts text to the host exactly as a phone does.</p>`
   },
   hud: {
     tag:"on the laptop", name:"thinking", title:"The review panel",
@@ -742,11 +711,7 @@ completed 0
     z:[862,320,1.9],
     sum:`<p>Every attached surface is the same thin idea: a mic, a screen, a full local copy, a queue — and no parser. Add one with <strong>+</strong> and the brain does not change: a new device is a new <code>source</code> label, not new understanding.</p>
     <p class="figs">works with the host off · edits quote the version they were made against</p>`,
-    more:`<p>The phone is the client that exists today and is the worked example below; a tablet or a
-    second laptop would attach the same way, and the brain would know it only by its label. Speech
-    recorded while disconnected is kept as audio and decided fresh on reconnect — not replayed as
-    a stale action.</p>
-    <p>A client never decides anything. It records, sends the sound over the private link, and renders what comes back — and what comes back has already been written.</p>
+    more:`<p>Every surface is the same idea: record, send, render. The parsing happens once, on the host.</p>
     <svg viewBox="0 0 380 250" role="img" aria-label="The round trip. The phone records audio and sends it over the private link to the brain, which transcribes, understands, executes and writes one file. Changing that file changes its timestamp, and both the laptop window and the phone are watching it: the laptop directly, the phone through a small token it polls. Neither is told; both notice.">
   <defs><marker id="rt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
     <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
@@ -786,64 +751,55 @@ completed 0
   <text x="190" y="222" text-anchor="middle" font-size="8" fill="var(--muted)">neither is notified — both are watching the same thing</text>
   <text x="190" y="238" text-anchor="middle" font-size="8" fill="var(--muted)">so a change made anywhere appears everywhere</text>
 </svg>
-<figcaption>Speak to either device and the same file changes; both surfaces notice on their own.</figcaption><p>Nothing pushes the update outward. The brain writes one file; changing it moves its timestamp; the laptop window watches that timestamp directly and the phone polls a few bytes derived from it. Both surfaces refresh because they noticed, not because they were told, which is why there is no way for one of them to miss a message.</p>
-    <p>When a queued command finally runs, the result arrives as a notification — silently
-    changing a calendar from a queue would be worse than not running the command at all.</p>
-    <p>And a queued change the laptop actively refuses — an edit against a record that changed, a
-    delete of something already gone — is dropped and reported rather than left to block
-    everything behind it.</p>`
+<figcaption>Speak to either device and the same file changes; both surfaces notice on their own.</figcaption>
+    <p>Updates spread by noticing rather than by being told. The host writes one file; that moves
+    its timestamp; the laptop window watches the timestamp and other devices poll a few bytes
+    derived from it. Both refresh on their own, so there is no message for either to miss.</p>
+
+    <p>Edits quote the version they were made against, and the host refuses one made against a
+    copy that has since moved. Saying so beats silently overwriting a change you cannot see.</p>`
   },
   sun: {
     tag:"time & sky", name:"sun", title:"Where the sun is",
     z:[708,492,2.4],
     sum:`<p>Which days are holy is arithmetic. What <em>time</em> they begin is the sun's position at your coordinates — and it moves three hours across a year.</p>
     <p class="figs">checked against published times · worst gap 28 seconds</p>`,
-    more:`<p class="figs">Verified against published times: 126 comparisons · six cities · worst disagreement 28 seconds</p>
-    <p>Repeating events skip Shabbat and yom tov, bounded by those computed times rather than by
-    midnight. Three exceptions, each with a reason. Meals are allowed — they are what the day is
-    for — unless the day is a fast, where a meal is the one thing that must not be booked. A
-    series deliberately anchored on the day it would skip keeps it; skipping every instance would
-    hollow it out. And if the times cannot be computed, nothing is skipped at all — a series
-    quietly losing days is worse than one landing where it should not.</p>
-    <p><strong>Which place, though.</strong> Sundown moves by hours between cities as well as by
-    three hours across a year, so a repeating event that skips Shabbat is wrong the moment you
-    travel &mdash; the boundary it is avoiding was computed somewhere you are not, and nothing
-    about the wrong answer looks wrong.</p>
-    <p>So a device can say where it is, and everything downstream follows without being told. It
-    is off until you turn it on, takes one reading rather than watching you, and reports again
-    only when you have moved far enough to change an answer. Only the position comes from the
-    device: how long before candle lighting a session must finish is a preference, not a fact
-    about the sky, and stays where the other preferences are.</p>`
+    more:`<p>Two questions, answered separately. Which days are holy comes from the calendar's own
+    arithmetic. What time they begin comes from the sun's position at your coordinates.</p>
+
+    <p>Candle lighting is a set number of minutes before sunset; the day ends at nightfall, defined
+    by how far the sun has dropped below the horizon. Both are settings, because both are matters
+    of practice rather than astronomy.</p>
+
+    <p>The times were checked once against published ones and the comparison runs offline since:
+    126 of them across six cities and a year, agreeing to within half a minute. Every time here is
+    displayed and acted on to the minute, so that is the same answer.</p>
+
+    <p>Sundown moves by three hours across a year and by hours again between cities, so a device
+    can report where it is and the calendar follows. Only the position comes from the device;
+    how long before candle lighting a session should end stays with the other preferences.</p>
+
+    <p>The model is never consulted here. It may propose a date; whether that date is available is
+    decided by this arithmetic. If the calculation cannot be made, the day is left alone.</p>`
   },
   cloud: {
-    tag:"ground rule", name:"internet", title:"Never",
+    tag:"where the work happens", name:"elsewhere", title:"Two doors, both shut",
     z:[690,62,2.2],
-    sum:`<p>As shipped and as run: no account, no API key, no cloud transcription. Every model reads from a file on the disk.</p>
-    <p class="figs">a test fails the build if the host reaches out</p>`,
-    more:`<p><strong>"Offline" is a configuration, not a property, and it is worth being exact about
-    which.</strong> Understanding a sentence needs a language model, and the one it is pointed at
-    by default runs on the host itself. That is what makes the whole thing work with the network
-    off. It is also a setting: point it at a hosted model instead, supply a key, and the same
-    system sends your commands to a company. The capability is deliberately there and deliberately
-    unused &mdash; nothing is configured, and no key exists.</p>
-    <p>What is not a setting is the enforcement. A test blocks every connection that is not the
-    machine talking to itself and fails the build if any code path tries to reach further, so the
-    shipped default cannot quietly stop being local. It has already caught one regression: a
-    library fetching its model over the internet on every start, which nobody noticed because the
+    sum:`<p>Everything that decides anything runs on the host, from files already on the disk. Two settings could send work elsewhere instead; neither is set.</p>
+    <p class="figs">speech &#183; grammar &#183; language model &mdash; all local</p>`,
+    more:`<p>The language model is the one that could plausibly live elsewhere, and pointing it at a
+    hosted one is a single setting away. It is set to the local one, which is what lets the whole
+    system work with the network switched off. The second door is a sync with a hosted calendar,
+    off in the same way.</p>
+
+    <p>A test keeps the first door honest: it blocks every connection that is not the machine
+    talking to itself, so the default cannot drift without the build noticing. It caught a library
+    fetching its model over the internet on every start &mdash; invisible until then, because the
     wifi was always on.</p>
 
-    <h3>The link between devices</h3>
-    <p>This is the honest exception, and calling the system "offline" without it would be a lie.
-    A second device reaching its host is real traffic over a real network, and if the two are not
-    in the same room it crosses the internet to get there. What it is <em>not</em> is a service:
-    the two machines address each other directly, over an encrypted private link, and no third
-    party holds your calendar or can be down.</p>
-    <p>One caveat worth knowing rather than glossing. The host can require a secret on every
-    request, and that is off by default &mdash; which is fine while only your own devices can
-    reach it, and worth turning on the moment anything else can.</p>
-
-    <p>There is one further door, shut unless you open it: an opt-in sync with a hosted calendar.
-    Nothing reaches a company through it unless you configure it and connect an account.</p>`
+    <p>Your other devices reach the host directly, over an encrypted private link between machines
+    you own. The host can also require a secret on every request, worth setting once anything but
+    your own devices can reach it.</p>`
   },
   tracelog: {
     tag:"on disk", title:"The trace log", z:[500,436,2.2],
@@ -874,67 +830,54 @@ completed 0
     tag:"more than one at a time", title:"Several things at once", z:[420,300,1.6],
     sum:`<p>One recording, one transcript &mdash; and possibly several records. A sentence can hold two events, a list of things to buy, or several unrelated commands at once.</p>
     <p class="figs">each record is written, checked and remembered on its own</p>`,
-    more:`<p>The recording is never split. It becomes one transcript, and everything after that decides
-    how many <em>records</em> it describes. Three situations, deliberately handled differently:</p>
+    more:`<p>The recording becomes one transcript. Everything after that decides how many records it
+    describes, and three situations are handled differently.</p>
 
-    <p><strong>Two events in one sentence.</strong> "lunch at noon and coffee at nine" gets no
-    confidence score at all. The rule parser holds one set of slots, so rather than fill half of
-    them and answer confidently about the first half, it refuses outright and hands the whole
-    sentence to the model. A softer version of the same instinct is in the score: two clock times
-    in one span multiply confidence by 0.70, because a second time is usually a second event.</p>
+    <p><strong>Two events in one sentence.</strong> The rule parser holds one set of slots, so
+    "lunch at noon and coffee at nine" is handed to the model whole rather than answered halfway.
+    Two clock times in one span also multiply confidence by 0.70, since a second time usually means
+    a second event.</p>
 
-    <p><strong>A list inside one task.</strong> "buy chicken and rice" is two tasks, not one, with
-    the verb shared out. The hard part is the conjunctions that are not separators &mdash; "a gift
-    for mum and dad" is one errand, and "fish and chips" is one thing to buy &mdash; so the split
-    is a small set of rules rather than a model call.</p>
+    <p><strong>A list inside one task.</strong> "buy chicken and rice" becomes two tasks with the
+    verb shared out. The work is in the conjunctions that join rather than separate &mdash; "a gift
+    for mum and dad" is one errand, "fish and chips" is one thing to buy.</p>
 
-    <p><strong>Several commands at once.</strong> They can be sent bracketed &mdash;
-    <code>[gym tomorrow at 7am] [call the dentist at four]</code> &mdash; and the host splits them
-    and parses each apart. Separate parses beat one joined parse, because each gets its own slots
-    and its own score rather than competing for one.</p>
+    <p><strong>Several commands at once.</strong> Sent bracketed &mdash;
+    <code>[gym tomorrow at 7am] [call the dentist at four]</code> &mdash; and parsed apart, so each
+    gets its own slots and its own score.</p>
 
-    <h3>What comes back</h3>
-    <p>Each record is created, checked and remembered separately, and the replies are joined into
-    one answer. Few enough and it names them &mdash; after "buy chicken and rice" the useful
-    confirmation is <em>which</em> two tasks exist, not that there are two; past three it counts
-    instead, because a list read aloud stops being a confirmation.</p>
-    <p>There is no such thing as a half-executed command. If the third of four fails, the first
-    two stand, the failure is reported against the third, and the fourth is still attempted.</p>`
+    <p>Each record is created, checked and remembered separately, and the replies join into one
+    answer: named while there are few, counted past three. If the third of four fails, the first
+    two stand and the fourth is still attempted.</p>`
   },
 
   queue: {
     tag:"speaking to nothing", title:"When the host is away", z:[820,300,1.6],
-    sum:`<p>Speak with the host unreachable and the recording is kept, not the decision. It is
-    transcribed and understood on reconnect, against the calendar as it is then.</p>
+    sum:`<p>Speak while the host is unreachable and the recording is kept. It is transcribed and understood on reconnect, against the calendar as it is then.</p>
     <p class="figs">sound is kept &#183; meaning is decided later</p>`,
-    more:`<p>This is the right way round, and it is worth saying why. A queued command could have been
-    stored as "create an event on Thursday" &mdash; already decided. Storing the sound instead
-    means it is re-decided when it finally runs, against whatever the calendar looks like by then.
-    An instruction is a thing you meant, not a diff you computed.</p>
+    more:`<p>What is stored is the sound, not a decision. The command is transcribed and understood when
+    it finally runs, against the calendar as it is then &mdash; an instruction is a thing you
+    meant, not a diff computed an hour ago.</p>
 
-    <p>Draining the queue has three outcomes, and they are deliberately different:</p>
+    <p>Draining the queue has three outcomes:</p>
     <table>
-      <thead><tr><th>What happened</th><th>What is done</th></tr></thead>
+      <thead><tr><th>Situation</th><th>Result</th></tr></thead>
       <tbody>
-        <tr><td class="m">the host is away again</td><td>stop; keep everything for next time</td></tr>
+        <tr><td class="m">the host is away again</td><td>stop, and keep everything for next time</td></tr>
         <tr><td class="m">the record changed meanwhile</td><td>the host's version stands, and you are told</td></tr>
-        <tr><td class="m">the change is impossible now</td><td>dropped quietly &mdash; the row is gone</td></tr>
+        <tr><td class="m">the change no longer applies</td><td>dropped, so the rest of the queue moves</td></tr>
       </tbody>
     </table>
-    <p>The third looks careless and is the opposite. A change that can never succeed &mdash; an
-    edit to something already deleted &mdash; used to sit at the head of the queue and block every
-    later change behind it, for ever. Retrying it cannot help; carrying on can.</p>
+    <p>The third keeps the queue flowing: a change to something already deleted can never succeed,
+    and holding it at the front would stall everything behind it.</p>
 
-    <p>The subtle one is what happens to a task created offline. It has no real id yet, only a
-    placeholder, so a later "tick it off" queued behind it refers to something the host has never
-    heard of. When the create finally lands, the id the host chose is written back over every
-    queued change still pointing at the placeholder. Without that, adding a task offline and
-    ticking it off loses the tick and nothing says so.</p>
+    <p>A task created offline carries a placeholder id, so a "tick it off" queued behind it points
+    at something the host has never seen. When the create lands, the host's real id is written back
+    over every queued change still using the placeholder.</p>
 
-    <p>A flush can be asked for by several things at once &mdash; reconnecting, opening the app,
-    the poll loop &mdash; so it is guarded: replaying the same recording twice would create the
-    event twice. And the result arrives as a notification, because a calendar changing on its own
-    from something said an hour ago is worse than the command not running.</p>`
+    <p>Flushes are guarded, since reconnecting, opening the app and the poll loop can all ask at
+    once and replaying a recording twice would create the event twice. Results arrive as a
+    notification, so a calendar that changes from something said an hour ago says so.</p>`
   },
 
   bench: {
