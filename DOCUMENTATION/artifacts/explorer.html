@@ -481,9 +481,16 @@ const P = {
     z:[357,485,2.6],
     sum:`<p>Speech becomes text on the laptop's own GPU, from a model already on disk.</p>
     <p class="figs">Whisper base · 74M parameters · no network</p>`,
-    more:`<p>This is the first of the three local models and the only one that touches sound.
-    Everything after this line works on plain text, which is what lets the laptop and the phone
-    share the rest of the pipeline exactly.</p>`
+    more:`<p>Whisper runs from a file already on the disk. Nothing is uploaded, and it works with the
+    network off.</p>
+    <p>What comes back is not clean text. Dictation produces "230PM" with no colon, splits names
+    into syllables, and turns unfamiliar words into familiar-sounding ones. Everything downstream
+    is built for that rather than against it &mdash; which is why the next step exists at all.</p>
+    <p>Some of what it hears is not a command. A stop word said on its own, an acknowledgement, a
+    false start abandoned after a syllable: anything with fewer than two meaningful words left is
+    dropped here and goes no further. It is not parsed, not executed, and not remembered &mdash;
+    that last one being the point, since the memory feeds the model examples of how you speak,
+    and a run of false starts teaches it that false starts are normal.</p>`
   },
   correct: {
     tag:"step 2 of 8", name:"correct", title:"374 words the dictionary doesn't know",
@@ -632,27 +639,28 @@ completed 0
     z:[397,400,2.4],
     sum:`<p>Your corrections come back as worked examples in the next prompt. The model itself never changes.</p>
     <p class="figs">4 most similar past commands · no fine-tuning</p>`,
-    more:`<p>Every command is kept with what it produced and what you made of it.</p>
-    <svg viewBox="0 0 380 176" role="img" aria-label="One remembered command: what you said before and after correction, which parser answered, what it produced, how long it took, and your verdict.">
-  <text x="0" y="11" font-size="9" fill="var(--muted)">ONE REMEMBERED COMMAND</text>
+    more:`<p>Your verdicts weight what the model is shown. A correction outranks an approval; a rejection
+    is never shown again. The model itself is unchanged &mdash; what changes is the company its
+    prompt keeps.</p>
 
-  <rect x="0" y="20" width="380" height="34" rx="4" fill="none" stroke="var(--line)"/>
-  <text x="7" y="33" font-size="8" fill="var(--muted)">WHAT YOU SAID</text>
-  <text x="7" y="47" font-size="8.5">raw_transcript → transcript • the vocabulary sits between them</text>
+    <p>Most verdicts are not buttons. Delete something the assistant made and that is a rejection;
+    edit it and that is a correction, with the fields you changed merged back in to form what the
+    parse <em>should</em> have produced. The explicit thumbs exist, but behaviour is the stronger
+    signal because it costs nothing to give.</p>
 
-  <rect x="0" y="62" width="380" height="34" rx="4" fill="none" stroke="var(--model)"/>
-  <text x="7" y="75" font-size="8" fill="var(--model)">WHAT IT DID</text>
-  <text x="7" y="89" font-size="8.5">parse_path • actions_json • result • llm_ms • total_ms</text>
+    <p><strong>The strongest signal of all is the retry.</strong> When a command produces the wrong
+    thing, gets deleted, and is immediately said again in different words, the second version is
+    what the first one meant &mdash; a correction already made, by the only means anyone actually
+    uses. Those pairs are found and turned into corrections automatically.</p>
 
-  <rect x="0" y="104" width="380" height="42" rx="4" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.2"/>
-  <text x="7" y="117" font-size="8" fill="var(--amber)">WHAT YOU THOUGHT OF IT</text>
-  <text x="7" y="131" font-size="8.5">feedback → approved • corrected • rejected • skipped</text>
-  <text x="7" y="142" font-size="8" fill="var(--muted)">correction_json holds what it should have produced</text>
-
-  <text x="0" y="166" font-size="8.5" fill="var(--muted)">deleting what it made counts as a verdict; so does editing it</text>
-</svg>
-<figcaption>The verdict is the valuable column, and most of it is collected without asking.</figcaption><p>Most verdicts are not buttons. Delete something the assistant made and that is a rejection; edit it and that is a correction, with the fields you changed merged back in to form what the parse <em>should</em> have produced. The explicit thumbs exist, but the behaviour is the stronger signal because it costs nothing to give.</p>
-    <p>On the next similar command the four closest past ones are pasted into the prompt. A correction outranks an approval; a rejection is never shown again. The model is unchanged — what changes is the company its prompt keeps.</p>`
+    <p>They are also treated with suspicion, because the cost of getting one wrong is high: a bad
+    correction is pasted into future prompts as an example of how you speak. A pair only counts if
+    the first was actually rejected, the gap is long enough to have been spoken, the two are
+    similar but not identical &mdash; a word-for-word repeat blames the recognition, not the
+    wording &mdash; and the retry itself succeeded. Then the model is asked whether it really was
+    a retry rather than two things you both wanted, and if it cannot answer, the pair is refused.
+    Run over a week of real use these rules find nothing, which is the correct answer for a week
+    of real use.</p>`
   },
   models: {
     tag:"on the laptop", name:"models", title:"Three models, one machine",
@@ -854,17 +862,34 @@ completed 0
     sum:`<p>Speak with the host unreachable and the recording is kept, not the decision. It is
     transcribed and understood on reconnect, against the calendar as it is then.</p>
     <p class="figs">sound is kept &#183; meaning is decided later</p>`,
-    more:`<p>This is the right way round, and it is worth saying why. A queued command could have
-    been stored as "create an event on Thursday" &mdash; already decided. Storing the sound
-    instead means it is re-decided when it finally runs, with whatever the calendar looks like by
-    then. An instruction is a thing you meant, not a diff you computed.</p>
-    <p>The consequences are all small and all deliberate. A flush that several things ask for at
-    once &mdash; reconnecting, opening the app, the poll loop &mdash; is guarded, because replaying
-    the same audio twice would create the event twice. The result arrives as a notification rather
-    than silently: a calendar changing on its own from something you said an hour ago is worse
-    than the command not running. And a queued edit the host refuses &mdash; a change to a record
-    that has since moved, a delete of something already gone &mdash; is dropped and reported
-    rather than left at the head of the queue blocking everything behind it.</p>`
+    more:`<p>This is the right way round, and it is worth saying why. A queued command could have been
+    stored as "create an event on Thursday" &mdash; already decided. Storing the sound instead
+    means it is re-decided when it finally runs, against whatever the calendar looks like by then.
+    An instruction is a thing you meant, not a diff you computed.</p>
+
+    <p>Draining the queue has three outcomes, and they are deliberately different:</p>
+    <table>
+      <thead><tr><th>What happened</th><th>What is done</th></tr></thead>
+      <tbody>
+        <tr><td class="m">the host is away again</td><td>stop; keep everything for next time</td></tr>
+        <tr><td class="m">the record changed meanwhile</td><td>the host's version stands, and you are told</td></tr>
+        <tr><td class="m">the change is impossible now</td><td>dropped quietly &mdash; the row is gone</td></tr>
+      </tbody>
+    </table>
+    <p>The third looks careless and is the opposite. A change that can never succeed &mdash; an
+    edit to something already deleted &mdash; used to sit at the head of the queue and block every
+    later change behind it, for ever. Retrying it cannot help; carrying on can.</p>
+
+    <p>The subtle one is what happens to a task created offline. It has no real id yet, only a
+    placeholder, so a later "tick it off" queued behind it refers to something the host has never
+    heard of. When the create finally lands, the id the host chose is written back over every
+    queued change still pointing at the placeholder. Without that, adding a task offline and
+    ticking it off loses the tick and nothing says so.</p>
+
+    <p>A flush can be asked for by several things at once &mdash; reconnecting, opening the app,
+    the poll loop &mdash; so it is guarded: replaying the same recording twice would create the
+    event twice. And the result arrives as a notification, because a calendar changing on its own
+    from something said an hour ago is worse than the command not running.</p>`
   },
 
   bench: {
