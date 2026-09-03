@@ -50,7 +50,16 @@ os.environ["MACALENDAR_MEMORY_DB"] = os.path.join(_TMP, "memory.db")
 # late — the same reason the other stores are redirected up here.
 _WANT_MEMORY = "--memory" in sys.argv
 if _WANT_MEMORY:
+    # `--memory-source PATH` replays against a given copy of the history
+    # instead of the live one — e.g. a slice with one dominant day held out,
+    # to check that a k>0 effect is the user's general style and not one
+    # day's particular vocabulary. Defaults to the real file, as before.
     _real_memory = os.path.expanduser("~/.assistant_tools/nlu_memory.db")
+    for _i, _arg in enumerate(sys.argv):
+        if _arg == "--memory-source" and _i + 1 < len(sys.argv):
+            _real_memory = os.path.expanduser(sys.argv[_i + 1])
+        elif _arg.startswith("--memory-source="):
+            _real_memory = os.path.expanduser(_arg.split("=", 1)[1])
     if os.path.exists(_real_memory):
         import shutil as _sh
         _sh.copyfile(_real_memory, os.environ["MACALENDAR_MEMORY_DB"])
@@ -175,6 +184,25 @@ def build_corpus(seed: int = 7) -> list[dict]:
     ev("daily Shacharit at 6:30 am", [("create_event", {"start_time": "06:30", "recurrence": "daily"})], "recurring/daily")
     ev("weekly Netivim zoom on wednesdays at 7 pm", [("create_event", {"start_time": "19:00", "recurrence": "weekly"})], "recurring/weekly")
 
+    # --- events: from real failures ---------------------------------------
+    # Mined from ~/.assistant_tools/nlu_memory.db (feedback in corrected/rejected,
+    # llm/hybrid path — the only path few-shot examples reach). The hand-written
+    # corpus above scores 100% on that path in both k=0 and k=4 (ASSISTANT_AUDIT_
+    # SUMMARY.md, run 7), so it cannot show whether the examples help. These two
+    # reproduced against current code before being added; the ground truth is
+    # read straight off what the speaker actually said, not off correction_json
+    # (much of that pool turned out to be stale or, for one row, corrupted by
+    # the batch-correction bug fixed alongside this).
+    ev("set a meeting at 4pm today, but it is only 20 minutes meeting with one moment meeting with reards, "
+       "okay, then let's do another meeting from 6 from 6 o'clock to 640 meetings with kids for project defense",
+       [("create_event", {"date": d(0), "start_time": "16:00", "end_time": "16:20"}),
+        ("create_event", {"date": d(0), "start_time": "18:00", "end_time": "18:40"})], "multi/disfluent-duration")
+    ev("a meeting for me tomorrow at two one sorry one pm and four pm and then another one a pizza party at 6.30 pm at edo's",
+       [("create_event", {"date": d(1), "start_time": "13:00", "end_time": "14:00"}),
+        ("create_event", {"date": d(1), "start_time": "16:00", "end_time": "17:00"}),
+        ("create_event", {"date": d(1), "start_time": "18:30", "end_time": "19:30", "title_contains": "pizza"})],
+       "multi/self-correction-count")
+
     # --- tasks -------------------------------------------------------------
     def td(text, expect, shape):
         C.append({"area": "tasks", "shape": shape, "text": text, "expect": expect})
@@ -206,6 +234,14 @@ def build_corpus(seed: int = 7) -> list[dict]:
        [("create_todo", {"titles_contain": ["milk", "bananas"], "todo_count": 2, "tags_contain": "Groceries"})], "multi/tagged")
     td("add to my general list: renew passport", [("create_todo", {"titles_contain": ["passport"], "list_name": "general"})], "single/general-list")
     td("remind me to call Ima", [("create_todo", {"titles_contain": ["Ima"]})], "single/hebrew-name")
+
+    # --- tasks: from real failures -----------------------------------------
+    # Same provenance as the events cases above. Ground truth is deliberately
+    # conservative (item count and titles only) — the real correction data
+    # for this one wasn't clean enough to assert more without guessing.
+    td("[TASKS VIEW] i need to buy some groceries, i need rice and chicken, the chicken i need to get "
+       "far away, the rice i can get at whole foods",
+       [("create_todo", {"titles_contain": ["chicken", "rice"], "todo_count": 2})], "multi/interleaved-clauses")
 
     # --- update / delete (seeded) ----------------------------------------
     seed_ev = {"title": "Meeting with Tal", "date": d(1), "start_time": "13:00", "end_time": "14:00"}
@@ -282,22 +318,37 @@ def _norm_action(a: str) -> str:
     return a.split("|")[0]
 
 
-def _check(case: dict, resp: dict, db) -> tuple[bool, list[str]]:
-    """Compare executed actions + DB effects against expectations."""
+def _check(case: dict, resp: dict, db) -> tuple[bool, list[str], dict]:
+    """Compare executed actions + DB effects against expectations.
+
+    A single pass/fail bit collapses two different failure modes that call
+    for different fixes: missing something the command asked for (recall),
+    and producing something it didn't (precision) — a duplicated task from
+    a misread clause is a precision failure, a dropped self-correction that
+    merges two events into one is a recall failure on the second event, and
+    "97% accurate" doesn't say which one a run mostly had. So each expected
+    item is tracked individually (`exp_hit`) rather than folded into one
+    case-wide bit, and actions/DB rows the system produced beyond what was
+    expected are counted explicitly rather than only mentioned in passing.
+    """
     problems: list[str] = []
     got_actions = list(resp.get("actions") or [])
     exp = case["expect"]
+    exp_hit = [True] * len(exp)   # per expected item: did everything about it check out
+
     # action multiset (order-insensitive), with alternatives "a|b"
     remaining = got_actions[:]
-    for name, _ in exp:
+    for idx, (name, _) in enumerate(exp):
         alts = name.split("|")
         hit = next((g for g in remaining if g in alts), None)
         if hit is None:
             problems.append(f"missing action {name} (got {got_actions})")
+            exp_hit[idx] = False
         else:
             remaining.remove(hit)
-    if remaining:
-        problems.append(f"extra actions {remaining}")
+    extra_actions = remaining
+    if extra_actions:
+        problems.append(f"extra actions {extra_actions}")
 
     # DB effects
     events = []
@@ -305,7 +356,8 @@ def _check(case: dict, resp: dict, db) -> tuple[bool, list[str]]:
         events += db.get_events_for_day(TODAY + dt.timedelta(days=off))
     todos = db.get_todos(include_completed=True)
     used_ev: set[int] = set()
-    for name, f in exp:
+    extra_todo_rows = 0
+    for idx, (name, f) in enumerate(exp):
         if name.startswith("create_event"):
             cands = [e for e in events if e["id"] not in used_ev
                      and (not f.get("date") or e["date"] == f["date"])
@@ -315,42 +367,63 @@ def _check(case: dict, resp: dict, db) -> tuple[bool, list[str]]:
                      and (not f.get("recurrence") or (e.get("recurrence") or "") == f["recurrence"])]
             if not cands:
                 problems.append(f"no event matching {f} in DB " + str([(e['title'], e['date'], e['start_time']) for e in events][:6]))
+                exp_hit[idx] = False
             else:
                 used_ev.add(cands[0]["id"])
         elif name.startswith("create_todo"):
             # How many rows: "buy chicken and rice" is two tasks, and
             # titles_contain alone can't tell that from one task named
-            # "buy chicken and rice".
+            # "buy chicken and rice". A count higher than expected (not just
+            # different) is specifically the "extra output" failure mode —
+            # e.g. an interleaved clause spawning its own spurious task.
             if f.get("todo_count") is not None and len(todos) != f["todo_count"]:
                 problems.append(f"expected {f['todo_count']} todos, got {len(todos)}: {[t['title'] for t in todos]}")
+                exp_hit[idx] = False
+                extra_todo_rows += max(0, len(todos) - f["todo_count"])
             for sub in f.get("titles_contain", []):
                 m = [t for t in todos if sub.lower() in t["title"].lower()]
                 if not m:
                     problems.append(f"no todo containing '{sub}' (todos={[t['title'] for t in todos]})")
+                    exp_hit[idx] = False
                 else:
                     if f.get("due_date") and (m[0].get("due_date") or "")[:10] != f["due_date"]:
                         problems.append(f"todo '{m[0]['title']}' due {m[0].get('due_date')} != {f['due_date']}")
+                        exp_hit[idx] = False
                     if f.get("list_name") and (m[0].get("list_name") or m[0].get("list")) != f["list_name"]:
                         problems.append(f"todo '{m[0]['title']}' list {m[0].get('list_name')} != {f['list_name']}")
+                        exp_hit[idx] = False
                     if f.get("tags_contain") and not any(
                             x.lower() == f["tags_contain"].lower() for x in (m[0].get("tags") or [])):
                         problems.append(f"todo '{m[0]['title']}' tags {m[0].get('tags')} missing {f['tags_contain']}")
+                        exp_hit[idx] = False
         elif "db_event_start" in f:
             title, t = f["db_event_start"]
             if not any(title.lower() in e["title"].lower() and e["start_time"] == t for e in events):
                 problems.append(f"expected '{title}' at {t}; have {[(e['title'], e['date'], e['start_time']) for e in events]}")
+                exp_hit[idx] = False
         elif "db_event_end" in f:
             title, t = f["db_event_end"]
             if not any(title.lower() in e["title"].lower() and e["end_time"] == t for e in events):
                 problems.append(f"expected '{title}' ending {t}; have {[(e['title'], e['end_time']) for e in events]}")
+                exp_hit[idx] = False
         elif "db_event_title" in f:
             sub, t = f["db_event_title"]
             if not any(sub.lower() in e["title"].lower() and e["start_time"] == t for e in events):
                 problems.append(f"expected event titled ~'{sub}' at {t}; have {[(e['title'], e['start_time']) for e in events]}")
+                exp_hit[idx] = False
         elif "db_event_absent" in f:
             if any(f["db_event_absent"].lower() in e["title"].lower() for e in events):
                 problems.append(f"'{f['db_event_absent']}' still in DB")
-    return (not problems), problems
+                exp_hit[idx] = False
+
+    counts = {
+        "expected": len(exp),
+        "recall_hits": sum(exp_hit),
+        "produced_actions": len(got_actions),
+        "extra_actions": len(extra_actions),
+        "extra_todo_rows": extra_todo_rows,
+    }
+    return (not problems), problems, counts
 
 
 def _reset_db(db) -> None:
@@ -404,7 +477,7 @@ def run(args) -> dict:
         t0 = time.perf_counter()
         resp = client.post("/voice/text", json={"transcript": case["text"]}).get_json()
         first_ms = int((time.perf_counter() - t0) * 1000)
-        ok_quick, problems_quick = _check(case, resp, db)
+        ok_quick, problems_quick, counts_quick = _check(case, resp, db)
 
         # wait for the background self-check (if any) and re-check DB
         verify = None; settle_ms = first_ms
@@ -419,7 +492,7 @@ def run(args) -> dict:
                     break
                 time.sleep(0.25)
             settle_ms = int((time.perf_counter() - t0) * 1000)
-        ok_settled, problems_settled = _check(case, resp, db)
+        ok_settled, problems_settled, counts_settled = _check(case, resp, db)
 
         trace = resp.get("trace") or []
         stage_ms = {s["stage"]: stage_ms_get(trace, s["stage"]) for s in trace}
@@ -428,6 +501,7 @@ def run(args) -> dict:
              "first_ms": first_ms, "settle_ms": settle_ms, "llm_ms": stage_ms.get("llm", 0), "rule_ms": stage_ms.get("rule", 0),
              "corrections": resp.get("corrections"), "verify": verify,
              "ok_quick": ok_quick, "ok_settled": ok_settled, "problems": problems_settled or problems_quick,
+             "counts": counts_settled,
              "changed_by_selfcheck": (ok_quick != ok_settled) or bool(verify and not verify.get("ok", True) and verify.get("applied"))}
         results.append(r)
         mark = "✓" if ok_settled else ("~" if ok_quick else "✗")
@@ -461,7 +535,7 @@ def run_audio(client, db, cases) -> list[dict]:
         with open(wav, "rb") as f:
             resp = client.post("/voice", data={"audio": (f, "a.wav")}, content_type="multipart/form-data").get_json()
         ms = int((time.perf_counter() - t0) * 1000)
-        ok, problems = _check(case, resp, db)
+        ok, problems, _counts = _check(case, resp, db)
         heard = resp.get("original_transcript") or resp.get("transcript") or ""
         out.append({"voice": voice, "text": case["text"], "heard": heard, "corrected": resp.get("transcript"),
                     "corrections": resp.get("corrections"), "ok": ok, "ms": ms, "stt_ms": stage_ms_get(resp.get("trace") or [], "stt")})
@@ -471,10 +545,32 @@ def run_audio(client, db, cases) -> list[dict]:
 
 # ------------------------------------------------------------------ report
 
+def _recall_precision(rows: list[dict]) -> tuple[float, float, dict]:
+    """Recall and precision over expected-item / produced-item counts.
+
+    "Accuracy" (the case-level ok_settled rate) doesn't say whether a wrong
+    case failed because the system missed something it should have done
+    (recall) or did something extra it shouldn't have (precision) — those
+    call for different fixes, and a single percentage collapses them.
+    """
+    exp = sum(r["counts"]["expected"] for r in rows)
+    hits = sum(r["counts"]["recall_hits"] for r in rows)
+    produced = sum(r["counts"]["produced_actions"] for r in rows)
+    extra = sum(r["counts"]["extra_actions"] for r in rows)
+    extra_rows = sum(r["counts"]["extra_todo_rows"] for r in rows)
+    tp = produced - extra
+    fp = extra + extra_rows
+    recall = hits / exp if exp else 1.0
+    precision = tp / (tp + fp) if (tp + fp) else 1.0
+    return recall, precision, {"expected": exp, "recall_hits": hits, "produced": produced,
+                                "extra_actions": extra, "extra_todo_rows": extra_rows}
+
+
 def write_report(data: dict, path: str, args) -> None:
     R = data["results"]
     n = len(R)
     def rate(xs): return f"{sum(xs)/len(xs):.0%}" if xs else "–"
+    recall, precision, rp_counts = _recall_precision(R)
     lines = [
         "# Assistant audit — accuracy, latency, self-check",
         "",
@@ -483,25 +579,34 @@ def write_report(data: dict, path: str, args) -> None:
         "",
         "## Headline",
         "",
-        f"- **Correct after the quick answer:** {rate([r['ok_quick'] for r in R])}  ·  **correct once settled (after self-check):** {rate([r['ok_settled'] for r in R])}",
+        f"- **Correct after the quick answer:** {rate([r['ok_quick'] for r in R])}  ·  **correct once settled (after self-check):** {rate([r['ok_settled'] for r in R])} "
+        f"— case-level exact match against this corpus's hand-written expectations, {n} cases, not a real-usage or human-judged figure",
+        f"- **Recall {recall:.0%}** ({rp_counts['recall_hits']}/{rp_counts['expected']} expected items produced correctly) · "
+        f"**precision {precision:.0%}** ({rp_counts['produced'] - rp_counts['extra_actions']}/{rp_counts['produced']} produced actions were expected"
+        + (f", plus {rp_counts['extra_todo_rows']} extra task rows beyond what was expected" if rp_counts['extra_todo_rows'] else "") + ") "
+        "— accuracy alone doesn't distinguish missing something asked for from producing something extra",
         f"- **Time to first result:** p50 {_pct([r['first_ms'] for r in R], .5)/1000:.1f} s · p95 {_pct([r['first_ms'] for r in R], .95)/1000:.1f} s  ·  "
         f"**time to settled:** p50 {_pct([r['settle_ms'] for r in R], .5)/1000:.1f} s · p95 {_pct([r['settle_ms'] for r in R], .95)/1000:.1f} s",
         f"- Parse paths: " + ", ".join(f"{p} {sum(1 for r in R if r['parse']==p)}" for p in ("rule", "hybrid", "llm", "error")),
         "",
         "## By area",
         "",
-        "| Area | n | quick ✓ | settled ✓ | first p50 | first p95 | settled p50 |",
-        "|---|---:|---:|---:|---:|---:|---:|",
+        "| Area | n | quick ✓ | settled ✓ | recall | precision | first p50 | first p95 | settled p50 |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for area in sorted({r["area"] for r in R}):
         xs = [r for r in R if r["area"] == area]
+        rec, prec, _c = _recall_precision(xs)
         lines.append(f"| {area} | {len(xs)} | {rate([r['ok_quick'] for r in xs])} | {rate([r['ok_settled'] for r in xs])} | "
+                     f"{rec:.0%} | {prec:.0%} | "
                      f"{_pct([r['first_ms'] for r in xs], .5)/1000:.1f} s | {_pct([r['first_ms'] for r in xs], .95)/1000:.1f} s | {_pct([r['settle_ms'] for r in xs], .5)/1000:.1f} s |")
-    lines += ["", "## By parse path", "", "| Path | n | quick ✓ | settled ✓ | first p50 | first p95 | LLM ms p50 |", "|---|---:|---:|---:|---:|---:|---:|"]
+    lines += ["", "## By parse path", "", "| Path | n | quick ✓ | settled ✓ | recall | precision | first p50 | first p95 | LLM ms p50 |", "|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
     for p in ("rule", "hybrid", "llm", "error"):
         xs = [r for r in R if r["parse"] == p]
         if xs:
+            rec, prec, _c = _recall_precision(xs)
             lines.append(f"| {p} | {len(xs)} | {rate([r['ok_quick'] for r in xs])} | {rate([r['ok_settled'] for r in xs])} | "
+                         f"{rec:.0%} | {prec:.0%} | "
                          f"{_pct([r['first_ms'] for r in xs], .5)/1000:.1f} s | {_pct([r['first_ms'] for r in xs], .95)/1000:.1f} s | {int(_pct([r['llm_ms'] for r in xs], .5))} |")
     fixed = [r for r in R if not r["ok_quick"] and r["ok_settled"]]
     broke = [r for r in R if r["ok_quick"] and not r["ok_settled"]]
@@ -520,6 +625,21 @@ def write_report(data: dict, path: str, args) -> None:
     for s in shapes:
         xs = [r for r in R if r["shape"] == s]
         lines.append(f"| {s} | {len(xs)} | {rate([r['ok_settled'] for r in xs])} | {_pct([r['first_ms'] for r in xs], .5)/1000:.1f} s |")
+    extra_output = [r for r in R if r["counts"]["extra_actions"] or r["counts"]["extra_todo_rows"]]
+    if extra_output:
+        lines += ["", "## Produced more than expected (precision failures)", "",
+                  "Distinct from a wrong or missing answer: the system did something on top of what "
+                  "was asked for — an extra action, or extra rows from one action (a duplicated task "
+                  "from a misread clause is invisible to an action-count check, since the action count "
+                  "can still be right).", ""]
+        for r in extra_output:
+            extras = []
+            if r["counts"]["extra_actions"]:
+                extras.append(f"{r['counts']['extra_actions']} extra action(s)")
+            if r["counts"]["extra_todo_rows"]:
+                extras.append(f"{r['counts']['extra_todo_rows']} extra task row(s)")
+            lines.append(f"- **{r['text']}** — {', '.join(extras)} — got {r['actions']}")
+
     lines += ["", "## Failures", ""]
     fails = [r for r in R if not r["ok_settled"]]
     if not fails:
