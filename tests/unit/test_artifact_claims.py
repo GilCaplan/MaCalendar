@@ -1,14 +1,21 @@
 """The published explainers must agree with the code they describe.
 
-Two artifacts are published to public URLs. They quote constants — the routing
-threshold, the confidence multipliers, how many verbs the table holds, how many
-past commands are retrieved — and every one of those is a number somebody can
-change in an afternoon without ever opening the HTML.
+Three artifacts are published to public URLs. They quote constants — the
+routing threshold, the confidence multipliers, how many verbs the table
+holds, how many past commands are retrieved — and every one of those is a
+number somebody can change in an afternoon without ever opening the HTML.
+Several of them are quoted on more than one page, so a check that reads only
+one page misses the other's drift entirely — that already happened once (the
+architecture page carried a stale test count for weeks because the checks
+only read the internals page). Most checks below run against every published
+page and skip whichever ones don't make the claim, rather than assuming in
+advance which page says what; that's what lets a check catch drift on a page
+that didn't exist yet when the check was written.
 
-That already happened. The pages claimed 706 tests when there were 778, and
-"55% of the pool has never been reviewed" when purging the test entries had
-moved it to 48%. Neither is a big error; both are the kind that make a reader
-stop trusting the parts they cannot check.
+That already happened, twice. The pages claimed 706 tests when there were
+778, and "55% of the pool has never been reviewed" when purging the test
+entries had moved it to 48%. Neither is a big error; both are the kind that
+make a reader stop trusting the parts they cannot check.
 
 So the agreement is a test rather than a promise. Each case below reads the
 value out of the code and asserts the artifact says the same thing. When a
@@ -44,14 +51,32 @@ def _word(n: int) -> str:
 
 
 def _prose(path: pathlib.Path) -> str:
-    """The page's words, with SVG coordinates and CSS stripped out.
+    """The page's words, with SVG coordinates, CSS and JS code stripped out.
 
     Diagram geometry is full of bare numbers, and matching '0.85' against a
-    path's y-coordinate would let a claim pass for the wrong reason.
+    path's y-coordinate would let a claim pass for the wrong reason. The
+    explorable pages carry an inline <script> full of its own numbers
+    (viewBox coordinates, panel scale factors, array indices) — a blind
+    `<script>` strip stopped those from leaking in, but every one of
+    explorer.html's actual claims (its panels' `sum`/`more` fields) also
+    lives *inside* that script, as JS template-literal strings rendered into
+    the DOM at runtime rather than present as static HTML. Stripping the
+    whole block first would silently drop everything there was to check on
+    that page, which is worse than the noise it fixes. So: pull the
+    backtick-delimited string content out of <script> first — that's where
+    this codebase's multi-line HTML content lives, as opposed to the
+    double-quoted strings used for both content and code (selectors,
+    attributes) — and keep only that.
     """
     s = path.read_text()
+    recovered = " ".join(
+        lit for block in re.findall(r"<script>(.*?)</script>", s, flags=re.S)
+        for lit in re.findall(r"`([^`]*)`", block)
+    )
     s = re.sub(r"<svg.*?</svg>", " ", s, flags=re.S)
     s = re.sub(r"<style.*?</style>", " ", s, flags=re.S)
+    s = re.sub(r"<script.*?</script>", " ", s, flags=re.S)
+    s = s + " " + recovered
     s = re.sub(r"<[^>]+>", " ", s)
     return re.sub(r"\s+", " ", s)
 
@@ -83,51 +108,74 @@ def all_prose() -> dict:
 # Routing — the number the whole page is organised around
 # ---------------------------------------------------------------------------
 
-def test_the_routing_threshold_matches_the_parser(prose):
+def test_the_routing_threshold_matches_the_parser(all_prose):
     from assistant.intent.rule_parser import RULE_THRESHOLD
-    assert str(RULE_THRESHOLD) in prose, (
-        f"the parser routes at {RULE_THRESHOLD}; the artifact says otherwise")
+    for name, text in all_prose.items():
+        if "rout" not in text.lower():
+            continue
+        assert str(RULE_THRESHOLD) in text, (
+            f"the parser routes at {RULE_THRESHOLD}; {name} says otherwise")
 
 
-def test_every_confidence_multiplier_is_quoted_correctly(prose):
+def test_every_confidence_multiplier_is_quoted_correctly(all_prose):
     """The four penalties, read out of the function that applies them."""
     src = (ROOT / "assistant" / "intent" / "rule_parser.py").read_text()
     body = src.split("def _compute_confidence")[1].split("\ndef ")[0]
     multipliers = sorted({m.group(1) for m in re.finditer(r"multiplier \*= (0\.\d+)", body)})
     assert multipliers, "no multipliers found — has _compute_confidence been rewritten?"
-    for value in multipliers:
-        # 0.7 in code is written 0.70 on the page; accept either spelling.
-        spellings = {value, f"{float(value):.2f}"}
-        assert any(s in prose for s in spellings), (
-            f"_compute_confidence multiplies by {value}, which the artifact never mentions")
+    for name, text in all_prose.items():
+        # "confidence" alone also matches architecture.html's unrelated routing
+        # claim ("confidence ≥ 0.85") — anchor on "multipl" specifically so
+        # that page (which never states the per-case multipliers) is correctly
+        # skipped rather than held to a claim it doesn't make.
+        if "multipl" not in text.lower():
+            continue
+        for value in multipliers:
+            # 0.7 in code is written 0.70 on the page; accept either spelling.
+            spellings = {value, f"{float(value):.2f}"}
+            assert any(s in text for s in spellings), (
+                f"_compute_confidence multiplies by {value}, which {name} never mentions")
 
 
 # ---------------------------------------------------------------------------
 # The verb table and the action registry
 # ---------------------------------------------------------------------------
 
-def test_the_size_of_the_verb_table_is_current(prose):
+def test_the_size_of_the_verb_table_is_current(all_prose):
     from assistant.intent.rule_parser import INTENT_MAP
-    assert f"{len(INTENT_MAP)} verb" in prose, (
-        f"INTENT_MAP holds {len(INTENT_MAP)} verbs; the artifact quotes a different count")
+    for name, text in all_prose.items():
+        if "verb" not in text.lower():
+            continue
+        assert f"{len(INTENT_MAP)} verb" in text, (
+            f"INTENT_MAP holds {len(INTENT_MAP)} verbs; {name} quotes a different count")
 
 
-def test_the_number_of_rule_reachable_actions_is_current(prose):
+def test_the_number_of_rule_reachable_actions_is_current(all_prose):
     from assistant.intent.rule_parser import INTENT_MAP
     reachable = len(set(INTENT_MAP.values()))
-    assert re.search(rf"\b{reachable}\b", prose), (
-        f"{reachable} actions are reachable by rule; the artifact does not say so")
+    for name, text in all_prose.items():
+        if "reachable" not in text.lower():
+            continue
+        assert re.search(rf"\b{reachable}\b", text), (
+            f"{reachable} actions are reachable by rule; {name} does not say so")
 
 
-def test_the_split_between_task_and_other_actions_is_current(prose):
+def test_the_split_between_task_and_other_actions_is_current(all_prose):
     """'Eight of the fifteen actions are about tasks' — both halves."""
     registry = _loaded_registry()
     names = sorted(registry)
     task_actions = [n for n in names if "todo" in n or "subtask" in n]
     task_word, total_word = _word(len(task_actions)), _word(len(names))
-    assert re.search(rf"\b{task_word}\s+of\s+the\s+{total_word}\b", prose, re.I), (
-        f"{len(task_actions)} of {len(names)} actions are task actions; "
-        "the artifact's phrasing no longer matches")
+    for name, text in all_prose.items():
+        # "N of the M actions" alone also matches the unrelated rule-reachable
+        # claim ("nine of the fifteen actions are reachable this way") — anchor
+        # on "about task" too, or explorer.html's "9 of the 15 reachable" false-
+        # triggered this check against the wrong pair of numbers.
+        if not re.search(r"of\s+the\s+\w+\s+actions?\s+are\s+about\s+task", text, re.I):
+            continue
+        assert re.search(rf"\b{task_word}\s+of\s+the\s+{total_word}\b", text, re.I), (
+            f"{len(task_actions)} of {len(names)} actions are task actions; "
+            f"{name}'s phrasing no longer matches")
 
 
 def _loaded_registry():
@@ -166,12 +214,16 @@ def _loaded_registry():
 # Retrieval of past commands
 # ---------------------------------------------------------------------------
 
-def test_the_number_of_examples_retrieved_matches_the_default(prose):
+def test_the_number_of_examples_retrieved_matches_the_default(all_prose):
     from assistant.intent.memory import CommandMemory
     import inspect
     k = inspect.signature(CommandMemory.retrieve).parameters["k"].default
-    assert re.search(rf"\b(only )?{_word(k)}\b", prose, re.I) or f"k={k}" in prose, (
-        f"retrieve() defaults to k={k}; the artifact quotes a different number")
+    for name, text in all_prose.items():
+        if "past command" not in text.lower() and "closest" not in text.lower() \
+                and "most similar" not in text.lower():
+            continue
+        assert re.search(rf"\b(only )?{_word(k)}\b", text, re.I) or f"k={k}" in text, (
+            f"retrieve() defaults to k={k}; {name} quotes a different number")
 
 
 def test_the_similarity_weights_are_quoted_correctly(prose):
@@ -197,23 +249,39 @@ def test_the_candidate_pool_size_is_current(prose):
 # The models
 # ---------------------------------------------------------------------------
 
-def test_the_models_named_are_the_models_configured(prose):
+def test_the_models_named_are_the_models_configured(all_prose):
     """Whisper, spaCy and the LLM, as config.example.yaml and the code set them."""
     cfg = (ROOT / "config.example.yaml").read_text()
     llm = re.search(r"model:\s*\"(llama[^\"]+)\"", cfg)
     assert llm, "the default Ollama model is no longer a llama build"
-    family, _, size = llm.group(1).partition(":")
-    assert size.upper().replace("B", "B") in prose.replace(" ", "") or size.upper() in prose, (
-        f"the configured model is {llm.group(1)}; the artifact quotes a different size")
+    _, _, size = llm.group(1).partition(":")
 
     parser = (ROOT / "assistant" / "intent" / "rule_parser.py").read_text()
     spacy_model = re.search(r'spacy\.load\("([^"]+)"\)', parser)
-    assert spacy_model and spacy_model.group(1) in prose, (
-        "the artifact must name the spaCy model the parser actually loads")
+    assert spacy_model, "the rule parser no longer loads a spaCy model by this name"
 
     whisper = re.search(r"model:\s*\"mlx-community/whisper-(\w+)-mlx\"", cfg)
-    assert whisper and whisper.group(1) in prose.lower(), (
-        "the artifact must name the Whisper size actually configured")
+    assert whisper, "config.example.yaml no longer names a Whisper size this way"
+
+    for name, text in all_prose.items():
+        if "llama" in text.lower():
+            assert size.upper() in text.upper(), (
+                f"the configured model is {llm.group(1)}; {name} quotes a different size")
+        if re.search(r"\bwhisper\b.{0,20}\b(tiny|base|small|medium|large)\b", text, re.I):
+            assert whisper.group(1) in text.lower(), (
+                f"{name} names a Whisper size but not the one actually configured")
+
+    # The exact spaCy filename is technical-page detail, internals.html only,
+    # by design — a "big picture" page names Whisper by parameter count
+    # instead (explorer.html: "74M"), not by this identifier. A generic "does
+    # the page attempt this claim" marker false-triggered on unrelated
+    # snake_case identifiers already in internals.html's own API examples
+    # (routed_to_llm, base_updated_at) — checking only the one page that is
+    # actually supposed to make this claim avoids guessing at intent from text.
+    internals_text = all_prose.get(INTERNALS.name)
+    if internals_text and "spacy" in internals_text.lower():
+        assert spacy_model.group(1) in internals_text, (
+            "internals.html must name the spaCy model the parser actually loads")
 
 
 def test_the_artifact_does_not_claim_an_embedding_model(prose):
@@ -372,12 +440,36 @@ def test_measured_claims_cite_a_run_that_still_exists(prose):
         "reports it — either the summary is missing a run, or the number is invented")
 
 
-def test_the_corpus_size_quoted_matches_the_summary(prose):
+def test_the_corpus_size_quoted_matches_the_summary(all_prose):
     summary = (ROOT / "DOCUMENTATION" / "ASSISTANT_AUDIT_SUMMARY.md").read_text()
-    m = re.search(r"(\d+)-command corpus", prose)
-    assert m, "the artifact no longer says how big the corpus is"
-    assert f"{m.group(1)} commands" in summary, (
-        f"no run of {m.group(1)} commands is recorded in the summary")
+    for name, text in all_prose.items():
+        for m in re.finditer(r"(\d+)-command corpus", text):
+            assert f"{m.group(1)} commands" in summary, (
+                f"{name} cites an {m.group(1)}-command corpus, but no run of that "
+                "size is recorded in the summary")
+
+
+def test_the_memory_comparison_cites_a_run_that_still_exists(all_prose):
+    """The k=0 vs k=4 comparison ('scored 98% and 97%') is Run 7's finding.
+
+    Phrased as a two-way score rather than a single "N% correct" — the more
+    general test_measured_claims_cite_a_run_that_still_exists doesn't match
+    this shape, so it needed its own check or the citation could drift
+    unnoticed (exactly the failure mode this whole file exists to prevent,
+    on the one number most likely to change once the memory-scaling study
+    the k-sweep, the held-out day, the external pool — produces a new
+    finding to replace Run 7's inconclusive one).
+    """
+    summary = (ROOT / "DOCUMENTATION" / "ASSISTANT_AUDIT_SUMMARY.md").read_text()
+    for name, text in all_prose.items():
+        m = re.search(r"scored (\d+)% and (\d+)%", text)
+        if not m:
+            continue
+        a, b = m.group(1), m.group(2)
+        assert f"{a}%" in summary and f"{b}%" in summary, (
+            f"{name} claims the memory comparison scored {a}% and {b}%, but "
+            "ASSISTANT_AUDIT_SUMMARY.md doesn't record a run with both figures "
+            "— either the summary is missing that run, or the page is stale")
 
 
 # ---------------------------------------------------------------------------
