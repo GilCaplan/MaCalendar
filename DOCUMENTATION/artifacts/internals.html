@@ -1219,10 +1219,146 @@ tzeit (it ends)   = dusk at 8.5° below the horizon   <span class="c">configurab
   <hr class="rule">
 
   <!-- 7 ------------------------------------------------------------------ -->
-    <p class="layer"><span>What is not known</span><em>last, because it only means something now</em></p>
+    <hr class="rule">
+
+  <!-- 20 ----------------------------------------------------------------- -->
+  <section>
+    <h2><span class="num">20</span>A repeating event is not a rule, it is rows</h2>
+    <p>
+      "Every day at 7pm until October" could be stored as a pattern and expanded when
+      something asks. It is not. The occurrences are written as <strong>ordinary
+      individual rows</strong>, each with a <code>series_id</code> pointing at the first,
+      and every query in the system stays a plain date lookup that knows nothing about
+      recurrence.
+    </p>
+
+    <table>
+      <thead><tr><th>Consequence</th><th>Why it follows</th></tr></thead>
+      <tbody>
+        <tr><td class="m">one occurrence can be edited alone</td><td>it is a row; nothing else references it</td></tr>
+        <tr><td class="m">a skipped day simply is not written</td><td>no exception list to keep in step with the rule</td></tr>
+        <tr><td class="m">an unbounded series stops after a year</td><td>rows are finite, so a horizon is required</td></tr>
+        <tr><td class="m">"delete from here on" re-roots the series</td><td>deleting the root would orphan the past occurrences</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      The third row is the honest cost: a series with no stated end is written a year
+      forward and no further. The fourth is the subtle one — if you delete from a date
+      that includes the first occurrence, the series is re-rooted onto the earliest
+      instance still standing, so the ones before it stay linked to something that
+      exists.
+    </p>
+
+    <p class="note">
+      This is also what makes the Shabbat rule in section 09 cheap. Skipping is a decision
+      taken <em>once, at write time</em>, per candidate date — not a filter every reader
+      has to remember to apply. A row that should not exist is never created, so no query
+      anywhere can accidentally return it.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- 21 ----------------------------------------------------------------- -->
+  <section>
+    <h2><span class="num">21</span>Two devices, one truth, no merge</h2>
+    <p>
+      The phone holds a full local copy and works with the laptop switched off, which
+      raises the question every offline-capable app has to answer: what happens when both
+      sides changed the same thing? The answer here is deliberately not "merge".
+    </p>
+
+    <h3>Edits carry the version they were made against</h3>
+<pre><span class="c">PATCH /events/42</span>
+{ "start_time": "16:00",
+  "base_updated_at": "2026-09-02T14:11:03Z" }   <span class="c">← the copy I edited</span>
+
+<span class="c">409 Conflict</span> — "changed on the Mac since you edited it"</pre>
+
+    <p>
+      The device quotes the version stamp it worked from. If the record has moved on since,
+      the write is <strong>refused rather than applied</strong>, and the phone says so.
+      Losing an edit loudly beats losing one silently, and for a calendar with a single
+      human writing to it, that is the whole of the concurrency story.
+    </p>
+
+    <h3>Polling that costs almost nothing</h3>
+<pre>GET /changes  →  {"token": "1788376902.418244-4325376"}
+                          <span class="c">└ modification time ┘ └ size ┘  of the database file</span></pre>
+
+    <p>
+      Refetching every list on a timer is expensive, so the phone used to do it every 30
+      seconds — meaning something added on the laptop could sit invisible for half a
+      minute. This returns a few bytes derived from the database file itself, so the phone
+      can ask every couple of seconds and do real work only when the answer changes. It
+      relies on one property of the storage engine: in rollback-journal mode every commit
+      touches the main file, so modification time and size together move on any write.
+    </p>
+
+    <h3>What a queued command is worth</h3>
+    <p>
+      A command spoken with the laptop unreachable is queued on the phone and replayed on
+      reconnect — but it is queued as <em>text</em>, not as an action. It is parsed when it
+      finally arrives, against the calendar as it is then. That is the right way round: an
+      instruction is a thing you meant, not a diff you computed, and re-deciding it later
+      with better information is strictly better than replaying a stale conclusion.
+    </p>
+  </section>
+
+  <hr class="rule">
+
+  <!-- 22 ----------------------------------------------------------------- -->
+  <section>
+    <h2><span class="num">22</span>The one door to the outside, and its three locks</h2>
+    <p>
+      Everything so far runs on one machine. There is one deliberate exception, off by
+      default and configured by hand: a two-way sync with a hosted calendar. It is worth
+      describing precisely, because "syncs with your work calendar" is exactly the kind of
+      feature that quietly turns a local system into a networked one.
+    </p>
+
+    <table>
+      <thead><tr><th>Lock</th><th>What it prevents</th></tr></thead>
+      <tbody>
+        <tr><td class="m">only events that came <em>from</em> the remote are ever pushed</td><td>a private local event silently appearing in a work calendar</td></tr>
+        <tr><td class="m">remote-origin events are read-only unless two-way is on</td><td>edits marked for a push that will never happen, diverging for ever</td></tr>
+        <tr><td class="m">subscribed feeds are always read-only</td><td>writing to something with no write path at all</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      The first lock is the important one and it is structural rather than a setting:
+      push-eligibility requires the row to already carry a remote id. A locally created
+      event has none, so there is no code path by which it can leave — not "we remember not
+      to", but "there is nothing to send it as".
+    </p>
+
+    <h3>Conflicts, and deletes that survive a failure</h3>
+    <p>
+      Conflict policy is last-write-wins, decided during the pull by comparing timestamps:
+      if the local edit is newer, the remote version is not applied and the row is kept
+      marked dirty for the next push. Deletes cannot work that way — a deleted row cannot
+      carry a flag — so deletion writes a <strong>tombstone</strong> to a queue, which the
+      sync drains and re-queues on failure. Without it, deleting while offline would delete
+      locally and leave the remote copy for ever.
+    </p>
+
+    <p class="warn">
+      <strong>So the honest version of "nothing leaves the machine" is this:</strong> the
+      part that decides things — transcription, parsing, the model, the calendar
+      arithmetic, sundown — has no network path at all, and a test fails the build if that
+      changes. Storage and decision-making are local absolutely. <em>Distribution</em> is
+      local by default: the phone reaches the laptop directly, and the only way anything
+      reaches a third party is if you configure this feature and connect an account.
+      It is off, and the code contains no credentials for it.
+    </p>
+  </section>
+
+  <p class="layer"><span>What is not known</span><em>last, because it only means something now</em></p>
 
 <section>
-    <h2><span class="num">20</span>What is measured, and what is not</h2>
+    <h2><span class="num">23</span>What is measured, and what is not</h2>
     <p>
       Worth separating, because the numbers on the architecture page come from one
       harness that does not exercise everything.

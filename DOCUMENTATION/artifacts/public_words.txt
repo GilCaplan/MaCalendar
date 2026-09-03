@@ -34,3 +34,9 @@ gemini
 # code sample: festival(israel=True) selects the one-day festival schedule.
 # A country name, not a fact about anyone.
 israel
+
+# NOTE ON FALSE POSITIVES
+# The word list holds ordinary English words as well as personal ones, so this
+# check occasionally flags an innocent one. Prefer rewording the sentence — it
+# is usually clearer anyway — over adding the word here. Everything above
+# should be a word that genuinely had to appear.
