@@ -157,7 +157,15 @@
       Repeating events skip them; a training planner will not schedule a run on one.
       Section 09 covers how that works.
     </p>
-  </section>
+  
+    <p class="note">
+      Not everything heard is a command. A stop word said on its own, an acknowledgement, a false
+      start abandoned after a syllable &mdash; anything with fewer than two meaningful words left
+      is dropped before it is parsed, and above all before it is remembered. That last part is the
+      point: the command history feeds the model worked examples, so a run of false starts would
+      teach it that false starts are how this person speaks.
+    </p>
+</section>
 
   <hr class="rule">
 
@@ -930,7 +938,23 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
       at 6" is an event. That single judgement is why the self-check's routing rules
       spend most of their words on it.
     </p>
-  </section>
+  
+    <h3>Five of a thing is one task</h3>
+    <p>
+      A task carries a count, and it exists because of a failure that only shows up in use.
+      Asked for five of something, a model with no way to express a quantity does the only thing
+      it can: it emits the same task five times. Five identical rows are worse than untidy —
+      tick one off and you cannot tell which of the five it was, so the list stops being a record
+      of what is left.
+    </p>
+    <p>
+      Reading a count is deliberately narrow, because a false positive silently changes what was
+      asked for. An explicit multiplier anywhere, or a count after a verb that implies buying a
+      quantity of something. That is what keeps "call 911" one phone call and "read chapter 7"
+      one chapter, and it is why most of the tests for it are about numbers that must be left
+      alone rather than numbers that must be read.
+    </p>
+</section>
 
   <hr class="rule">
 
@@ -1352,7 +1376,22 @@ worst disagreement: <span class="a">28 seconds</span></pre>
       — <em>nothing is skipped</em>. A series that quietly loses days is worse than one that
       lands somewhere it should not, because the second is visible and the first is not.
     </p>
-  </section>
+  
+    <h3>And for where you are</h3>
+    <p>
+      Sundown moves by hours between places as well as by three hours across a year, so a
+      repeating event that skips Shabbat is wrong the moment you travel: the boundary it is
+      avoiding was computed somewhere you are not, and nothing about the wrong answer looks
+      wrong. A device can report where it is, and the calendar follows without being told.
+    </p>
+    <p>
+      Only the position comes from the device. How long before candle lighting a session must
+      finish is a preference, not a fact about the sky, and stays with the other preferences.
+      Coordinates outside the possible range are refused rather than stored — a latitude of 200
+      does not fail loudly, it quietly computes a sunset that never happens and every day
+      becomes available.
+    </p>
+</section>
 
   <hr class="rule">
 
@@ -1519,7 +1558,23 @@ worst disagreement: <span class="a">28 seconds</span></pre>
       has never been measured, because the audit runs against a blank history. Until
       that changes, every answer about it is an argument rather than a result.
     </p>
-  </section>
+  
+    <h3>Two things that were unmeasurable until recently</h3>
+    <p>
+      The score the routing decision turns on was computed, used, and thrown away on every
+      command. There was no way to ask afterwards whether the threshold sat in the right place,
+      because you cannot bucket outcomes by a number nobody wrote down. It is recorded now, and
+      the question becomes answerable after a few weeks of ordinary use rather than by argument.
+    </p>
+    <p>
+      The corpus, meanwhile, always ran against an <em>empty</em> history — so every claim about
+      the personalisation layer was untested by construction. It can now be replayed against a
+      copy of the real history, with the number of retrieved examples as a flag. The comparison
+      worth running first is not which number is best but whether retrieving anything helps at
+      all: noisy examples measurably hurt a model this size, and over half the pool has never
+      been reviewed by a human.
+    </p>
+</section>
 
   <hr class="rule">
   <p class="foot">tested · one machine · no network</p>
