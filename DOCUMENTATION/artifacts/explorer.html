@@ -343,22 +343,31 @@
     <g id="clients"></g>
 
     <!-- ============ THE INTERNET, NEVER ============ -->
-    <g data-panel="cloud" role="button" tabindex="0" aria-label="Two connections the system can make and does not: a hosted language model instead of the local one, and a sync with a hosted calendar. Both are settings, and neither is configured.">
-      <rect x="608" y="6" width="166" height="112" fill="transparent"/>
-      <path class="frame" d="M 668 44 h 40 a 10.5 10.5 0 0 0 4 -21 a 14 14 0 0 0 -28 -6 a 11 11 0 0 0 -15 10 a 8.5 8.5 0 0 0 -1 17 z"
+    <g data-panel="cloud" role="button" tabindex="0" aria-label="Two connections the system could make, each drawn as an open switch: the language model is set to the local one rather than a hosted one, and calendar sync has no sources connected.">
+      <rect x="670" y="6" width="180" height="152" fill="transparent"/>
+      <path class="frame" d="M 662 44 h 40 a 10.5 10.5 0 0 0 4 -21 a 14 14 0 0 0 -28 -6 a 11 11 0 0 0 -15 10 a 8.5 8.5 0 0 0 -1 17 z"
             fill="none" stroke="var(--muted)" stroke-width="1.4" stroke-dasharray="4 3"/>
-      <text x="691" y="37" text-anchor="middle" font-size="7.5" fill="var(--muted)">elsewhere</text>
+      <text x="686" y="37" text-anchor="middle" font-size="7.5" fill="var(--muted)">elsewhere</text>
 
-      <g font-size="7.5" fill="var(--muted)" text-anchor="middle">
-        <line x1="646" y1="52" x2="646" y2="68" stroke="var(--muted)" stroke-dasharray="2 3" stroke-opacity=".6"/>
-        <line x1="640" y1="62" x2="652" y2="62" stroke="var(--ink)" stroke-width="1.6"/>
-        <text x="646" y="82">hosted model</text>
-        <text x="646" y="92" fill-opacity=".7">off</text>
+      <!-- one trunk, two switches stacked on it -->
+      <line x1="686" y1="63" x2="686" y2="74" stroke="var(--muted)" stroke-width="1.2"/>
 
-        <line x1="736" y1="52" x2="736" y2="68" stroke="var(--muted)" stroke-dasharray="2 3" stroke-opacity=".6"/>
-        <line x1="730" y1="62" x2="742" y2="62" stroke="var(--ink)" stroke-width="1.6"/>
-        <text x="736" y="82">calendar sync</text>
-        <text x="736" y="92" fill-opacity=".7">off</text>
+      <g font-size="7.5" fill="var(--muted)">
+        <!-- switch 1: open, terminal to terminal -->
+        <circle cx="686" cy="76" r="2" fill="none" stroke="var(--muted)" stroke-width="1.2"/>
+        <line x1="686" y1="78" x2="672" y2="92" stroke="var(--ink)" stroke-width="1.6"/>
+        <circle cx="686" cy="98" r="2" fill="none" stroke="var(--muted)" stroke-width="1.2"/>
+        <text x="696" y="84" text-anchor="start" font-weight="600" fill="var(--ink)">language model</text>
+        <text x="696" y="94" text-anchor="start" fill-opacity=".85">set to: local</text>
+
+        <line x1="686" y1="100" x2="686" y2="116" stroke="var(--muted)" stroke-width="1.2"/>
+
+        <!-- switch 2: the same symbol, same reading -->
+        <circle cx="686" cy="118" r="2" fill="none" stroke="var(--muted)" stroke-width="1.2"/>
+        <line x1="686" y1="120" x2="672" y2="134" stroke="var(--ink)" stroke-width="1.6"/>
+        <circle cx="686" cy="140" r="2" fill="none" stroke="var(--muted)" stroke-width="1.2"/>
+        <text x="696" y="126" text-anchor="start" font-weight="600" fill="var(--ink)">calendar sync</text>
+        <text x="696" y="136" text-anchor="start" fill-opacity=".85">0 sources connected</text>
       </g>
     </g>
 
