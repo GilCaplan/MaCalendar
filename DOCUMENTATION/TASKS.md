@@ -84,10 +84,18 @@ Running list of user-reported issues and feature requests, with status. Update w
 | 77 | **The audit's headline "N% accurate" collapsed two different failure modes**: missing something asked for vs. producing something extra. `_check()` now tracks each expected item individually and counts extra actions/task rows explicitly, so the report gets recall and precision — overall, by area, by parse path — plus a dedicated "produced more than expected" section. Confirmed it surfaces something real: tasks area is 95% recall but 79% precision, driven by the row 75/76-adjacent duplicate-task bug. Headline number also now labelled explicitly as case-level exact match against the hand-written corpus, not a real-usage or human-judged figure. `A_k0`/`A_k1` of the overnight run predate this and lack the breakdown — cheap to backfill (~15-20 min each) once the rest finishes | done 2026-09-03 | `scripts/audit_assistant.py` `_check`, `_recall_precision` |
 | 78 | **Linux/PC host migration checked, deferred.** Core (parser, Ollama, spaCy, API, DB, GUI via PyQt6, default STT) is already cross-platform — no work needed. One real blocker: TTS shells out to macOS `say` directly, on by default, in the live voice pipeline (not just dev tooling) — needs swapping for a cross-platform engine (`pyttsx3` / `espeak`) before a Linux host would actually speak replies. Minor, non-blocking degradations: the thinking HUD's "join all Spaces" polish is an AppKit best-effort layer with no Linux equivalent yet (falls back to a normal always-on-top window); optional macOS Calendar.app import wouldn't apply; launch script and weekly-review scheduling are trivially cron-able | todo | `assistant/tts/speaker.py` |
 
+| 79 | **Engine v2 — the brain rebuilt as the 7-step deep track** (branch `engine-v2`). The old `_run_transcript` (~800 lines of interleaved heuristics, plus four background bolt-ons) retired and replaced by `assistant/engine/`: frozen per-stage contracts (`state.py`, `ENGINE.md`, `test_engine_contracts.py`), fast track (instant rule-parser commit) + deep track (segment → decompose → validate → generate → commit → label → crosscheck), every old named rule ported into `validate.py` with its regression tests, observance gate for AI-created events (leyning/meals/davening on holy days, fasts exclude meals), `needs_edit` transcript-confirmation round-trip gated on `supports_edit`. Done so far: contracts + skeleton + strip + docs rebuild, 970 unit tests green. Remaining, stage-gated: LLM segmentation (2), LLM decomposition (3), text repair (4), crosscheck build w/ tiered patches + verify token (6), step-1 learning loop + Mac edit dialog, intake coalescing (0), per-stage audit lines, full audit vs run-7 baseline | in progress 2026-09-03 | `assistant/engine/`, `DOCUMENTATION/ENGINE.md` |
+
 ## How we are working right now
 
-The 2026-09-02 order of play (internals artifact, install iOS, build the
-harness) is done — see rows 56, 61, 62. Current thread, as of 2026-09-03:
+**Row 79 (engine v2) is the current thread on branch `engine-v2`** — the plan
+lives in the row; contracts are frozen, remaining work is stage-gated
+(build → independent test vs real Ollama → revamp → next stage), and the
+merge gate is the full audit beating the recorded run-7 baseline in
+`ASSISTANT_AUDIT_SUMMARY.md`. No audits until the row-76 overnight jobs
+finish — two model-loading jobs side by side segfault.
+
+Previous thread, as of 2026-09-03 (still relevant on `main`):
 
 **Row 76 is running unattended overnight.** If you're picking this up cold:
 `DOCUMENTATION/experiments/memory_scaling/build.log` has the pool-build

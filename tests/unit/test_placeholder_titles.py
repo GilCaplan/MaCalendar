@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from assistant.api.server import _is_placeholder_title
+from assistant.engine.validate import is_placeholder_title as _is_placeholder_title
 
 
 class _Cfg:

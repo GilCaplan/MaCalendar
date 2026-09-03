@@ -2,12 +2,14 @@
 
 Short version of the things that are easy to get wrong here. The architecture
 lives in `DOCUMENTATION/SYSTEM.md` (and `SYSTEM_MAC.md` / `SYSTEM_IPHONE.md`);
-this file is about the workflow.
+the engine's stage contracts live in `DOCUMENTATION/ENGINE.md`; this file is
+about the workflow.
 
 ## The shape of it
 
-**`assistant.api` is the brain, and it is the only one.** It parses, executes
-and self-checks every command, wherever the command came from. Four processes
+**`assistant.api` is the brain's front door, and `assistant.engine` is the
+brain.** The API server receives every command, wherever it came from, and
+hands it to the engine — which parses, executes and checks it. Four processes
 run on the Mac, started by `Launch Calendar.command`:
 
     ollama serve                     the model, localhost:11434
@@ -16,19 +18,24 @@ run on the Mac, started by `Launch Calendar.command`:
     python -m assistant.main         the calendar GUI
 
 **Both the GUI and the iPhone are clients of the API.** The GUI records audio,
-posts the transcript to `127.0.0.1:8080/voice/text`, and renders the answer; the
-phone does the same over Tailscale. `source` — `"mac"` or `"ios"` — is the only
-difference between them, and it only labels the trace, the vocabulary
+posts the transcript to `127.0.0.1:8080/voice/text`, and renders the answer;
+the phone does the same over Tailscale. `source` — `"mac"` or `"ios"` — is the
+only difference between them, and it only labels the trace, the vocabulary
 corrections and the command memory.
 
-This is recent and worth respecting: the GUI used to have its own copy of the
-whole pipeline, the two drifted, and every fix had to be written twice or the
-surfaces disagreed. **Do not add parsing or execution to `pipeline.py`.** If a
-behaviour needs to exist on the Mac, it belongs in `assistant/api/server.py`,
-where the phone gets it too.
+Two rules keep this true, each bought with real drift:
+
+- **Do not add parsing or execution to `pipeline.py`.** The GUI used to have
+  its own copy of the whole pipeline, the two drifted, and every fix had to be
+  written twice or the surfaces disagreed. If a behaviour needs to exist on
+  the Mac, it belongs in the engine, where the phone gets it too.
+- **Do not add parsing or execution to `server.py` either.** That is where the
+  old brain accumulated ~800 lines of interleaved heuristics that took a
+  rewrite to untangle. `server.py` is HTTP: routes, request shapes, CRUD. The
+  brain is `assistant/engine/`.
 
 The HUD is a fourth process and talks to nothing: it tails
-`~/.assistant_tools/trace_bus.jsonl`, which the API appends to. That is what
+`~/.assistant_tools/trace_bus.jsonl`, which the engine appends to. That is what
 lets it float over a full-screen app with the calendar closed, and it is the
 durable record the card's History view reads back.
 
@@ -36,11 +43,33 @@ durable record the card's History view reads back.
 parse and execute, and both now happen in a process with no screen. The GUI
 warns at startup if it is above 0.
 
+## Working on the engine
+
+`assistant/engine/` is the 7-step deep track: transcript repair → segment →
+decompose → validate → generate → crosscheck → label, with a fast track that
+commits a confident rule parse instantly. `DOCUMENTATION/ENGINE.md` is the
+canonical contract reference — open it before touching any stage.
+
+- **Stage I/O contracts are frozen.** `tests/unit/test_engine_contracts.py`
+  pins them. Fix a weak stage inside its own module, against its own tests —
+  never by reshaping `EngineState`, editing the orchestrator, or reaching into
+  another stage. If the contract itself seems wrong, that is a design change:
+  take it to TASKS.md, don't slip it into a fix.
+- Each stage has its own test file (`test_engine_<stage>.py`) and its own
+  trace step; the audit reports per-stage lines. A weak stage is found by its
+  line, not by staring at the headline number.
+- `scripts/engine_stage_check.py --stage <name>` re-verifies one stage in
+  isolation against the real local LLM (Ollama-guarded, scratch stores,
+  `source: "test"`).
+- Deterministic-first everywhere: a stage may only call the LLM when its
+  deterministic reading found nothing, and every LLM call is
+  schema-constrained and grounded on the raw transcript.
+
 ## It never touches the internet
 
 Whisper runs on the GPU from a cached model, the LLM is Ollama on localhost,
-spaCy and the date recogniser are local, `pyluach` and `astral` are pure Python,
-and the database is a file. `tests/unit/test_offline.py` blocks every
+spaCy and the date recogniser are local, `pyluach` and `astral` are pure
+Python, and the database is a file. `tests/unit/test_offline.py` blocks every
 non-loopback socket and fails the build if that stops being true — it already
 regressed once, when `mlx_whisper` was resolving its model against
 huggingface.co on every start.
@@ -51,27 +80,26 @@ between two of your own machines rather than a dependency on a service.
 ## Personal data lives outside the repo
 
 `~/.assistant_tools/` holds the calendar DB, the command memory, the personal
-vocabulary and the event categories. **None of it is test data.** The vocabulary
-is hand-curated and the command memory feeds the few-shot examples the parser
-learns from, so writing junk into either quietly degrades the assistant.
+vocabulary and the event categories. **None of it is test data.** The
+vocabulary is hand-curated and the command memory feeds the review flows, so
+writing junk into either quietly degrades the assistant.
 
-Every store honours an environment override, and `tests/conftest.py` points all
-four at a scratch directory *before* importing anything from `assistant` (the
-paths are read at import time, so a fixture is too late):
+Every store honours an environment override, and `tests/conftest.py` points
+all four at a scratch directory *before* importing anything from `assistant`
+(the paths are read at import time, so a fixture is too late):
 
     MACALENDAR_DB  MACALENDAR_MEMORY_DB  MACALENDAR_VOCAB  MACALENDAR_CATEGORIES
 
-Set them in any script that exercises the pipeline. If you are unsure whether
+Set them in any script that exercises the engine. If you are unsure whether
 something wrote to the real files, check: `md5 ~/.assistant_tools/vocab.json`
 before and after.
 
 **`MACALENDAR_TRACE_BUS` is the fifth**, and it was missed for a long time.
-`trace_bus.jsonl` is the durable log the thinking card's History reads back, so
-a script that leaves it alone publishes its commands into the record of what
-you actually asked the assistant. The audit was doing exactly that — 89
-synthetic commands per run, until the bus held more corpus than usage. Anything
-driving the API programmatically should also post `"source": "test"`, which the
-History filters out by default.
+`trace_bus.jsonl` is the durable log the thinking card's History reads back,
+so a script that leaves it alone publishes its commands into the record of
+what you actually asked the assistant. Anything driving the API
+programmatically should also post `"source": "test"`, which the History
+filters out by default.
 
 ## Testing
 
@@ -86,77 +114,54 @@ test that fails instead of skipping turns the build red.
 `conftest.py` sets `MACALENDAR_NO_WARMUP=1`: `create_app()` otherwise spawns a
 thread that unzips Whisper and spaCy while the suite runs, and two model loads
 on separate threads segfault the interpreter — the same collision the BLAS pin
-guards against. A test that builds the app wants routes, not models.
+guards against. The engine reads the same flag before starting any daemon
+thread. A test that builds the app wants routes, not models.
 
 ## Measuring a change to the assistant
 
 Do not judge an NLU change by trying a couple of phrasings. The harness runs a
-corpus of ~84 commands through the real path and reports accuracy by area and
-by parse path:
+corpus of ~89 commands through the real path and reports recall, precision and
+accuracy by area and by parse path (`fast` / `deep`):
 
-    python -m scripts.audit_assistant                 # full, ~10 min
+    python -m scripts.audit_assistant                 # full
     python -m scripts.audit_assistant --limit 20      # smoke
     python -m scripts.audit_assistant --area tasks
 
-It writes `DOCUMENTATION/ASSISTANT_AUDIT.md`. It runs against scratch databases
-and a *copy* of the real vocabulary, so it measures your actual word list
-without changing it. Re-run it after a parser change: twice now a fix has
-quietly regressed something else, and the corpus caught it. It takes ~25 min
-now that the self-check runs on every command, not the ~10 it used to.
-
-**The corpus alone measures the parser, not the personalisation.** By default
-the audit points the command memory at an empty file, so the few-shot examples
-have nothing to retrieve and every claim about them is untested. Add
-`--memory` to replay against a *copy* of the real history, and `--memory-k N`
-to change how many examples are retrieved:
-
-    python -m scripts.audit_assistant --memory                 # as it really is
-    python -m scripts.audit_assistant --memory --memory-k 0    # with memory off
-
-Run those two against each other before tuning anything. The first question is
-not whether four examples is the right number, it is whether the memory helps
-at all — noisy examples measurably hurt a model this size, and over half the
-pool has never been reviewed by a human.
-
-Keep the conclusions in `DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md` — the
-generated report is overwritten on every run.
+It writes `DOCUMENTATION/ASSISTANT_AUDIT.md` — overwritten every run, so
+conclusions go in `DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md`. That file also
+holds the engine's baseline: the retired brain's last numbers (run 7, 98%
+exact match), which is what a rebuilt stage has to beat. `--memory` replays
+against a *copy* of the real history, `--memory-k N` sets the retrieval count;
+run 7 measured no k=4 effect, so the engine defaults memory injection off.
 
 **Read the shape table with the sample size next to it.** Several rows are
-n=1, and a 0% there is one command, not a trend. Two of them were chased as
-real failures before anyone noticed they were the self-check overwriting a
-correct answer rather than a parse problem at all.
+n=1, and a 0% there is one command, not a trend.
 
 `scripts/weekly_review.py` reports real usage rather than the corpus, and is
-the honest instrument for "is it actually any good". It reports a **flag rate**
-and refuses to compute an accuracy below three approvals: the ratio divides by
-approvals, a thumbs-up is work with no reward, and with none of them the
-formula reads 0% however well it did. It also drops verdicts that arrive in
-bursts of five within three seconds — a backlog being cleared is not a
-judgement, and 24 such rejections once put the headline at 9%.
+the honest instrument for "is it actually any good". It reports a **flag
+rate** and refuses to compute an accuracy below three approvals; it also
+drops verdicts that arrive in bursts (a backlog being cleared is not a
+judgement).
 
 ## Things that have bitten before
 
-- **Don't run the audit and the test suite at once.** Both load spaCy and torch,
-  and the combination used to segfault. `tests/conftest.py` pins BLAS to one
-  thread, which fixed it, but the audit does not.
+- **Don't run the audit and the test suite at once.** Both load spaCy and
+  torch, and the combination used to segfault. `tests/conftest.py` pins BLAS
+  to one thread, which fixed it, but the audit does not. The same applies to
+  any two model-loading jobs side by side.
 - **The API reference is generated.** After adding or changing an endpoint:
   `python scripts/gen_api_reference.py`.
 - **The API reloads itself; nothing else does.** It runs with `--reload`, so
   editing anything under `assistant/` restarts it (tests, scripts and
-  DOCUMENTATION are excluded, or writing a test would bounce the server). The
-  **calendar GUI and the thinking HUD do not** — restart them by hand, and
-  remember that when a change "has no effect". The phone needs a reinstall
-  (`xcrun devicectl device install app` is more reliable than Xcode's Run when
-  the device is on Wi-Fi).
-
-- **A UI test that never sends a mouse event tests nothing.** Three bugs in the
-  HUD's history view shipped green: a signal connected straight to a slot that
-  took the `checked` bool as its first argument, rows built as a `QPushButton`
-  containing a layout (a button sizes to its text, so they collapsed to 15px),
-  and both times the tests called the handler instead of clicking the control.
-  Use `QTest.mouseClick` / `QTest.keyClicks`, and connect `clicked` through a
-  lambda.
-- **Deleting is destructive.** When the parser cannot identify what to delete,
+  DOCUMENTATION are excluded). The **calendar GUI and the thinking HUD do
+  not** — restart them by hand, and remember that when a change "has no
+  effect". The phone needs a reinstall (`xcrun devicectl device install app`
+  is more reliable than Xcode's Run when the device is on Wi-Fi).
+- **A UI test that never sends a mouse event tests nothing.** Three bugs in
+  the HUD's history view shipped green because tests called handlers instead
+  of clicking controls. Use `QTest.mouseClick` / `QTest.keyClicks`, and
+  connect `clicked` through a lambda.
+- **Deleting is destructive.** When the engine cannot identify what to delete,
   empty slots — which surface as "I couldn't find …" — are the right answer.
   Guessing is not.
 
@@ -186,47 +191,41 @@ gets a whole season wrong.
 Three exceptions, each with a reason:
 
 - **Meals are allowed** — they are what the day is for. Unless it is a fast,
-  where a meal is the one thing that must not be booked; Yom Kippur is both and
-  the fast wins.
+  where a meal is the one thing that must not be booked; Yom Kippur is both
+  and the fast wins.
 - **A series anchored on Shabbat keeps it.** A Saturday shiur was put there on
   purpose, and skipping every instance would leave a weekly series with one
   event.
 - **Nothing is skipped if observance cannot be computed.** A series quietly
   losing days is worse than one landing where it should not.
 
+The engine adds a fourth rule for what *it* creates (never for manual edits):
+a one-off event inside Shabbat / yom tov must be leyning, a meal or davening,
+and on a fast day a meal must not be booked before the fast ends. The refusal
+is explained in the reply — see the observance gate in `ENGINE.md`.
+
 ## The published pages are downstream of the code
 
 `DOCUMENTATION/artifacts/*.html` are the explainers published to public URLs,
-and they quote constants from the code — the routing threshold, the confidence
-multipliers, the size of the verb table, how many past commands are retrieved.
-Those drift. The pages claimed 706 tests when there were 793, and a review rate
-that a purge had made wrong months earlier.
-
+and they quote constants from the code. Those drift.
 **`tests/unit/test_artifact_claims.py` enforces the agreement**, reading each
-value out of the code and asserting the page says the same thing. If you change
-a constant a page quotes, that test goes red and names the file to edit. If you
-add a claim to a page, add its check — a number with no check is a number that
-will be wrong within a month. `DOCUMENTATION/ARTIFACT_BUILDER.md` carries the
-full table and the layering rules.
-
-Two things it also guards, both of which have already gone wrong once:
-
-- **No personal detail on a published page.** The check treats any word in the
-  personal vocabulary as a leak unless it is declared general in
-  `DOCUMENTATION/artifacts/public_words.txt`. Four survived a manual sweep by
-  hiding inside SVG `aria-label`s.
-- **A measured number must cite a run that still exists.** `ASSISTANT_AUDIT.md`
-  is overwritten every run, so conclusions go in `ASSISTANT_AUDIT_SUMMARY.md`
-  and the page cites that.
+value out of the code and asserting the page says the same thing. If you
+change a constant a page quotes, that test goes red and names the file to
+edit. If you add a claim to a page, add its check.
+`DOCUMENTATION/ARTIFACT_BUILDER.md` carries the full table and layering rules,
+including: **no personal detail on a published page** (the check treats any
+vocabulary word as a leak unless declared in `artifacts/public_words.txt`),
+and **a measured number must cite a run that still exists**
+(`ASSISTANT_AUDIT_SUMMARY.md`, never the overwritten report).
 
 ## Where the plan lives
 
-`DOCUMENTATION/TASKS.md` is the tracker and carries the current order of play at
-the bottom — read it before picking up work, and move a row rather than starting
-a parallel list. `DOCUMENTATION/MODELS.md` is the canonical answer to which
-models do what. `DOCUMENTATION/ARTIFACT_BUILDER.md` is the brief for the
-published explainer pages, including the rule that no personal detail of the
-author may appear in one.
+`DOCUMENTATION/TASKS.md` is the tracker and carries the current order of play
+at the bottom — read it before picking up work, and move a row rather than
+starting a parallel list. `DOCUMENTATION/MODELS.md` is the canonical answer to
+which models do what. `DOCUMENTATION/ENGINE.md` is the engine's stage-contract
+reference. `DOCUMENTATION/ARTIFACT_BUILDER.md` is the brief for the published
+explainer pages.
 
 ## Conventions
 

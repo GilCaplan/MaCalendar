@@ -650,45 +650,11 @@ class Pipeline:
 # Stop-keyword helper
 # ---------------------------------------------------------------------------
 
-# Built-in stop patterns (longest first so "set events" beats "set event")
-_BUILTIN_STOP_PATTERNS = [
-    r"\bset\s+events?\b",
-    r"\bexecute\b",
-    r"\bxq\b",        # STT mishearing of "execute"
-    r"\bdone\b",
-    r"\bstop\b",
-    r"\bsubmit\b",
-    r"\bconfirm\b",
-    r"\bthat'?s?\s+it\b",
-    r"\bok\s+go\b",
-]
-
-
-def _build_stop_re(extra_phrases: "list[str] | None" = None) -> "re.Pattern[str]":
-    """Build a stop-keyword regex from built-ins plus any user-configured phrases.
-
-    ``extra_phrases`` is the list from ``config.audio.stop_phrases``.
-    Each phrase is converted to a word-boundary regex; multi-word phrases are
-    matched literally (spaces collapse to ``\\s+``).
-    """
-    patterns = list(_BUILTIN_STOP_PATTERNS)
-    for phrase in (extra_phrases or []):
-        phrase = phrase.strip()
-        if not phrase:
-            continue
-        # Escape and allow flexible internal whitespace
-        escaped = r"\s+".join(re.escape(w) for w in phrase.split())
-        patterns.append(r"\b" + escaped + r"\b")
-    combined = r"[\s,.!?]*(?:" + "|".join(patterns) + r")[\s,.!?]*$"
-    return re.compile(combined, re.IGNORECASE)
-
-
-# Module-level default (no extra phrases); pipeline rebuilds per-call with config.
-_STOP_RE = _build_stop_re()
-
-
-def _strip_stop_keyword(transcript: str, extra_phrases: "list[str] | None" = None) -> str:
-    """Remove trailing stop keywords from the transcript."""
-    stop_re = _build_stop_re(extra_phrases) if extra_phrases else _STOP_RE
-    cleaned = stop_re.sub("", transcript).strip()
-    return cleaned if cleaned else transcript
+# Stop-keyword handling lives with the brain now (the engine strips them as
+# step 1 of every command); this client imports the same helpers for its own
+# recording UX — the streaming stop-word listener and the review bar — so the
+# two can never disagree about what ends a recording.
+from assistant.engine.transcript import (            # noqa: E402
+    build_stop_re as _build_stop_re,
+    strip_stop_keyword as _strip_stop_keyword,
+)

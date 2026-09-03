@@ -7,8 +7,9 @@ pre-execution handoff signals — low confidence, missing slots, a crash — fir
 The parse was confident, complete and wrong, and only running it revealed that.
 
 Escalation therefore has to happen *after* execution comes up empty, which is
-what TargetNotFound signals. These tests drive the real Flask route, because
-that is the only place this logic lives now: the Mac GUI posts here too.
+what TargetNotFound signals. These tests drive the real Flask route — the one
+place this logic lives (the engine's commit step; its ownership moves into
+step 6, crosscheck, when that is built): the Mac GUI posts here too.
 """
 from __future__ import annotations
 
@@ -20,6 +21,7 @@ from assistant.actions.calendar.intent import CalendarIntent
 from assistant.actions.todo.intent import CompleteTodoIntent
 from assistant.exceptions import TargetNotFound
 import assistant.api.server as server
+import assistant.engine.generate as generate
 
 SAID = "Walk Mark Stalk today at 230PM"
 
@@ -37,32 +39,23 @@ class _RuleResult:
 
 @pytest.fixture
 def client(monkeypatch):
-    monkeypatch.setattr(server, "_get_rule_parser", lambda: None)
     app = server.create_app()
     app.config.update(TESTING=True)
     return app.test_client()
 
 
-@pytest.fixture(autouse=True)
-def no_verify(monkeypatch):
-    """The background self-check is a separate concern; keep it out of the way."""
-    cfg = server.load_config()
-    cfg.verify_fast_path = False
-    monkeypatch.setattr(server, "load_config", lambda *a, **k: cfg)
-
-
 def _wire(monkeypatch, rule_intents, reparse, execute_results):
-    """Point the server at a fake rule parser, LLM parser and action registry."""
+    """Point the engine at a fake rule parser, LLM parser and action registry."""
     rp = MagicMock()
     rp.analyze.return_value = _RuleResult(rule_intents)
-    monkeypatch.setattr(server, "_get_rule_parser", lambda: rp)
+    monkeypatch.setattr(generate, "_get_rule_parser", lambda: rp)
 
     parser = MagicMock()
     parser.parse.return_value = reparse
     parser.last_llm_ms = 0
     parser.last_examples_used = 0
     parser.last_raw_response = ""
-    monkeypatch.setattr(server, "_get_parser", lambda: parser)
+    monkeypatch.setattr(generate, "_get_parser", lambda cfg: parser)
 
     registry = MagicMock()
 
@@ -73,7 +66,7 @@ def _wire(monkeypatch, rule_intents, reparse, execute_results):
         return cls
 
     registry.get.side_effect = _get
-    monkeypatch.setattr(server, "_get_registry", lambda: registry)
+    monkeypatch.setattr(generate, "get_registry", lambda: registry)
     return parser
 
 

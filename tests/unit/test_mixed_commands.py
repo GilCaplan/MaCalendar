@@ -55,7 +55,7 @@ def test_a_mixed_command_is_answered_by_the_rules_alone(client):
     in one pass. Two events would not — see below.
     """
     body, _ = _say(client, "book gym tomorrow at 7am and remind me to buy milk")
-    assert body["parse"] == "rule", f"expected the fast path, got {body['parse']}"
+    assert body["parse"] == "fast", f"expected the fast track, got {body['parse']}"
 
 
 def test_a_mixed_command_asks_the_client_to_refresh_both_surfaces(client):

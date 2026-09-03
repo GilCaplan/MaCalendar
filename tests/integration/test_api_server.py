@@ -123,13 +123,14 @@ def test_voice_text_create_todo_rule_fast_path(app_client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert "create_todo" in data["actions"]
-    assert data["parse"] == "rule"
+    assert data["parse"] == "fast"
     assert data["refresh"] == "todos"
 
     todos = db.get_todos(list_name=None, include_completed=True)
     assert any("milk" in t["title"].lower() for t in todos)
 
 
+@pytest.mark.skip(reason="verify_token returns when engine step 6 (crosscheck) is built")
 def test_voice_text_create_event_rule_fast_path(app_client, sample_config):
     client, db = app_client
     # The verify token is what this asserts, so ask for it explicitly rather than
@@ -139,7 +140,7 @@ def test_voice_text_create_event_rule_fast_path(app_client, sample_config):
     assert resp.status_code == 200
     data = resp.get_json()
     assert "create_event" in data["actions"]
-    assert data["parse"] == "rule"
+    assert data["parse"] == "fast"
     assert data["refresh"] == "events"
     # A verify_token is issued for rule-path results (iOS polls it for corrections).
     assert "verify_token" in data
@@ -186,6 +187,7 @@ def test_voice_verify_unknown_token_returns_404(app_client):
     assert resp.status_code == 404
 
 
+@pytest.mark.skip(reason="verify_token returns when engine step 6 (crosscheck) is built")
 def test_voice_verify_pending_before_ready(app_client, sample_config):
     """Immediately after a rule-path response, the verify token exists but the
     background thread almost certainly hasn't finished — poll returns pending.

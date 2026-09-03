@@ -39,10 +39,24 @@ def test_date_pin_restricts_to_that_day(db):
 
 
 @pytest.fixture
-def normalise(monkeypatch):
-    monkeypatch.setenv("MACALENDAR_NO_WARMUP", "1")
-    from assistant.api.server import create_app
-    return create_app()._normalise_intents
+def normalise():
+    """The anaphor/date-pin rules live in the engine's validate stage now;
+    drive them through its public object pass, same shapes as before."""
+    from assistant.engine import load_config, validate
+    from assistant.engine.state import EngineState, Item
+
+    cfg = load_config()
+
+    def _run(parsed, transcript, rule_actions):
+        st = EngineState(raw_text=transcript, text=transcript)
+        st.items = [Item(id=f"item_{i + 1}", kind="event", text=transcript,
+                         action=name, intent=intent)
+                    for i, (name, intent) in enumerate(parsed)]
+        validate.run_objects(st, cfg)
+        out = [(it.action, it.intent) for it in st.items if it.intent is not None]
+        return out, [f.human() for f in st.fixes]
+
+    return _run
 
 
 def _upd(**kw):
