@@ -496,9 +496,13 @@ def run(args) -> dict:
 
         trace = resp.get("trace") or []
         stage_ms = {s["stage"]: stage_ms_get(trace, s["stage"]) for s in trace}
+        rules = [r_ for st in trace for r_ in (st.get("data", {}) or {}).get("rules", [])]
+        loops = sum(1 for st in trace if st.get("title") == "Looping back")
+        findings = [f for st in trace for f in (st.get("data", {}) or {}).get("findings", [])]
         r = {"i": i, "area": case["area"], "shape": case["shape"], "text": case["text"],
              "parse": resp.get("parse"), "actions": resp.get("actions"), "message": resp.get("message", "")[:160],
              "first_ms": first_ms, "settle_ms": settle_ms, "llm_ms": stage_ms.get("llm", 0), "rule_ms": stage_ms.get("rule", 0),
+             "stage_ms": stage_ms, "rules": rules, "loops": loops, "findings": findings,
              "corrections": resp.get("corrections"), "verify": verify,
              "ok_quick": ok_quick, "ok_settled": ok_settled, "problems": problems_settled or problems_quick,
              "counts": counts_settled,
@@ -587,7 +591,8 @@ def write_report(data: dict, path: str, args) -> None:
         "— accuracy alone doesn't distinguish missing something asked for from producing something extra",
         f"- **Time to first result:** p50 {_pct([r['first_ms'] for r in R], .5)/1000:.1f} s · p95 {_pct([r['first_ms'] for r in R], .95)/1000:.1f} s  ·  "
         f"**time to settled:** p50 {_pct([r['settle_ms'] for r in R], .5)/1000:.1f} s · p95 {_pct([r['settle_ms'] for r in R], .95)/1000:.1f} s",
-        f"- Parse paths: " + ", ".join(f"{p} {sum(1 for r in R if r['parse']==p)}" for p in ("rule", "hybrid", "llm", "error")),
+        f"- Parse paths: " + ", ".join(f"{p} {sum(1 for r in R if r['parse']==p)}"
+                                       for p in sorted({r["parse"] or "-" for r in R})),
         "",
         "## By area",
         "",
@@ -601,7 +606,7 @@ def write_report(data: dict, path: str, args) -> None:
                      f"{rec:.0%} | {prec:.0%} | "
                      f"{_pct([r['first_ms'] for r in xs], .5)/1000:.1f} s | {_pct([r['first_ms'] for r in xs], .95)/1000:.1f} s | {_pct([r['settle_ms'] for r in xs], .5)/1000:.1f} s |")
     lines += ["", "## By parse path", "", "| Path | n | quick ✓ | settled ✓ | recall | precision | first p50 | first p95 | LLM ms p50 |", "|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
-    for p in ("rule", "hybrid", "llm", "error"):
+    for p in sorted({r["parse"] or "-" for r in R}):
         xs = [r for r in R if r["parse"] == p]
         if xs:
             rec, prec, _c = _recall_precision(xs)
@@ -620,6 +625,29 @@ def write_report(data: dict, path: str, args) -> None:
         lines.append(f"  - fixed: “{r['text']}” → {r['verify']}")
     for r in broke[:5]:
         lines.append(f"  - broke: “{r['text']}” → {r['verify']}")
+    stages = ("stt", "vocab", "rule", "llm", "validate", "execute", "verify")
+    lines += ["", "## Engine stages (latency; a slow or misbehaving stage is fixed in ITS module)", "",
+              "| Stage | ran on | ms p50 | ms p95 |", "|---|---:|---:|---:|"]
+    for st in stages:
+        xs = [r["stage_ms"][st] for r in R if r.get("stage_ms", {}).get(st)]
+        if xs:
+            lines.append(f"| {st} | {len(xs)}/{n} | {int(_pct(xs, .5))} | {int(_pct(xs, .95))} |")
+    rule_counts = {}
+    for r in R:
+        for rule in r.get("rules", []):
+            rule_counts[rule] = rule_counts.get(rule, 0) + 1
+    if rule_counts:
+        lines += ["", "## Named-rule fixes applied", "", "| Rule | times |", "|---|---:|"]
+        for rule, c in sorted(rule_counts.items(), key=lambda kv: -kv[1]):
+            lines.append(f"| {rule} | {c} |")
+    looped = [r for r in R if r.get("loops")]
+    found = [f for r in R for f in r.get("findings", [])]
+    lines += ["", "## Cross-check (step 6)", "",
+              f"- Findings: {len(found)} ({', '.join(sorted(set(found))) or 'none'}) across "
+              f"{sum(1 for r in R if r.get('findings'))} command(s); loop-backs on {len(looped)} "
+              f"command(s) ({sum(r['loops'] for r in looped)} re-entries total).",
+              f"- Budget exhausted (answer flagged as unsure): "
+              f"{sum(1 for r in R if 'not sure I caught every part' in (r['message'] or ''))}."]
     lines += ["", "## By shape (failures first)", "", "| Shape | n | settled ✓ | first p50 |", "|---|---:|---:|---:|"]
     shapes = sorted({r["shape"] for r in R}, key=lambda s: (sum(r["ok_settled"] for r in R if r["shape"] == s) / max(1, sum(1 for r in R if r["shape"] == s))))
     for s in shapes:

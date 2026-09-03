@@ -375,7 +375,8 @@ def run(state: EngineState, cfg) -> EngineState:
     repaired = len(state.fixes) - fixes_before
     if state.trace and repaired:
         state.trace.step(VALIDATE, "Tidied", f"{repaired} repair(s): "
-                         + "; ".join(f.human() for f in state.fixes[fixes_before:]))
+                         + "; ".join(f.human() for f in state.fixes[fixes_before:]),
+                         rules=[f.rule for f in state.fixes[fixes_before:]])
     return state
 
 
@@ -430,7 +431,8 @@ def run_objects(state: EngineState, cfg) -> EngineState:
     applied = state.fixes[fixes_before:]
     if state.trace and applied:
         state.trace.step(VALIDATE, "Sanity fixes",
-                         "; ".join(f.human() for f in applied))
+                         "; ".join(f.human() for f in applied),
+                         rules=[f.rule for f in applied])
     return state
 
 
