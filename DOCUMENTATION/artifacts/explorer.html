@@ -841,56 +841,65 @@ series_id   NULL
 
   batch: {
     tag:"more than one at a time", title:"Several things at once", z:[420,300,1.6],
-    sum:`<p>One recording, one transcript &mdash; and possibly several records. A sentence can hold two events, a list of things to buy, or several unrelated commands at once.</p>
-    <p class="figs">each record is written, checked and remembered on its own</p>`,
-    more:`<p>The recording becomes one transcript. Everything after that decides how many records it
-    describes, and three situations are handled differently.</p>
+    sum:`<p>One recording becomes one transcript, and a transcript can describe several records &mdash; events, tasks, or a mixture. What differs is who works it out.</p>
+    <p class="figs">each record is created, checked and remembered on its own</p>`,
+    more:`<p>Three shapes, and they take three different routes. These are the actual results:</p>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Said</th><th>Route</th><th>Produces</th></tr></thead>
+      <tbody>
+        <tr><td class="m">an event and a task</td><td>rules</td><td>two actions</td></tr>
+        <tr><td class="m">two events</td><td>the model</td><td>two actions</td></tr>
+        <tr><td class="m">a list of things to buy</td><td>rules, then the model</td><td>one action, several titles</td></tr>
+      </tbody>
+    </table></div>
 
-    <p><strong>Two events in one sentence.</strong> The rule parser holds one set of slots, so
-    "lunch at noon and coffee at nine" is handed to the model whole rather than answered halfway.
-    Two clock times in one span also multiply confidence by 0.70, since a second time usually means
-    a second event.</p>
+    <p><strong>An event and a task travel the fast path together.</strong> They are different
+    actions with different slots, so both fit at once and the rules answer in a tenth of a second
+    &mdash; then tell the client to refresh both surfaces.</p>
 
-    <p><strong>A list inside one task.</strong> "buy chicken and rice" becomes two tasks with the
-    verb shared out. The work is in the conjunctions that join rather than separate &mdash; "a gift
-    for mum and dad" is one errand, "fish and chips" is one thing to buy.</p>
+    <p><strong>Two events do not.</strong> The rules hold one set of event slots, so a second one
+    has nowhere to go; rather than fill half of them the sentence goes to the model whole. Two
+    clock times in one span also lower confidence, since a second time usually means a second
+    event.</p>
 
-    <p><strong>Several commands at once.</strong> Sent bracketed &mdash;
-    <code>[gym tomorrow at 7am] [call the dentist at four]</code> &mdash; and parsed apart, so each
-    gets its own slots and its own score.</p>
+    <p><strong>A list stays one action.</strong> "buy milk and bread" produces a single create with
+    several titles rather than several creates, because the difficulty is in the conjunctions that
+    join rather than separate &mdash; "a gift for mum and dad" is one errand.</p>
 
-    <p>Each record is created, checked and remembered separately, and the replies join into one
-    answer: named while there are few, counted past three. If the third of four fails, the first
-    two stand and the fourth is still attempted.</p>`
+    <p>Several unrelated commands can also be sent bracketed &mdash;
+    <code>[gym tomorrow at 7am] [call the dentist at four]</code> &mdash; and are parsed apart, so
+    each gets its own slots and score. The replies join into one answer: named while there are
+    few, counted past three. If the third of four fails, the first two stand and the fourth is
+    still attempted.</p>`
   },
 
   queue: {
     tag:"speaking to nothing", title:"When the host is away", z:[820,300,1.6],
-    sum:`<p>Speak while the host is unreachable and the recording is kept. It is transcribed and understood on reconnect, against the calendar as it is then.</p>
+    sum:`<p>Three queues, at two different points. A device holds what it cannot send; the host holds what it cannot yet understand.</p>
     <p class="figs">sound is kept &#183; meaning is decided later</p>`,
-    more:`<p>What is stored is the sound, not a decision. The command is transcribed and understood when
-    it finally runs, against the calendar as it is then &mdash; an instruction is a thing you
-    meant, not a diff computed an hour ago.</p>
-
-    <p>Draining the queue has three outcomes:</p>
-    <table>
-      <thead><tr><th>Situation</th><th>Result</th></tr></thead>
+    more:`<div class="tblwrap"><table>
+      <thead><tr><th>Queue</th><th>Holds</th><th>Drains when</th></tr></thead>
       <tbody>
-        <tr><td class="m">the host is away again</td><td>stop, and keep everything for next time</td></tr>
-        <tr><td class="m">the record changed meanwhile</td><td>the host's version stands, and you are told</td></tr>
-        <tr><td class="m">the change no longer applies</td><td>dropped, so the rest of the queue moves</td></tr>
+        <tr><td class="m">on a device</td><td>the recording you spoke</td><td>the host answers again</td></tr>
+        <tr><td class="m">on a device</td><td>edits made while away</td><td>the host answers again</td></tr>
+        <tr><td class="m">on the host</td><td>a transcript it could not parse</td><td>the language model is back</td></tr>
       </tbody>
-    </table>
-    <p>The third keeps the queue flowing: a change to something already deleted can never succeed,
-    and holding it at the front would stall everything behind it.</p>
+    </table></div>
 
-    <p>A task created offline carries a placeholder id, so a "tick it off" queued behind it points
-    at something the host has never seen. When the create lands, the host's real id is written back
-    over every queued change still using the placeholder.</p>
+    <p>The third is the one people do not expect. A command can arrive perfectly well while the
+    language model is down, so the transcript is parked and retried every half minute, up to five
+    times. It is a different failure from the phone being unable to reach the host, and it is
+    handled in a different place.</p>
 
-    <p>Flushes are guarded, since reconnecting, opening the app and the poll loop can all ask at
-    once and replaying a recording twice would create the event twice. Results arrive as a
-    notification, so a calendar that changes from something said an hour ago says so.</p>`
+    <p>What a device stores is the sound, not a decision. The command is understood when it
+    finally runs, against the calendar as it is then &mdash; an instruction is a thing you meant,
+    not a diff computed an hour ago.</p>
+
+    <p>Draining the edit queue has three outcomes: the host is away again, so everything is kept;
+    the record changed meanwhile, so the host's version stands and you are told; or the change no
+    longer applies, so it is dropped and the rest of the queue moves. A task created offline
+    carries a placeholder id, and when the create lands the host's real id is written back over
+    every queued change still using it.</p>`
   },
 
   bench: {
