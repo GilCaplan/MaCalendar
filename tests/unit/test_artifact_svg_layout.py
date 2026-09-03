@@ -40,6 +40,22 @@ def _width(label: str, size: float) -> float:
     return plain * size * GLYPH
 
 
+def _inherited_anchor(svg: str, at: int) -> str:
+    """The nearest enclosing group's text-anchor, or "start"."""
+    depth = 0
+    for m in reversed(list(re.finditer(r"<g\b([^>]*)>|</g>", svg[:at]))):
+        if m.group(0) == "</g>":
+            depth += 1
+            continue
+        if depth:
+            depth -= 1
+            continue
+        found = dict(_ATTR.findall(m.group(1) or "")).get("text-anchor")
+        if found:
+            return found
+    return "start"
+
+
 def _boxes(svg: str):
     for match in _TEXT.finditer(svg):
         attrs, inner = match.group(1), match.group(2)
@@ -57,7 +73,11 @@ def _boxes(svg: str):
             continue
         size = float(a.get("font-size", 12) or 12)
         w = _width(label, size)
-        anchor = a.get("text-anchor", "start")
+        # text-anchor is inheritable, and these drawings set it on a <g> and
+        # let the labels inside pick it up. Reading only the element's own
+        # attribute measured centred text from its left edge, which put the
+        # box in the wrong place and hid real collisions.
+        anchor = a.get("text-anchor") or _inherited_anchor(svg, match.start())
         left = x - w if anchor == "end" else x - w / 2 if anchor == "middle" else x
         yield y, left, left + w, label, size
 

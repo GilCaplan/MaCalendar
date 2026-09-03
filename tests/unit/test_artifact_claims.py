@@ -22,6 +22,7 @@ the run the artifact quotes, so at least the citation cannot rot silently.
 """
 from __future__ import annotations
 
+import os
 import pathlib
 import re
 
@@ -271,6 +272,58 @@ def test_no_page_quotes_a_test_count(all_prose):
         assert not found, (
             f"{name} quotes a test count ({found}). Say \"tests\" — the number "
             "changes with every commit and nobody reads it as information.")
+
+
+def test_the_models_are_placed_in_the_right_processes(all_prose):
+    """Two of the three models load inside the assistant, not the model server.
+
+    A reader looked at the drawing and concluded the separate box held all
+    three, which is a reasonable thing to conclude when it is the only box with
+    a model named in it. It holds one. spaCy loads in the rule parser and
+    Whisper in the API — both inside the process that does the deciding — and
+    the drawing now says so. If that ever stops being true the pages have to
+    change with it.
+    """
+    parser = (ROOT / "assistant" / "intent" / "rule_parser.py").read_text()
+    server = (ROOT / "assistant" / "api" / "server.py").read_text()
+    assert "spacy.load" in parser, "spaCy no longer loads in the rule parser"
+    assert "WhisperSTT" in server, "the API no longer loads a speech model"
+
+    # Only the page that draws the two as separate boxes has to label them:
+    # a page discussing the model in prose is not making the claim visually,
+    # and demanding a phrase of it would be policing style rather than fact.
+    for name, text in all_prose.items():
+        if "THE ASSISTANT" not in text:
+            continue
+        assert "its own process" in text, (
+            f"{name} draws the language model beside the assistant without "
+            "saying it is a separate process — the distinction a reader got wrong")
+        assert "Whisper" in text and "spaCy" in text, (
+            f"{name} claims three local models but names only one, which is how "
+            "the other two came to look like they lived in the model server")
+
+
+def test_the_table_and_column_counts_are_current(all_prose):
+    """Quoted as words on the page, so they cannot be caught by a number scan."""
+    import sqlite3
+    db = pathlib.Path(os.path.expanduser("~/.assistant_tools/calendar.db"))
+    if not db.exists():
+        pytest.skip("no calendar database on this machine (CI)")
+    c = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    tables = len(list(c.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")))
+    events = len(list(c.execute("PRAGMA table_info(events)")))
+    todos = len(list(c.execute("PRAGMA table_info(todos)")))
+
+    words = {16: "sixteen", 19: "nineteen", 21: "twenty-one"}
+    for name, text in all_prose.items():
+        if "tables" not in text:
+            continue
+        assert words.get(tables, str(tables)) in text or str(tables) in text, (
+            f"{name}: the database has {tables} tables")
+        if "EVENT ROW" in text:
+            assert f"{events} COLUMNS" in text, f"{name}: an event row has {events} columns"
+            assert words.get(todos, str(todos)) in text, f"{name}: a task row has {todos} columns"
 
 
 def test_measured_claims_cite_a_run_that_still_exists(prose):

@@ -74,6 +74,7 @@ Running list of user-reported issues and feature requests, with status. Update w
 | 67 | **Misheard names could never be learned.** Every failed name was already in the word list, but the matcher compared letters while speech fails phonetically, so no correction was made, none was learned, and the same command failed forever. A sound-code gate recovers 5 of 6 on first encounter, up from 1 | done 2026-09-03 | `vocab.phonetic_key`, `tests/unit/test_vocab_phonetic.py` |
 | 68 | Third explainer: an explorable drawing rather than 6,600 words of prose | in review | `DOCUMENTATION/artifacts/explorer.html` |
 | 69 | Explorer: the trace log opened the review panel's text (both carried the same panel id); storage panel too long to read; nothing described how several events in one sentence, or a queue of recordings, are handled | done 2026-09-03 | `DOCUMENTATION/artifacts/explorer.html` |
+| 70 | Explorer named the deciding process "the brain" and the model host "model server", so a reader concluded the server held all three models. It holds one — spaCy and Whisper load inside the deciding process, which the drawing hid | done 2026-09-03 | `explorer.html`, `test_artifact_claims.py` |
 
 ## How we are working right now
 

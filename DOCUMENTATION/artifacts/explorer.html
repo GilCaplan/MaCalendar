@@ -95,7 +95,8 @@
              padding:10px 12px; overflow-x:auto; margin:0 0 14px;}
   #pbody pre code{background:none; border:0; padding:0; font-size:12px; line-height:1.65;
                   white-space:pre; display:block;}
-  #pbody svg{max-width:100%; height:auto; display:block; margin:2px 0 14px;}
+  #pbody svg{width:100%; max-width:430px; height:auto; display:block; margin:2px 0 14px;}
+  #pbody pre{max-width:560px;}
   #pbody svg text{font-family:'IBM Plex Mono',ui-monospace,monospace; fill:var(--ink);}
   #pbody figcaption{font:400 11.5px/1.5 'IBM Plex Mono',monospace; color:var(--muted);
                     margin:-8px 0 14px;}
@@ -173,18 +174,26 @@
           fill="var(--panel)" stroke="var(--line)" stroke-width="1.5"/>
 
     <!-- model server -->
-    <g data-panel="models" role="button" tabindex="0" aria-label="The model server: Llama 3.1 8B, four-bit, pinned in memory, 5.8 gigabytes resident.">
+    <g data-panel="models" role="button" tabindex="0" aria-label="The language model: Llama 3.1 8B in its own process, pinned in memory, answering only when the assistant asks it something.">
       <rect class="frame" x="104" y="176" width="104" height="124" rx="6" fill="var(--panel)" stroke="var(--model)" stroke-width="1.5"/>
-      <text x="156" y="198" text-anchor="middle" font-size="11" font-weight="600" fill="var(--model)">model server</text>
-      <text x="156" y="222" text-anchor="middle" font-size="9.5" fill="var(--muted)">Llama 3.1 8B</text>
-      <text x="156" y="250" text-anchor="middle" font-size="9.5" fill="var(--muted)">5.8 GB resident</text>
+      <text x="156" y="196" text-anchor="middle" font-size="11" font-weight="600" fill="var(--model)">language model</text>
+      <text x="156" y="212" text-anchor="middle" font-size="8" fill="var(--muted)">its own process</text>
+      <text x="156" y="238" text-anchor="middle" font-size="9.5" fill="var(--muted)">Llama 3.1 8B</text>
+      <text x="156" y="256" text-anchor="middle" font-size="9.5" fill="var(--muted)">5.8 GB resident</text>
+      <text x="156" y="280" text-anchor="middle" font-size="8" fill="var(--muted)">answers when asked</text>
     </g>
 
     <!-- THE BRAIN frame + header -->
     <rect x="250" y="128" width="205" height="256" rx="8" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="2"/>
-    <g data-panel="brain" role="button" tabindex="0" aria-label="The brain: the one process that parses and executes every command from both devices.">
-      <rect class="frame" x="250" y="128" width="205" height="42" rx="8" fill="transparent" stroke="transparent"/>
-      <text x="352" y="150" text-anchor="middle" font-size="13.5" font-weight="600" letter-spacing="1.4" fill="var(--amber)">THE BRAIN</text>
+    <g data-panel="brain" role="button" tabindex="0" aria-label="The assistant: one process that hears, understands, checks and executes every command from every surface. Two of the three models load inside it.">
+      <rect class="frame" x="250" y="120" width="205" height="52" rx="8" fill="transparent" stroke="transparent"/>
+      <text x="352" y="140" text-anchor="middle" font-size="13" font-weight="600" letter-spacing="1.2" fill="var(--amber)">THE ASSISTANT</text>
+      <!-- two of the three models live in HERE, not in the model server; the
+           drawing hid that, and a reader assumed the server held all three -->
+      <g font-size="7" fill="var(--muted)" text-anchor="middle">
+        <text x="308" y="158.5" text-anchor="middle" fill="var(--cold)">Whisper</text>
+        <text x="396" y="158.5" text-anchor="middle" fill="var(--cold)">spaCy</text>
+      </g>
     </g>
 
     <!-- pipeline chain, steps 2..7 -->
@@ -220,9 +229,8 @@
 
     <!-- route <-> model server -->
     <line x1="248" y1="256" x2="210" y2="256" stroke="var(--muted)" marker-start="url(#mi)" marker-end="url(#mi)"/>
-    <text x="229" y="241" text-anchor="middle" font-size="8" fill="var(--muted)">when</text>
-      <text x="229" y="252" text-anchor="middle" font-size="8" fill="var(--muted)">unsure</text>
-    <text x="229" y="272" text-anchor="middle" font-size="8" fill="var(--muted)">7.8 s</text>
+    <text x="229" y="241" text-anchor="middle" font-size="8" fill="var(--muted)">asks it</text>
+      <text x="229" y="272" text-anchor="middle" font-size="8" fill="var(--muted)">~8 s</text>
 
     <!-- answer to calendar window -->
     <line x1="457" y1="150" x2="474" y2="150" stroke="var(--muted)" marker-end="url(#mi)"/>
@@ -285,7 +293,7 @@
     </g>
     <!-- tails -->
     <line x1="540" y1="404" x2="548" y2="302" stroke="var(--muted)" stroke-dasharray="3 3" marker-end="url(#mi)"/>
-    <text x="576" y="360" font-size="8" fill="var(--muted)">reads</text>
+    <text x="576" y="360" font-size="8" fill="var(--muted)">panel reads</text>
 
     <!-- three files on disk -->
     <g data-panel="write" role="button" tabindex="0" aria-label="The calendar database file: the single source of truth.">
