@@ -243,7 +243,14 @@ class VocabStore:
 
     # ---------------------------------------------------------- mutators
 
-    def add_word(self, word: str, aliases: list[str] | None = None) -> VocabEntry:
+    def add_word(
+        self,
+        word: str,
+        aliases: list[str] | None = None,
+        *,
+        label: str = "",
+        expands_to: str = "",
+    ) -> VocabEntry:
         word = word.strip()
         if not word:
             raise ValueError("Word cannot be empty")
@@ -255,6 +262,47 @@ class VocabStore:
                 self._entries.append(entry)
             for a in aliases or []:
                 self._add_alias_to(entry, a)
+            # Only set when given, so re-adding an existing word to add an
+            # alias does not blank a label it already carried.
+            if label.strip():
+                entry.label = label.strip()
+            if expands_to.strip():
+                entry.expands_to = expands_to.strip()
+            self._save()
+            return entry
+
+    def update_word(
+        self,
+        word: str,
+        *,
+        label: "str | None" = None,
+        expands_to: "str | None" = None,
+        aliases: "list[str] | None" = None,
+    ) -> "VocabEntry | None":
+        """Edit an existing word. Returns None if there is no such word.
+
+        Only the fields passed are touched, so a caller that knows about
+        labels but not acronyms cannot wipe an acronym by omitting it. Passing
+        an empty string clears a field — which is different from omitting it,
+        and is how the settings screens offer "remove this label".
+
+        `aliases`, when given, replaces the list outright: the editing screens
+        show all of them at once, so a partial update would silently drop
+        whatever the screen had not been told about.
+        """
+        self._load()
+        with self._lock:
+            entry = self._find(word)
+            if entry is None:
+                return None
+            if label is not None:
+                entry.label = label.strip()
+            if expands_to is not None:
+                entry.expands_to = expands_to.strip()
+            if aliases is not None:
+                entry.aliases = []
+                for alias in aliases:
+                    self._add_alias_to(entry, alias)
             self._save()
             return entry
 

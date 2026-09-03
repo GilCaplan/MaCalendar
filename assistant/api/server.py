@@ -1462,8 +1462,37 @@ def create_app() -> Flask:
         if not word:
             return jsonify({"error": "Missing 'word'", "code": 400}), 400
         aliases = [str(a) for a in body.get("aliases", []) if str(a).strip()]
-        entry = get_vocab().add_word(word, aliases)
+        entry = get_vocab().add_word(
+            word, aliases,
+            label=str(body.get("label", "") or ""),
+            expands_to=str(body.get("expands_to", "") or ""),
+        )
         return jsonify(entry.to_dict()), 201
+
+    @app.patch("/vocab/<path:word>")
+    def vocab_update(word: str):
+        """Edit a word the settings screens are showing.
+
+        Only the fields present in the body are changed; an empty string
+        clears one. That distinction is what lets a screen offer "remove this
+        label" without a second endpoint, and stops a client that predates a
+        field from wiping it by omission.
+        """
+        from assistant.stt.vocab import get_vocab
+        body = request.get_json(silent=True) or {}
+        fields = {}
+        for key in ("label", "expands_to"):
+            if key in body:
+                fields[key] = str(body.get(key) or "")
+        if "aliases" in body:
+            fields["aliases"] = [str(a).strip() for a in body.get("aliases") or []
+                                 if str(a).strip()]
+        if not fields:
+            return jsonify({"error": "Nothing to change", "code": 400}), 400
+        entry = get_vocab().update_word(word, **fields)
+        if entry is None:
+            return jsonify({"error": f"No such word: {word}", "code": 404}), 404
+        return jsonify(entry.to_dict())
 
     @app.post("/vocab/alias")
     def vocab_alias():

@@ -214,6 +214,37 @@ struct VocabWord: Codable, Identifiable, Equatable {
     let word: String
     let aliases: [String]
     let hits: Int
+    /// What this word implies about a task or event — "Coursework" for a
+    /// course name. Used to tag tasks and colour events.
+    var label: String = ""
+    /// What the shorthand stands for. Never substituted into your text; it is
+    /// context for labelling and for the model, so the words stay yours.
+    var expandsTo: String = ""
+
+    enum CodingKeys: String, CodingKey {
+        case word, aliases, hits, label
+        case expandsTo = "expands_to"
+    }
+
+    // Both fields arrived after the first 374 words were saved, so most
+    // entries on disk have neither and a strict decode would fail on them.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        word      = try c.decode(String.self, forKey: .word)
+        aliases   = try c.decodeIfPresent([String].self, forKey: .aliases) ?? []
+        hits      = try c.decodeIfPresent(Int.self, forKey: .hits) ?? 0
+        label     = try c.decodeIfPresent(String.self, forKey: .label) ?? ""
+        expandsTo = try c.decodeIfPresent(String.self, forKey: .expandsTo) ?? ""
+    }
+
+    init(word: String, aliases: [String] = [], hits: Int = 0,
+         label: String = "", expandsTo: String = "") {
+        self.word = word; self.aliases = aliases; self.hits = hits
+        self.label = label; self.expandsTo = expandsTo
+    }
+
+    /// True when the word does more than fix a mishearing.
+    var carriesMeaning: Bool { !label.isEmpty || !expandsTo.isEmpty }
 }
 
 struct VocabRecent: Codable, Identifiable {

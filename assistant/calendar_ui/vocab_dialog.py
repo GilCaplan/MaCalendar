@@ -13,9 +13,9 @@ import json
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QCheckBox, QDialog, QDoubleSpinBox, QFormLayout, QHBoxLayout, QLabel,
-    QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPushButton,
-    QTabWidget, QTextEdit, QVBoxLayout, QWidget,
+    QCheckBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFormLayout,
+    QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
+    QPushButton, QTabWidget, QTextEdit, QVBoxLayout, QWidget,
 )
 
 from assistant.calendar_ui import icons
@@ -105,8 +105,17 @@ class VocabDialog(QDialog):
         hint.setObjectName("muted")
         lay.addWidget(hint)
 
-        # word list
+        # search — 374 words is well past the point of scrolling for one
+        self._search = QLineEdit()
+        self._search.setPlaceholderText("Search words, labels and expansions")
+        self._search.setClearButtonEnabled(True)
+        self._search.textChanged.connect(lambda _t: self._refresh_vocab())
+        lay.addWidget(self._search)
+
+        # word list — double-click opens what the word means
         self._list = QListWidget()
+        self._list.itemDoubleClicked.connect(self._edit_word)
+        self._list.setToolTip("Double-click a word to set what it means")
         lay.addWidget(self._list, 1)
 
         # add word
@@ -156,8 +165,20 @@ class VocabDialog(QDialog):
 
     def _refresh_vocab(self) -> None:
         self._list.clear()
+        needle = (self._search.text() if hasattr(self, "_search") else "").strip().lower()
         for e in self._vocab.entries:
+            if needle and needle not in " ".join(
+                [e.word, getattr(e, "label", "") or "", getattr(e, "expands_to", "") or "",
+                 " ".join(e.aliases)]
+            ).lower():
+                continue
             text = e.word
+            # A word can do three separate things; showing which is which is
+            # the whole point of the list.
+            if getattr(e, "label", ""):
+                text += f"   [{e.label}]"
+            if getattr(e, "expands_to", ""):
+                text += f"   = {e.expands_to}"
             if e.aliases:
                 text += "   ← heard as: " + ", ".join(e.aliases)
             if e.hits:
@@ -186,6 +207,65 @@ class VocabDialog(QDialog):
             learn_aliases=self._learn_cb.isChecked(),
             threshold=self._thr.value(),
         )
+
+    def _edit_word(self, item: QListWidgetItem) -> None:
+        """What a word means, and what it is short for.
+
+        Both fields change how commands are interpreted — a label decides how
+        a task is tagged — and until now they could only be set by editing a
+        JSON file. A wrong label has no visible symptom beyond tasks quietly
+        filing themselves in the wrong place, which is exactly the kind of
+        thing that needs to be visible.
+        """
+        word = item.data(Qt.ItemDataRole.UserRole)
+        entry = next((e for e in self._vocab.entries if e.word == word), None)
+        if entry is None:
+            return
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(word)
+        outer = QVBoxLayout(dlg)
+        form = QFormLayout()
+
+        label = QLineEdit(getattr(entry, "label", "") or "")
+        label.setPlaceholderText("Coursework, Groceries, Errands…")
+        form.addRow("Means", label)
+
+        expands = QLineEdit(getattr(entry, "expands_to", "") or "")
+        expands.setPlaceholderText("What the shorthand stands for")
+        form.addRow("Short for", expands)
+
+        aliases = QLineEdit(", ".join(entry.aliases))
+        aliases.setPlaceholderText("Misheard spellings, comma separated")
+        form.addRow("Heard as", aliases)
+        outer.addLayout(form)
+
+        hint = QLabel(
+            f"A task mentioning “{word}” gets the tag above. An expansion is "
+            "never substituted into your words — the assistant is only told "
+            "what it means."
+        )
+        hint.setObjectName("muted")
+        hint.setWordWrap(True)
+        outer.addWidget(hint)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        outer.addWidget(buttons)
+
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        self._vocab.update_word(
+            word,
+            label=label.text().strip(),
+            expands_to=expands.text().strip(),
+            aliases=[a.strip() for a in aliases.text().split(",") if a.strip()],
+        )
+        self._refresh_vocab()
 
     def _add_word(self) -> None:
         word = self._new_word.text().strip()

@@ -757,11 +757,31 @@ class APIClient: ObservableObject {
         try decode(VocabState.self, from: try await request("/vocab"))
     }
 
-    func vocabAddWord(_ word: String, aliases: [String] = []) async throws {
-        _ = try await request("/vocab", method: "POST", body: ["word": word, "aliases": aliases])
+    func vocabAddWord(_ word: String, aliases: [String] = [],
+                      label: String = "", expandsTo: String = "") async throws {
+        var body: [String: Any] = ["word": word, "aliases": aliases]
+        if !label.isEmpty     { body["label"]      = label }
+        if !expandsTo.isEmpty { body["expands_to"] = expandsTo }
+        _ = try await request("/vocab", method: "POST", body: body)
     }
 
     /// Teach a correction: STT heard `wrong`, you meant `right`.
+    /// Change a word the settings screen is showing.
+    ///
+    /// Only the fields passed are sent, and the server changes only what it
+    /// receives — so clearing a label means sending an empty string, which is
+    /// deliberately different from not sending it at all.
+    func vocabUpdate(word: String, label: String? = nil,
+                     expandsTo: String? = nil, aliases: [String]? = nil) async throws {
+        var fields: [String: Any] = [:]
+        if let label     { fields["label"]      = label }
+        if let expandsTo { fields["expands_to"] = expandsTo }
+        if let aliases   { fields["aliases"]    = aliases }
+        guard !fields.isEmpty else { return }
+        let path = "/vocab/\(word.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? word)"
+        _ = try await request(path, method: "PATCH", body: fields)
+    }
+
     func vocabTeach(wrong: String, right: String) async throws {
         _ = try await request("/vocab/alias", method: "POST", body: ["wrong": wrong, "right": right])
     }

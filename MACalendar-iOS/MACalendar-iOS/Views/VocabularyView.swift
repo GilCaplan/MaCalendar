@@ -19,7 +19,27 @@ struct VocabularyView: View {
     @State private var showFix = false
     @FocusState private var wordFocused: Bool
     @State private var showOnboarding = false
+    @State private var wordSearch = ""
+    @State private var editing: VocabWord? = nil
+    @State private var showClearAll = false
     @State private var showImport = false
+
+    /// The words to show: everything, or what the search box matches.
+    ///
+    /// Matches the word, its label and its expansion, because with a few
+    /// hundred entries you are as likely to be looking for "everything tagged
+    /// Coursework" as for one particular word.
+    private var visibleWords: [VocabWord] {
+        let all = state?.words ?? []
+        let needle = wordSearch.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !needle.isEmpty else { return all }
+        return all.filter {
+            $0.word.lowercased().contains(needle)
+            || $0.label.lowercased().contains(needle)
+            || $0.expandsTo.lowercased().contains(needle)
+            || $0.aliases.contains { $0.lowercased().contains(needle) }
+        }
+    }
 
     var body: some View {
         List {
@@ -94,21 +114,40 @@ struct VocabularyView: View {
                     .disabled(newWord.trimmingCharacters(in: .whitespaces).isEmpty)
                     .tint(settings.accentColor)
                 }
-                if let words = state?.words, !words.isEmpty {
-                    ForEach(words) { w in
-                        VStack(alignment: .leading, spacing: 3) {
-                            HStack {
-                                Text(w.word).font(.body.weight(.medium))
-                                Spacer()
-                                if w.hits > 0 {
-                                    Text("\(w.hits)×").font(.caption2).foregroundColor(.secondary)
+                if !visibleWords.isEmpty {
+                    ForEach(visibleWords) { w in
+                        Button { editing = w } label: {
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack(spacing: 6) {
+                                    Text(w.word).font(.body.weight(.medium))
+                                        .foregroundColor(.primary)
+                                    if !w.label.isEmpty {
+                                        Text(w.label)
+                                            .font(.caption2.weight(.medium))
+                                            .padding(.horizontal, 6).padding(.vertical, 1)
+                                            .background(Capsule().fill(settings.accentColor.opacity(0.16)))
+                                            .foregroundColor(settings.accentColor)
+                                    }
+                                    Spacer()
+                                    if w.hits > 0 {
+                                        Text("\(w.hits)×").font(.caption2).foregroundColor(.secondary)
+                                    }
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption2).foregroundColor(.secondary)
+                                }
+                                // The three things a word can do, each said in
+                                // the words the feature uses elsewhere.
+                                if !w.expandsTo.isEmpty {
+                                    Text("short for \(w.expandsTo)")
+                                        .font(.caption).foregroundColor(.secondary)
+                                }
+                                if !w.aliases.isEmpty {
+                                    Text("heard as: " + w.aliases.joined(separator: ", "))
+                                        .font(.caption).foregroundColor(.secondary)
                                 }
                             }
-                            if !w.aliases.isEmpty {
-                                Text("heard as: " + w.aliases.joined(separator: ", "))
-                                    .font(.caption).foregroundColor(.secondary)
-                            }
                         }
+                        .buttonStyle(.plain)
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
                                 Task { try? await api.vocabDelete(word: w.word); await load() }
@@ -116,10 +155,24 @@ struct VocabularyView: View {
                         }
                     }
                 } else if !loading {
-                    Text("No words yet. Add names of people, places, or Hebrew words the assistant keeps getting wrong.")
+                    Text(wordSearch.isEmpty
+                         ? "No words yet. Add names of people, places, or words the assistant keeps getting wrong."
+                         : "No word matches “\(wordSearch)”.")
                         .font(.footnote).foregroundColor(.secondary)
                 }
-            } header: { Text("Your words (\(state?.words.count ?? 0))") }
+            } header: {
+                HStack {
+                    Text("Your words (\(state?.words.count ?? 0))")
+                    Spacer()
+                    if (state?.words.count ?? 0) > 12 {
+                        Button(role: .destructive) { showClearAll = true } label: {
+                            Text("Clear all").font(.caption)
+                        }
+                    }
+                }
+            } footer: {
+                Text("Tap a word to set what it means, or what it is short for.")
+            }
 
             Section {
                 if let recent = state?.recent, !recent.isEmpty {
@@ -136,8 +189,29 @@ struct VocabularyView: View {
             } header: { Text("Recent transcripts — tap a word to fix it") }
         }
         .navigationTitle("Vocabulary")
+        .searchable(text: $wordSearch, prompt: "Search your words")
         .refreshable { await load() }
         .task { await load() }
+        .sheet(item: $editing) { word in
+            NavigationStack {
+                VocabWordEditor(word: word) { label, expandsTo, aliases in
+                    try? await api.vocabUpdate(word: word.word, label: label,
+                                               expandsTo: expandsTo, aliases: aliases)
+                    await load()
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .alert("Clear the whole word list?", isPresented: $showClearAll) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete \(state?.words.count ?? 0) words", role: .destructive) {
+                Task { await clearAllWords() }
+            }
+        } message: {
+            Text("This removes every word, along with its corrections and labels. "
+                 + "It cannot be undone, and the assistant will start mishearing "
+                 + "names it currently gets right.")
+        }
         .overlay { if loading && state == nil { ProgressView() } }
         .sheet(isPresented: $showImport, onDismiss: { Task { await load() } }) {
             VocabImportView()
@@ -156,6 +230,16 @@ struct VocabularyView: View {
                 .presentationDetents([.height(260)])
             }
         }
+    }
+
+    /// Delete every word, one call each — there is no bulk-delete endpoint,
+    /// and inventing one for a button that should be pressed approximately
+    /// never is the wrong trade.
+    private func clearAllWords() async {
+        for word in state?.words ?? [] {
+            try? await api.vocabDelete(word: word.word)
+        }
+        await load()
     }
 
     private func load() async {
@@ -499,5 +583,118 @@ struct ThinkingView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.secondarySystemBackground))
         .cornerRadius(10)
+    }
+}
+
+
+// MARK: - Editing one word
+
+/// What a word means, and what it is short for.
+///
+/// These two fields change how commands are interpreted — a label decides how
+/// a task is tagged — and until now they existed only in a JSON file on the
+/// Mac. A wrong label has no visible symptom beyond tasks quietly filing
+/// themselves in the wrong place, so being able to see and change one matters
+/// more than the size of the screen suggests.
+struct VocabWordEditor: View {
+    let word: VocabWord
+    /// (label, expansion, aliases) — all three sent together, since the screen
+    /// shows all three and a partial save would drop what it did not send.
+    let onSave: (String, String, [String]) async -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var settings: AppSettings
+
+    @State private var label: String
+    @State private var expandsTo: String
+    @State private var aliases: [String]
+    @State private var newAlias = ""
+    @State private var saving = false
+
+    init(word: VocabWord, onSave: @escaping (String, String, [String]) async -> Void) {
+        self.word = word
+        self.onSave = onSave
+        _label     = State(initialValue: word.label)
+        _expandsTo = State(initialValue: word.expandsTo)
+        _aliases   = State(initialValue: word.aliases)
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                TextField("Coursework, Groceries, Errands…", text: $label)
+                    .textInputAutocapitalization(.words)
+            } header: {
+                Text("What it means")
+            } footer: {
+                Text("A task or event mentioning “\(word.word)” gets this tag. "
+                     + "Leave it empty for no tag.")
+            }
+
+            Section {
+                TextField("What it stands for", text: $expandsTo)
+            } header: {
+                Text("Short for")
+            } footer: {
+                Text("Only for shorthand you actually say. It is never "
+                     + "substituted into your words — the assistant is just "
+                     + "told what it means.")
+            }
+
+            Section {
+                ForEach(aliases, id: \.self) { alias in
+                    Text(alias).foregroundColor(.secondary)
+                }
+                .onDelete { aliases.remove(atOffsets: $0) }
+
+                HStack {
+                    TextField("Add a misheard spelling", text: $newAlias)
+                        .autocorrectionDisabled()
+                        .onSubmit(addAlias)
+                    Button(action: addAlias) {
+                        Image(systemName: "plus.circle.fill")
+                    }
+                    .disabled(newAlias.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .tint(settings.accentColor)
+                }
+            } header: {
+                Text("Heard as")
+            } footer: {
+                Text("Transcripts containing any of these are rewritten to "
+                     + "“\(word.word)”. Swipe to remove one.")
+            }
+        }
+        .navigationTitle(word.word)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { dismiss() }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") {
+                    saving = true
+                    Task {
+                        await onSave(label.trimmingCharacters(in: .whitespaces),
+                                     expandsTo.trimmingCharacters(in: .whitespaces),
+                                     aliases)
+                        dismiss()
+                    }
+                }
+                .disabled(saving)
+            }
+        }
+    }
+
+    private func addAlias() {
+        let value = newAlias.trimmingCharacters(in: .whitespaces)
+        // An alias equal to the word would make the corrector rewrite it to
+        // itself; the server drops those too, but saying so here is clearer
+        // than a silent no-op.
+        guard !value.isEmpty,
+              value.lowercased() != word.word.lowercased(),
+              !aliases.contains(where: { $0.lowercased() == value.lowercased() })
+        else { newAlias = ""; return }
+        aliases.append(value)
+        newAlias = ""
     }
 }
