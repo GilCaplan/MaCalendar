@@ -165,3 +165,72 @@ def test_dry_run_reports_without_writing(memory):
     _say(memory, "book the dentist for tuesday at ten", when=now + 9)
     assert len(memory.learn_from_reformulations(dry_run=True)) == 1
     assert memory.get(wrong)["feedback"] == FEEDBACK_REJECTED
+
+
+# ---------------------------------------------------------------------------
+# The second opinion
+# ---------------------------------------------------------------------------
+
+def _pair(memory):
+    now = time.time()
+    wrong = _say(memory, "book the dentist for tuesday at nine", when=now,
+                 verdict=FEEDBACK_REJECTED)
+    _say(memory, "book the dentist for tuesday at ten", when=now + 9)
+    return wrong
+
+
+def test_a_reviewer_can_refuse_a_pair_the_rules_accepted(memory):
+    """The rules are structural — timing, similarity, who spoke. They cannot
+    tell a correction from two things the speaker genuinely wanted."""
+    wrong = _pair(memory)
+    assert memory.learn_from_reformulations(verify=lambda a, b: False) == []
+    assert memory.get(wrong)["feedback"] == FEEDBACK_REJECTED
+
+
+def test_a_reviewer_that_agrees_lets_it_through(memory):
+    wrong = _pair(memory)
+    assert len(memory.learn_from_reformulations(verify=lambda a, b: True)) == 1
+    assert memory.get(wrong)["feedback"] == FEEDBACK_CORRECTED
+
+
+def test_a_reviewer_that_cannot_answer_blocks_rather_than_approves(memory):
+    """The model may be unreachable. Silence must not read as consent — a wrong
+    correction is pasted into future prompts, so a false yes costs much more
+    than a false no."""
+    def unavailable(a, b):
+        raise RuntimeError("model is not running")
+
+    wrong = _pair(memory)
+    assert memory.learn_from_reformulations(verify=unavailable) == []
+    assert memory.get(wrong)["feedback"] == FEEDBACK_REJECTED
+
+
+def test_the_reviewer_is_shown_both_commands(memory):
+    seen = []
+    _pair(memory)
+    memory.learn_from_reformulations(verify=lambda a, b: seen.append((a, b)) or True)
+    assert seen == [("book the dentist for tuesday at nine",
+                     "book the dentist for tuesday at ten")]
+
+
+# ---------------------------------------------------------------------------
+# Nothing worth learning from should have been recorded in the first place
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("said", ["", "Execute.", "execute", "Execute a...", "No.",
+                                  "ok", "um", "I need a b-"])
+def test_a_false_start_is_never_treated_as_a_command(said):
+    """Four of these reached the parser and were remembered as real commands.
+
+    They are worse than harmless: the memory feeds the model worked examples,
+    so a run of junk teaches it that junk is how this person speaks.
+    """
+    from assistant.api.server import is_trivial_transcript
+    assert is_trivial_transcript(said), f"{said!r} should be ignored outright"
+
+
+@pytest.mark.parametrize("said", ["gym tomorrow", "buy milk", "lunch at noon",
+                                  "what do I have today", "delete the meeting"])
+def test_a_real_command_is_not_mistaken_for_a_false_start(said):
+    from assistant.api.server import is_trivial_transcript
+    assert not is_trivial_transcript(said), f"{said!r} is a real command"

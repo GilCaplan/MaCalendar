@@ -129,6 +129,35 @@ def _end_is_exclusive(text: str) -> bool:
     return bool(_re2.search(_EXCLUSIVE_END, t))
 
 
+#: Words that carry no instruction on their own. A transcript made only of
+#: these is a false start, not a command.
+_FILLER = frozenset({
+    "a", "an", "the", "um", "uh", "er", "hmm", "ok", "okay", "yes", "yeah",
+    "no", "nope", "yep", "so", "and", "but", "well", "just", "please",
+})
+
+
+def is_trivial_transcript(text: str) -> bool:
+    """True when there is nothing here to act on.
+
+    Four of these reached the parser and were remembered as real commands:
+    "Execute.", "Execute a...", "No.", "I need a b-". A stop word said on its
+    own, a false start abandoned after a syllable, a stray acknowledgement —
+    each was parsed, executed against nothing, and then sat in the history as
+    an example of how this user speaks.
+
+    They are worse than harmless. The command memory feeds the model worked
+    examples, and a run of junk teaches it that junk is normal.
+    """
+    words = [w for w in re.findall(r"[a-z0-9']+", (text or "").lower()) if w]
+    if not words:
+        return True
+    meaningful = [w for w in words if w not in _FILLER and len(w) > 1]
+    # One meaningful word is an instruction only if it names something to do,
+    # and by this point the stop words are already gone — so it does not.
+    return len(meaningful) < 2
+
+
 def _named_weekdays(text: str) -> set:
     """Weekday numbers named in the text, for anchoring a weekly series."""
     import re as _re2
@@ -611,6 +640,16 @@ def create_app() -> Flask:
         raw_transcript = transcript
         # Parity with the Mac pipeline: drop trailing "execute"/"done"/… stop words
         transcript = _strip_stop_keyword(transcript, cfg.audio.stop_phrases)
+        if is_trivial_transcript(transcript):
+            # Ignored completely: not parsed, not executed, and above all not
+            # remembered. Recording it would make a false start part of the
+            # record of how this user talks.
+            logger.info("Ignoring a transcript with nothing in it: %r", raw_transcript[:40])
+            trace.step(DONE, "Nothing to do",
+                       "Heard a stop word or a false start, nothing to act on.")
+            return {"message": "", "actions": [], "refresh": "", "parse": "ignored",
+                    "corrections": [], "trace": trace.to_list(), "memory_id": None}
+
         # Personal vocabulary auto-correct
         transcript, vocab_fixes = apply_vocab(transcript, source=source)
         corrections = [c.to_dict() for c in vocab_fixes]
@@ -970,10 +1009,33 @@ def create_app() -> Flask:
         # Runs here because a pair only completes when the second command
         # arrives, and on a daemon thread because nothing waits on it — the
         # answer has already gone back. Idempotent, so repeating it is free.
+        def _was_a_retry(wrong: str, right: str) -> bool:
+            """Ask the model whether the second command is a retry of the first.
+
+            The structural rules cannot tell a correction from two things the
+            speaker genuinely wanted. "book the dentist at nine" followed by
+            "book the dentist at ten" is a retry if the first was a mishearing
+            and two appointments if it was not — and only the words can say
+            which. A reader is good at that; timing is not.
+
+            Refusing on doubt is deliberate: a wrong correction is pasted into
+            future prompts as an example of how this user speaks, so the cost
+            of a false yes is much higher than of a false no.
+            """
+            answer = parser.call_llm_json(
+                "You judge whether a second voice command was a RETRY of the first — "
+                "the speaker being misheard or misunderstood, and saying it again — "
+                "or a SEPARATE thing they also wanted. Answer only with JSON: "
+                '{\"retry\": true} or {\"retry\": false}. '
+                "Say false unless it is clearly the same request restated.",
+                f"FIRST (was deleted): {wrong}\nSECOND: {right}",
+            )
+            return bool(answer.get("retry") is True)
+
         def _mine_reformulations() -> None:
             try:
                 from assistant.intent.memory import get_memory
-                for pair in get_memory().learn_from_reformulations():
+                for pair in get_memory().learn_from_reformulations(verify=_was_a_retry):
                     logger.info("Learned from a retry: %r -> %r (%.0fs apart)",
                                 pair["wrong"][:48], pair["right"][:48], pair["gap_sec"])
             except Exception as exc:                 # never let this affect a command

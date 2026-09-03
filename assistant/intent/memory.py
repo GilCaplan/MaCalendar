@@ -24,7 +24,7 @@ import re
 import sqlite3
 import threading
 import time
-from typing import Any, Iterable
+from typing import Callable, Any, Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -296,7 +296,9 @@ class CommandMemory:
             })
         return out
 
-    def learn_from_reformulations(self, *, dry_run: bool = False) -> list[dict[str, Any]]:
+    def learn_from_reformulations(self, *, dry_run: bool = False,
+                                  verify: "Callable[[str, str], bool] | None" = None
+                                  ) -> list[dict[str, Any]]:
         """Turn those pairs into corrections the model will actually see.
 
         The failed command keeps its rejection — it was rejected — but gains
@@ -312,6 +314,22 @@ class CommandMemory:
             existing = self.get(pair["wrong_id"]) or {}
             if existing.get("correction"):
                 continue
+            # A second opinion before writing. The rules above are structural —
+            # timing, similarity, who spoke — and cannot tell "book the dentist
+            # at nine" followed by "book the dentist at ten" (a correction) from
+            # the same pair where the speaker genuinely wanted both. A reader
+            # can. When no verifier is supplied the structural rules stand
+            # alone, which is what the tests exercise.
+            if verify is not None:
+                try:
+                    if not verify(pair["wrong"], pair["right"]):
+                        logger.info("Retry pair rejected on review: %r -> %r",
+                                    pair["wrong"][:40], pair["right"][:40])
+                        continue
+                except Exception as exc:
+                    # A verifier that cannot answer must not silently approve.
+                    logger.debug("Retry verification unavailable (%s); skipping pair", exc)
+                    continue
             if not dry_run:
                 self.set_feedback(pair["wrong_id"], FEEDBACK_CORRECTED,
                                   correction=json.loads(pair["actions_json"]))
