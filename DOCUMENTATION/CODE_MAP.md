@@ -22,6 +22,12 @@
 | Step 6: BLAME router + MAX_REENTRIES (implementation pending) | `engine/crosscheck.py` |
 | Step 7: label read-back | `engine/label.py` |
 | Contract pins | `tests/unit/test_engine_contracts.py` |
+| Intake lock + `coalesce()` (step 0) | `engine/__init__.py` |
+| Background verify + patch tiers (`_background_verify`) | `engine/__init__.py` |
+| Gate learning (`learn_from_edit`, `confirm_unchanged`, confirms sidecar) | `engine/transcript.py` |
+| Shared LLM transport (`call_json`, MACALENDAR_LLM_DISABLED guard) | `engine/llm.py` |
+| Per-stage live gates | `scripts/engine_stage_check.py` |
+| Mac gate dialog (`ask_transcript_edit`, STATUS_EDIT) | `calendar_ui/window.py`, `pipeline.py` |
 
 ## Database — `assistant/db.py`
 

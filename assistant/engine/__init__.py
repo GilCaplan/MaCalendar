@@ -109,7 +109,7 @@ def run_transcript(text: str, trace: Any = None, source: str = "ios",
     corrections / trace / uncertain_words [+ memory_id, verify_token,
     pending_id, needs_edit].
     """
-    from assistant.trace import Trace, DONE
+    from assistant.trace import Trace
 
     cfg = load_config()
     trace = trace or Trace(source=source)
@@ -577,7 +577,13 @@ def _record_memory(state: EngineState, cfg, result_msg: str,
 
 
 def _log_nlu(state: EngineState, action_names: list, failure: str = "") -> None:
-    """NLU_TRACKING.md — appended after every action, success and failure."""
+    """NLU_TRACKING.md — appended after every action, success and failure.
+
+    Except test traffic: the file is the record of real usage, and the audit's
+    89 synthetic commands per run would drown it — the same lesson the trace
+    bus taught (its History filters "test" for the same reason)."""
+    if state.source == "test":
+        return
     try:
         from assistant.pipeline import Pipeline
         success = bool(action_names)
