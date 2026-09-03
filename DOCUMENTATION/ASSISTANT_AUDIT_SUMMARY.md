@@ -242,3 +242,51 @@ python -m scripts.audit_assistant --audio            # full, ~20 min
 python -m scripts.audit_assistant --area tasks       # one area
 python -m scripts.benchmark_models --history         # LLM models on your real history
 ```
+
+## Runs 8–9 — 2026-09-03 — the engine's first measurements (branch `engine-v2`)
+
+The brain was rebuilt as the 8-stage engine (TASKS row 79, `ENGINE.md`); these
+two runs are its acceptance measurements against run 7's baseline (98% exact
+match, tasks 95%/79% recall/precision, old brain, k=4).
+
+**Run 8 (92 cases): 85% quick / 80% settled · recall 83% · precision 88% ·
+first p50 33.3s.** The per-stage tables named every mechanism, which is the
+design working:
+
+- The cross-check cried wolf: 232 findings, loop-backs on 39 of 51 deep
+  commands (85s avg vs 36s unlooped). Three causes, all stage-internal: a
+  multi-title create_todo could satisfy only ONE extracted ask ("milk, eggs
+  and bread" → two false "missing" → the background patch added DUPLICATES,
+  breaking 4 commands that were right at the quick answer); observance-gate
+  refusals didn't count as covering their ask (every gated command
+  loop-stormed pointlessly); extraction kind-mislabels became false missings.
+- The observance gate itself worked exactly as specified — ~5 "failures" were
+  Friday-evening bookings it rightly refused; the corpus predated the policy.
+  Gate-colliding cases are now weekday-pinned and the gate has its own two
+  cases (Saturday gym → refusal; Friday-night Shabbat dinner → booked).
+- Two commands died whole on one item's validation error.
+
+**Run 9 (94 cases, after the revamp + extraction-prompt fine-tune): 88%
+quick = 88% settled · recall 90% · precision 90% · first p50 16.7s · settled
+p50 17.7s.** Loop-backs 39→3 commands, findings 39→4, broken-by-self-check
+4→0, extra task rows 8→3, deep p50 70s→22.7s. **The fast track is at
+parity with the old brain: 97% quick AND settled, recall 98%, precision
+100%, ~50ms.** The capacity-aware matcher plus a granularity contract in the
+extraction prompt (mirroring decompose's own splitting rules, with worked
+examples from run 8's failures) is what closed the false-alarm gap.
+
+**Remaining gap to the 98% bar (11 failures), ranked:**
+1. Multi-item deep segmentation quality (6): event chains ("one at 4,
+   another at 6:30") drop or duplicate an item; colon task-lists sometimes
+   over-split now. Next single-stage tune: event-chain examples in the
+   segment prompt, and an update/delete that ended NOT-FOUND should stop
+   counting as covering an ask (it hid a "night shift" create misread from
+   the checker).
+2. Action-layer quirks the corpus surfaces (2, predate the engine): an
+   update that reports success while changing nothing ("move my 1pm meeting
+   to 3pm"), and `_find_event` missing a seeded "Guri Karpas" on 'guri'.
+3. Worst-case deep latency: three disfluent monsters at 95–208s (bounded by
+   the loop budget, still ugly). `engine.reconcile: uncertain` is the
+   designed lever; run 9's telemetry (findings on 4/94) begins to justify it.
+
+Conclusions live here because ASSISTANT_AUDIT.md is overwritten every run.
