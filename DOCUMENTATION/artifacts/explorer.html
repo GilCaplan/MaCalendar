@@ -78,6 +78,10 @@
             padding:4px 10px 4px 0; letter-spacing:.04em;}
   #pbody td{border-bottom:1px solid var(--faint); padding:5px 10px 5px 0; vertical-align:top;}
   #pbody .tblwrap{overflow-x:auto;}
+  #pbody svg{max-width:100%; height:auto; display:block; margin:2px 0 14px;}
+  #pbody svg text{font-family:'IBM Plex Mono',ui-monospace,monospace; fill:var(--ink);}
+  #pbody figcaption{font:400 11.5px/1.5 'IBM Plex Mono',monospace; color:var(--muted);
+                    margin:-8px 0 14px;}
   #pbody .num{font-variant-numeric:tabular-nums; white-space:nowrap;}
   .morebtn{display:inline-block; margin:0 0 14px; border:1px solid var(--line); border-radius:6px;
            background:transparent; color:var(--amber); cursor:pointer;
@@ -126,7 +130,7 @@
 </header>
 
 <div class="stagewrap">
-<svg id="stage" viewBox="0 0 1000 580" aria-label="The system: a laptop running four processes, a phone beside it, a private link between them, a crossed-out internet, and the sun. Every framed part can be opened." role="group">
+<svg id="stage" viewBox="0 0 1000 664" aria-label="The system: a laptop running four processes, a phone beside it, a private link between them, a crossed-out internet, and the sun. Every framed part can be opened." role="group">
   <defs>
     <marker id="mi" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M0 0 L8 4 L0 8 z" fill="var(--muted)"/>
@@ -340,7 +344,52 @@
       <line x1="952" y1="482" x2="961" y2="473" stroke="var(--amber)" stroke-width="1.5"/>
       <text x="930" y="534" text-anchor="middle" font-size="9.5" fill="var(--muted)">sun &amp; sky</text>
     </g>
-  </g>
+  
+    <!-- ================= beside the machine: nothing here runs ============ -->
+    <g>
+      <line x1="40" y1="566" x2="960" y2="566" stroke="var(--line)" stroke-dasharray="2 4" opacity=".8"/>
+      <text x="40" y="586" font-size="10" fill="var(--muted)" letter-spacing="1.6">BESIDE THE MACHINE · NONE OF THIS RUNS</text>
+    </g>
+
+    <g data-panel="bench" role="button" tabindex="0"
+       aria-label="The workflow beside the machine: written notes that record decisions, and tests that fail the build when the code and the notes disagree. None of it runs at command time.">
+      <rect class="frame" x="40" y="596" width="920" height="52" rx="6" fill="none"
+            stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+      <g font-size="8.5">
+        <rect x="56" y="608" width="86" height="28" rx="3" fill="none" stroke="var(--line)"/>
+        <text x="99" y="619" text-anchor="middle" font-weight="600">CLAUDE.md</text>
+        <text x="99" y="630" text-anchor="middle" fill="var(--muted)">the rules</text>
+
+        <rect x="150" y="608" width="86" height="28" rx="3" fill="none" stroke="var(--line)"/>
+        <text x="193" y="619" text-anchor="middle" font-weight="600">TASKS.md</text>
+        <text x="193" y="630" text-anchor="middle" fill="var(--muted)">the order</text>
+
+        <rect x="244" y="608" width="86" height="28" rx="3" fill="none" stroke="var(--line)"/>
+        <text x="287" y="619" text-anchor="middle" font-weight="600">AUDIT.md</text>
+        <text x="287" y="630" text-anchor="middle" fill="var(--muted)">the numbers</text>
+
+        <rect x="338" y="608" width="96" height="28" rx="3" fill="none" stroke="var(--line)"/>
+        <text x="386" y="619" text-anchor="middle" font-weight="600">ARTIFACT.md</text>
+        <text x="386" y="630" text-anchor="middle" fill="var(--muted)">this page</text>
+      </g>
+
+      <path d="M 442 622 L 486 622" stroke="var(--amber)" stroke-width="1.2" marker-end="url(#ma)"/>
+      <text x="464" y="616" text-anchor="middle" font-size="7.5" fill="var(--amber)">checked by</text>
+
+      <rect x="492" y="606" width="150" height="32" rx="4" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.2"/>
+      <text x="567" y="618" text-anchor="middle" font-size="9" font-weight="600">930 tests</text>
+      <text x="567" y="629" text-anchor="middle" font-size="7.5" fill="var(--muted)">red when they disagree</text>
+
+      <path d="M 650 622 L 694 622" stroke="var(--line)" stroke-width="1.2" marker-end="url(#mi)"/>
+      <rect x="700" y="606" width="112" height="32" rx="4" fill="none" stroke="var(--line)"/>
+      <text x="756" y="618" text-anchor="middle" font-size="9" font-weight="600">the code</text>
+      <text x="756" y="629" text-anchor="middle" font-size="7.5" fill="var(--muted)">everything above</text>
+
+      <text x="828" y="616" font-size="8" fill="var(--muted)">no model runs here</text>
+      <text x="828" y="628" font-size="8" fill="var(--muted)">no user is present</text>
+    </g>
+    </g>
 </svg>
 </div>
 <p class="cap">Every framed part opens. The numbered chain is the pipeline — <kbd>←</kbd> <kbd>→</kbd> step through it, <kbd>esc</kbd> closes, ⌂ returns to the whole system.</p>
@@ -476,9 +525,40 @@ const P = {
     z:[300,376,2.3],
     sum:`<p>Written to a file on the disk, and the answer comes straight back. Nothing waits.</p>
     <p class="figs">one SQLite file · yours, on your machine</p>`,
-    more:`<p>Deleting is held to a higher bar than creating. When the parser cannot identify what
-    to delete, "I couldn't find it" is the designed answer — guessing at a deletion is worse than
-    failing at one.</p>`
+    more:`<p>One file, twenty-one tables. The calendar is the smallest part of it — events and tasks are two tables among timers, counters, courses, assignments, training plans, tags and sub-tasks. The voice pipeline touches the first few; the rest are filled by the screens.</p>
+    <svg viewBox="0 0 380 208" role="img" aria-label="The nineteen columns of one event row, grouped by what fills them: nine come from what you said, three the system decides, three are bookkeeping, and four exist only for syncing with a hosted calendar.">
+  <text x="0" y="11" font-size="9" fill="var(--muted)">ONE EVENT ROW · 19 COLUMNS</text>
+
+  <rect x="0" y="20" width="380" height="52" rx="4" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.2"/>
+  <text x="7" y="33" font-size="8.5" fill="var(--amber)">FROM WHAT YOU SAID — 9</text>
+  <g font-size="8.5">
+    <text x="7" y="47">title</text><text x="52" y="47">date</text><text x="92" y="47">start_time</text>
+    <text x="160" y="47">end_time</text><text x="222" y="47">attendees</text><text x="286" y="47">location</text>
+    <text x="7" y="62">description</text><text x="80" y="62">recurrence</text><text x="152" y="62">recurrence_end</text>
+  </g>
+
+  <rect x="0" y="80" width="184" height="40" rx="4" fill="none" stroke="var(--model)" stroke-width="1.2"/>
+  <text x="7" y="93" font-size="8.5" fill="var(--model)">THE SYSTEM DECIDES — 3</text>
+  <g font-size="8.5"><text x="7" y="110">category</text><text x="62" y="110">color</text><text x="106" y="110">series_id</text></g>
+
+  <rect x="196" y="80" width="184" height="40" rx="4" fill="none" stroke="var(--line)" stroke-width="1.2"/>
+  <text x="203" y="93" font-size="8.5" fill="var(--muted)">BOOKKEEPING — 3</text>
+  <g font-size="8.5"><text x="203" y="110">id</text><text x="222" y="110">created_at</text><text x="290" y="110">updated_at</text></g>
+
+  <rect x="0" y="128" width="380" height="40" rx="4" fill="none" stroke="var(--line)" stroke-width="1.2" stroke-dasharray="3 2"/>
+  <text x="7" y="141" font-size="8.5" fill="var(--muted)">ONLY IF YOU CONNECT A HOSTED CALENDAR — 4</text>
+  <g font-size="8.5" fill="var(--muted)">
+    <text x="7" y="158">source</text><text x="52" y="158">external_id</text>
+    <text x="124" y="158">external_source</text><text x="216" y="158">sync_dirty</text>
+  
+
+    </g>
+
+  <text x="0" y="188" font-size="8.5" fill="var(--muted)">a task row is the same shape: 16 columns, 6 of them yours</text>
+  <text x="0" y="201" font-size="8.5" fill="var(--muted)">— title, list, priority, due_date, tags, quantity</text>
+</svg>
+<figcaption>Understanding the sentence fills nine of nineteen columns. The rest is the system's own work.</figcaption><p>Two of those groups are worth noticing. <strong>The system decides three columns</strong> — what kind of thing this is, therefore what colour, and whether it belongs to a repeating series — none of which you said. And <strong>four exist only for syncing</strong> with a hosted calendar, which is off unless you connect one; on a machine that never does, they are dead weight carried so the feature can exist at all.</p>
+    <p>A repeating event is not a rule stored once. Each occurrence is an ordinary row sharing a <code>series_id</code>, so every query in the system stays a plain date lookup that knows nothing about recurrence — and a day that should be skipped is simply never written.</p>`
   },
   review: {
     tag:"step 7 of 8", name:"review", title:"The model reads everything — afterwards",
@@ -496,14 +576,27 @@ const P = {
     z:[397,400,2.4],
     sum:`<p>Your corrections come back as worked examples in the next prompt. The model itself never changes.</p>
     <p class="figs">4 most similar past commands · no fine-tuning</p>`,
-    more:`<p>Similarity is arithmetic, not another model: 60% word overlap plus 40% sequence
-    resemblance, scored over the most recent past commands (a pool of up to 2,000). Your feedback
-    tilts the ranking — a command you <em>corrected</em> gains +0.15, because corrections are the
-    most instructive examples; an approval gains +0.05; a rejected reading is never shown to the
-    model again.</p>
-    <p>There is no embedding model anywhere in the system. For a few hundred short strings,
-    word-overlap arithmetic answers instantly, and a fourth model to keep warm was judged not
-    worth its memory.</p>`
+    more:`<p>Every command is kept with what it produced and what you made of it.</p>
+    <svg viewBox="0 0 380 176" role="img" aria-label="One remembered command: what you said before and after correction, which parser answered, what it produced, how long it took, and your verdict.">
+  <text x="0" y="11" font-size="9" fill="var(--muted)">ONE REMEMBERED COMMAND</text>
+
+  <rect x="0" y="20" width="380" height="34" rx="4" fill="none" stroke="var(--line)"/>
+  <text x="7" y="33" font-size="8" fill="var(--muted)">WHAT YOU SAID</text>
+  <text x="7" y="47" font-size="8.5">raw_transcript &#8594; transcript &#8226; the vocabulary sits between them</text>
+
+  <rect x="0" y="62" width="380" height="34" rx="4" fill="none" stroke="var(--model)"/>
+  <text x="7" y="75" font-size="8" fill="var(--model)">WHAT IT DID</text>
+  <text x="7" y="89" font-size="8.5">parse_path &#8226; actions_json &#8226; result &#8226; llm_ms &#8226; total_ms</text>
+
+  <rect x="0" y="104" width="380" height="42" rx="4" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.2"/>
+  <text x="7" y="117" font-size="8" fill="var(--amber)">WHAT YOU THOUGHT OF IT</text>
+  <text x="7" y="131" font-size="8.5">feedback &#8594; approved &#8226; corrected &#8226; rejected &#8226; skipped</text>
+  <text x="7" y="142" font-size="8" fill="var(--muted)">correction_json holds what it should have produced</text>
+
+  <text x="0" y="166" font-size="8.5" fill="var(--muted)">deleting what it made counts as a verdict; so does editing it</text>
+</svg>
+<figcaption>The verdict is the valuable column, and most of it is collected without asking.</figcaption><p>Most verdicts are not buttons. Delete something the assistant made and that is a rejection; edit it and that is a correction, with the fields you changed merged back in to form what the parse <em>should</em> have produced. The explicit thumbs exist, but the behaviour is the stronger signal because it costs nothing to give.</p>
+    <p>On the next similar command the four closest past ones are pasted into the prompt. A correction outranks an approval; a rejection is never shown again. The model is unchanged — what changes is the company its prompt keeps.</p>`
   },
   models: {
     tag:"on the laptop", name:"models", title:"Three models, one machine",
@@ -549,7 +642,48 @@ const P = {
     z:[806,328,1.7],
     sum:`<p>Holds a full copy and works with the laptop off. Speech recorded offline is kept as audio and decided fresh on reconnect — not replayed as a stale action.</p>
     <p class="figs">edits quote the version they were made against</p>`,
-    more:`<p>When a queued command finally runs, the result arrives as a notification — silently
+    more:`<p>The phone never decides anything. It records, sends the sound over the private link, and renders what comes back — and what comes back has already been written.</p>
+    <svg viewBox="0 0 380 250" role="img" aria-label="The round trip. The phone records audio and sends it over the private link to the brain, which transcribes, understands, executes and writes one file. Changing that file changes its timestamp, and both the laptop window and the phone are watching it: the laptop directly, the phone through a small token it polls. Neither is told; both notice.">
+  <defs><marker id="rt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+    <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
+
+  <rect x="0" y="16" width="96" height="34" rx="4" fill="none" stroke="var(--line)"/>
+  <text x="48" y="30" text-anchor="middle" font-size="8.5" font-weight="600">phone</text>
+  <text x="48" y="42" text-anchor="middle" font-size="7.5" fill="var(--muted)">records audio</text>
+
+  <path d="M 100 33 L 138 33" stroke="var(--amber)" stroke-width="1.2" marker-end="url(#rt)" color="var(--amber)"/>
+  <text x="119" y="27" text-anchor="middle" font-size="7" fill="var(--amber)">VPN</text>
+
+  <rect x="142" y="10" width="120" height="46" rx="4" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.2"/>
+  <text x="202" y="24" text-anchor="middle" font-size="8.5" font-weight="600" fill="var(--amber)">the brain</text>
+  <text x="202" y="36" text-anchor="middle" font-size="7.5" fill="var(--muted)">hears · understands</text>
+  <text x="202" y="47" text-anchor="middle" font-size="7.5" fill="var(--muted)">checks · executes</text>
+
+  <path d="M 202 60 L 202 84" stroke="var(--line)" stroke-width="1.2" marker-end="url(#rt)" color="var(--line)"/>
+  <text x="210" y="76" font-size="7" fill="var(--muted)">writes</text>
+
+  <rect x="142" y="88" width="120" height="34" rx="4" fill="none" stroke="var(--good)" stroke-width="1.4"/>
+  <text x="202" y="102" text-anchor="middle" font-size="8.5" font-weight="600">one file on disk</text>
+  <text x="202" y="114" text-anchor="middle" font-size="7.5" fill="var(--muted)">its timestamp moves</text>
+
+  <path d="M 142 105 L 60 105 L 60 150" stroke="var(--line)" stroke-width="1.2" fill="none" marker-end="url(#rt)" color="var(--line)"/>
+  <path d="M 262 105 L 330 105 L 330 150" stroke="var(--line)" stroke-width="1.2" fill="none" marker-end="url(#rt)" color="var(--line)"/>
+
+  <rect x="0" y="154" width="120" height="44" rx="4" fill="none" stroke="var(--line)"/>
+  <text x="60" y="168" text-anchor="middle" font-size="8.5" font-weight="600">laptop window</text>
+  <text x="60" y="180" text-anchor="middle" font-size="7.5" fill="var(--muted)">watches the file</text>
+  <text x="60" y="191" text-anchor="middle" font-size="7.5" fill="var(--muted)">itself</text>
+
+  <rect x="270" y="154" width="110" height="44" rx="4" fill="none" stroke="var(--line)"/>
+  <text x="325" y="168" text-anchor="middle" font-size="8.5" font-weight="600">phone</text>
+  <text x="325" y="180" text-anchor="middle" font-size="7.5" fill="var(--muted)">polls a 4-byte token</text>
+  <text x="325" y="191" text-anchor="middle" font-size="7.5" fill="var(--muted)">every couple of seconds</text>
+
+  <text x="190" y="222" text-anchor="middle" font-size="8" fill="var(--muted)">neither is notified — both are watching the same thing</text>
+  <text x="190" y="238" text-anchor="middle" font-size="8" fill="var(--muted)">so a change made anywhere appears everywhere</text>
+</svg>
+<figcaption>Speak to either device and the same file changes; both surfaces notice on their own.</figcaption><p>Nothing pushes the update outward. The brain writes one file; changing it moves its timestamp; the laptop window watches that timestamp directly and the phone polls a few bytes derived from it. Both surfaces refresh because they noticed, not because they were told, which is why there is no way for one of them to miss a message.</p>
+    <p>When a queued command finally runs, the result arrives as a notification — silently
     changing a calendar from a queue would be worse than not running the command at all.</p>
     <p>And a queued change the laptop actively refuses — an edit against a record that changed, a
     delete of something already gone — is dropped and reported rather than left to block
@@ -577,10 +711,32 @@ const P = {
     that is not the machine talking to itself, and fails the build if any code path tries to
     reach further. It has already caught one regression — a library quietly fetching its model
     from the internet on every start.</p>`
+  ,
+  bench: {
+    tag:"beside the machine", title:"How it is kept honest", z:[500,622,1.35],
+    sum:`<p>Written notes carry the decisions; tests fail the build when the code and the notes
+    disagree. None of it runs when you speak — it runs when the code changes.</p>
+    <p class="figs">930 tests · one machine · no network</p>`,
+    more:`<p>Every constant on this page — the routing line, the confidence multipliers, how many
+    verbs the table holds, how many past commands are retrieved — is a number somebody can change
+    in an afternoon without opening this file. Two had already drifted before anyone looked: a
+    test count and a review rate, both quietly wrong for weeks.</p>
+    <p>So the agreement is a test rather than a promise. One suite reads each value out of the
+    source and asserts the page says the same thing; another estimates where every label in every
+    diagram lands and fails when two collide, which is how a 22-pixel overlap was found. A third
+    treats any word from the personal vocabulary as a leak unless it has been explicitly declared
+    general — the burden inverted deliberately, because presuming the other way means every new
+    name silently becomes publishable.</p>
+    <p>The written half is small and each file has one job: what the rules are, what order the
+    work happens in, what the last measured run reported, and what these pages are allowed to
+    say. Notes that only describe are skipped; notes that decide something are kept.</p>
+    <p>The reason it sits below the line: this is the only part of the drawing that is not
+    running. No model, no user, no command — it is the workbench the machine was built on, and
+    it is here because a system that cannot be checked is only believed.</p>`
   }
 };
 const ORDER = ["brain","hear","correct","parse","route","check","write","review","learn",
-               "models","window","hud","link","phone","sun","cloud"];
+               "models","window","hud","link","phone","sun","cloud","bench"];
 
 const stage = document.getElementById("stage");
 const world = document.getElementById("world");
