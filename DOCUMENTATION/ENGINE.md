@@ -59,11 +59,14 @@ channel to mutate state through.
 ## The stages
 
 ### 0 · intake (orchestrator — `assistant/engine/__init__.py`)
-Queueing and coalescing. Commands arriving mid-run queue; before the next run
-they are coalesced up to `engine.coalesce_max_tokens` as `("…")and("…")` —
-a wrapper step 2 splits deterministically — and overflow runs sequentially.
-*Status: coalescing not yet built (sequencing phase 4); bracket batching from
-the phone already flows through step 2.*
+Two halves, both live. **Serialization**: `run_transcript` holds a lock — one
+command at a time, FIFO, so concurrent requests cannot race the anaphora
+context; the wait shows honestly in the trace total. **Coalescing**:
+`engine.coalesce(texts, budget)` combines queued inputs into `("…")and("…")`
+batches under `engine.coalesce_max_tokens` (a wrapper step 2 splits
+deterministically), overflow running sequentially — used by the pending-retry
+loop, where server-side inputs genuinely pile up; the phone's bracket batching
+flows through step 2 as before.
 
 ### 1 · transcript (`transcript.py` · trace stage `vocab` · tests `test_engine_flow.py`)
 Reads `raw_text`; writes `text`, `corrections`, `needs_edit`, `ignored`.
@@ -71,9 +74,13 @@ Stop-word strip → trivial-transcript filter (a false start is ignored AND not
 remembered) → `apply_vocab` (confident fixes, phonetic matching) → the
 confidence gate: doubtful words with `engine.confirm_transcript` on and a
 client that declared `supports_edit` become a `needs_edit` response — the
-client shows an editor, resubmits, and the saved edit is learned (alias +
-phonetic key). *Status: gate live; the learning loop and the confirm-twice
-whitelist are phase 5.*
+client shows an editor and resubmits with `edited_from`. A changed word is
+learned as a vocab alias (`learn_from_edit`); an untouched resubmit counts a
+confirmation (`confirm_unchanged`, counters beside the vocab in
+`transcript_confirms.json` — never inside the hand-curated vocab), and at 2
+confirmations the word is whitelisted and never asked about again. The Mac
+sends `supports_edit`, shows the dialog (`ask_transcript_edit`, real-click
+tested) and has the Settings toggle; the iOS sheet is queued. *Status: live.*
 
 ### 2 · segment (`segment.py` · trace `rule` · tests `test_engine_segment.py`)
 Reads `text`; writes fresh `items` (id, kind, text only). Deterministic

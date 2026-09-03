@@ -44,6 +44,41 @@ from assistant.exceptions import AssistantError, TargetNotFound
 
 logger = logging.getLogger(__name__)
 
+# Step 0, half one: one command at a time. Flask serves requests on threads,
+# and two commands interleaving would race the anaphora context ("the one I
+# just made") and the per-run trace. Waiting here is the intake queue — FIFO,
+# invisible, and the wait shows up honestly in the trace's total.
+_run_lock = threading.Lock()
+
+
+def coalesce(texts: "list[str]", max_tokens: int = 300) -> "list[str]":
+    """Step 0, half two: queued inputs are combined into ("…")and("…") batches
+    up to a token budget (≈4 chars/token), so several short queued commands
+    cost one parse instead of several; overflow runs in later batches. The
+    wrapper is deterministic for step 2 to split — logic stays independent."""
+    batches: list[str] = []
+    current: list[str] = []
+    used = 0
+    for text in texts:
+        t = (text or "").strip()
+        if not t:
+            continue
+        cost = max(1, len(t) // 4)
+        if current and used + cost > max_tokens:
+            batches.append(_wrap(current))
+            current, used = [], 0
+        current.append(t)
+        used += cost
+    if current:
+        batches.append(_wrap(current))
+    return batches
+
+
+def _wrap(parts: "list[str]") -> str:
+    if len(parts) == 1:
+        return parts[0]
+    return "and".join(f'("{p}")' for p in parts)
+
 
 def load_config():
     """config.yaml is local-only (gitignored); fall back to the example, then
@@ -81,6 +116,15 @@ def run_transcript(text: str, trace: Any = None, source: str = "ios",
     if trace_run:
         from assistant import trace_bus as _tb
         trace.on_step(lambda st: _tb.publish_step(trace_run, st.to_dict()))
+
+    with _run_lock:
+        return _run_locked(text, trace, source, current_view, trace_run,
+                           supports_edit, cfg)
+
+
+def _run_locked(text, trace, source, current_view, trace_run,
+                supports_edit, cfg) -> dict:
+    from assistant.trace import DONE
 
     state = EngineState(raw_text=text, source=source, current_view=current_view,
                         supports_edit=supports_edit, trace=trace)

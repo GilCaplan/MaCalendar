@@ -47,6 +47,7 @@ from assistant.calendar_ui.importer import parse_ics, scan_macos_calendar, impor
 from assistant.db import CalendarDB
 from assistant.pipeline import (
     STATUS_DONE,
+    STATUS_EDIT,
     STATUS_ERROR,
     STATUS_IDLE,
     STATUS_LISTENING,
@@ -73,6 +74,7 @@ _MIC_ICONS = {
     STATUS_IDLE: "🎙",
     STATUS_LISTENING: "🔴",
     STATUS_REVIEW: "📨",
+    STATUS_EDIT: "✏️",
     STATUS_PROCESSING: "⚙️",
     STATUS_DONE: "✅",
     STATUS_ERROR: "⚠️",
@@ -85,6 +87,7 @@ _MIC_OBJ_NAMES = {
     STATUS_IDLE: "mic_idle",
     STATUS_LISTENING: "mic_listening",
     STATUS_REVIEW: "mic_processing",
+    STATUS_EDIT: "mic_processing",
     STATUS_PROCESSING: "mic_processing",
     STATUS_DONE: "mic_idle",
     STATUS_ERROR: "mic_idle",
@@ -240,6 +243,52 @@ class ReviewBar(QFrame):
             f" border: 1px solid {accent}; border-radius: {_styles.RADIUS_SM}px;"
             f" padding: 3px 10px; font-weight: 700; }}"
         )
+
+
+def ask_transcript_edit(parent, payload_json: str) -> "str | None":
+    """The gate's dialog, on its own so a test can drive it with real clicks.
+
+    Shows the doubted transcript in an editable field. Returns the text to run
+    (possibly untouched — that is a confirmation), or None for cancel.
+    """
+    import json as _json
+
+    from PyQt6.QtWidgets import (
+        QDialog, QDialogButtonBox, QLabel, QLineEdit, QVBoxLayout,
+    )
+
+    try:
+        payload = _json.loads(payload_json or "{}")
+    except ValueError:
+        payload = {}
+    transcript = payload.get("transcript") or ""
+    words = [w for w in (payload.get("words") or []) if w]
+
+    dlg = QDialog(parent)
+    dlg.setWindowTitle("Check the transcription")
+    dlg.setObjectName("transcript_edit_dialog")
+    lay = QVBoxLayout(dlg)
+    doubt = ", ".join(f"“{w}”" for w in words) or "some words"
+    label = QLabel(f"I'm not sure I heard {doubt} right. Fix anything that's "
+                   "wrong, then Send — or Send as-is if it's fine.")
+    label.setWordWrap(True)
+    lay.addWidget(label)
+    edit = QLineEdit(transcript)
+    edit.setObjectName("transcript_edit_field")
+    lay.addWidget(edit)
+    buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                               | QDialogButtonBox.StandardButton.Cancel)
+    buttons.setObjectName("transcript_edit_buttons")
+    buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Send")
+    buttons.accepted.connect(lambda: dlg.accept())
+    buttons.rejected.connect(lambda: dlg.reject())
+    lay.addWidget(buttons)
+    edit.setFocus()
+
+    accepted = dlg.exec() == QDialog.DialogCode.Accepted
+    text = edit.text().strip()
+    dlg.deleteLater()
+    return text if (accepted and text) else None
 
 
 class CalendarWindow(QMainWindow):
@@ -925,6 +974,12 @@ class CalendarWindow(QMainWindow):
             return
         self._review_bar.stop()
 
+        if status == STATUS_EDIT:
+            # The message is a JSON payload, not a toast: the engine's gate is
+            # holding execution until the doubted words are checked.
+            self._show_transcript_edit(message)
+            return
+
         if message:
             self.show_toast(message)
 
@@ -937,6 +992,15 @@ class CalendarWindow(QMainWindow):
         elif status == STATUS_SWITCH_TODO:
             self._set_view("todo")
             self.refresh_todos()
+
+    def _show_transcript_edit(self, payload_json: str) -> None:
+        """The engine's transcript gate: show what was heard, let the speaker
+        fix it, and hand the verdict back to the pipeline's worker thread.
+        Sending it back untouched is itself an answer (a confirmation the
+        server counts toward whitelisting the word)."""
+        verdict = ask_transcript_edit(self, payload_json)
+        if self._pipeline is not None:
+            self._pipeline.submit_transcript_edit(verdict)
 
     def _auto_refresh_if_db_changed(self) -> None:
         import os as _os
@@ -1370,6 +1434,15 @@ class CalendarWindow(QMainWindow):
         thinking_cb.toggled.connect(_thinking_toggled)
         _thinking_toggled(thinking_cb.isChecked())
 
+        confirm_cb = QCheckBox("Check doubted words with me before acting")
+        confirm_cb.setToolTip(
+            "When the vocabulary isn't sure it heard a word right, show the\n"
+            "transcription for a quick fix before anything is executed.\n"
+            "Off: act on the best guess (you can still tap a word to fix it).")
+        confirm_cb.setChecked(bool(getattr(getattr(self._config, "engine", None),
+                                           "confirm_transcript", False)))
+        assistant.addWidget(confirm_cb)
+
         vocab_btn = QPushButton(icons.icon("vocab"), "Vocabulary && Assistant Log…")
         vocab_btn.setToolTip("Teach the assistant names and words it mishears; review recent commands")
         vocab_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1502,6 +1575,17 @@ class CalendarWindow(QMainWindow):
                     # Event separator
                     sep_val = sep_edit.text().strip()
                     txt = re.sub(r'event_separator:\s*"[^"]*"', f'event_separator: "{sep_val}"', txt, count=1)
+                    # Engine gate — append the block if config.yaml predates it
+                    _confirm = "true" if confirm_cb.isChecked() else "false"
+                    if re.search(r"^engine:", txt, flags=re.M):
+                        if re.search(r"confirm_transcript:\s*(?:true|false)", txt):
+                            txt = re.sub(r"confirm_transcript:\s*(?:true|false)",
+                                         f"confirm_transcript: {_confirm}", txt, count=1)
+                        else:
+                            txt = re.sub(r"(^engine:)", rf"\1\n  confirm_transcript: {_confirm}",
+                                         txt, count=1, flags=re.M)
+                    else:
+                        txt += f"\nengine:\n  confirm_transcript: {_confirm}\n"
                     # Hebrew calendar — append the block if config.yaml predates this feature
                     if "hebrew_calendar:" in txt:
                         txt = re.sub(

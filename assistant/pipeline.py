@@ -32,6 +32,9 @@ STATUS_ERROR = "error"
 # review bar). Skipped when a stop word ended the recording — saying "execute"
 # means go, not "go in three seconds".
 STATUS_REVIEW = "review"
+# The engine's transcript gate wants the speaker to check a doubted word
+# before anything executes; the message is a JSON payload for the dialog.
+STATUS_EDIT = "edit_transcript"
 
 # Two button presses within this window while listening = cancel recording
 _DOUBLE_TAP_SEC = 0.4
@@ -98,6 +101,11 @@ class Pipeline:
         self._recording_cancelled = threading.Event()  # set to discard current recording
         self._review_event = threading.Event()        # UI answered the review bar
         self._review_choice: Optional[str] = None     # "send" | "redo" | "add" | "cancel"
+        # The engine's transcript gate: when the vocabulary doubts a word, the
+        # brain answers needs_edit and this pair carries the dialog's verdict
+        # back to the worker thread (same pattern as the review bar).
+        self._edit_event = threading.Event()
+        self._edit_text: Optional[str] = None
         self._last_listen_press: float = 0.0  # monotonic time of last press during STATUS_LISTENING
 
         self.on_auth_expired: Optional[Callable[[], None]] = None
@@ -397,7 +405,8 @@ class Pipeline:
                                  raw_transcript=_raw_transcript, corrections=_corrections)
 
     def _process_transcript(self, transcript: str, trace, t_start: float, *,
-                            raw_transcript: str = "", corrections: list | None = None) -> bool:
+                            raw_transcript: str = "", corrections: list | None = None,
+                            edited_from: str = "") -> bool:
         """Hand the transcript to the brain and render the answer.
 
         The Mac used to parse and execute here, in this process, with its own
@@ -435,7 +444,12 @@ class Pipeline:
             "transcript": transcript,
             "source": "mac",
             "current_view": self.current_view,
+            # This client can show the "check the transcription" dialog, so the
+            # engine's gate may answer needs_edit here.
+            "supports_edit": True,
         }
+        if edited_from:
+            payload["edited_from"] = edited_from
         if self._trace_run:
             payload["trace_run"] = self._trace_run
 
@@ -470,6 +484,21 @@ class Pipeline:
         message = data.get("message") or ""
         actions = data.get("actions") or []
         pending_id = data.get("pending_id")
+
+        if data.get("parse") == "needs_edit":
+            # The vocabulary doubts a word and the setting says ask first.
+            # Nothing has executed; the dialog's answer decides what does.
+            shown = data.get("transcript") or transcript
+            edited = self._await_transcript_edit(shown, data.get("needs_edit") or [])
+            if edited is None:
+                self._set_status(STATUS_IDLE, "❌ Cancelled")
+                trace.step(ERROR, "Cancelled", "You discarded the doubted transcript.", ok=False)
+                self._trace_result(transcript=shown, message="Cancelled — nothing was done.")
+                self._phase = STATUS_IDLE
+                return False
+            return self._process_transcript(edited, trace, t_start,
+                                            raw_transcript=raw_transcript or shown,
+                                            edited_from=shown)
 
         if data.get("parse") == "error" and not actions:
             self._tts.speak(message or "I couldn't understand that request.")
@@ -615,6 +644,27 @@ class Pipeline:
         choice = self._review_choice if answered else "send"
         self._review_choice = None
         return choice or "send"
+
+    def _await_transcript_edit(self, transcript: str, doubted: list) -> "str | None":
+        """Block on the "check the transcription" dialog. Returns the text to
+        run (possibly untouched — that is a confirmation the server counts),
+        or None for cancel. A dialog left unanswered cancels: executing a
+        doubted transcript minutes later would surprise more than it helps."""
+        import json as _json
+        self._edit_text = None
+        self._edit_event.clear()
+        words = [d.get("heard") if isinstance(d, dict) else str(d) for d in doubted]
+        self._set_status(STATUS_EDIT, _json.dumps(
+            {"transcript": transcript, "words": [w for w in words if w]}))
+        answered = self._edit_event.wait(timeout=180)
+        text = (self._edit_text or "").strip() if answered else None
+        self._edit_text = None
+        return text if text else None
+
+    def submit_transcript_edit(self, text: "str | None") -> None:
+        """Called by the UI thread with the dialog's verdict (None = cancel)."""
+        self._edit_text = text
+        self._edit_event.set()
 
     def _trace_begin(self):
         """Start a trace whose steps stream to the HUD as they happen."""

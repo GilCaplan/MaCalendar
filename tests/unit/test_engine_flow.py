@@ -155,3 +155,86 @@ def test_llm_offline_queues_the_command(monkeypatch):
     assert out["parse"] == "error"
     assert "offline" in out["message"].lower() or "saved" in out["message"].lower()
     assert out.get("pending_id") is not None
+
+
+# --- the gate's learning loop ----------------------------------------------
+
+@pytest.fixture
+def scratch_vocab(monkeypatch, tmp_path):
+    """A private vocabulary store, so learning tests cannot touch the shared
+    scratch one other tests read."""
+    import assistant.stt.vocab as vocab_module
+    path = str(tmp_path / "vocab.json")
+    store = vocab_module.VocabStore(path=path)
+    monkeypatch.setattr(vocab_module, "get_vocab", lambda: store)
+    monkeypatch.setattr(vocab_module, "VOCAB_PATH", path)
+    return store
+
+
+def test_a_saved_edit_becomes_an_alias(scratch_vocab):
+    from assistant.engine import transcript
+    pairs = transcript.learn_from_edit("call noga tomorrow at nine",
+                                       "call Noa tomorrow at nine")
+    assert pairs == [("noga", "Noa")]
+    entry = next(e for e in scratch_vocab.entries if e.word == "Noa")
+    assert "noga" in [a.lower() for a in entry.aliases]
+
+
+def test_an_untouched_resubmit_whitelists_after_two_confirms(scratch_vocab):
+    from assistant.engine import transcript
+    text = "meet Moxie at the park tomorrow"
+    assert transcript.confirm_unchanged(text) == []          # first confirm
+    promoted = transcript.confirm_unchanged(text)            # second
+    assert promoted == ["Moxie"]
+    assert any(e.word == "Moxie" for e in scratch_vocab.entries)
+    # And the gate stays quiet about it from now on.
+    assert not any(s["heard"] == "Moxie" for s in scratch_vocab.suggestions(text))
+
+
+def test_the_endpoint_learns_and_bypasses_the_gate(scratch_vocab, monkeypatch, cfg):
+    monkeypatch.setattr(cfg.engine, "confirm_transcript", True)
+    monkeypatch.setattr(engine, "load_config", lambda: cfg)
+    import assistant.api.server as server
+    monkeypatch.setattr(server, "load_config", lambda *a, **k: cfg)
+    rr = SimpleNamespace(confidence=0.97, missing_slots=[],
+                         intents=[("query_schedule", SimpleNamespace())])
+    rp = MagicMock()
+    rp.analyze.return_value = rr
+    monkeypatch.setattr(generate, "_get_rule_parser", lambda: rp)
+    _fake_registry(monkeypatch, {"query_schedule": ["all clear"]})
+
+    app = server.create_app()
+    client = app.test_client()
+    body = client.post("/voice/text", json={
+        "transcript": "call Noa tomorrow", "source": "test",
+        "edited_from": "call noga tomorrow", "supports_edit": True,
+    }).get_json()
+    # The edit taught the alias AND the resubmission was not re-gated.
+    assert body["parse"] != "needs_edit"
+    entry = next(e for e in scratch_vocab.entries if e.word == "Noa")
+    assert "noga" in [a.lower() for a in entry.aliases]
+
+
+# --- step 0: intake coalescing ---------------------------------------------
+
+def test_coalesce_wraps_within_budget():
+    got = engine.coalesce(["gym tomorrow at 7am", "buy milk"], max_tokens=300)
+    assert got == ['("gym tomorrow at 7am")and("buy milk")']
+
+
+def test_coalesce_overflow_runs_sequentially():
+    texts = ["a" * 400, "b" * 400, "c" * 400]
+    got = engine.coalesce(texts, max_tokens=150)
+    assert got == texts                       # each too big to share a batch
+
+
+def test_coalesce_single_input_is_unwrapped():
+    assert engine.coalesce(["just one thing"], max_tokens=300) == ["just one thing"]
+
+
+def test_the_wrapper_round_trips_through_segment(cfg):
+    from assistant.engine import segment
+    batch = engine.coalesce(["gym tomorrow at 7am", "buy milk"], max_tokens=300)[0]
+    st = EngineState(raw_text=batch, text=batch)
+    segment.run(st, cfg)
+    assert [it.text for it in st.items] == ["gym tomorrow at 7am", "buy milk"]

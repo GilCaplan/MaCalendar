@@ -10,7 +10,6 @@ from __future__ import annotations
 import datetime
 import logging
 import os
-import re
 import sqlite3
 from typing import Any
 
@@ -30,7 +29,6 @@ def load_config(path: str = "config.yaml") -> AppConfig:
         except ConfigError:
             return AppConfig()
 from assistant.db import get_db
-from assistant.exceptions import AssistantError, TargetNotFound
 
 logger = logging.getLogger(__name__)
 
@@ -105,8 +103,13 @@ def _llm_reachable(cfg) -> bool:
 
 
 def start_pending_retry_loop(run_transcript, interval: float = 30.0) -> None:
-    """Daemon: whenever the LLM is reachable, re-run queued commands (max 5 tries each)."""
+    """Daemon: whenever the LLM is reachable, re-run queued commands (max 5
+    tries each). Queued inputs are the engine's step-0 case in the flesh —
+    several commands parked while the model was away — so they are coalesced
+    into ("…")and("…") batches under the token budget and each batch costs one
+    parse; overflow batches run sequentially."""
     def _loop() -> None:
+        from assistant.engine import coalesce
         from assistant.intent.memory import get_memory
         while True:
             _time.sleep(interval)
@@ -118,16 +121,26 @@ def start_pending_retry_loop(run_transcript, interval: float = 30.0) -> None:
                 cfg = load_config()
                 if not _llm_reachable(cfg):
                     continue
+                live = []
                 for row in rows:
                     if row["attempts"] >= 5:
                         mem.resolve_pending(row["id"], "failed", "gave up after 5 attempts")
-                        continue
-                    logger.info("📱 Retrying queued command #%s: %s", row["id"], row["transcript"])
-                    result = run_transcript(row["transcript"])
-                    if result.get("parse") == "error":
-                        mem.bump_pending(row["id"])
-                    else:
-                        mem.resolve_pending(row["id"], "done", result.get("message", ""))
+                    elif (row["transcript"] or "").strip():
+                        live.append(row)   # empties would desync the batch map
+                budget = int(getattr(cfg.engine, "coalesce_max_tokens", 300))
+                taken = 0
+                for batch in coalesce([r["transcript"] for r in live], budget):
+                    n = batch.count(")and(") + 1 if ")and(" in batch else 1
+                    batch_rows = live[taken:taken + n]
+                    taken += n
+                    logger.info("📱 Retrying %d queued command(s): %s",
+                                len(batch_rows), batch[:80])
+                    result = run_transcript(batch)
+                    for row in batch_rows:
+                        if result.get("parse") == "error":
+                            mem.bump_pending(row["id"])
+                        else:
+                            mem.resolve_pending(row["id"], "done", result.get("message", ""))
             except Exception as e:
                 logger.warning("📱 Pending retry loop error: %s", e)
     _threading.Thread(target=_loop, daemon=True, name="pending-retry").start()
@@ -371,6 +384,26 @@ def create_app() -> Flask:
         # A client that can show the "edit the transcription" round-trip says
         # so; older clients never see a needs_edit response.
         edit_ok = bool(body.get("supports_edit"))
+        # The round-trip's second half: `edited_from` carries the transcript
+        # the gate doubted. A changed word teaches the vocabulary an alias (so
+        # the same mishearing auto-corrects next time); an untouched resubmit
+        # earns each doubted word a confirmation toward being whitelisted.
+        # Either way the gate is bypassed for THIS resubmission — asking twice
+        # about the same words would be nagging.
+        edited_from = (body.get("edited_from") or "").strip()
+        if edited_from:
+            from assistant.engine import transcript as _engine_transcript
+            if edited_from.strip().lower() != transcript.lower():
+                learned = _engine_transcript.learn_from_edit(edited_from, transcript, src)
+                if learned:
+                    logger.info("Learned from a transcript edit: %s",
+                                ", ".join(f"{w}→{r}" for w, r in learned))
+            else:
+                promoted = _engine_transcript.confirm_unchanged(transcript)
+                if promoted:
+                    logger.info("Whitelisted after repeated confirmation: %s",
+                                ", ".join(promoted))
+            edit_ok = False
         return jsonify(_run_transcript(transcript, source=src, current_view=view,
                                        trace_run=run, supports_edit=edit_ok))
 

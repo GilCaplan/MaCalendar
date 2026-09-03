@@ -134,3 +134,94 @@ def uncertain_words(text: str) -> list:
         return get_vocab().suggestions(text)
     except Exception:
         return []
+
+
+# ---------------------------------------------------------------------------
+# Learning from the needs_edit round-trip — so the gate fires LESS over time.
+# The endpoint calls these before re-running the corrected transcript; they
+# are stage-1 public API (like validate's readers), not part of run().
+# ---------------------------------------------------------------------------
+
+def _confirms_path() -> str:
+    """Confirmation counters live BESIDE the vocabulary, never inside it —
+    vocab.json is hand-curated and junk written there degrades the assistant."""
+    import os
+    from assistant.stt.vocab import VOCAB_PATH
+    return os.path.join(os.path.dirname(VOCAB_PATH), "transcript_confirms.json")
+
+
+CONFIRMS_TO_WHITELIST = 2
+
+
+def learn_from_edit(original: str, edited: str, source: str = "test") -> list:
+    """The user's saved edit is a correction they already typed out: each word
+    they replaced becomes a vocab alias (misheard → meant), so the same
+    mishearing auto-corrects next time and the gate stays quiet. Returns the
+    (wrong, right) pairs learned."""
+    import difflib
+
+    from assistant.stt.vocab import get_vocab
+
+    o_words = original.split()
+    e_words = edited.split()
+    pairs: list = []
+    sm = difflib.SequenceMatcher(None, [w.lower() for w in o_words],
+                                 [w.lower() for w in e_words])
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag != "replace" or (i2 - i1) != (j2 - j1):
+            continue                      # only clean word-for-word swaps teach
+        for wrong, right in zip(o_words[i1:i2], e_words[j1:j2]):
+            wrong = wrong.strip(".,!?;:")
+            right = right.strip(".,!?;:")
+            if not wrong or not right or wrong.lower() == right.lower():
+                continue
+            try:
+                # add_alias creates `right` as a vocab word when it is new.
+                get_vocab().add_alias(wrong, right)
+                pairs.append((wrong, right))
+            except Exception:
+                continue
+    return pairs
+
+
+def confirm_unchanged(text: str) -> list:
+    """The user looked and sent the words back untouched: each doubted word
+    earns a confirmation, and at CONFIRMS_TO_WHITELIST it joins the vocabulary
+    as itself — the gate never asks about it again. Returns words whitelisted
+    this time."""
+    import json
+    import os
+
+    from assistant.stt.vocab import get_vocab
+
+    try:
+        doubted = [s.get("heard") for s in get_vocab().suggestions(text) if s.get("heard")]
+    except Exception:
+        return []
+    if not doubted:
+        return []
+    path = _confirms_path()
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            counts = json.load(f)
+    except Exception:
+        counts = {}
+    promoted = []
+    for word in doubted:
+        key = word.lower()
+        counts[key] = int(counts.get(key, 0)) + 1
+        if counts[key] >= CONFIRMS_TO_WHITELIST:
+            try:
+                get_vocab().add_word(word)
+                promoted.append(word)
+            except Exception:
+                continue
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(counts, f, ensure_ascii=False, indent=1)
+        os.replace(tmp, path)
+    except Exception:
+        pass
+    return promoted
