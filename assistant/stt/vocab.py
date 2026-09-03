@@ -37,6 +37,19 @@ VOCAB_PATH = os.environ.get("MACALENDAR_VOCAB") or os.path.expanduser("~/.assist
 
 DEFAULT_THRESHOLD = 0.80   # difflib ratio; 1.0 = identical
 MIN_FUZZY_LEN = 3          # never fuzzy-match tokens shorter than this
+#: How far a phonetic match may fall below the user's own similarity setting.
+#:
+#: Expressed as a relaxation of `threshold` rather than as a fixed number, so
+#: it follows whatever strictness this user has chosen instead of a value
+#: fitted to one person's mistakes. Someone who tightens the dial tightens the
+#: phonetic path with it.
+#:
+#: The size is set by what phonetic identity is worth as evidence, not by a
+#: sample: two words with the same sound code, the same syllable count, and no
+#: other word in the list sharing that code are nearly certainly the same word,
+#: so the spelling barely has to agree — but it cannot be ignored entirely, or
+#: any two words in a bucket would be interchangeable.
+PHONETIC_RELAXATION = 0.25
 RECENT_LIMIT = 20          # transcripts kept for the "fix a word" UI
 
 # Very common English words that must never be fuzzy-replaced by a vocab word
@@ -76,6 +89,67 @@ def _english() -> set[str]:
 def _norm(s: str) -> str:
     """Lowercase, strip punctuation/diacritics-ish noise for comparison."""
     return re.sub(r"[^a-z0-9֐-׿' ]+", "", s.lower()).strip()
+
+
+def phonetic_key(word: str) -> str:
+    """A code for how a word sounds, so mishearings can be matched at all.
+
+    Speech recognition fails phonetically and `difflib` compares letters, so
+    the two are blind to each other in exactly the case that matters most:
+
+        heard "bugroot", meant "Bagrut"   -> 0.62 by letters, needs 0.90
+        heard "makabi",  meant "Maccabi"  -> 0.77
+        heard "ofeer",    meant "Ofir"     -> 0.75
+
+    Every one of those targets was already in the word list. None was reachable,
+    so none was corrected, so the alias was never learned and the same command
+    failed identically the next day. Lowering the letter threshold is not the
+    answer — that is what rewrote correct names to wrong ones before.
+
+    This is Soundex: keep the first letter, code the consonants by where they
+    are made in the mouth, drop the vowels. Words that sound alike collide;
+    words that merely look alike do not. Non-Latin script returns "" and is
+    never matched, since the coding table means nothing for it.
+    """
+    letters = [c for c in word.upper() if "A" <= c <= "Z"]
+    if not letters:
+        return ""                       # Hebrew script, digits, punctuation
+    codes = {"B": "1", "F": "1", "P": "1", "V": "1",
+             "C": "2", "G": "2", "J": "2", "K": "2",
+             "Q": "2", "S": "2", "X": "2", "Z": "2",
+             "D": "3", "T": "3",
+             "L": "4",
+             "M": "5", "N": "5",
+             "R": "6"}
+    out = letters[0]
+    previous = codes.get(letters[0], "")
+    for ch in letters[1:]:
+        code = codes.get(ch, "")
+        if code and code != previous:
+            out += code
+        # H and W are transparent: they do not separate two like consonants.
+        if ch not in ("H", "W"):
+            previous = code
+    return (out + "000")[:4]
+
+
+def _vowel_groups(word: str) -> int:
+    """Roughly the syllable count — the structure Soundex throws away.
+
+    Soundex codes consonants and discards vowels entirely, which is what lets
+    "pasta" and "pset" share a code: P-S-T either way. They do not sound alike
+    at all, and the difference is exactly the vowels. Requiring the same number
+    of vowel runs puts back enough of that structure to tell them apart, while
+    still ignoring *which* vowels they are — which is the whole point, since a
+    mishearing changes vowel quality constantly ("bagrut" heard as "bugroot").
+    """
+    return len(re.findall(r"[aeiouy]+", word.lower()))
+
+
+def _best_by_letters(window: str, candidates: list[str]) -> str:
+    """Of several words that sound alike, the one spelled most like this."""
+    return max(candidates,
+               key=lambda w: difflib.SequenceMatcher(None, window, _norm(w)).ratio())
 
 
 @dataclass
@@ -153,6 +227,8 @@ class VocabStore:
         self._path = path
         self._lock = threading.RLock()
         self._entries: list[VocabEntry] = []
+        #: word-sound index, rebuilt lazily; None means "stale"
+        self._phonetic_cache: "dict[str, list[str]] | None" = None
         self._recent: list[dict[str, Any]] = []
         self.auto_correct: bool = True
         self.learn_aliases: bool = True
@@ -180,6 +256,7 @@ class VocabStore:
                 data = {}
             self._entries = [VocabEntry.from_dict(d) for d in data.get("entries", [])]
             self._entries = [e for e in self._entries if e.word]
+            self._phonetic_cache = None      # the word list just changed
             self._recent = list(data.get("recent", []))[-RECENT_LIMIT:]
             self.auto_correct = bool(data.get("auto_correct", True))
             self.learn_aliases = bool(data.get("learn_aliases", True))
@@ -188,6 +265,7 @@ class VocabStore:
             self._mtime = mtime
 
     def _save(self) -> None:
+        self._phonetic_cache = None      # a word was added, edited or removed
         with self._lock:
             os.makedirs(os.path.dirname(self._path), exist_ok=True)
             data = {
@@ -305,6 +383,21 @@ class VocabStore:
                     self._add_alias_to(entry, alias)
             self._save()
             return entry
+
+    def _phonetic_bucket(self, key: str) -> list[str]:
+        """Every known word that sounds like this one.
+
+        Built once and cached, because it is consulted for every entry of every
+        window of every command. Cleared whenever the word list changes.
+        """
+        if self._phonetic_cache is None:
+            index: dict[str, list[str]] = {}
+            for e in self._entries:
+                k = phonetic_key(e.word)
+                if k:
+                    index.setdefault(k, []).append(e.word)
+            self._phonetic_cache = index
+        return self._phonetic_cache.get(key, [])
 
     def _add_alias_to(self, entry: VocabEntry, alias: str) -> bool:
         alias = alias.strip()
@@ -466,6 +559,27 @@ class VocabStore:
                     # First letter must agree — mishearings keep the onset far more often than not
                     if score >= thr and window[:1] == target[:1]:
                         reason = "fuzzy"
+                    elif (n == 1 and score >= self.threshold - PHONETIC_RELAXATION
+                          and _vowel_groups(window) == _vowel_groups(target)):
+                        # Sounding identical is strong evidence, but only with
+                        # three guards, each of which stopped a real mistake:
+                        #
+                        #  n == 1        — a phrase's word boundaries move when
+                        #                  it is misheard, so a code computed
+                        #                  over one is not comparable. This is
+                        #                  what stopped "set meeting for" being
+                        #                  rewritten to "set a meeting".
+                        #  vowel groups  — see _vowel_groups; stopped "pasta"
+                        #                  becoming "pset".
+                        #  bucket of one — nothing else in the word list sounds
+                        #                  the same, so there is nothing to
+                        #                  confuse it with. Where several do
+                        #                  collide, the letters break the tie.
+                        key = phonetic_key(window)
+                        if key and key == phonetic_key(entry.word):
+                            rivals = self._phonetic_bucket(key)
+                            if len(rivals) == 1 or _best_by_letters(window, rivals) == entry.word:
+                                reason = "phonetic"
 
                 if reason is None:
                     i += 1
@@ -482,8 +596,17 @@ class VocabStore:
                     replaced[j] = True
                 corrections.append(Correction(original_text, entry.word, reason, score))
                 entry.hits += 1
-                if learn and reason == "fuzzy" and score >= 0.9 and self._add_alias_to(entry, original_text):
-                    logger.info("Vocab learned alias %r → %r", original_text, entry.word)
+                # Remember the mishearing so the next one is an exact hit
+                # rather than another guess. A phonetic match is learned even
+                # though its letter score is low — the score is low BECAUSE the
+                # spelling differs, which is the whole reason it was missed
+                # before. It has already passed the vowel-group, single-word,
+                # bucket-of-one, not-English and not-another-known-word guards;
+                # a letter threshold on top of those would only re-impose the
+                # test it was designed to get past.
+                learnable = (reason == "phonetic") or (reason == "fuzzy" and score >= 0.9)
+                if learn and learnable and self._add_alias_to(entry, original_text):
+                    logger.info("Vocab learned alias %r → %r (%s)", original_text, entry.word, reason)
                 dirty = True
                 i += n
 

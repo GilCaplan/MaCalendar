@@ -1,0 +1,724 @@
+<title>Under the Lid</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+  :root{
+    --bg:#e8ebee; --panel:#f6f7f8; --screen:#eef1f3; --ink:#1b222b; --muted:#5b6673;
+    --line:#b9c2cc; --faint:#d6dce2; --amber:#8f6407; --amber-soft:rgba(158,113,10,.10);
+    --model:#116e83; --good:#20714a; --codebg:#dfe3e8; --shadow:rgba(20,28,38,.16);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0b0f14; --panel:#141a22; --screen:#0f141b; --ink:#dde4eb; --muted:#8a96a3;
+      --line:#33404f; --faint:#1c2530; --amber:#e3aa3d; --amber-soft:rgba(227,170,61,.09);
+      --model:#5cc3d6; --good:#54b183; --codebg:#1a222d; --shadow:rgba(0,0,0,.55);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0b0f14; --panel:#141a22; --screen:#0f141b; --ink:#dde4eb; --muted:#8a96a3;
+    --line:#33404f; --faint:#1c2530; --amber:#e3aa3d; --amber-soft:rgba(227,170,61,.09);
+    --model:#5cc3d6; --good:#54b183; --codebg:#1a222d; --shadow:rgba(0,0,0,.55);
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg); color:var(--ink);
+       font:16px/1.62 'IBM Plex Serif',Georgia,'Times New Roman',serif;
+       margin:0; padding:0 0 76px 0;}
+  header{max-width:1080px; margin:0 auto; padding:34px 20px 8px;}
+  .eyebrow{font:500 11px/1 'IBM Plex Mono',ui-monospace,monospace; letter-spacing:.22em;
+           text-transform:uppercase; color:var(--muted); margin:0 0 10px;}
+  h1{font:600 clamp(1.55rem,4.2vw,2.35rem)/1.1 'IBM Plex Mono',ui-monospace,monospace;
+     letter-spacing:.05em; text-transform:uppercase; margin:0 0 12px; text-wrap:balance;}
+  .lede{max-width:66ch; margin:0 0 10px; color:var(--ink);}
+  .lede strong{color:var(--amber);}
+  .stats{font:400 12.5px/1.7 'IBM Plex Mono',ui-monospace,monospace; color:var(--muted); margin:0;}
+  .stats b{color:var(--ink); font-weight:500;}
+  .stagewrap{max-width:1120px; margin:8px auto 0; padding:0 12px;}
+  #stage{width:100%; height:auto; display:block;}
+  #world{transition:transform .55s cubic-bezier(.22,.85,.3,1); transform-origin:0 0; will-change:transform;}
+  #stage text{font-family:'IBM Plex Mono',ui-monospace,monospace; fill:var(--ink); user-select:none;}
+  #stage [data-panel]{cursor:pointer; outline:none;}
+  #stage [data-panel] .frame{transition:stroke .2s, opacity .45s;}
+  #stage [data-panel]{transition:opacity .45s;}
+  #stage.zoomed [data-panel]:not(.sel){opacity:.38;}
+  #stage [data-panel]:hover .frame,
+  #stage [data-panel]:focus-visible .frame,
+  #stage [data-panel].sel .frame{stroke:var(--amber); stroke-width:2.4;}
+  .cap{max-width:1080px; margin:6px auto 0; padding:0 20px;
+       font:400 12px/1.6 'IBM Plex Mono',ui-monospace,monospace; color:var(--muted);}
+  .cap kbd{border:1px solid var(--line); border-radius:3px; padding:0 4px; font-family:inherit;}
+
+  /* ------- the panel: a window ------- */
+  #panel{position:fixed; right:16px; top:16px; z-index:50;
+         width:min(432px, calc(100vw - 32px)); max-height:calc(100vh - 100px);
+         background:var(--panel); border:1px solid var(--line); border-radius:10px;
+         box-shadow:0 20px 52px var(--shadow); display:flex; flex-direction:column;
+         animation:pin .28s cubic-bezier(.2,.8,.3,1);}
+  @keyframes pin{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:none;}}
+  #panel.full{top:12px; left:12px; right:12px; bottom:72px; width:auto; max-height:none;}
+  #panel[hidden]{display:none;}
+  .pbar{display:flex; align-items:center; gap:10px; padding:9px 10px 9px 15px;
+        border-bottom:1px solid var(--line); flex:none;}
+  .pdot{width:8px; height:8px; border-radius:50%; background:var(--amber); flex:none;}
+  .ptt{flex:1; min-width:0;}
+  #ptag{display:block; font:500 9.5px/1.2 'IBM Plex Mono',monospace; letter-spacing:.18em;
+        text-transform:uppercase; color:var(--muted);}
+  #ptitle{display:block; font:600 14.5px/1.25 'IBM Plex Mono',monospace; letter-spacing:.02em;}
+  .pbar button{flex:none; width:30px; height:30px; border:1px solid var(--line); border-radius:6px;
+        background:transparent; color:var(--ink); font:500 14px/1 'IBM Plex Mono',monospace; cursor:pointer;}
+  .pbar button:hover{border-color:var(--amber); color:var(--amber);}
+  #pbody{overflow-y:auto; padding:14px 18px 6px; font-size:14.5px;}
+  #pbody p{margin:0 0 12px; max-width:62ch;}
+  #pbody ul{margin:0 0 12px; padding-left:20px;}
+  #pbody li{margin:0 0 8px;}
+  #pbody code{font:500 12.5px 'IBM Plex Mono',monospace; background:var(--codebg);
+              padding:1px 5px; border-radius:4px;}
+  #pbody .figs{font:500 13px/1.7 'IBM Plex Mono',monospace; color:var(--amber);}
+  #pbody table{border-collapse:collapse; font:400 12.5px/1.5 'IBM Plex Mono',monospace;
+               margin:0 0 14px; width:100%;}
+  #pbody th{text-align:left; font-weight:500; color:var(--muted); border-bottom:1px solid var(--line);
+            padding:4px 10px 4px 0; letter-spacing:.04em;}
+  #pbody td{border-bottom:1px solid var(--faint); padding:5px 10px 5px 0; vertical-align:top;}
+  #pbody .tblwrap{overflow-x:auto;}
+  #pbody .num{font-variant-numeric:tabular-nums; white-space:nowrap;}
+  .morebtn{display:inline-block; margin:0 0 14px; border:1px solid var(--line); border-radius:6px;
+           background:transparent; color:var(--amber); cursor:pointer;
+           font:500 12px/1 'IBM Plex Mono',monospace; letter-spacing:.06em; padding:8px 12px;}
+  .morebtn:hover{border-color:var(--amber);}
+  .pmore{border-top:1px dashed var(--line); padding-top:12px;}
+  .pnav{display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--line); flex:none;}
+  .pnav button{border:1px solid var(--line); border-radius:6px; background:transparent; color:var(--ink);
+        font:500 12px/1.2 'IBM Plex Mono',monospace; padding:8px 10px; cursor:pointer;
+        white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .pnav button:hover{border-color:var(--amber); color:var(--amber);}
+  #pnext{flex:1; text-align:right;}
+  #pprev{flex:1; text-align:left;}
+
+  /* ------- bottom rail ------- */
+  #rail{position:fixed; left:0; right:0; bottom:0; z-index:40; display:flex; gap:6px;
+        padding:9px 12px; background:var(--panel); border-top:1px solid var(--line);
+        overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  #rail button{flex:none; border:1px solid var(--line); border-radius:6px; background:transparent;
+        color:var(--muted); font:500 11.5px/1 'IBM Plex Mono',monospace; letter-spacing:.03em;
+        padding:8px 11px; cursor:pointer;}
+  #rail button b{color:var(--amber); font-weight:600; margin-right:4px;}
+  #rail button:hover{border-color:var(--amber); color:var(--ink);}
+  #rail button.on{border-color:var(--amber); color:var(--ink); background:var(--amber-soft);}
+  button:focus-visible, [data-panel]:focus-visible{outline:2px solid var(--amber); outline-offset:2px;}
+
+  @media (max-width:760px){
+    #panel{left:0; right:0; bottom:56px; top:auto; width:auto; max-height:62vh;
+           border-radius:12px 12px 0 0; border-left:none; border-right:none; border-bottom:none;}
+    #panel.full{top:8px; bottom:56px; left:0; right:0; border-radius:12px;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important; animation:none !important;}
+  }
+</style>
+
+<header>
+  <p class="eyebrow">an explorable of one small machine</p>
+  <h1>Under the Lid</h1>
+  <p class="lede">A voice-driven calendar assistant that runs entirely on one laptop, with a phone
+  as a second surface. You speak; an event appears. No account, no API key, nothing sent to any
+  company — and <strong>one brain</strong>: every command, from either device, is understood and
+  executed by a single process on the laptop. Everything else in the drawing is thin.</p>
+  <p class="stats"><b>3</b> local models &nbsp;·&nbsp; <b>15</b> actions &nbsp;·&nbsp;
+  <b>97%</b> on an 89-command corpus &nbsp;·&nbsp; <b>0</b> requests to the internet</p>
+</header>
+
+<div class="stagewrap">
+<svg id="stage" viewBox="0 0 1000 580" aria-label="The system: a laptop running four processes, a phone beside it, a private link between them, a crossed-out internet, and the sun. Every framed part can be opened." role="group">
+  <defs>
+    <marker id="mi" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L8 4 L0 8 z" fill="var(--muted)"/>
+    </marker>
+    <marker id="ma" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L8 4 L0 8 z" fill="var(--amber)"/>
+    </marker>
+  </defs>
+
+  <g id="world">
+    <!-- desk -->
+    <line x1="24" y1="512" x2="976" y2="512" stroke="var(--line)" stroke-width="1.5"/>
+
+    <!-- ============ THE LAPTOP (static chrome) ============ -->
+    <text x="88" y="86" font-size="10.5" letter-spacing="1.4" fill="var(--muted)">ONE LAPTOP · FOUR PROCESSES</text>
+    <rect x="85" y="95" width="545" height="370" rx="10" fill="var(--panel)" stroke="var(--line)" stroke-width="1.5"/>
+    <rect x="101" y="111" width="513" height="338" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+    <circle cx="357" cy="103" r="2" fill="var(--muted)"/>
+    <path d="M 62 465 L 653 465 L 671 503 Q 674 512 663 512 L 52 512 Q 41 512 44 503 Z"
+          fill="var(--panel)" stroke="var(--line)" stroke-width="1.5"/>
+
+    <!-- model server -->
+    <g data-panel="models" role="button" tabindex="0" aria-label="The model server: Llama 3.1 8B, four-bit, pinned in memory, 5.8 gigabytes resident.">
+      <rect class="frame" x="117" y="176" width="114" height="124" rx="6" fill="var(--panel)" stroke="var(--model)" stroke-width="1.5"/>
+      <text x="174" y="198" text-anchor="middle" font-size="11" font-weight="600" fill="var(--model)">model server</text>
+      <text x="174" y="218" text-anchor="middle" font-size="9.5" fill="var(--muted)">Llama 3.1 8B</text>
+      <text x="174" y="233" text-anchor="middle" font-size="9.5" fill="var(--muted)">4-bit · pinned</text>
+      <text x="174" y="248" text-anchor="middle" font-size="9.5" fill="var(--muted)">5.8 GB resident</text>
+      <text x="174" y="270" text-anchor="middle" font-size="8.5" fill="var(--muted)">always warm</text>
+    </g>
+
+    <!-- THE BRAIN frame + header -->
+    <rect x="250" y="128" width="205" height="256" rx="8" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="2"/>
+    <g data-panel="brain" role="button" tabindex="0" aria-label="The brain: the one process that parses and executes every command from both devices.">
+      <rect class="frame" x="250" y="128" width="205" height="42" rx="8" fill="transparent" stroke="transparent"/>
+      <text x="352" y="150" text-anchor="middle" font-size="13.5" font-weight="600" letter-spacing="1.4" fill="var(--amber)">THE BRAIN</text>
+      <text x="352" y="164" text-anchor="middle" font-size="8.5" fill="var(--muted)">one process — parses &amp; executes everything</text>
+    </g>
+
+    <!-- pipeline chain, steps 2..7 -->
+    <g data-panel="correct" role="button" tabindex="0" aria-label="Step 2: correct the transcript against a 374-word personal vocabulary.">
+      <rect class="frame" x="282" y="176" width="141" height="24" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="352" y="192" text-anchor="middle" font-size="10">2 · correct words</text>
+    </g>
+    <line x1="352" y1="201" x2="352" y2="205" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <g data-panel="parse" role="button" tabindex="0" aria-label="Step 3: rule parser, 76 verb mappings, scores its own confidence.">
+      <rect class="frame" x="282" y="210" width="141" height="24" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="352" y="226" text-anchor="middle" font-size="10">3 · parse by rule</text>
+    </g>
+    <line x1="352" y1="235" x2="352" y2="239" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <g data-panel="route" role="button" tabindex="0" aria-label="Step 4: route. Confident rules answer in a tenth of a second; otherwise the model reads it.">
+      <rect class="frame" x="282" y="244" width="141" height="24" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="352" y="260" text-anchor="middle" font-size="10">4 · route ≥ 0.85</text>
+    </g>
+    <line x1="352" y1="269" x2="352" y2="273" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <g data-panel="check" role="button" tabindex="0" aria-label="Step 5: thirteen deterministic checks before anything is written.">
+      <rect class="frame" x="282" y="278" width="141" height="24" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="352" y="294" text-anchor="middle" font-size="10">5 · check ×13</text>
+    </g>
+    <line x1="352" y1="303" x2="352" y2="307" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <g data-panel="write" role="button" tabindex="0" aria-label="Step 6: write to the local database file. The user sees the result now.">
+      <rect class="frame" x="282" y="312" width="141" height="24" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="352" y="328" text-anchor="middle" font-size="10">6 · write</text>
+    </g>
+    <line x1="352" y1="337" x2="352" y2="341" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <g data-panel="review" role="button" tabindex="0" aria-label="Step 7: the model reviews every command afterwards, on a background thread, advisory only.">
+      <rect class="frame" x="282" y="346" width="141" height="24" rx="4" fill="var(--screen)" stroke="var(--line)" stroke-dasharray="4 3"/>
+      <text x="352" y="362" text-anchor="middle" font-size="10">7 · review (bg)</text>
+    </g>
+
+    <!-- route <-> model server -->
+    <line x1="280" y1="256" x2="233" y2="256" stroke="var(--muted)" marker-start="url(#mi)" marker-end="url(#mi)"/>
+    <text x="256" y="248" text-anchor="middle" font-size="8" fill="var(--muted)">if unsure</text>
+    <text x="256" y="270" text-anchor="middle" font-size="8" fill="var(--muted)">7.8 s</text>
+
+    <!-- answer to calendar window -->
+    <line x1="457" y1="150" x2="474" y2="150" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <text x="466" y="122" text-anchor="middle" font-size="8" fill="var(--muted)">answer</text>
+
+    <!-- writes / remembers / appends -->
+    <path d="M 282 328 L 266 328 L 266 398" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <text x="262" y="382" text-anchor="end" font-size="8" fill="var(--muted)">writes</text>
+    <path d="M 412 372 L 412 398" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <text x="418" y="390" font-size="8" fill="var(--muted)">remembers</text>
+    <path d="M 457 352 L 500 352 L 500 400" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <text x="468" y="346" font-size="8" fill="var(--muted)">appends</text>
+
+    <!-- calendar window -->
+    <g data-panel="window" role="button" tabindex="0" aria-label="The calendar window on the laptop: a thin client with no parser inside.">
+      <rect class="frame" x="478" y="128" width="122" height="82" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.5"/>
+      <line x1="478" y1="144" x2="600" y2="144" stroke="var(--line)"/>
+      <circle cx="488" cy="136" r="2" fill="var(--muted)"/><circle cx="496" cy="136" r="2" fill="var(--muted)"/>
+      <text x="539" y="162" text-anchor="middle" font-size="10.5" font-weight="600">calendar window</text>
+      <text x="539" y="178" text-anchor="middle" font-size="8.5" fill="var(--muted)">a thin client</text>
+      <text x="539" y="192" text-anchor="middle" font-size="8.5" fill="var(--muted)">records · posts · renders</text>
+    </g>
+
+    <!-- thinking panel: floats past the laptop frame -->
+    <g data-panel="hud" role="button" tabindex="0" aria-label="The thinking panel: a floating card that talks to nothing and tails a log file.">
+      <rect x="524" y="236" width="116" height="64" rx="6" fill="var(--shadow)" opacity=".5"/>
+      <rect class="frame" x="520" y="232" width="116" height="64" rx="6" fill="var(--panel)" stroke="var(--line)" stroke-width="1.5"/>
+      <line x1="520" y1="246" x2="636" y2="246" stroke="var(--line)"/>
+      <circle cx="529" cy="239" r="2" fill="var(--amber)"/>
+      <text x="578" y="262" text-anchor="middle" font-size="10.5" font-weight="600">thinking panel</text>
+      <text x="578" y="276" text-anchor="middle" font-size="8.5" fill="var(--muted)">floats over everything</text>
+      <text x="578" y="288" text-anchor="middle" font-size="8.5" fill="var(--muted)">talks to nothing</text>
+    </g>
+    <!-- tails -->
+    <line x1="556" y1="404" x2="576" y2="302" stroke="var(--muted)" stroke-dasharray="3 3" marker-end="url(#mi)"/>
+    <text x="576" y="360" font-size="8" fill="var(--muted)">tails</text>
+
+    <!-- three files on disk -->
+    <text x="252" y="400" font-size="8" letter-spacing="1" fill="var(--muted)">THREE FILES ON DISK</text>
+    <g data-panel="write" role="button" tabindex="0" aria-label="The calendar database file: the single source of truth.">
+      <path class="frame" d="M 252 406 L 332 406 L 342 416 L 342 444 L 252 444 Z" fill="var(--panel)" stroke="var(--line)" stroke-width="1.5"/>
+      <text x="297" y="424" text-anchor="middle" font-size="9">calendar db</text>
+      <text x="297" y="437" text-anchor="middle" font-size="8" fill="var(--muted)">the truth</text>
+    </g>
+    <g data-panel="learn" role="button" tabindex="0" aria-label="Step 8: the command memory file. Every command, what it produced, and your verdict.">
+      <path class="frame" d="M 362 406 L 442 406 L 452 416 L 452 444 L 362 444 Z" fill="var(--panel)" stroke="var(--line)" stroke-width="1.5"/>
+      <text x="407" y="424" text-anchor="middle" font-size="9">memory db</text>
+      <text x="407" y="437" text-anchor="middle" font-size="8" fill="var(--muted)">your history</text>
+      <circle cx="366" cy="406" r="7.5" fill="var(--amber)"/>
+      <text x="366" y="409.5" text-anchor="middle" font-size="9" font-weight="600" fill="var(--bg)">8</text>
+    </g>
+    <g data-panel="hud" role="button" tabindex="0" aria-label="The trace log: JSON lines the brain appends and the thinking panel tails.">
+      <path class="frame" d="M 472 406 L 552 406 L 562 416 L 562 444 L 472 444 Z" fill="var(--panel)" stroke="var(--line)" stroke-width="1.5"/>
+      <text x="517" y="424" text-anchor="middle" font-size="9">trace log</text>
+      <text x="517" y="437" text-anchor="middle" font-size="8" fill="var(--muted)">the thinking</text>
+    </g>
+
+    <!-- mic on the base = step 1 -->
+    <g data-panel="hear" role="button" tabindex="0" aria-label="Step 1: hear. Whisper base, 74 million parameters, on the laptop GPU. Audio never leaves the machine.">
+      <rect x="322" y="468" width="72" height="38" fill="transparent"/>
+      <circle class="frame" cx="357" cy="487" r="14" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.5"/>
+      <rect x="354" y="479" width="6" height="10" rx="3" fill="var(--amber)"/>
+      <path d="M 350 487 a 7 7 0 0 0 14 0" fill="none" stroke="var(--amber)" stroke-width="1.5"/>
+      <line x1="357" y1="494" x2="357" y2="497" stroke="var(--amber)" stroke-width="1.5"/>
+      <circle cx="337" cy="473" r="7.5" fill="var(--amber)"/>
+      <text x="337" y="476.5" text-anchor="middle" font-size="9" font-weight="600" fill="var(--bg)">1</text>
+    </g>
+
+    <!-- ============ THE LINK ============ -->
+    <g data-panel="link" role="button" tabindex="0" aria-label="The link: text over a private network between your own two machines. The source field is the only difference between the devices.">
+      <rect class="frame" x="632" y="262" width="96" height="80" rx="6" fill="transparent" stroke="transparent"/>
+      <text x="681" y="277" text-anchor="middle" font-size="8.5" fill="var(--muted)">what you said</text>
+      <line x1="726" y1="285" x2="638" y2="285" stroke="var(--muted)" marker-end="url(#mi)"/>
+      <line x1="638" y1="301" x2="726" y2="301" stroke="var(--muted)" marker-end="url(#mi)"/>
+      <text x="681" y="315" text-anchor="middle" font-size="8.5" fill="var(--muted)">what happened</text>
+      <text x="681" y="331" text-anchor="middle" font-size="9" fill="var(--muted)">two machines</text>
+      <text x="681" y="343" text-anchor="middle" font-size="9" fill="var(--muted)">no service</text>
+    </g>
+
+    <!-- ============ THE PHONE ============ -->
+    <text x="730" y="138" font-size="10.5" letter-spacing="1.4" fill="var(--muted)">THE PHONE · A THIN CLIENT</text>
+    <g data-panel="phone" role="button" tabindex="0" aria-label="The phone: a full local copy that works with the laptop off; versioned edits; spoken commands queued as recordings, not actions.">
+      <rect class="frame" x="730" y="148" width="152" height="360" rx="24" fill="var(--panel)" stroke="var(--line)" stroke-width="1.5"/>
+      <rect x="741" y="168" width="130" height="320" rx="14" fill="var(--screen)" stroke="var(--line)"/>
+      <line x1="788" y1="158" x2="824" y2="158" stroke="var(--line)" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="806" cy="210" r="16" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.5"/>
+      <rect x="803" y="201" width="6" height="11" rx="3" fill="var(--amber)"/>
+      <path d="M 798 210 a 8 8 0 0 0 16 0" fill="none" stroke="var(--amber)" stroke-width="1.5"/>
+      <line x1="806" y1="218" x2="806" y2="222" stroke="var(--amber)" stroke-width="1.5"/>
+      <text x="806" y="243" text-anchor="middle" font-size="8.5" fill="var(--muted)">records — decides nothing</text>
+      <rect x="752" y="258" width="108" height="46" rx="5" fill="var(--panel)" stroke="var(--line)"/>
+      <text x="806" y="277" text-anchor="middle" font-size="9.5" font-weight="600">local copy</text>
+      <text x="806" y="292" text-anchor="middle" font-size="8.5" fill="var(--muted)">works offline</text>
+      <rect x="752" y="318" width="108" height="46" rx="5" fill="var(--panel)" stroke="var(--line)"/>
+      <text x="806" y="337" text-anchor="middle" font-size="9.5" font-weight="600">voice queue</text>
+      <text x="806" y="352" text-anchor="middle" font-size="8.5" fill="var(--muted)">sound, not actions</text>
+      <rect x="752" y="384" width="108" height="26" rx="13" fill="transparent" stroke="var(--line)"/>
+      <text x="806" y="401" text-anchor="middle" font-size="9" fill="var(--amber)">source: "ios"</text>
+      <line x1="783" y1="474" x2="829" y2="474" stroke="var(--line)" stroke-width="2.5" stroke-linecap="round"/>
+    </g>
+
+    <!-- ============ THE INTERNET, NEVER ============ -->
+    <g data-panel="cloud" role="button" tabindex="0" aria-label="The internet: never contacted. No account, no API key; every model runs from a local copy.">
+      <rect x="605" y="8" width="100" height="106" fill="transparent"/>
+      <circle class="frame" cx="655" cy="52" r="38" fill="transparent" stroke="var(--muted)" stroke-width="2"/>
+      <path d="M 640 63 h 31 a 8.5 8.5 0 0 0 3 -16.5 a 11.5 11.5 0 0 0 -22 -4.5 a 9 9 0 0 0 -12 8.5 a 6.8 6.8 0 0 0 0 12.5 z"
+            fill="none" stroke="var(--muted)" stroke-width="1.5"/>
+      <line x1="629" y1="79" x2="681" y2="26" stroke="var(--ink)" stroke-width="3"/>
+      <text x="655" y="106" text-anchor="middle" font-size="9.5" fill="var(--muted)">the internet — never</text>
+    </g>
+
+    <!-- ============ THE SUN ============ -->
+    <g data-panel="sun" role="button" tabindex="0" aria-label="Sun and sky: candle lighting and nightfall computed from solar geometry at configured coordinates.">
+      <rect x="886" y="440" width="90" height="100" fill="transparent"/>
+      <path class="frame" d="M 903 511 A 27 27 0 0 1 957 511 Z" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.5"/>
+      <line x1="930" y1="474" x2="930" y2="462" stroke="var(--amber)" stroke-width="1.5"/>
+      <line x1="908" y1="482" x2="899" y2="473" stroke="var(--amber)" stroke-width="1.5"/>
+      <line x1="952" y1="482" x2="961" y2="473" stroke="var(--amber)" stroke-width="1.5"/>
+      <text x="930" y="534" text-anchor="middle" font-size="9.5" fill="var(--muted)">sun &amp; sky</text>
+    </g>
+  </g>
+</svg>
+</div>
+<p class="cap">Every framed part opens. The numbered chain is the pipeline — <kbd>←</kbd> <kbd>→</kbd> step through it, <kbd>esc</kbd> closes, ⌂ returns to the whole system.</p>
+
+<aside id="panel" hidden aria-label="Detail panel">
+  <div class="pbar">
+    <span class="pdot" aria-hidden="true"></span>
+    <span class="ptt"><span id="ptag"></span><span id="ptitle"></span></span>
+    <button id="pfull" title="Expand to full detail" aria-label="Expand to full detail">⤢</button>
+    <button id="pclose" title="Close" aria-label="Close panel">×</button>
+  </div>
+  <div id="pbody"></div>
+  <div class="pnav">
+    <button id="pprev"></button>
+    <button id="phome" aria-label="Back to the whole system">⌂</button>
+    <button id="pnext"></button>
+  </div>
+</aside>
+
+<nav id="rail" aria-label="Jump to any step">
+  <button data-go="home" id="bhome">⌂ system</button>
+  <button data-go="hear"><b>1</b>hear</button>
+  <button data-go="correct"><b>2</b>correct</button>
+  <button data-go="parse"><b>3</b>parse</button>
+  <button data-go="route"><b>4</b>route</button>
+  <button data-go="check"><b>5</b>check</button>
+  <button data-go="write"><b>6</b>write</button>
+  <button data-go="review"><b>7</b>review</button>
+  <button data-go="learn"><b>8</b>learn</button>
+</nav>
+
+<script>
+const P = {
+  brain: {
+    tag:"the thesis", name:"the brain", title:"One brain",
+    z:[352,256,1.9],
+    sum:`<p>One process on the laptop understands and executes every command. The calendar window
+    on the laptop and the phone in your pocket are both thin clients: <strong>neither contains a
+    parser</strong>. Both hand over what you said and render what comes back, and the only
+    difference between them is one field naming which device spoke — <code>"mac"</code> or
+    <code>"ios"</code>.</p>
+    <p class="figs">15 actions · 101 endpoints · ~34,000 lines · 930 tests</p>`,
+    more:`<p>It was not always this way. The calendar window once carried its own private copy of
+    the whole pipeline. The two copies drifted, and every fix had to be written twice or the
+    surfaces would disagree about what a sentence meant. Collapsing to one brain is the decision
+    everything else on this page leans on: a behaviour that exists, exists once, and the phone
+    gets it for free.</p>
+    <p>Five domains live behind those 101 endpoints — calendar, tasks, training, coursework,
+    time-tracking — and voice reaches only the first two and a half. Where a screen is the better
+    instrument, there is only a screen.</p>
+    <p>One small tell of the design: a caller that does not label its source is treated as a test,
+    so a stray development request can never masquerade as a command you actually gave.</p>`
+  },
+  hear: {
+    tag:"step 1 of 8", name:"hear", title:"It hears locally",
+    z:[357,485,2.6],
+    sum:`<p>A speech-to-text model — Whisper <code>base</code>, 74M parameters — runs on the
+    laptop's own GPU from a locally cached copy. Sound in, words out; the recording never leaves
+    the machine.</p>
+    <p>The phone does not transcribe. It records, and sends the audio to the laptop — so both
+    devices are heard by the same ears, with the same vocabulary.</p>`,
+    more:`<p>This is the first of the three local models and the only one that touches sound.
+    Everything after this line works on plain text, which is what lets the laptop and the phone
+    share the rest of the pipeline exactly.</p>`
+  },
+  correct: {
+    tag:"step 2 of 8", name:"correct", title:"374 words the dictionary doesn't know",
+    z:[352,190,2.9],
+    sum:`<p>Before any parsing, the transcript is checked against a personal vocabulary — 374
+    words at last count. A word in that list can do three different things, kept deliberately
+    separate:</p>
+    <ul>
+      <li><strong>Fix a mishearing.</strong> The transcript is rewritten, and the misheard form is
+      remembered as an alias so next time it is an exact hit.</li>
+      <li><strong>Expand shorthand.</strong> Never substituted into your words — expanding would
+      edit what you said rather than correct it. It rides along as context instead.</li>
+      <li><strong>Carry a label.</strong> A word can imply what kind of task or event it belongs
+      to, so the label travels with it.</li>
+    </ul>`,
+    more:`<p>Two guard rails. Fuzzy matching never touches a list of protected everyday words, so
+    a vocabulary name can never swallow the word <em>data</em>. And every vocabulary word is also
+    fed to the speech model as a bias, nudging it to spell the word right in the first place —
+    correction is the fallback, not the plan.</p>`
+  },
+  parse: {
+    tag:"step 3 of 8", name:"parse", title:"Rules first",
+    z:[352,222,2.9],
+    sum:`<p>A grammar model — spaCy's small English model, 13 MB — tags which word is the verb,
+    what it acts on, and where the times are. A table of <strong>76 verb→action mappings</strong>
+    then tries to read the sentence directly: "book", "move", "cancel", "add"&hellip; Nine of the
+    fifteen actions are reachable this way, and for those sentences no large model runs at
+    all.</p>
+    <p>The parser scores its own confidence, 0 to 1 — and that score is what the next step routes
+    on.</p>`,
+    more:`<p>The score starts at the fraction of required slots filled, then pays for its
+    doubts:</p>
+    <div class="tblwrap"><table>
+      <tr><th class="num">factor</th><th>doubt</th></tr>
+      <tr><td class="num">× 0.95</td><td>the date came from a regex fallback, not the date recogniser</td></tr>
+      <tr><td class="num">× 0.85</td><td>the domain was guessed from whichever screen was open</td></tr>
+      <tr><td class="num">× 0.80</td><td>"it" or "that one" was resolved to a past event</td></tr>
+      <tr><td class="num">× 0.70</td><td>two clock times in one sentence — probably two events</td></tr>
+      <tr><td class="num">+ 0.05</td><td>per optional slot filled, capped at +0.10</td></tr>
+    </table></div>
+    <p>These multipliers are hand-picked and have never been calibrated against outcomes. Worth
+    saying plainly: the threshold works in practice — the next step has the measurements — but
+    nobody has verified that 0.80 is the right price for a pronoun.</p>`
+  },
+  route: {
+    tag:"step 4 of 8", name:"route", title:"The 0.85 line",
+    z:[310,256,2.4],
+    sum:`<p>Score ≥ 0.85 with no required slot missing → the rules' answer stands, in about a
+    tenth of a second. Anything below goes to the large model — Llama&nbsp;3.1&nbsp;8B, running on
+    the laptop — which takes 7.8&nbsp;s at the median.</p>
+    <svg viewBox="0 0 360 44" style="max-width:100%;height:auto" role="img"
+         aria-label="Of 89 corpus commands, 44 percent were answered by the rules and 56 percent by the model.">
+      <rect x="0" y="4" width="156" height="14" fill="var(--amber)"/>
+      <rect x="160" y="4" width="200" height="14" fill="var(--model)"/>
+      <text x="0" y="36" font-size="10.5" font-family="IBM Plex Mono,monospace" fill="var(--amber)">rules · 44% · ~0.1 s</text>
+      <text x="360" y="36" text-anchor="end" font-size="10.5" font-family="IBM Plex Mono,monospace" fill="var(--model)">model · 56% · 7.8 s</text>
+    </svg>`,
+    more:`<p>Measured on an 89-command corpus, run end to end through the real pipeline:</p>
+    <div class="tblwrap"><table>
+      <tr><th>path</th><th class="num">correct</th><th class="num">commands</th><th class="num">median</th></tr>
+      <tr><td>rules alone</td><td class="num">97%</td><td class="num">39</td><td class="num">~0.1 s</td></tr>
+      <tr><td>model</td><td class="num">98%</td><td class="num">41</td><td class="num">7.8 s</td></tr>
+      <tr><td>mixed</td><td class="num">89%</td><td class="num">9</td><td class="num">12.1 s</td></tr>
+      <tr><td><strong>overall</strong></td><td class="num"><strong>97%</strong></td><td class="num">89</td><td></td></tr>
+    </table></div>
+    <p>The mixed row is nine commands — read small samples gently. And the threshold buys speed,
+    not autonomy: even a command the rules answered is re-read by the model afterwards
+    (step&nbsp;7).</p>`
+  },
+  check: {
+    tag:"step 5 of 8", name:"check", title:"Thirteen sober questions",
+    z:[352,290,2.9],
+    sum:`<p>Whichever parser answered, the result passes 13 deterministic checks before anything
+    is written — the difference between <em>parseable</em> and <em>plausible</em>. A date in the
+    past parses perfectly and is almost always wrong.</p>
+    <p>Each check exists because something went wrong once. Every fix is announced in the reply
+    and the thinking panel, never applied silently.</p>`,
+    more:`<p>Among them:</p>
+    <div class="tblwrap"><table>
+      <tr><th>what it catches</th><th>the ruling</th></tr>
+      <tr><td>a date in the past</td><td>"Monday", said on a Wednesday, means next Monday</td></tr>
+      <tr><td>"dinner with Sam at 8pm" filed as 18:00–20:00</td><td>a time said with "at" is when it starts</td></tr>
+      <tr><td>a bare afternoon hour</td><td>"at 4" is 16:00, not 04:00</td></tr>
+      <tr><td>"every Friday" spoken, no repetition set</td><td>set it</td></tr>
+      <tr><td>"until" vs "through"</td><td>"until" excludes the day it names; "through" keeps it</td></tr>
+      <tr><td>a weekly series anchored on the wrong day</td><td>it must start on a day it names</td></tr>
+      <tr><td>a phantom second event with a junk title</td><td>dropped</td></tr>
+      <tr><td>"the one you just made"</td><td>resolved as a reference, never guessed as a title</td></tr>
+    </table></div>
+    <p>The weekly-anchor rule has a scar to show: "stand-up every Sunday and Tuesday at 9" once
+    produced 106 events — not one of them on a Sunday or a Tuesday. The repetition was right; the
+    starting date was whatever the model happened to pick.</p>`
+  },
+  write: {
+    tag:"step 6 of 8", name:"write", title:"A file, and the answer now",
+    z:[300,376,2.3],
+    sum:`<p>The result is written to a local database file and the reply comes back immediately —
+    you see the event <em>now</em>, before any slow second opinion. No sync service, no cloud
+    store: the calendar is a file on the laptop's disk, and that file is the single source of
+    truth for both devices.</p>`,
+    more:`<p>Deleting is held to a higher bar than creating. When the parser cannot identify what
+    to delete, "I couldn't find it" is the designed answer — guessing at a deletion is worse than
+    failing at one.</p>`
+  },
+  review: {
+    tag:"step 7 of 8", name:"review", title:"The model reads everything — afterwards",
+    z:[352,358,2.9],
+    sum:`<p>After the answer has already been delivered, the large model re-reads
+    <strong>every</strong> command on a background thread — including the ones the rules were
+    certain about. There is no confidence score high enough to skip it.</p>
+    <p>It is advisory: it reports what it would have done differently; it does not silently
+    rewrite your calendar. And because the answer already arrived, its seconds cost nothing you
+    can feel.</p>`,
+    more:`<p class="figs">On the 89-command corpus: proposed a correction on 37 · fixed 0 · broke 0</p>
+    <p>That measurement is why it only advises. An earlier design let it apply what it proposed;
+    audits then caught it overwriting answers that were already right, and the measured run showed
+    its 37 proposals improving nothing — so the pen was taken away. The wiring is kept for the day
+    a stronger local model earns it back.</p>`
+  },
+  learn: {
+    tag:"step 8 of 8", name:"learn", title:"Remembered, not retrained",
+    z:[397,400,2.4],
+    sum:`<p>Every command is remembered with what it produced and your verdict on it. When a new
+    command arrives, the four most similar past commands are pasted into the model's prompt as
+    worked examples — <em>here is how this speaker's sentences were read correctly before</em>.</p>
+    <p>The model itself never changes. No fine-tuning; the learning lives in the prompt.</p>`,
+    more:`<p>Similarity is arithmetic, not another model: 60% word overlap plus 40% sequence
+    resemblance, scored over the most recent past commands (a pool of up to 2,000). Your feedback
+    tilts the ranking — a command you <em>corrected</em> gains +0.15, because corrections are the
+    most instructive examples; an approval gains +0.05; a rejected reading is never shown to the
+    model again.</p>
+    <p>There is no embedding model anywhere in the system. For a few hundred short strings,
+    word-overlap arithmetic answers instantly, and a fourth model to keep warm was judged not
+    worth its memory.</p>`
+  },
+  models: {
+    tag:"on the laptop", name:"models", title:"Three models, one machine",
+    z:[174,238,2.4],
+    sum:`<div class="tblwrap"><table>
+      <tr><th>model</th><th class="num">size</th><th>decides</th></tr>
+      <tr><td>Whisper <code>base</code></td><td class="num">74 M</td><td>sound → words</td></tr>
+      <tr><td>spaCy small English</td><td class="num">13 MB</td><td>which word is the verb</td></tr>
+      <tr><td>Llama 3.1 8B</td><td class="num">4-bit</td><td>meaning — and judging meaning</td></tr>
+    </table></div>
+    <p>The 8B model is pinned in memory permanently — 5.8 GB resident — so no command ever pays a
+    load time. That is a reasonable thing to do <em>because</em> it is 8B; most sizing choices
+    here follow from that one.</p>`,
+    more:`<p>One loaded copy of the big model is asked six different questions: the cold parse
+    when rules score low; the fill-in when rules got half the sentence; two flavours of
+    after-the-fact review; naming a placeholder title; and a retry when an action matched nothing.
+    Same weights, six prompts.</p>
+    <p>What is deliberately missing: no embedding model, no classifier model. Everything that
+    could be arithmetic is arithmetic.</p>`
+  },
+  window: {
+    tag:"on the laptop", name:"window", title:"The calendar window",
+    z:[539,169,2.4],
+    sum:`<p>The calendar you look at on the laptop is a client. It records audio, posts it to the
+    brain, and draws the answer — which is exactly what the phone does, plus a keyboard and a
+    bigger screen. It contains no parser: when you speak to it, it hands the words over like any
+    other caller.</p>`,
+    more:`<p>Its former intelligence is the cautionary tale behind the whole design: it used to
+    own a private copy of the pipeline, and the two copies drifted until the same sentence could
+    mean different things depending on where you said it. Now, if a behaviour needs to exist on
+    the laptop, it is added to the brain — where the phone inherits it the same afternoon.</p>`
+  },
+  hud: {
+    tag:"on the laptop", name:"thinking", title:"The thinking panel",
+    z:[560,300,2.2],
+    sum:`<p>A small floating card that shows the assistant deciding — which words were corrected,
+    which path the sentence took, what the reviewer thought. It talks to <strong>nothing</strong>.
+    The brain appends one JSON line per step to a log file; the panel just tails the file.</p>`,
+    more:`<p>That non-connection is the feature. Because it holds no link to any process, it can
+    float over a full-screen app with the calendar closed — and a command spoken to the phone in
+    another room still streams onto the laptop's screen, because the brain writes the same lines
+    wherever the words came from.</p>`
+  },
+  link: {
+    tag:"between the devices", name:"link", title:"One field of difference",
+    z:[681,298,2.4],
+    sum:`<p>The phone reaches the laptop over a private network between your own two machines —
+    no relay, no third computer involved. Up the wire go the words you said; back comes what
+    happened.</p>
+    <p>The request carries one extra field — <code>source: "ios"</code> or <code>"mac"</code> —
+    and that is the <em>entire</em> difference between speaking to the phone and speaking to the
+    laptop. It labels the trace and the memory. It changes nothing about how the sentence is
+    read.</p>`,
+    more:`<p>This link is the system's only concession to networking at all — and it is a link
+    between two machines you own, not a dependency on a service.</p>`
+  },
+  phone: {
+    tag:"the second surface", name:"phone", title:"The phone",
+    z:[806,328,1.7],
+    sum:`<p>A full local copy of the calendar lives on the phone, so it works with the laptop off.
+    Reads come from the copy; changes wait their turn.</p>
+    <ul>
+      <li><strong>Edits are versioned.</strong> An edit quotes the version of the record it was
+      made against and is refused if the record has moved on. No merge, no guess — a refused edit
+      is shown to you instead.</li>
+      <li><strong>Spoken commands queue as sound.</strong> A command spoken while disconnected is
+      kept as the recording itself, not as a decided action. On reconnect the audio is sent and
+      decided fresh by the brain, rather than replaying a conclusion that may have gone stale.</li>
+    </ul>`,
+    more:`<p>When a queued command finally runs, the result arrives as a notification — silently
+    changing a calendar from a queue would be worse than not running the command at all.</p>
+    <p>And a queued change the laptop actively refuses — an edit against a record that changed, a
+    delete of something already gone — is dropped and reported rather than left to block
+    everything behind it.</p>`
+  },
+  sun: {
+    tag:"time & sky", name:"sun", title:"Where the sun is",
+    z:[928,490,2.3],
+    sum:`<p>Some days must not be scheduled over. <em>Which</em> days comes from the fixed
+    calendar's own arithmetic; <em>when they begin</em> comes from solar geometry at your
+    configured coordinates. Candle lighting is 18 minutes before sunset; the day ends at
+    nightfall, when the sun sits 8.5° below the horizon. Both are configurable.</p>
+    <p>Sunset drifts by more than three hours across the year — 16:38 in December, 19:51 in June —
+    so any rule written against dates alone is wrong for a whole season.</p>`,
+    more:`<p class="figs">Verified against published times: 126 comparisons · six cities · worst disagreement 28 seconds</p>
+    <p>Repeating events skip Shabbat and yom tov, bounded by those computed times rather than by
+    midnight. Three exceptions, each with a reason. Meals are allowed — they are what the day is
+    for — unless the day is a fast, where a meal is the one thing that must not be booked. A
+    series deliberately anchored on the day it would skip keeps it; skipping every instance would
+    hollow it out. And if the times cannot be computed, nothing is skipped at all — a series
+    quietly losing days is worse than one landing where it should not.</p>`
+  },
+  cloud: {
+    tag:"ground rule", name:"internet", title:"Never",
+    z:[655,62,2.2],
+    sum:`<p>No account, no API key, no telemetry, no cloud transcription. The speech model runs
+    from a cached copy, the language model is served on the laptop itself, and the database is a
+    file. Unplug the router and everything on this page still works — except the phone reaching
+    the laptop.</p>`,
+    more:`<p>This is enforced, not promised: a test in the suite blocks every network connection
+    that is not the machine talking to itself, and fails the build if any code path tries to
+    reach further. It has already caught one regression — a library quietly fetching its model
+    from the internet on every start.</p>`
+  }
+};
+const ORDER = ["brain","hear","correct","parse","route","check","write","review","learn",
+               "models","window","hud","link","phone","sun","cloud"];
+
+const stage = document.getElementById("stage");
+const world = document.getElementById("world");
+const panel = document.getElementById("panel");
+const ptag = document.getElementById("ptag");
+const ptitle = document.getElementById("ptitle");
+const pbody = document.getElementById("pbody");
+const pprev = document.getElementById("pprev");
+const pnext = document.getElementById("pnext");
+let cur = null;
+
+function focusPoint(){
+  return matchMedia("(max-width:760px)").matches ? [500,200] : [365,290];
+}
+function open(id){
+  cur = id;
+  const d = P[id];
+  const [cx,cy,s] = d.z, [fx,fy] = focusPoint();
+  world.style.transform = `translate(${fx - s*cx}px, ${fy - s*cy}px) scale(${s})`;
+  stage.classList.add("zoomed");
+  stage.querySelectorAll(".sel").forEach(e => e.classList.remove("sel"));
+  stage.querySelectorAll(`[data-panel="${id}"]`).forEach(e => e.classList.add("sel"));
+  ptag.textContent = d.tag;
+  ptitle.textContent = d.title;
+  pbody.innerHTML = d.sum +
+    (d.more ? `<button class="morebtn" id="pmorebtn">full detail ▸</button>
+               <div class="pmore" id="pmore" hidden>${d.more}</div>` : "");
+  const mb = document.getElementById("pmorebtn");
+  if (mb) mb.addEventListener("click", showMore);
+  const i = ORDER.indexOf(id);
+  const prev = ORDER[(i - 1 + ORDER.length) % ORDER.length];
+  const next = ORDER[(i + 1) % ORDER.length];
+  pprev.textContent = "← " + P[prev].name;
+  pnext.textContent = P[next].name + " →";
+  panel.hidden = false;
+  panel.classList.remove("full");
+  pbody.scrollTop = 0;
+  rail();
+}
+function showMore(){
+  const m = document.getElementById("pmore");
+  const b = document.getElementById("pmorebtn");
+  if (m){ m.hidden = false; }
+  if (b){ b.remove(); }
+  panel.classList.add("full");
+}
+function close(){
+  cur = null;
+  world.style.transform = "";
+  stage.classList.remove("zoomed");
+  stage.querySelectorAll(".sel").forEach(e => e.classList.remove("sel"));
+  panel.hidden = true;
+  panel.classList.remove("full");
+  rail();
+}
+function step(d){
+  if (cur === null){ open(d > 0 ? ORDER[0] : ORDER[ORDER.length-1]); return; }
+  const i = ORDER.indexOf(cur);
+  open(ORDER[(i + d + ORDER.length) % ORDER.length]);
+}
+function rail(){
+  document.querySelectorAll("#rail button").forEach(b => {
+    b.classList.toggle("on", b.dataset.go === (cur ?? "home"));
+  });
+}
+
+stage.addEventListener("click", e => {
+  const g = e.target.closest("[data-panel]");
+  if (g) open(g.dataset.panel);
+});
+stage.addEventListener("keydown", e => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.panel){
+    e.preventDefault();
+    open(e.target.dataset.panel);
+  }
+});
+document.getElementById("pclose").addEventListener("click", close);
+document.getElementById("phome").addEventListener("click", close);
+document.getElementById("pfull").addEventListener("click", () => {
+  if (panel.classList.contains("full")){ panel.classList.remove("full"); }
+  else { showMore(); }
+});
+pprev.addEventListener("click", () => step(-1));
+pnext.addEventListener("click", () => step(1));
+document.querySelectorAll("#rail button").forEach(b => {
+  b.addEventListener("click", () => b.dataset.go === "home" ? close() : open(b.dataset.go));
+});
+document.addEventListener("keydown", e => {
+  if (e.target.closest("input,textarea")) return;
+  if (e.key === "Escape" && cur !== null) close();
+  else if (e.key === "ArrowRight" && cur !== null) step(1);
+  else if (e.key === "ArrowLeft" && cur !== null) step(-1);
+});
+rail();
+</script>

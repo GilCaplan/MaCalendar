@@ -58,11 +58,51 @@ def test_english_words_and_known_words_are_never_rewritten(vocab):
     assert fixed == text and fixes == []
 
 
-def test_auto_correct_off_and_threshold(vocab):
+def test_raising_the_threshold_tightens_matching(vocab):
+    """The strictness dial governs the phonetic path as well as the letter one.
+
+    This test used to assert that a threshold of 0.95 left "Shaull" alone. It
+    no longer does, and the change is deliberate: "Shaull" and "Shaul" have the
+    same sound code and the same syllable count, and nothing else in the list
+    sounds like them, so they are the same name written two ways. Refusing that
+    was never the point of the dial.
+
+    What the dial does control is how far a spelling may drift, and that is
+    what is asserted here — at 0.95 a word the letters cannot reach is refused,
+    where at the default it would be corrected.
+    """
     vocab.add_word("Shaul")
+    vocab.add_word("Bagrut")
     vocab.update_settings(threshold=0.95)
+
+    # Same name, differently spelled: still corrected.
     fixed, fixes = vocab.correct("go to Shaull")
-    assert fixes == [] and fixed == "go to Shaull"
+    assert fixed == "go to Shaul" and [f.replacement for f in fixes] == ["Shaul"]
+
+    # A spelling far from the word: the tightened dial refuses it.
+    fixed, fixes = vocab.correct("bugroot exam friday")
+    assert fixes == [] and fixed == "bugroot exam friday"
+
+
+def test_turning_auto_correct_off_stops_every_kind_of_correction(vocab, monkeypatch):
+    """The off switch has to cover the phonetic path too, or it is not off.
+
+    Checked at `apply_vocab`, which is where the switch lives — `correct()` is
+    the mechanism and always corrects; the entry point decides whether to call
+    it. Asserting against `correct()` would test the wrong layer and pass
+    whatever the switch did.
+    """
+    import assistant.stt.vocab as V
+    vocab.add_word("Bagrut")
+    monkeypatch.setattr(V, "get_vocab", lambda: vocab)
+
+    vocab.update_settings(auto_correct=True)
+    fixed, fixes = V.apply_vocab("bugroot exam friday")
+    assert fixed == "Bagrut exam friday", "the phonetic path should be on here"
+
+    vocab.update_settings(auto_correct=False)
+    fixed, fixes = V.apply_vocab("bugroot exam friday")
+    assert fixes == [] and fixed == "bugroot exam friday"
 
 
 def test_whisper_prompt_and_persistence(tmp_path):

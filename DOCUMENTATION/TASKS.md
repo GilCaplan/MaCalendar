@@ -71,6 +71,8 @@ Running list of user-reported issues and feature requests, with status. Update w
 | 64 | **Sundown was computed for a hardcoded place.** `ObservanceSettings` defaults and the `observance:` config block held the same values but nothing connected them, so any call without an explicit settings object — including the recurrence Shabbat skipping — ignored the configuration | done 2026-09-03 | `observance.current_settings()`, `tests/unit/test_observance_settings.py` |
 | 65 | Device location: the phone reports its coordinates so sundown follows you, with manual override in settings | todo | builds on 64 |
 | 66 | Sundown verified against published times rather than trusted: fetched once from an authority, checked in, compared offline. 126 comparisons over 6 cities, worst disagreement 28 s — no fix needed | done 2026-09-03 | `scripts/fetch_zmanim_reference.py`, `tests/unit/test_zmanim_accuracy.py` |
+| 67 | **Misheard names could never be learned.** Every failed name was already in the word list, but the matcher compared letters while speech fails phonetically, so no correction was made, none was learned, and the same command failed forever. A sound-code gate recovers 5 of 6 on first encounter, up from 1 | done 2026-09-03 | `vocab.phonetic_key`, `tests/unit/test_vocab_phonetic.py` |
+| 68 | Third explainer: an explorable drawing rather than 6,600 words of prose | in review | `DOCUMENTATION/artifacts/explorer.html` |
 
 ## How we are working right now
 
