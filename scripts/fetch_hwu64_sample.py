@@ -80,6 +80,18 @@ def _fetch() -> str:
         return resp.read().decode("utf-8")
 
 
+#: Word-count cut point separating "simple" from "medium" single-action
+#: utterances (p50=7 in the actual cleaned source data). There is no
+#: single-utterance "complex" tier — HWU-64 was elicited one action per
+#: utterance ("what would you tell your PDA to do X"), so a longer sentence
+#: there is just a more detailed description of ONE thing, not genuinely
+#: harder. What actually stresses this system — multiple events, multiple
+#: tasks, or a mix of the two in one command — doesn't occur naturally in
+#: the source at all; _compose_complex builds it directly instead.
+def _complexity(text: str) -> str:
+    return "simple" if len(text.split()) <= 6 else "medium"
+
+
 def _clean_rows(csv_text: str) -> list[dict]:
     rows = list(csv.DictReader(io.StringIO(csv_text), delimiter=";"))
     out = []
@@ -89,22 +101,72 @@ def _clean_rows(csv_text: str) -> list[dict]:
             continue
         if "[" in text or "]" in text:
             continue  # leftover template placeholder, not real spoken text
-        out.append({"scenario": row["scenario"], "intent": row["intent"], "text": text})
+        out.append({"scenario": row["scenario"], "intent": row["intent"], "text": text,
+                    "complexity": _complexity(text)})
     return out
 
 
-def build_sample(n: int, rows: list[dict]) -> list[dict]:
-    rnd = random.Random(SEED)
-    by_bucket = {b: [r for r in rows if (r["scenario"], r["intent"]) == b] for b in BUCKETS}
-    total_available = sum(len(v) for v in by_bucket.values())
-    if total_available == 0:
-        raise SystemExit("none of the expected (scenario, intent) buckets were found")
+_CONNECTIVES = [" and ", " and also ", ", and then ", ". Also, ", " — and "]
 
+
+def _join_two(a: str, b: str, rnd: random.Random) -> str:
+    a = a.strip().rstrip(".!?")
+    b = b.strip()
+    conn = rnd.choice(_CONNECTIVES)
+    if conn[0] == "." or conn[0] == ",":
+        pass                                  # sentence-final connective keeps b's own casing
+    else:
+        b = b[0].lower() + b[1:] if b else b  # mid-sentence join reads as one command
+    return f"{a}{conn}{b}"
+
+
+def _compose_complex(rows: list[dict], rnd: random.Random, n: int) -> list[dict]:
+    """Build n genuinely multi-action prompts: two real utterances joined.
+
+    Even thirds across event+event ("book gym... and a meeting..."), task+
+    task ("add milk... and also remind me to..."), and event+task — the
+    system's own domain split (calendar events vs. todo/task items, which
+    separately carry tags and due dates). Drawn with replacement: HWU-64
+    only has 257 usable lists/createoradd utterances, not enough to build
+    thousands of unique pairs without reusing components — accepted here
+    since the pairING is what makes each one distinct, not the raw halves.
+    """
+    cal = [r["text"] for r in rows if r["scenario"] == "calendar" and r["intent"] == "set"]
+    tsk = [r["text"] for r in rows if r["scenario"] == "lists" and r["intent"] == "createoradd"]
+    if not cal or not tsk:
+        return []
+    kinds = (["event+event"] * (n - 2 * (n // 3))) + (["task+task"] * (n // 3)) + (["event+task"] * (n // 3))
+    rnd.shuffle(kinds)
+    out = []
+    for kind in kinds:
+        if kind == "event+event":
+            a, b = rnd.choice(cal), rnd.choice(cal)
+        elif kind == "task+task":
+            a, b = rnd.choice(tsk), rnd.choice(tsk)
+        else:
+            a, b = rnd.choice(cal), rnd.choice(tsk)
+        out.append({"scenario": "compound", "intent": kind,
+                    "text": _join_two(a, b, rnd), "complexity": "complex"})
+    return out
+
+
+def build_sample(n: int, rows: list[dict], seed: int = SEED) -> list[dict]:
+    rnd = random.Random(seed)
+    # Roughly equal thirds: simple/medium as single real utterances (scenario/
+    # intent proportions preserved within each), complex as composed pairs.
+    want_tier = round(n / 3)
     sample: list[dict] = []
-    for bucket, items in by_bucket.items():
-        want = round(n * len(items) / total_available)
-        rnd.shuffle(items)
-        sample.extend(items[:want])
+    for tier in ("simple", "medium"):
+        tier_rows = [r for r in rows if r["complexity"] == tier]
+        by_bucket = {b: [r for r in tier_rows if (r["scenario"], r["intent"]) == b] for b in BUCKETS}
+        total = sum(len(v) for v in by_bucket.values())
+        if total == 0:
+            continue
+        for bucket, items in by_bucket.items():
+            want = round(want_tier * len(items) / total)
+            rnd.shuffle(items)
+            sample.extend(items[:want])
+    sample.extend(_compose_complex(rows, rnd, n - len(sample)))
 
     rnd.shuffle(sample)
     sample = sample[:n]
