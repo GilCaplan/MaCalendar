@@ -575,9 +575,18 @@ const P = {
   write: {
     tag:"step 6 of 8", name:"write", title:"A file, and the answer now",
     z:[300,376,2.3],
-    sum:`<p>Written to a file on the disk, and the answer comes straight back. Nothing waits.</p>
-    <p class="figs">one SQLite file · yours, on your machine</p>`,
-    more:`<p>One file, twenty-one tables. Events and tasks are two of them, among timers, counters, courses, assignments and training plans. The voice pipeline touches the first few; the screens fill the rest.</p>
+    sum:`<p>Written to a file on the disk, and the answer comes straight back. Which table depends on which action the parse chose &mdash; an event and a task take the same route here.</p>
+    <p class="figs">one SQLite file &#183; yours, on your machine</p>`,
+    more:`<p><strong>There is no step that sorts tasks from events.</strong> It is a
+    reasonable thing to expect &mdash; a filter somewhere deciding which kind of thing this is
+    &mdash; but the decision was already made, further back. Understanding the sentence produces
+    <em>an action</em>, one of fifteen, and "create an event" and "create a task" are two of them.
+    By the time anything is written, the choice is not a question any more.</p>
+    <p>That is why the steps in the drawing are drawn once rather than twice. Correcting words,
+    parsing, routing, the thirteen checks, the write, the review &mdash; every one of them runs the
+    same way whichever action came out. What differs is which table the action writes to, and how
+    it phrases the sentence it says back.</p>
+    <p>One file, twenty-one tables. Events and tasks are two of them, among timers, counters, courses, assignments and training plans. The voice pipeline touches the first few; the screens fill the rest.</p>
     <svg viewBox="0 0 380 208" role="img" aria-label="The nineteen columns of one event row, grouped by what fills them: nine come from what you said, three the system decides, three are bookkeeping, and four exist only for syncing with a hosted calendar.">
   <text x="0" y="11" font-size="9" fill="var(--muted)">ONE EVENT ROW · 19 COLUMNS</text>
   <rect x="0" y="20" width="380" height="52" rx="4" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.2"/>
@@ -809,23 +818,32 @@ completed 0
   cloud: {
     tag:"ground rule", name:"internet", title:"Never",
     z:[690,62,2.2],
-    sum:`<p>No account, no API key, no cloud transcription. Every model runs from a file on the disk, and the host never reaches out to anything.</p>
-    <p class="figs">a test fails the build if it ever does</p>`,
-    more:`<p>Enforced rather than promised: a test in the suite blocks every connection that is not the
-    machine talking to itself, and fails the build if any code path tries to reach further. It has
-    already caught one regression &mdash; a library quietly fetching its model over the internet on
-    every start, which nobody noticed because the wifi was always on.</p>
-    <p><strong>Worth stating precisely, because "offline" is usually an overclaim.</strong> The
-    host makes no outbound request at all: transcription, understanding, the calendar arithmetic
-    and sundown are computed here, from files that are already here. What does use a network is the
-    link between your devices &mdash; a phone reaching its own host is real traffic over a real
-    connection, and if it goes over the internet rather than the room's wifi, it goes over the
-    internet.</p>
-    <p>The distinction that matters is who is on the other end. No third party is asked anything,
-    holds anything, or can be down. Turn the network off entirely and the host still works; only
-    the second device loses its way home.</p>
-    <p>There is one door, and it is shut by default: an opt-in sync with a hosted calendar. Nothing
-    reaches a company unless you configure that and connect an account.</p>`
+    sum:`<p>As shipped and as run: no account, no API key, no cloud transcription. Every model reads from a file on the disk.</p>
+    <p class="figs">a test fails the build if the host reaches out</p>`,
+    more:`<p><strong>"Offline" is a configuration, not a property, and it is worth being exact about
+    which.</strong> Understanding a sentence needs a language model, and the one it is pointed at
+    by default runs on the host itself. That is what makes the whole thing work with the network
+    off. It is also a setting: point it at a hosted model instead, supply a key, and the same
+    system sends your commands to a company. The capability is deliberately there and deliberately
+    unused &mdash; nothing is configured, and no key exists.</p>
+    <p>What is not a setting is the enforcement. A test blocks every connection that is not the
+    machine talking to itself and fails the build if any code path tries to reach further, so the
+    shipped default cannot quietly stop being local. It has already caught one regression: a
+    library fetching its model over the internet on every start, which nobody noticed because the
+    wifi was always on.</p>
+
+    <h3>The link between devices</h3>
+    <p>This is the honest exception, and calling the system "offline" without it would be a lie.
+    A second device reaching its host is real traffic over a real network, and if the two are not
+    in the same room it crosses the internet to get there. What it is <em>not</em> is a service:
+    the two machines address each other directly, over an encrypted private link, and no third
+    party holds your calendar or can be down.</p>
+    <p>One caveat worth knowing rather than glossing. The host can require a secret on every
+    request, and that is off by default &mdash; which is fine while only your own devices can
+    reach it, and worth turning on the moment anything else can.</p>
+
+    <p>There is one further door, shut unless you open it: an opt-in sync with a hosted calendar.
+    Nothing reaches a company through it unless you configure it and connect an account.</p>`
   },
   tracelog: {
     tag:"on disk", title:"The trace log", z:[500,436,2.2],

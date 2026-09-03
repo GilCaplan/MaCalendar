@@ -146,7 +146,7 @@
       to understand the sentence; if it is unsure, a language model running locally reads
       it instead. Whatever they decide is checked against a list of deterministic sanity
       rules, written to a SQLite file, and then read back by the model as a second
-      opinion. Nothing is sent anywhere: no account, no API key, no server. The
+      opinion. Nothing is sent anywhere: no account, no API key, no server &mdash; though that last part is a configuration rather than a property, and section 22 says exactly which. The
       interesting parts are the seams — where one component hands to another, and what
       happens when it hands over something wrong.
     </p>
@@ -1530,7 +1530,30 @@ worst disagreement: <span class="a">28 seconds</span></pre>
       reaches a third party is if you configure this feature and connect an account.
       It is off, and the code contains no credentials for it.
     </p>
-  </section>
+  
+    <h3>What "offline" is actually a claim about</h3>
+    <p>
+      Understanding a sentence needs a language model, and the one this is pointed at by default
+      runs on the machine itself &mdash; which is what makes the whole thing work with the network
+      off. That is a setting. Point it at a hosted model, supply a key, and the same system sends
+      your commands to a company. The capability is deliberately present and deliberately unused:
+      nothing is configured and no key exists.
+    </p>
+    <p>
+      What is not a setting is the enforcement. A test blocks every connection that is not the
+      machine talking to itself, so the shipped default cannot quietly stop being local &mdash; it
+      has already caught a library fetching its model over the internet on every start, which
+      nobody noticed because the wifi was always on.
+    </p>
+    <p>
+      The link between devices is the honest exception. A second device reaching its host is real
+      traffic over a real network, and if the two are not in the same room it crosses the internet.
+      What it is not is a service: the two machines address each other directly over an encrypted
+      private link, and no third party holds the calendar or can be down. The host can also require
+      a secret on every request, which is off by default &mdash; fine while only your own devices
+      can reach it, and worth turning on the moment anything else can.
+    </p>
+</section>
 
   <p class="layer"><span>What is not known</span><em>last, because it only means something now</em></p>
 
