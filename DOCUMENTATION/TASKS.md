@@ -78,23 +78,31 @@ Running list of user-reported issues and feature requests, with status. Update w
 | 71 | **Reformulation mining**: when a command is deleted and a near-identical one succeeds moments later, the pair is a correction the user already gave for free. Runs after every command, on a daemon thread. Finds nothing in the current history — the loose version found three pairs and two were nonsense | done 2026-09-03 | `assistant/intent/memory.py` |
 | 72 | Four false starts ("Execute.", "No.", "I need a b-") were parsed, executed and remembered as real commands, teaching the model that junk is normal | done 2026-09-03 | `server.is_trivial_transcript` |
 | 73 | **Ran the memory comparison.** k=4 98% vs k=0 97% over 89 commands — but the LLM path, the only place examples enter the prompt, is 100% in both arms, so the corpus cannot detect an effect on it. No measurable difference, and the instrument is the limitation | done 2026-09-03 | `ASSISTANT_AUDIT_SUMMARY.md` run 7 |
-| 74 | Build a corpus from the real history's *failures* to measure the memory — the hand-written one is at ceiling on the path that matters, so it can only detect harm | todo | needs run 7's finding |
+| 74 | Build a corpus from the real history's *failures* to measure the memory — the hand-written one is at ceiling on the path that matters, so it can only detect harm | in progress 2026-09-03 | `scripts/audit_assistant.py` corpus, see 75/76 |
+| 75 | **Found and fixed while mining row 74**: editing one event in a same-typed batch ("book gym, then a meeting, then dinner") applied that edit's fields to every same-typed action in the batch, corrupting the others' stored correction — `example_records` only tracked action *type*, not which specific action a record came from. Two real corpus cases added from the same mining pass (duration arithmetic, a dropped self-correction), both still reproduce live | done 2026-09-03 | `assistant/intent/memory.py` `feedback_for_record`, `tests/unit/test_vocab_memory_trace.py` |
+| 76 | **Memory scaling study, in progress overnight**: does retrieval pool *size* matter, and is any k>0 effect about personalisation specifically or just "having more examples"? Real history (74 commands, 65% from one day) can't grow, so built a second pool from HWU-64 (Liu et al. IWSDS 2019, CC BY 4.0) — 3000 real calendar/reminder utterances run through the actual parser against scratch DBs, nested tiers at 60/300/1000/3000. Comparing k-sweep on the real history, a held-out slice (dominant day + the row 75 bug's corrupted correction removed), and each external tier. Fixture and build script checked in, `.db` outputs regenerable and gitignored | in progress 2026-09-03 | `scripts/fetch_hwu64_sample.py`, `scripts/build_memory_scaling_pool.py`, `DOCUMENTATION/experiments/memory_scaling/` — results land in `ASSISTANT_AUDIT_SUMMARY.md` |
 
 ## How we are working right now
 
-Order of play, agreed 2026-09-02:
+The 2026-09-02 order of play (internals artifact, install iOS, build the
+harness) is done — see rows 56, 61, 62. Current thread, as of 2026-09-03:
 
-1. **Finish the internals artifact** — genericise it, rewrite it for a reader
-   with no context, add the three interactive figures. Brief:
-   `DOCUMENTATION/ARTIFACT_BUILDER.md`.
-2. **Install the iOS build** so the three committed fixes are actually on the
-   phone.
-3. **Build the harness**, then use it to answer the calibration question.
+**Row 76 is running unattended overnight.** If you're picking this up cold:
+`DOCUMENTATION/experiments/memory_scaling/build.log` has the pool-build
+progress; `scripts/build_memory_scaling_pool.py` is resumable, so if it died
+just re-run it. Once the pool exists, `--slice-tiers` exports the nested
+60/300/1000/3000 dbs, then each tier runs through
+`scripts/audit_assistant.py --memory --memory-source <tier db>` at k=4 (k=0
+only needs running once — pool size cannot affect it, nothing is retrieved).
+Conclusions go in `ASSISTANT_AUDIT_SUMMARY.md`, not the overwritten
+`ASSISTANT_AUDIT.md`. Also queued, same session: the k=0/1/2/4/8 sweep on the
+real history (dataset A) and the held-out-day check (dataset B) from before
+the scaling study was scoped up — see the run log in that summary once it
+lands.
 
-Nothing after 3 gets planned until 3 has produced a number. Several decisions
-queued behind it — `k`, the eviction policy, the confidence weights, whether
-labelling should move to the LLM — are currently arguments rather than results,
-and the harness is what turns them into results.
+Decisions still waiting on a number, not yet worth arguing about: `k` itself,
+the eviction policy, the confidence weights (row 57, also waiting on a week
+of real use), whether labelling should move to the LLM.
 
 ## Working agreements
 - Everything on the phone is local: no third-party services; the only network peer is the Mac over Tailscale.
