@@ -132,7 +132,75 @@ class ObservanceSettings:
     latest_evening: datetime.time = datetime.time(22, 30)
 
 
+#: The fallback, used only when config.yaml cannot be read at all. It is NOT
+#: what the module normally uses — see `current_settings()`.
 DEFAULT_SETTINGS = ObservanceSettings()
+
+_settings_cache: "ObservanceSettings | None" = None
+
+
+def settings_from_config(cfg=None) -> ObservanceSettings:
+    """Build settings from config.yaml's `observance:` block.
+
+    These fields used to exist in two places that merely happened to agree:
+    the dataclass defaults above, and the config block. Nothing connected
+    them, so `candle_lighting(date)` called without an explicit settings
+    object silently ignored the configured location — and the recurrence
+    skipping in db.py is exactly such a caller. Editing the coordinates would
+    have moved the workout planner and left the calendar computing sundown
+    for wherever the defaults were written.
+    """
+    try:
+        if cfg is None:
+            from assistant.config import load_config
+            cfg = load_config()
+        ob = cfg.observance
+    except Exception:
+        return DEFAULT_SETTINGS
+
+    def _time(value, fallback):
+        if isinstance(value, datetime.time):
+            return value
+        try:
+            hh, _, mm = str(value).partition(":")
+            return datetime.time(int(hh), int(mm or 0))
+        except (TypeError, ValueError):
+            return fallback
+
+    d = DEFAULT_SETTINGS
+    return ObservanceSettings(
+        latitude=getattr(ob, "latitude", d.latitude),
+        longitude=getattr(ob, "longitude", d.longitude),
+        timezone=getattr(ob, "timezone", d.timezone),
+        city=getattr(ob, "city", d.city),
+        tzeit_depression=getattr(ob, "tzeit_depression", d.tzeit_depression),
+        candle_lighting_minutes=getattr(ob, "candle_lighting_minutes", d.candle_lighting_minutes),
+        erev_buffer_minutes=getattr(ob, "erev_buffer_minutes", d.erev_buffer_minutes),
+        motzei_buffer_minutes=getattr(ob, "motzei_buffer_minutes", d.motzei_buffer_minutes),
+        earliest_hour=getattr(ob, "earliest_hour", d.earliest_hour),
+        latest_evening=_time(getattr(ob, "latest_evening", d.latest_evening), d.latest_evening),
+    )
+
+
+def current_settings() -> ObservanceSettings:
+    """The settings every function here uses when not given one explicitly.
+
+    Cached, because a six-week plan asks for the same handful of dates
+    repeatedly; call `reload_settings()` after changing the configuration or
+    the device location.
+    """
+    global _settings_cache
+    if _settings_cache is None:
+        _settings_cache = settings_from_config()
+    return _settings_cache
+
+
+def reload_settings() -> ObservanceSettings:
+    """Forget the cached settings so the next call re-reads the configuration."""
+    global _settings_cache
+    _settings_cache = None
+    _sun_times.cache_clear()
+    return current_settings()
 
 
 # ---------------------------------------------------------------------------
@@ -165,20 +233,23 @@ def _shift(t: datetime.time, minutes: int) -> datetime.time:
     return (base + datetime.timedelta(minutes=minutes)).time()
 
 
-def sunset(date: datetime.date, settings: ObservanceSettings = DEFAULT_SETTINGS) -> Optional[datetime.time]:
+def sunset(date: datetime.date, settings: Optional[ObservanceSettings] = None) -> Optional[datetime.time]:
+    settings = settings or current_settings()
     times = _sun_times(date, settings.latitude, settings.longitude,
                        settings.timezone, settings.tzeit_depression)
     return times[1] if times else None
 
 
-def tzeit(date: datetime.date, settings: ObservanceSettings = DEFAULT_SETTINGS) -> Optional[datetime.time]:
+def tzeit(date: datetime.date, settings: Optional[ObservanceSettings] = None) -> Optional[datetime.time]:
+    settings = settings or current_settings()
     """Nightfall — when Shabbat or a chag ends on *date*."""
     times = _sun_times(date, settings.latitude, settings.longitude,
                        settings.timezone, settings.tzeit_depression)
     return times[2] if times else None
 
 
-def candle_lighting(date: datetime.date, settings: ObservanceSettings = DEFAULT_SETTINGS) -> Optional[datetime.time]:
+def candle_lighting(date: datetime.date, settings: Optional[ObservanceSettings] = None) -> Optional[datetime.time]:
+    settings = settings or current_settings()
     ss = sunset(date, settings)
     return _shift(ss, -settings.candle_lighting_minutes) if ss else None
 
@@ -293,7 +364,7 @@ def _daytime_blocked(date: datetime.date, israel: bool) -> Tuple[bool, str]:
 
 def availability(
     date: datetime.date,
-    settings: ObservanceSettings = DEFAULT_SETTINGS,
+    settings: Optional[ObservanceSettings] = None,
     israel: bool = True,
 ) -> DayAvailability:
     """What *date* offers: its daylight hours, and the evening that follows it.
@@ -303,6 +374,7 @@ def availability(
     marked `fallback=True` so the scheduler can prefer ordinary days and reach
     for motzei Shabbat only when a chag would otherwise cost a session.
     """
+    settings = settings or current_settings()
     windows: List[TimeWindow] = []
 
     day_blocked, day_reason = _daytime_blocked(date, israel)
@@ -386,10 +458,11 @@ def availability(
 def blocked_days(
     start: datetime.date,
     end: datetime.date,
-    settings: ObservanceSettings = DEFAULT_SETTINGS,
+    settings: Optional[ObservanceSettings] = None,
     israel: bool = True,
 ) -> List[DayAvailability]:
     """Every day in [start, end] that is not fully free — for prompts and previews."""
+    settings = settings or current_settings()
     out: List[DayAvailability] = []
     cur = start
     while cur <= end:
