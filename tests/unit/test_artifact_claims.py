@@ -55,11 +55,27 @@ def _prose(path: pathlib.Path) -> str:
     return re.sub(r"\s+", " ", s)
 
 
+PAGES = sorted(ARTIFACTS.glob("*.html")) if ARTIFACTS.exists() else []
+
+
 @pytest.fixture(scope="module")
 def prose() -> str:
     if not INTERNALS.exists():
         pytest.skip(f"{INTERNALS} not present")
     return _prose(INTERNALS)
+
+
+@pytest.fixture(scope="module")
+def all_prose() -> dict:
+    """Every published page, for claims that appear on more than one.
+
+    The architecture page carried a stale test count for weeks because the
+    checks only read the internals page — the drift was on the artifact
+    nobody was testing.
+    """
+    if not PAGES:
+        pytest.skip("no artifacts present")
+    return {p.name: _prose(p) for p in PAGES}
 
 
 # ---------------------------------------------------------------------------
@@ -243,6 +259,50 @@ def _collected_test_count() -> int:
     if not m:
         pytest.skip("could not collect the suite to count it")
     return int(m.group(1))
+
+
+def test_every_page_that_counts_the_tests_counts_them_correctly(all_prose):
+    """Both pages print a test count, in different words, and both drifted."""
+    actual = _collected_test_count()
+    for name, text in all_prose.items():
+        for m in re.finditer(r"([\d,]+)\s+tests\b", text):
+            claimed = int(m.group(1).replace(",", ""))
+            assert claimed <= actual, (
+                f"{name} claims {claimed} tests but only {actual} exist")
+            assert actual - claimed <= 60, (
+                f"{name} claims {claimed} tests, there are now {actual}")
+
+
+def test_the_endpoint_and_action_counts_on_the_summary_page(all_prose):
+    """The architecture page opens with a stat block. Each number is checkable."""
+    server = (ROOT / "assistant" / "api" / "server.py").read_text()
+    endpoints = len(re.findall(r"@app\.(?:get|post|patch|delete|put)\(", server))
+    actions = len(_loaded_registry())
+    for name, text in all_prose.items():
+        if "Endpoints" not in text:
+            continue
+        assert re.search(rf"Endpoints\s+{endpoints}\b", text), (
+            f"{name} miscounts the endpoints; there are {endpoints}")
+        assert re.search(rf"Actions\s+{actions}\b", text), (
+            f"{name} miscounts the actions; there are {actions}")
+
+
+def test_the_line_count_on_the_summary_page_is_not_stale(all_prose):
+    """Quoted to the hundred, so it only has to be close — but not by 2,000."""
+    import subprocess
+    out = subprocess.run(
+        ["bash", "-c",
+         "find assistant scripts -name '*.py' | xargs wc -l | tail -1"],
+        capture_output=True, text=True, cwd=ROOT).stdout
+    m = re.search(r"(\d+)\s+total", out)
+    if not m:
+        pytest.skip("could not count the Python lines")
+    actual = int(m.group(1))
+    for name, text in all_prose.items():
+        for q in re.finditer(r"Python\s+([\d,]+)\s+lines", text):
+            claimed = int(q.group(1).replace(",", ""))
+            assert abs(actual - claimed) <= 1000, (
+                f"{name} says {claimed:,} lines of Python; there are {actual:,}")
 
 
 def test_measured_claims_cite_a_run_that_still_exists(prose):
