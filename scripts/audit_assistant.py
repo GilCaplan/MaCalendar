@@ -679,6 +679,10 @@ def main() -> None:
     ap.add_argument("--memory-k", type=int, metavar="N",
                     help="how many past examples to retrieve (0 turns the memory off, "
                          "which is the comparison worth running first)")
+    ap.add_argument("--memory-source", metavar="PATH",
+                    help="replay against a copy of this history file instead of the live "
+                         "one (already applied at import time, above — declared here only "
+                         "so argparse doesn't reject it as unrecognized)")
     ap.add_argument("--audio", action="store_true")
     ap.add_argument("--out", default="DOCUMENTATION/ASSISTANT_AUDIT.md")
     args = ap.parse_args()
