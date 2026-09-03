@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 
 <style>
-  /* Same tokens as the architecture page — this is its companion, and they
+  /* Same tokens as the architecture page &#8212; this is its companion, and they
      are the assistant's own colours from styles.py and thinking_panel.py. */
   :root {
     --ground:#0f1013; --surface:#141519; --raised:#1a1b20; --border:#212227;
@@ -124,10 +124,10 @@
 <div class="wrap">
 
   <header style="display:flex;flex-direction:column;gap:1rem">
-    <div class="eyebrow">MACalendar · internals</div>
+    <div class="eyebrow">MACalendar &#183; internals</div>
     <h1>Reading the<br><em>assistant's mind</em></h1>
     <p class="standfirst">
-      A voice-driven calendar that runs entirely on one laptop — you speak, and an event
+      A voice-driven calendar that runs entirely on one laptop &#8212; you speak, and an event
       or a task appears. This page opens it up: how it decides what you meant, when it
       trusts a set of rules over a language model, and how it learns the words you use
       that no dictionary contains.
@@ -146,13 +146,13 @@
       it instead. Whatever they decide is checked against a list of deterministic sanity
       rules, written to a SQLite file, and then read back by the model as a second
       opinion. Nothing is sent anywhere: no account, no API key, no server. The
-      interesting parts are the seams — where one component hands to another, and what
+      interesting parts are the seams &#8212; where one component hands to another, and what
       happens when it hands over something wrong.
     </p>
     <p class="note">
       It is also <strong>aware of the Jewish calendar</strong>. Sundown is computed from
       the configured latitude and longitude, so the system knows when Shabbat and
-      festivals begin and end — not as dates, but as moments that shift through the year.
+      festivals begin and end &#8212; not as dates, but as moments that shift through the year.
       Repeating events skip them; a training planner will not schedule a run on one.
       Section 09 covers how that works.
     </p>
@@ -173,15 +173,15 @@
         <tr><td class="m">calendar</td><td>events, repeating series, colour categories, guests</td><td>yes</td></tr>
         <tr><td class="m">tasks</td><td>lists, tags, sub-tasks, quantities, due dates</td><td>yes</td></tr>
         <tr><td class="m">training</td><td>exercises, templates, plans, logged sessions</td><td>partly</td></tr>
-        <tr><td class="m">coursework</td><td>courses and assignments, linked to calendar entries</td><td>no — screen only</td></tr>
-        <tr><td class="m">time tracking</td><td>timers, sessions, tally counters, earnings</td><td>no — screen only</td></tr>
+        <tr><td class="m">coursework</td><td>courses and assignments, linked to calendar entries</td><td>no &#8212; screen only</td></tr>
+        <tr><td class="m">time tracking</td><td>timers, sessions, tally counters, earnings</td><td>no &#8212; screen only</td></tr>
       </tbody>
     </table>
 
     <p>
       Fifteen actions, 101 endpoints, roughly 34,000 lines. The voice layer that the
       rest of this page describes reaches <strong>two and a half of those five
-      domains</strong> — and that is a drawn line, not an unfinished one. Speech is good at
+      domains</strong> &#8212; and that is a drawn line, not an unfinished one. Speech is good at
       "book the dentist Thursday at four" and bad at "start the timer on the third project
       and log the last forty minutes to it retroactively". Where a screen is the better
       instrument, there is only a screen.
@@ -191,7 +191,7 @@
       The consequence worth carrying forward: <strong>the parser is one entry point into
       the data, not the owner of it.</strong> Every domain above is also edited directly, on
       two devices, sometimes while disconnected. That is why the last few sections are
-      about rows, versions and conflicts rather than about language — a good deal of the
+      about rows, versions and conflicts rather than about language &#8212; a good deal of the
       hard engineering here sits downstream of the sentence, not inside it.
     </p>
   </section>
@@ -209,9 +209,9 @@
     <table>
       <thead><tr><th>Model</th><th>Size</th><th>Runs on</th><th>Decides</th></tr></thead>
       <tbody>
-        <tr><td class="m">Whisper <code>base</code></td><td class="n">74 M</td><td>the laptop's GPU</td><td>sound → words</td></tr>
+        <tr><td class="m">Whisper <code>base</code></td><td class="n">74 M</td><td>the laptop's GPU</td><td>sound &#8594; words</td></tr>
         <tr><td class="m">spaCy <code>en_core_web_sm</code></td><td class="n">13 MB</td><td>CPU, in-process</td><td>which word is the verb</td></tr>
-        <tr><td class="m">Llama 3.1 <code>8B</code></td><td class="n">8 B, 4-bit</td><td>a local server on <code>:11434</code></td><td>meaning — and the judging of meaning</td></tr>
+        <tr><td class="m">Llama 3.1 <code>8B</code></td><td class="n">8 B, 4-bit</td><td>a local server on <code>:11434</code></td><td>meaning &#8212; and the judging of meaning</td></tr>
       </tbody>
     </table>
 
@@ -242,7 +242,7 @@
 
         <rect x="16" y="30" width="136" height="52" rx="7" fill="none" stroke="var(--cold)" stroke-width="1.6"></rect>
         <text x="84" y="52" text-anchor="middle" font-size="12" fill="var(--cold)">Whisper</text>
-        <text x="84" y="69" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".6">speech → text</text>
+        <text x="84" y="69" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".6">speech &#8594; text</text>
 
         <rect x="180" y="30" width="136" height="52" rx="7" fill="none" stroke="var(--cold)" stroke-width="1.6"></rect>
         <text x="248" y="52" text-anchor="middle" font-size="12" fill="var(--cold)">spaCy</text>
@@ -250,7 +250,7 @@
 
         <rect x="344" y="30" width="152" height="52" rx="7" fill="none" stroke="var(--accent)" stroke-width="1.6"></rect>
         <text x="420" y="52" text-anchor="middle" font-size="12" fill="var(--accent)">rule parser</text>
-        <text x="420" y="69" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".6">scores itself 0 – 1</text>
+        <text x="420" y="69" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".6">scores itself 0 &#8211; 1</text>
 
         <rect x="536" y="30" width="168" height="52" rx="7" fill="none" stroke="var(--llm)" stroke-width="1.6"></rect>
         <text x="620" y="52" text-anchor="middle" font-size="12" fill="var(--llm)">Llama 3.1 8B</text>
@@ -273,7 +273,7 @@
         <!-- review -->
         <rect x="536" y="206" width="168" height="46" rx="7" fill="none" stroke="var(--verify)" stroke-width="1.6" stroke-dasharray="5 3"></rect>
         <text x="620" y="225" text-anchor="middle" font-size="12" fill="var(--verify)">Llama reviews it</text>
-        <text x="620" y="241" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".6">background — always</text>
+        <text x="620" y="241" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".6">background &#8212; always</text>
         <path d="M 470 174 L 470 229 L 532 229" fill="none" stroke="var(--verify)" stroke-opacity=".7" marker-end="url(#m-ah)"></path>
 
         <text x="16" y="229" font-size="10.5" fill="currentColor" fill-opacity=".55">nothing here waits</text>
@@ -304,7 +304,7 @@
         <tr><td class="m">cold parse</td><td>the rules scored low, or found nothing at all</td><td class="n">yes</td></tr>
         <tr><td class="m">hybrid fill</td><td>the rules got some of it; the model is handed those and fills the gaps</td><td class="n">yes</td></tr>
         <tr><td class="m">title naming</td><td>the parse produced a stub title rather than a real one</td><td class="n">briefly</td></tr>
-        <tr><td class="m">escalation</td><td>the action referred to something that does not exist — the whole sentence is re-read</td><td class="n">yes</td></tr>
+        <tr><td class="m">escalation</td><td>the action referred to something that does not exist &#8212; the whole sentence is re-read</td><td class="n">yes</td></tr>
         <tr><td class="m">self-check (rules)</td><td>after a rule-path record is already saved</td><td class="n">no</td></tr>
         <tr><td class="m">self-check (all)</td><td>after every command, with your past commands in the prompt</td><td class="n">no</td></tr>
       </tbody>
@@ -313,7 +313,7 @@
     <p class="note">
       <strong>Why so small?</strong> The whole assistant has to sit resident on a laptop
       that is also being used for other things. The 8B model is pinned in memory
-      permanently so the first command of the day is not slow — which is only a
+      permanently so the first command of the day is not slow &#8212; which is only a
       reasonable thing to do <em>because</em> it is 8B. Every design choice on this page
       is downstream of that: the rules exist so the model is not needed for the easy
       two-thirds, and the review runs in the background so its cost is invisible.
@@ -335,16 +335,16 @@
     </p>
     <p>
       <strong>It decides who answers first, not who gets the last word.</strong> The
-      event is written either way, and then llama reads <em>every</em> command back —
+      event is written either way, and then llama reads <em>every</em> command back &#8212;
       including all of the 44% it never saw. The threshold buys speed, not autonomy.
     </p>
 
-    <pre><span class="c"># how the number is built — rule_parser.py:_compute_confidence</span>
-base       = <span class="a">required slots filled ÷ required slots</span>   <span class="c"># "did I get everything?"</span>
-           × 0.95   <span class="c">if the date came from regex, not the recogniser</span>
-           × 0.85   <span class="c">if the domain was guessed from the open view</span>
-           × 0.80   <span class="c">if it resolved "it" / "that one" to a past event</span>
-           × 0.70   <span class="c">if two clock times appeared — probably two events</span>
+    <pre><span class="c"># how the number is built &#8212; rule_parser.py:_compute_confidence</span>
+base       = <span class="a">required slots filled &#247; required slots</span>   <span class="c"># "did I get everything?"</span>
+           &#215; 0.95   <span class="c">if the date came from regex, not the recogniser</span>
+           &#215; 0.85   <span class="c">if the domain was guessed from the open view</span>
+           &#215; 0.80   <span class="c">if it resolved "it" / "that one" to a past event</span>
+           &#215; 0.70   <span class="c">if two clock times appeared &#8212; probably two events</span>
            + 0.05   <span class="c">per optional slot filled, capped at +0.10</span></pre>
 
     <figure>
@@ -353,7 +353,7 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
 
         <!-- annotations, each on its own baseline with a leader to its point -->
         <text x="70" y="26" font-size="10.5" fill="var(--verify)">"lunch at noon and coffee at 9"</text>
-        <text x="70" y="40" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--verify)" fill-opacity=".8">no score at all — two events, one set of slots</text>
+        <text x="70" y="40" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--verify)" fill-opacity=".8">no score at all &#8212; two events, one set of slots</text>
 
         <text x="700" y="74" text-anchor="end" font-size="10.5" fill="currentColor" fill-opacity=".78">"book gym tomorrow at 7am"  1.00</text>
         <path d="M 686 79 L 672 142" fill="none" stroke="currentColor" stroke-opacity=".28"></path>
@@ -379,19 +379,19 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
 
         <!-- who answers first, each centred in its own stretch of the scale -->
         <text x="325" y="192" text-anchor="middle" font-size="10.5" fill="var(--llm)">llama answers first</text>
-        <text x="325" y="206" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--llm)" fill-opacity=".8">7.8 s · 56%</text>
+        <text x="325" y="206" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--llm)" fill-opacity=".8">7.8 s &#183; 56%</text>
         <text x="625" y="192" text-anchor="middle" font-size="10.5" fill="var(--accent)">rules answer first</text>
-        <text x="625" y="206" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--accent)" fill-opacity=".8">0.1 s · 44%</text>
+        <text x="625" y="206" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--accent)" fill-opacity=".8">0.1 s &#183; 44%</text>
 
         <!-- and the review, spanning both: nothing escapes it -->
         <rect x="70" y="222" width="600" height="22" rx="5" fill="none" stroke="var(--llm)" stroke-dasharray="4 3"></rect>
-        <text x="370" y="237" text-anchor="middle" font-size="10.5" fill="var(--llm)">llama reviews every command afterwards — whichever side it fell</text>
+        <text x="370" y="237" text-anchor="middle" font-size="10.5" fill="var(--llm)">llama reviews every command afterwards &#8212; whichever side it fell</text>
       </svg>
       <figcaption>
         Real scores from the live parser. The last one never gets a number: the rule
         parser can hold one event's worth of slots, so a sentence with two raises
         <code>RuleParserSkip</code> and goes straight to the model rather than filling
-        half of it in. The dashed band is the point — a high score means the answer
+        half of it in. The dashed band is the point &#8212; a high score means the answer
         arrives sooner, not that it goes unchecked.
       </figcaption>
     </figure>
@@ -409,15 +409,15 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
     </p>
     <p>
       <strong>The difference is where the number comes from.</strong> Those systems read
-      a probability off a trained model and then <em>calibrate</em> it — Platt scaling,
-      temperature scaling — so that "0.85" actually means "right about 85% of the time".
+      a probability off a trained model and then <em>calibrate</em> it &#8212; Platt scaling,
+      temperature scaling &#8212; so that "0.85" actually means "right about 85% of the time".
       This formula's multipliers were chosen by hand: 0.95, 0.85, 0.80, 0.70, and a
       threshold that happens to equal one of them. None has been checked against outcomes.
     </p>
     <p class="note warn">
       <strong>Calibration is measurable here and has never been measured.</strong> The
       audit records both the confidence and whether the command was right, so bucketing
-      by score would show it directly: if commands scoring 0.85–0.90 are right 88% of the
+      by score would show it directly: if commands scoring 0.85&#8211;0.90 are right 88% of the
       time, the number means something. If they are right 97% of the time, the threshold
       is too cautious and work is being sent to the model for nothing. Either answer is
       more useful than the formula's current status, which is "plausible, and untested".
@@ -431,17 +431,17 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
     <h2><span class="num">05</span>How the rules read a sentence</h2>
     <p>
       No model. spaCy tags the words, a date recogniser lifts times out, and a table of
-      <strong>76 verb → action mappings</strong> decides what you asked for. Nine of the
+      <strong>76 verb &#8594; action mappings</strong> decides what you asked for. Nine of the
       fifteen actions are reachable this way; the rest always need llama.
     </p>
     <p>
       The verb lookup tries four things in order, and the fourth is where it goes wrong:
     </p>
-    <pre><span class="c">1.</span> the ROOT verb, if it maps to an action        <span class="g">← "<b>book</b> a haircut tomorrow"</span>
+    <pre><span class="c">1.</span> the ROOT verb, if it maps to an action        <span class="g">&#8592; "<b>book</b> a haircut tomorrow"</span>
 <span class="c">2.</span> the ROOT verb even if it doesn't, for WH-questions
 <span class="c">3.</span> any VERB or AUX in the span that maps
-<span class="c">4.</span> <span class="a">any token at all — any part of speech —</span>
-   <span class="a">whose lemma maps to an action</span>                 <span class="l">← the trapdoor</span></pre>
+<span class="c">4.</span> <span class="a">any token at all &#8212; any part of speech &#8212;</span>
+   <span class="a">whose lemma maps to an action</span>                 <span class="l">&#8592; the trapdoor</span></pre>
 
     <figure>
       <svg viewBox="0 0 720 244" role="img"
@@ -474,10 +474,10 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
           <text x="204" y="112" text-anchor="middle">ADP</text>
           <text x="323" y="112" text-anchor="middle">date</text>
         </g>
-        <text x="420" y="112" font-size="11" fill="currentColor" fill-opacity=".6">no verb anywhere — the title case fools it</text>
+        <text x="420" y="112" font-size="11" fill="currentColor" fill-opacity=".6">no verb anywhere &#8212; the title case fools it</text>
 
         <!-- rules 1-3 fail -->
-        <text x="16" y="146" font-size="11.5" fill="currentColor" fill-opacity=".6">rules 1–3 find nothing</text>
+        <text x="16" y="146" font-size="11.5" fill="currentColor" fill-opacity=".6">rules 1&#8211;3 find nothing</text>
         <line x1="180" y1="142" x2="238" y2="142" stroke="currentColor" stroke-opacity=".4" stroke-dasharray="3 3" marker-end="url(#i-ah2)"></line>
 
         <!-- rule 4 fires -->
@@ -488,8 +488,8 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
 
         <!-- result -->
         <rect x="248" y="180" width="300" height="46" rx="6" fill="none" stroke="var(--verify)"></rect>
-        <text x="398" y="199" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" fill="var(--verify)">complete_todo("call mark about…")</text>
-        <text x="398" y="216" text-anchor="middle" font-size="11" fill="currentColor" fill-opacity=".6">confidence 1.00 · no missing slots</text>
+        <text x="398" y="199" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" fill="var(--verify)">complete_todo("call mark about&#8230;")</text>
+        <text x="398" y="216" text-anchor="middle" font-size="11" fill="currentColor" fill-opacity=".6">confidence 1.00 &#183; no missing slots</text>
         <line x1="398" y1="160" x2="398" y2="180" stroke="var(--verify)" marker-end="url(#i-ah2)"></line>
 
         <text x="566" y="199" font-size="11" fill="currentColor" fill-opacity=".6">("mark" is a</text>
@@ -497,15 +497,15 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
       </svg>
       <figcaption>
         Rule 4 exists so that "mark it done" works when the tagger mistakes the verb for
-        a noun. The cost is that anyone with a name that is also a verb — Mark, Bill,
-        Rose, Summer — triggers it every time, and because every slot it needs is
+        a noun. The cost is that anyone with a name that is also a verb &#8212; Mark, Bill,
+        Rose, Summer &#8212; triggers it every time, and because every slot it needs is
         present it scores <strong>1.00</strong> and never consults the model. Better
         transcription would not help: the perfectly-spelled sentence scores 1.00 too.
       </figcaption>
     </figure>
 
     <p class="note warn">
-      <strong>How it is caught now.</strong> Not by lowering the confidence — that rule
+      <strong>How it is caught now.</strong> Not by lowering the confidence &#8212; that rule
       is load-bearing. The action runs, matches no such task, and raises
       <code>TargetNotFound</code>; the command is then re-read by llama, which returns
       <code>create_event</code>. Being wrong is detected by trying, not by doubting.
@@ -520,14 +520,14 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
     <p>
       Whichever parser answered, the result passes through deterministic guards. Each
       one exists because something went wrong once. They are the difference between
-      <em class="q">is this parseable</em> and <em class="q">is this plausible</em> — a
+      <em class="q">is this parseable</em> and <em class="q">is this plausible</em> &#8212; a
       date in the past parses perfectly and is almost always wrong.
     </p>
     <table>
       <thead><tr><th>What it catches</th><th>The case that caused it</th></tr></thead>
       <tbody>
         <tr><td>a date in the past</td><td class="m">LLMs pick <em>last</em> Thursday</td></tr>
-        <tr><td>"at 8pm" filed as the end time</td><td class="m">dinner at 8pm → 18:00–20:00</td></tr>
+        <tr><td>"at 8pm" filed as the end time</td><td class="m">dinner at 8pm &#8594; 18:00&#8211;20:00</td></tr>
         <tr><td>a bare hour that means PM</td><td class="m">"meeting at 4" is not 04:00</td></tr>
         <tr><td>recurrence words, no recurrence set</td><td class="m">"every friday" parsed as one-off</td></tr>
         <tr><td>"until" read as inclusive</td><td class="m">a series ran a day too long</td></tr>
@@ -549,16 +549,16 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
     <h2><span class="num">07</span>How it learns you</h2>
     <p>
       The part people mean when they ask whether it is "trained on me". It is not
-      fine-tuned — nothing about llama changes. Instead, your four most similar past
+      fine-tuned &#8212; nothing about llama changes. Instead, your four most similar past
       commands are pasted into the prompt as worked examples, under a header telling the
       model to match your phrasing and habits.
     </p>
 
-    <pre><span class="c">USER HISTORY — how this user's past commands were (correctly) interpreted.</span>
+    <pre><span class="c">USER HISTORY &#8212; how this user's past commands were (correctly) interpreted.</span>
 - "Set a meeting for 10 a.m. tomorrow morning" <span class="a">(user-corrected)</span>
-    → {"action": "create_event", "title": "Team Standup", "start_time": "10:00"}
+    &#8594; {"action": "create_event", "title": "Team Standup", "start_time": "10:00"}
 - "set meaning for tomorrow at 7 p.m. with the team"
-    → {"action": "create_event", "title": "meaning", "start_time": "19:00"}</pre>
+    &#8594; {"action": "create_event", "title": "meaning", "start_time": "19:00"}</pre>
 
     <figure>
       <svg viewBox="0 0 720 250" role="img"
@@ -581,20 +581,20 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
         <text x="230" y="20" font-family="IBM Plex Mono, monospace" font-size="10" fill="currentColor" fill-opacity=".5">YOUR VERDICT DECIDES ITS FATE</text>
 
         <rect x="230" y="30" width="230" height="34" rx="6" fill="none" stroke="var(--verify)"></rect>
-        <text x="248" y="52" font-size="11.5" fill="var(--verify)">👎 rejected</text>
+        <text x="248" y="52" font-size="11.5" fill="var(--verify)">&#128078; rejected</text>
         <text x="452" y="52" text-anchor="end" font-size="11" fill="currentColor" fill-opacity=".65">never shown again</text>
 
         <rect x="230" y="76" width="230" height="34" rx="6" fill="none" stroke="var(--done)" stroke-width="2"></rect>
-        <text x="248" y="98" font-size="11.5" fill="var(--done)">✏️ corrected</text>
+        <text x="248" y="98" font-size="11.5" fill="var(--done)">&#9999;&#65039; corrected</text>
         <text x="452" y="98" text-anchor="end" font-size="11" fill="currentColor" fill-opacity=".65">becomes the target</text>
 
         <rect x="230" y="122" width="230" height="34" rx="6" fill="none" stroke="currentColor" stroke-opacity=".45"></rect>
-        <text x="248" y="144" font-size="11.5" fill="currentColor">👍 approved</text>
+        <text x="248" y="144" font-size="11.5" fill="currentColor">&#128077; approved</text>
         <text x="452" y="144" text-anchor="end" font-size="11" fill="currentColor" fill-opacity=".65">+0.05 relevance</text>
 
         <rect x="230" y="168" width="230" height="34" rx="6" fill="none" stroke="currentColor" stroke-opacity=".25" stroke-dasharray="4 3"></rect>
         <text x="248" y="190" font-size="11.5" fill="currentColor" fill-opacity=".6">unreviewed</text>
-        <text x="452" y="190" text-anchor="end" font-size="11" fill="currentColor" fill-opacity=".5">used anyway · 48%</text>
+        <text x="452" y="190" text-anchor="end" font-size="11" fill="currentColor" fill-opacity=".5">used anyway &#183; 48%</text>
 
         <path d="M 170 122 L 200 122 L 200 47 L 228 47" fill="none" stroke="currentColor" stroke-opacity=".3" marker-end="url(#i-ah3)"></path>
         <path d="M 170 122 L 200 122 L 200 93 L 228 93" fill="none" stroke="var(--done)" stroke-opacity=".6" marker-end="url(#i-ah3)"></path>
@@ -614,15 +614,15 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
       </svg>
       <figcaption>
         Scoring is 60% word overlap and 40% sequence similarity, plus the verdict bonus.
-        The prompt stays about 710 characters whether you have 100 commands or 20,000 —
-        only four ever go in — so the history growing does not crowd the model.
+        The prompt stays about 710 characters whether you have 100 commands or 20,000 &#8212;
+        only four ever go in &#8212; so the history growing does not crowd the model.
       </figcaption>
     </figure>
 
     <p class="note warn">
       <strong>Two flaws worth knowing.</strong> The header claims these were
       "correctly interpreted", but <strong>48% of the pool has never been reviewed</strong>
-      — <code>success=1</code> only means nothing threw. And the candidate pool is the
+      &#8212; <code>success=1</code> only means nothing threw. And the candidate pool is the
       most recent 2,000 commands, so a correction you made deliberately becomes
       unreachable after about ten months of ordinary use. The cheapest signal evicts
       the dearest.
@@ -635,7 +635,7 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
   <section>
     <h2><span class="num">08</span>How it becomes yours</h2>
     <p>
-      Nothing about llama changes — no fine-tuning, no weights. What personalises the
+      Nothing about llama changes &#8212; no fine-tuning, no weights. What personalises the
       assistant is four small stores it consults, all of them plain files you can open,
       edit and delete. This is the part that turns a generic parser into one that knows
       that a word your dictation keeps mangling is the name of a course you take, and
@@ -660,21 +660,21 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
         <text x="362" y="48" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" fill="var(--accent)">vocab.json</text>
         <text x="362" y="64" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">374 words English does not know</text>
         <line x1="268" y1="76" x2="456" y2="76" stroke="var(--accent)" stroke-opacity=".3"></line>
-        <text x="268" y="94" font-size="10.5" fill="currentColor" fill-opacity=".8">aliases → fixes the spelling</text>
-        <text x="268" y="112" font-size="10.5" fill="currentColor" fill-opacity=".8">expands_to → explains shorthand</text>
-        <text x="268" y="130" font-size="10.5" fill="var(--done)">label → says what it is</text>
+        <text x="268" y="94" font-size="10.5" fill="currentColor" fill-opacity=".8">aliases &#8594; fixes the spelling</text>
+        <text x="268" y="112" font-size="10.5" fill="currentColor" fill-opacity=".8">expands_to &#8594; explains shorthand</text>
+        <text x="268" y="130" font-size="10.5" fill="var(--done)">label &#8594; says what it is</text>
         <line x1="196" y1="51" x2="250" y2="51" stroke="currentColor" stroke-opacity=".4" marker-end="url(#p-ah)"></line>
 
         <!-- what is it -->
         <rect x="252" y="164" width="105" height="58" rx="8" fill="none" stroke="var(--cold)"></rect>
         <text x="304" y="186" text-anchor="middle" font-size="11" fill="var(--cold)">task tags</text>
         <text x="304" y="202" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".55">Groceries</text>
-        <text x="304" y="215" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".55">Coursework…</text>
+        <text x="304" y="215" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".55">Coursework&#8230;</text>
 
         <rect x="367" y="164" width="105" height="58" rx="8" fill="none" stroke="var(--cold)"></rect>
         <text x="419" y="186" text-anchor="middle" font-size="11" fill="var(--cold)">categories</text>
         <text x="419" y="202" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".55">Fitness, Prayer</text>
-        <text x="419" y="215" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".55">Shabbat Meal…</text>
+        <text x="419" y="215" text-anchor="middle" font-size="10" fill="currentColor" fill-opacity=".55">Shabbat Meal&#8230;</text>
 
         <path d="M 304 138 L 304 162" fill="none" stroke="var(--done)" marker-end="url(#p-ah)"></path>
         <path d="M 419 138 L 419 162" fill="none" stroke="var(--done)" marker-end="url(#p-ah)"></path>
@@ -697,7 +697,7 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
 
         <!-- feedback -->
         <rect x="16" y="248" width="688" height="34" rx="6" fill="none" stroke="var(--done)" stroke-dasharray="4 3"></rect>
-        <text x="360" y="269" text-anchor="middle" font-size="11" fill="var(--done)">every correction you make feeds back into all of them — the only thing here that is truly yours</text>
+        <text x="360" y="269" text-anchor="middle" font-size="11" fill="var(--done)">every correction you make feeds back into all of them &#8212; the only thing here that is truly yours</text>
         <path d="M 106 68 L 106 265 L 14 265" fill="none" stroke="var(--done)" stroke-opacity=".3" stroke-dasharray="3 4"></path>
       </svg>
       <figcaption>
@@ -711,14 +711,14 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
     <table>
       <thead><tr><th>Field</th><th>Means</th><th>Effect on your text</th></tr></thead>
       <tbody>
-        <tr><td class="m">aliases</td><td>a mishearing to fix<br><span style="color:var(--muted)">"trigger" → "Trig"</span></td><td>rewritten — the wrong form was never what you said</td></tr>
-        <tr><td class="m">expands_to</td><td>shorthand you use<br><span style="color:var(--muted)">pset = problem set</span></td><td><strong>never rewritten</strong> — the model is told, your text stands</td></tr>
-        <tr><td class="m">label</td><td>what it implies<br><span style="color:var(--muted)">Trig → Coursework</span></td><td>none — it labels, silently</td></tr>
+        <tr><td class="m">aliases</td><td>a mishearing to fix<br><span style="color:var(--muted)">"trigger" &#8594; "Trig"</span></td><td>rewritten &#8212; the wrong form was never what you said</td></tr>
+        <tr><td class="m">expands_to</td><td>shorthand you use<br><span style="color:var(--muted)">pset = problem set</span></td><td><strong>never rewritten</strong> &#8212; the model is told, your text stands</td></tr>
+        <tr><td class="m">label</td><td>what it implies<br><span style="color:var(--muted)">Trig &#8594; Coursework</span></td><td>none &#8212; it labels, silently</td></tr>
       </tbody>
     </table>
     <p>
       An alias corrects something you did not say, so replacing it loses nothing. An
-      acronym <em>is</em> what you said — expanding it in your task would be editing your
+      acronym <em>is</em> what you said &#8212; expanding it in your task would be editing your
       words, not correcting them. That distinction is why they are different fields
       rather than one.
     </p>
@@ -726,7 +726,7 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
     <h3>Why the labels matter beyond colour</h3>
     <p>
       For events a label is mostly a colour: the category picks one, and an alternate
-      shade so two adjacent events are never identical. For tasks it does more work —
+      shade so two adjacent events are never identical. For tasks it does more work &#8212;
       the label is how you find things, filter them, and see at a glance that half your
       list is shopping. That is why half of untagged tasks was a real problem and a
       third of uncoloured events was mostly cosmetic.
@@ -734,7 +734,7 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
     <p class="note warn">
       <strong>What is missing.</strong> These three stores still learn separately. The
       vocabulary knew the course's name for months while the tagger had no idea it
-      meant coursework — that link was only added recently, and nothing yet connects
+      meant coursework &#8212; that link was only added recently, and nothing yet connects
       task tags to event categories, so "Running" and "Gym" exist as event labels with
       no home in the registry and no relationship to "Exercise". A two-level hierarchy
       is the intended fix and is not built.
@@ -750,16 +750,16 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
     <h2><span class="num">09</span>What it actually knows about time</h2>
     <p>
       Sundown is computed from your latitude and longitude with <code>astral</code>, and
-      the Hebrew date from <code>pyluach</code> — both pure Python, no lookup. That makes
+      the Hebrew date from <code>pyluach</code> &#8212; both pure Python, no lookup. That makes
       Shabbat a moving boundary rather than a day of the week.
     </p>
-    <pre>Fri  4 Sep   candles <span class="a">18:43</span>   →  19:00 falls <span class="l">inside</span> Shabbat
-Fri 18 Dec   candles <span class="a">16:20</span>   →  17:00 falls <span class="l">inside</span>, 16:00 does not
-Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g">out</span></pre>
+    <pre>Fri  4 Sep   candles <span class="a">18:43</span>   &#8594;  19:00 falls <span class="l">inside</span> Shabbat
+Fri 18 Dec   candles <span class="a">16:20</span>   &#8594;  17:00 falls <span class="l">inside</span>, 16:00 does not
+Sat  5 Sep   tzeit   <span class="a">19:37</span>   &#8594;  20:00 is <span class="g">out</span></pre>
     <p>
       A repeating event skips those windows, with three exceptions that are all about
       intent: <strong>meals are allowed</strong> because they are what the day is for
-      (unless it is a fast — Yom Kippur is both, and the fast wins); a series
+      (unless it is a fast &#8212; Yom Kippur is both, and the fast wins); a series
       <strong>anchored</strong> on Shabbat keeps it, because a Saturday shiur was put
       there deliberately; and if observance cannot be computed, nothing is skipped,
       because a series quietly losing days is worse than one landing where it should not.
@@ -776,7 +776,7 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
       with the sun.
     </p>
     <p>
-      A model is genuinely good at the shape of such a plan — how hard, how often, in what
+      A model is genuinely good at the shape of such a plan &#8212; how hard, how often, in what
       order, what a sensible week looks like. It is reliably bad at the dates, because
       nothing in its training tells it which Tuesday is a fast day. A model that has
       confidently scheduled a hard session on one is not a hypothetical; it is the default
@@ -808,7 +808,7 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
         <text x="235" y="54" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".55">dates</text>
         <text x="481" y="54" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".55">legal</text>
 
-        <text x="360" y="132" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">a proposal is advisory · a placement is not</text>
+        <text x="360" y="132" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".55">a proposal is advisory &#183; a placement is not</text>
       </svg>
       <figcaption>
         The model never writes a date. It writes a plan, and the dates are decided by code
@@ -830,7 +830,7 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
       modules.</strong> Whether a day is available is not negotiable and is calculated.
       Whether two hard sessions may fall on consecutive days is a preference someone can
       reasonably disagree with. Mixing them would let a preference quietly override a
-      boundary — so they are not editable in the same file.
+      boundary &#8212; so they are not editable in the same file.
     </p>
 
     <p class="note">
@@ -846,14 +846,14 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
     <h2><span class="num">10</span>More than one thing at once</h2>
     <p>
       A single sentence can hold two events, and the rule parser cannot: it has one set
-      of slots. Rather than fill half of them it refuses outright — <code>RuleParserSkip</code>
-      — and the sentence goes to llama whole. A softer version of the same instinct is in
+      of slots. Rather than fill half of them it refuses outright &#8212; <code>RuleParserSkip</code>
+      &#8212; and the sentence goes to llama whole. A softer version of the same instinct is in
       the score: two clock times in one span multiplies confidence by <strong>0.70</strong>,
       because "lunch at noon and coffee at 9" is usually two things wearing one sentence.
     </p>
     <p>
       Batching works the other way. Several commands can be sent as one request with each
-      in brackets — <code>[gym tomorrow at 7am] [lunch with Dana at noon]</code> — and the
+      in brackets &#8212; <code>[gym tomorrow at 7am] [lunch with Dana at noon]</code> &#8212; and the
       server splits them and parses each alone. That is cheaper rather than dearer,
       because a short single command often settles on the rules for no model call at all,
       and the review runs once for the batch instead of once each.
@@ -862,8 +862,8 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
       <thead><tr><th>Two commands sent as</th><th>LLM calls</th></tr></thead>
       <tbody>
         <tr><td>two separate requests</td><td class="n">4</td></tr>
-        <tr><td><code>[one] [two]</code> — split and parsed apart</td><td class="n">3</td></tr>
-        <tr><td>"one and two" — one run-on sentence</td><td class="n">2</td></tr>
+        <tr><td><code>[one] [two]</code> &#8212; split and parsed apart</td><td class="n">3</td></tr>
+        <tr><td>"one and two" &#8212; one run-on sentence</td><td class="n">2</td></tr>
       </tbody>
     </table>
     <p class="note">
@@ -885,13 +885,13 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
       <tbody>
         <tr>
           <td>the <strong>session</strong> queue</td>
-          <td class="m">pressing the mic while it is still thinking — the next thing you
+          <td class="m">pressing the mic while it is still thinking &#8212; the next thing you
             want to say, or (press again) more of the same sentence</td>
           <td class="m">the current command finishes</td>
         </tr>
         <tr>
           <td>the <strong>pending</strong> queue</td>
-          <td class="m">a command the model could not be reached for — Ollama down,
+          <td class="m">a command the model could not be reached for &#8212; Ollama down,
             laptop asleep. Stored with its transcript, never silently dropped</td>
           <td class="m">a retry loop notices the model is back</td>
         </tr>
@@ -916,11 +916,11 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
     <table>
       <thead><tr><th>Property</th><th>Behaviour</th></tr></thead>
       <tbody>
-        <tr><td>list</td><td class="m">"today" or "general" — where it lives, and what a daily read covers</td></tr>
+        <tr><td>list</td><td class="m">"today" or "general" &#8212; where it lives, and what a daily read covers</td></tr>
         <tr><td>tags</td><td class="m">inferred from the title, or from your own vocabulary</td></tr>
         <tr><td>due date</td><td class="m">optional, and the only date a task has</td></tr>
         <tr><td>subtasks</td><td class="m">a task can hold its own list; each completes separately</td></tr>
-        <tr><td>completion</td><td class="m">finished, not deleted — the record survives</td></tr>
+        <tr><td>completion</td><td class="m">finished, not deleted &#8212; the record survives</td></tr>
       </tbody>
     </table>
     <p>
@@ -938,18 +938,18 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
     <p>
       Asking is a first-class action, not a search box. <code>query_schedule</code> and
       <code>query_todos</code> answer in sentences, and because they create nothing they
-      are the one place the self-check may not act — there is no record to correct.
+      are the one place the self-check may not act &#8212; there is no record to correct.
     </p>
     <pre>"what do I have on friday"
-  → <span class="g">You have one event Friday, 4 September: Dentist Appointment at 9:00 AM.</span>
+  &#8594; <span class="g">You have one event Friday, 4 September: Dentist Appointment at 9:00 AM.</span>
 
 "what do I have this week"
-  → <span class="g">You have 6 events this week: Team Standup at 9:30 AM, ...</span></pre>
+  &#8594; <span class="g">You have 6 events this week: Team Standup at 9:30 AM, ...</span></pre>
     <p>
       A named day beats the relative scope: <code>scope</code> can only say today,
       tomorrow or this week, so "friday" used to fall through to today and answer
       confidently about the wrong day. It now carries an explicit date, and the answer
-      names the day back to you — <em class="q">"Friday, 4 September"</em> — so a
+      names the day back to you &#8212; <em class="q">"Friday, 4 September"</em> &#8212; so a
       misunderstanding is visible in the reply rather than discovered later.
     </p>
     <p class="note">
@@ -969,33 +969,33 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
 <section>
     <h2><span class="num">14</span>One request, end to end</h2>
     <p>
-      Everything above happens inside a single HTTP request. Both clients — the
-      desktop app and the phone — are thin: they capture audio, transcribe it, and
+      Everything above happens inside a single HTTP request. Both clients &#8212; the
+      desktop app and the phone &#8212; are thin: they capture audio, transcribe it, and
       post the text. Neither contains a parser. This is the whole contract:
     </p>
 
 <pre><span class="c">POST /voice/text</span>
 {
   "transcript":   "book gym tomorrow at 7am",
-  "source":       "mac" | "ios" | "test",   <span class="c">← the ONLY difference between clients</span>
-  "current_view": "month",                  <span class="c">← disambiguates "delete that"</span>
-  "trace_run":    "run-8f3a"                <span class="c">← optional; joins a live trace stream</span>
+  "source":       "mac" | "ios" | "test",   <span class="c">&#8592; the ONLY difference between clients</span>
+  "current_view": "month",                  <span class="c">&#8592; disambiguates "delete that"</span>
+  "trace_run":    "run-8f3a"                <span class="c">&#8592; optional; joins a live trace stream</span>
 }
 
 <span class="c">200 OK</span>
 {
-  "message":     "Added Gym tomorrow at 7:00 AM.",   <span class="c">← spoken aloud</span>
+  "message":     "Added Gym tomorrow at 7:00 AM.",   <span class="c">&#8592; spoken aloud</span>
   "actions":     [{"action": "create_event", "parameters": {...}}],
-  "refresh":     "switch_month",             <span class="c">← view the client should show</span>
+  "refresh":     "switch_month",             <span class="c">&#8592; view the client should show</span>
   "parse":       "rule" | "hybrid" | "llm" | "error",
-  "corrections": [...],                      <span class="c">← vocabulary rewrites applied</span>
+  "corrections": [...],                      <span class="c">&#8592; vocabulary rewrites applied</span>
   "trace":       [ ...stages... ],
-  "memory_id":   417                         <span class="c">← the row a 👍/👎 later attaches to</span>
+  "memory_id":   417                         <span class="c">&#8592; the row a &#128077;/&#128078; later attaches to</span>
 }</pre>
 
     <p>
       <code>source</code> carries more weight than it looks. It labels the trace, the
-      vocabulary corrections and the command memory — and it <strong>defaults to
+      vocabulary corrections and the command memory &#8212; and it <strong>defaults to
       <code>"test"</code></strong>, not to a real client. That default is deliberate and was
       once the other way round, which made an afternoon of scripted testing
       indistinguishable from real use in the history the model learns from. Forgetting
@@ -1010,7 +1010,7 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
 
     <figure>
       <svg viewBox="0 0 720 234" role="img"
-           aria-label="A timeline of one request. On the request thread: vocabulary, rule parse, validate, execute, and respond — about 100 milliseconds. The response returns there. Two daemon threads continue afterwards: the self-check, taking several seconds, and the memory write. The client already has its answer.">
+           aria-label="A timeline of one request. On the request thread: vocabulary, rule parse, validate, execute, and respond &#8212; about 100 milliseconds. The response returns there. Two daemon threads continue afterwards: the self-check, taking several seconds, and the memory write. The client already has its answer.">
         <defs>
           <marker id="t-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
             <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
@@ -1032,13 +1032,13 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
         <text x="412" y="59" text-anchor="middle" font-size="10.5" fill="var(--done)">respond</text>
 
         <path d="M 412 74 L 412 96" fill="none" stroke="var(--done)" stroke-opacity=".8" marker-end="url(#t-ah)"></path>
-        <text x="422" y="92" font-size="10" fill="var(--done)">client has its answer · ~0.1 s</text>
+        <text x="422" y="92" font-size="10" fill="var(--done)">client has its answer &#183; ~0.1 s</text>
 
-        <text x="16" y="130" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" fill-opacity=".5" letter-spacing="1.1">DAEMON THREADS — nothing waits on these</text>
+        <text x="16" y="130" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" fill-opacity=".5" letter-spacing="1.1">DAEMON THREADS &#8212; nothing waits on these</text>
         <line x1="16" y1="140" x2="704" y2="140" stroke="currentColor" stroke-opacity=".18" stroke-dasharray="4 3"></line>
 
         <rect x="366" y="150" width="230" height="30" rx="5" fill="none" stroke="var(--verify)" stroke-dasharray="5 3"></rect>
-        <text x="481" y="169" text-anchor="middle" font-size="10.5" fill="var(--verify)">self-check — several seconds</text>
+        <text x="481" y="169" text-anchor="middle" font-size="10.5" fill="var(--verify)">self-check &#8212; several seconds</text>
 
         <rect x="366" y="190" width="150" height="30" rx="5" fill="none" stroke="var(--llm)" stroke-dasharray="5 3"></rect>
         <text x="441" y="209" text-anchor="middle" font-size="10.5" fill="var(--llm)">write to memory</text>
@@ -1047,13 +1047,13 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
       </svg>
       <figcaption>
         The rule path in full. On the model path the top row is the same shape but the
-        parse box takes seconds instead of milliseconds — the bottom row is unchanged.
+        parse box takes seconds instead of milliseconds &#8212; the bottom row is unchanged.
       </figcaption>
     </figure>
 
     <p class="note">
       Because the self-check finishes after the response, it cannot change what you were
-      told. It writes its verdict into the trace, and — when configured to — an edit to
+      told. It writes its verdict into the trace, and &#8212; when configured to &#8212; an edit to
       the record. That asymmetry is why it is safe to run it on everything.
     </p>
   </section>
@@ -1070,17 +1070,17 @@ Sat  5 Sep   tzeit   <span class="a">19:37</span>   →  20:00 is <span class="g
     <h3>What the rules hand over</h3>
 <pre><span class="c">@dataclass</span>
 class RuleParseResult:
-    confidence:     float            <span class="c">← the number section 03 is about</span>
+    confidence:     float            <span class="c">&#8592; the number section 03 is about</span>
     intents:        list[tuple[str, BaseIntent]]
-    missing_slots:  list[str]        <span class="c">← non-empty ⇒ never fast-pathed</span>
+    missing_slots:  list[str]        <span class="c">&#8592; non-empty &#8658; never fast-pathed</span>
     raw_slots:      dict             <span class="c">{action: {slot: value}}</span>
     transcript:     str
     routed_to_llm:  bool
-    dropped_spans:  int              <span class="c">← parts it could not route at all</span></pre>
+    dropped_spans:  int              <span class="c">&#8592; parts it could not route at all</span></pre>
 
     <p>
       Two fields decide routing, not one. A result is answered directly only when
-      <code>confidence &gt;= 0.85</code> <em>and</em> <code>missing_slots</code> is empty —
+      <code>confidence &gt;= 0.85</code> <em>and</em> <code>missing_slots</code> is empty &#8212;
       a high score with a hole in it still goes to the model.
       <code>dropped_spans</code> is the quieter signal: it counts parts of the sentence the
       rules never accounted for, which is how a half-understood command is told apart
@@ -1090,7 +1090,7 @@ class RuleParseResult:
     <h3>What validation is</h3>
     <p>
       Every action declares a Pydantic model, and that model is where the domain rules
-      live — not in the parser, and not in the executor. A spoken time reaching
+      live &#8212; not in the parser, and not in the executor. A spoken time reaching
       <code>CalendarIntent</code> as <code>"230PM"</code> is normalised to
       <code>"14:30"</code> by a field validator; one reaching it as <code>"99:99"</code>
       is rejected outright, and the rejection is what triggers a re-parse. The parser
@@ -1114,7 +1114,7 @@ class RuleParseResult:
     <p>
       <code>description</code> and <code>parameters_schema</code> are not documentation.
       They are concatenated into the system prompt and into the JSON schema the model is
-      constrained to emit — so <strong>the registry generates the prompt</strong>. An
+      constrained to emit &#8212; so <strong>the registry generates the prompt</strong>. An
       action's prose about when to use it is, literally, how the model learns to use it.
       That is also why prompt-engineering in this system means editing a class attribute
       next to the code it describes.
@@ -1142,10 +1142,10 @@ class RuleParseResult:
     </table>
 
     <p>
-      The catalogue dominates, and it is identical between calls — which is the point. The
+      The catalogue dominates, and it is identical between calls &#8212; which is the point. The
       date table is rebuilt <em>only</em> when the day changes, so the long prefix stays
       byte-identical and the model's prefix cache keeps hitting. When that cache is missed
-      the same call takes 30–60 seconds instead of 8; an early version had the context
+      the same call takes 30&#8211;60 seconds instead of 8; an early version had the context
       window set below the prompt's own length, so every single call overflowed and
       re-processed the whole thing.
     </p>
@@ -1154,14 +1154,14 @@ class RuleParseResult:
 <pre>POST localhost:11434/api/chat
 {
   "model":  "llama3.1:8b",
-  "format":  { ...JSON Schema assembled from the registry... },  <span class="c">← the model CANNOT emit prose</span>
+  "format":  { ...JSON Schema assembled from the registry... },  <span class="c">&#8592; the model CANNOT emit prose</span>
   "stream":  false,
-  "keep_alive": -1,                       <span class="c">← never unload between commands</span>
+  "keep_alive": -1,                       <span class="c">&#8592; never unload between commands</span>
   "options": { "temperature": 0.1, "num_ctx": 8192 }
 }</pre>
 
     <p>
-      <code>format</code> is a grammar constraint at sampling time, not an instruction — the
+      <code>format</code> is a grammar constraint at sampling time, not an instruction &#8212; the
       model is unable to produce a token that would break the schema. So the failure mode
       is a <em>valid</em> object with wrong values, never a parse error, which is exactly
       why the layer after this one exists. The self-check runs the same way but at
@@ -1176,23 +1176,23 @@ class RuleParseResult:
     <h2><span class="num">17</span>When the thing you named does not exist</h2>
     <p>
       A parse can be perfectly well-formed and still refer to nothing. "Mark the dentist
-      appointment done" is a valid <code>complete_todo</code> — but if there is no such
+      appointment done" is a valid <code>complete_todo</code> &#8212; but if there is no such
       task, executing it is not an error, it is a <em>miss</em>. The two need different
       handling, and conflating them is how a confidently-wrong rule parse used to reach
-      the user as "I couldn't find…".
+      the user as "I couldn't find&#8230;".
     </p>
 
 <pre>class AssistantError(Exception):        <span class="c">something broke</span>
-    ├── STTError, OllamaError, ParseError, ...
+    &#9500;&#9472;&#9472; STTError, OllamaError, ParseError, ...
 
-class TargetNotFound(Exception):        <span class="c">nothing broke — the target isn't there</span>
+class TargetNotFound(Exception):        <span class="c">nothing broke &#8212; the target isn't there</span>
     <span class="c">deliberately NOT an AssistantError</span></pre>
 
     <p>
       That inheritance gap is load-bearing. <code>TargetNotFound</code> is caught
       separately and triggers <strong>escalation</strong>: the sentence goes back to the
       model with the failed interpretation attached, and is re-read from scratch. It is
-      the safety net under the confidence score — the case where the rules were sure, and
+      the safety net under the confidence score &#8212; the case where the rules were sure, and
       wrong, and the only evidence is that reality disagreed.
     </p>
 
@@ -1235,7 +1235,7 @@ class TargetNotFound(Exception):        <span class="c">nothing broke — the ta
    {"stage": "vocab",    "detail": "No corrections needed",   "ms": 2,    "ok": true},
    {"stage": "rule",     "detail": "create_event @ 1.00",     "ms": 96,   "ok": true},
    {"stage": "execute",  "detail": "Added Gym tomorrow 7 AM", "ms": 11,   "ok": true},
-   {"stage": "verify",   "detail": "agrees — no change",      "ms": 6210, "ok": true}
+   {"stage": "verify",   "detail": "agrees &#8212; no change",      "ms": 6210, "ok": true}
  ],
  "result": {"transcript": "...", "message": "...", "actions": [...], "memory_id": 417}}</pre>
 
@@ -1249,14 +1249,14 @@ class TargetNotFound(Exception):        <span class="c">nothing broke — the ta
     <h3>The failure this shape causes</h3>
     <p>
       Only the API reloads itself when its code changes. The desktop app and the thinking
-      panel do not, and the phone needs a reinstall — so a change can be live in the brain
+      panel do not, and the phone needs a reinstall &#8212; so a change can be live in the brain
       and stale in three places at once. "It had no effect" is, more often than not, this.
     </p>
 
     <p class="note">
       One more constraint the process model imposes: two model loads on separate threads
       segfault the interpreter. The test suite pins the numerical library to one thread to
-      avoid it, and the API refuses to warm its models up when running under test — a test
+      avoid it, and the API refuses to warm its models up when running under test &#8212; a test
       that builds the app wants its routes, not its weights.
     </p>
   </section>
@@ -1268,26 +1268,26 @@ class TargetNotFound(Exception):        <span class="c">nothing broke — the ta
     <h2><span class="num">19</span>Sundown, computed rather than looked up</h2>
     <p>
       Section 09 said the system knows when Shabbat begins. This is how, because it is two
-      independent questions answered by two different means — and conflating them is the
+      independent questions answered by two different means &#8212; and conflating them is the
       classic way to get it wrong.
     </p>
 
     <table>
       <thead><tr><th>Question</th><th>Answered by</th><th>Nature of the answer</th></tr></thead>
       <tbody>
-        <tr><td class="m">Which days are holy?</td><td>the fixed rabbinic calendar, computed</td><td>exact — it is arithmetic</td></tr>
-        <tr><td class="m">At what time?</td><td>solar position from your coordinates</td><td>astronomical, ±1–2 min</td></tr>
+        <tr><td class="m">Which days are holy?</td><td>the fixed rabbinic calendar, computed</td><td>exact &#8212; it is arithmetic</td></tr>
+        <tr><td class="m">At what time?</td><td>solar position from your coordinates</td><td>astronomical, &#177;1&#8211;2 min</td></tr>
       </tbody>
     </table>
 
-<pre><span class="c"># which days — computed from the calendar's own arithmetic, not a lookup table</span>
+<pre><span class="c"># which days &#8212; computed from the calendar's own arithmetic, not a lookup table</span>
 HebrewDate.from_pydate(date).festival(israel=True, include_working_days=False)
-    → a name only when work is forbidden; <span class="a">None</span> on intermediate festival days
+    &#8594; a name only when work is forbidden; <span class="a">None</span> on intermediate festival days
 
-<span class="c"># what time — solar geometry at the configured latitude and longitude</span>
+<span class="c"># what time &#8212; solar geometry at the configured latitude and longitude</span>
 sunset            = <span class="a">astral</span>.sun(observer, date)["sunset"]
-candle_lighting   = sunset − 18 min          <span class="c">configurable</span>
-tzeit (it ends)   = dusk at 8.5° below the horizon   <span class="c">configurable</span></pre>
+candle_lighting   = sunset &#8722; 18 min          <span class="c">configurable</span>
+tzeit (it ends)   = dusk at 8.5&#176; below the horizon   <span class="c">configurable</span></pre>
 
     <p>
       <code>include_working_days=False</code> is doing real work: the alternative call
@@ -1305,7 +1305,7 @@ tzeit (it ends)   = dusk at 8.5° below the horizon   <span class="c">configurab
 
     <p>
       Over three hours of drift across the year. A 19:00 event on a Friday is comfortably
-      outside the boundary in June and well inside it in December — so a rule written
+      outside the boundary in June and well inside it in December &#8212; so a rule written
       against dates alone is wrong for a whole season, silently, in the direction that
       books things where they should not be.
     </p>
@@ -1315,7 +1315,7 @@ tzeit (it ends)   = dusk at 8.5° below the horizon   <span class="c">configurab
       A day here runs sundown to sundown, so every civil date is modelled as two
       independently governed halves: the daytime is governed by that date's own status, and
       <strong>the evening by the following date's</strong>. This is why a Saturday night can
-      be free in one week and blocked in the next — if another festival day begins at
+      be free in one week and blocked in the next &#8212; if another festival day begins at
       sundown, the evening was never Saturday's to give.
     </p>
 
@@ -1328,11 +1328,11 @@ tzeit (it ends)   = dusk at 8.5° below the horizon   <span class="c">configurab
     </p>
     <p>
       So the published times were fetched <em>once</em>, from a reference that states
-      nightfall using the same definition — the same degrees of solar depression — and
+      nightfall using the same definition &#8212; the same degrees of solar depression &#8212; and
       checked in as a fixture. The comparison then runs offline, for ever:
     </p>
 
-<pre>126 comparisons · 6 cities · 7 dates across a year · 3 times each
+<pre>126 comparisons &#183; 6 cities &#183; 7 dates across a year &#183; 3 times each
 worst disagreement: <span class="a">28 seconds</span></pre>
 
     <p>
@@ -1347,8 +1347,8 @@ worst disagreement: <span class="a">28 seconds</span></pre>
     <p class="note">
       <strong>The model is not consulted here, ever.</strong> It may propose a date; whether
       that date is available is decided by this code, deterministically. And if the
-      computation cannot be done at all — an unreachable configuration, an out-of-range date
-      — <em>nothing is skipped</em>. A series that quietly loses days is worse than one that
+      computation cannot be done at all &#8212; an unreachable configuration, an out-of-range date
+      &#8212; <em>nothing is skipped</em>. A series that quietly loses days is worse than one that
       lands somewhere it should not, because the second is visible and the first is not.
     </p>
   </section>
@@ -1381,7 +1381,7 @@ worst disagreement: <span class="a">28 seconds</span></pre>
 
     <p>
       The third row is the honest cost: a series with no stated end is written a year
-      forward and no further. The fourth is the subtle one — if you delete from a date
+      forward and no further. The fourth is the subtle one &#8212; if you delete from a date
       that includes the first occurrence, the series is re-rooted onto the earliest
       instance still standing, so the ones before it stay linked to something that
       exists.
@@ -1389,7 +1389,7 @@ worst disagreement: <span class="a">28 seconds</span></pre>
 
     <p class="note">
       This is also what makes the Shabbat rule in section 09 cheap. Skipping is a decision
-      taken <em>once, at write time</em>, per candidate date — not a filter every reader
+      taken <em>once, at write time</em>, per candidate date &#8212; not a filter every reader
       has to remember to apply. A row that should not exist is never created, so no query
       anywhere can accidentally return it.
     </p>
@@ -1409,9 +1409,9 @@ worst disagreement: <span class="a">28 seconds</span></pre>
     <h3>Edits carry the version they were made against</h3>
 <pre><span class="c">PATCH /events/42</span>
 { "start_time": "16:00",
-  "base_updated_at": "2026-09-02T14:11:03Z" }   <span class="c">← the copy I edited</span>
+  "base_updated_at": "2026-09-02T14:11:03Z" }   <span class="c">&#8592; the copy I edited</span>
 
-<span class="c">409 Conflict</span> — "changed on the Mac since you edited it"</pre>
+<span class="c">409 Conflict</span> &#8212; "changed on the Mac since you edited it"</pre>
 
     <p>
       The device quotes the version stamp it worked from. If the record has moved on since,
@@ -1421,12 +1421,12 @@ worst disagreement: <span class="a">28 seconds</span></pre>
     </p>
 
     <h3>Polling that costs almost nothing</h3>
-<pre>GET /changes  →  {"token": "1788376902.418244-4325376"}
-                          <span class="c">└ modification time ┘ └ size ┘  of the database file</span></pre>
+<pre>GET /changes  &#8594;  {"token": "1788376902.418244-4325376"}
+                          <span class="c">&#9492; modification time &#9496; &#9492; size &#9496;  of the database file</span></pre>
 
     <p>
       Refetching every list on a timer is expensive, so the phone used to do it every 30
-      seconds — meaning something added on the laptop could sit invisible for half a
+      seconds &#8212; meaning something added on the laptop could sit invisible for half a
       minute. This returns a few bytes derived from the database file itself, so the phone
       can ask every couple of seconds and do real work only when the answer changes. It
       relies on one property of the storage engine: in rollback-journal mode every commit
@@ -1436,7 +1436,7 @@ worst disagreement: <span class="a">28 seconds</span></pre>
     <h3>What a queued command is worth</h3>
     <p>
       A command spoken with the laptop unreachable is queued on the phone and replayed on
-      reconnect — but it is queued as <em>text</em>, not as an action. It is parsed when it
+      reconnect &#8212; but it is queued as <em>text</em>, not as an action. It is parsed when it
       finally arrives, against the calendar as it is then. That is the right way round: an
       instruction is a thing you meant, not a diff you computed, and re-deciding it later
       with better information is strictly better than replaying a stale conclusion.
@@ -1467,7 +1467,7 @@ worst disagreement: <span class="a">28 seconds</span></pre>
     <p>
       The first lock is the important one and it is structural rather than a setting:
       push-eligibility requires the row to already carry a remote id. A locally created
-      event has none, so there is no code path by which it can leave — not "we remember not
+      event has none, so there is no code path by which it can leave &#8212; not "we remember not
       to", but "there is nothing to send it as".
     </p>
 
@@ -1475,16 +1475,16 @@ worst disagreement: <span class="a">28 seconds</span></pre>
     <p>
       Conflict policy is last-write-wins, decided during the pull by comparing timestamps:
       if the local edit is newer, the remote version is not applied and the row is kept
-      marked dirty for the next push. Deletes cannot work that way — a deleted row cannot
-      carry a flag — so deletion writes a <strong>tombstone</strong> to a queue, which the
+      marked dirty for the next push. Deletes cannot work that way &#8212; a deleted row cannot
+      carry a flag &#8212; so deletion writes a <strong>tombstone</strong> to a queue, which the
       sync drains and re-queues on failure. Without it, deleting while offline would delete
       locally and leave the remote copy for ever.
     </p>
 
     <p class="warn">
       <strong>So the honest version of "nothing leaves the machine" is this:</strong> the
-      part that decides things — transcription, parsing, the model, the calendar
-      arithmetic, sundown — has no network path at all, and a test fails the build if that
+      part that decides things &#8212; transcription, parsing, the model, the calendar
+      arithmetic, sundown &#8212; has no network path at all, and a test fails the build if that
       changes. Storage and decision-making are local absolutely. <em>Distribution</em> is
       local by default: the phone reaches the laptop directly, and the only way anything
       reaches a third party is if you configure this feature and connect an account.
@@ -1504,23 +1504,23 @@ worst disagreement: <span class="a">28 seconds</span></pre>
       <thead><tr><th>Claim</th><th>Evidence</th></tr></thead>
       <tbody>
         <tr><td>97% correct</td><td>89-command corpus, run end to end</td></tr>
-        <tr><td>rule 97% · llm 98% · hybrid 89%</td><td>same corpus, split by path</td></tr>
+        <tr><td>rule 97% &#183; llm 98% &#183; hybrid 89%</td><td>same corpus, split by path</td></tr>
         <tr><td>self-check catches wrong parses</td><td>15 of 16 you had corrected or rejected</td></tr>
-        <tr><td>applying its fixes hurts</td><td>0 fixed, 1 broken — hence advisory</td></tr>
+        <tr><td>applying its fixes hurts</td><td>0 fixed, 1 broken &#8212; hence advisory</td></tr>
         <tr><td>observance boundaries</td><td>35 unit tests against real sundown times</td></tr>
-        <tr style="color:var(--verify)"><td><strong>does your history help at all?</strong></td><td><strong>unmeasured</strong> — the corpus runs with an empty memory</td></tr>
+        <tr style="color:var(--verify)"><td><strong>does your history help at all?</strong></td><td><strong>unmeasured</strong> &#8212; the corpus runs with an empty memory</td></tr>
         <tr style="color:var(--verify)"><td><strong>is four examples the right number?</strong></td><td><strong>unmeasured</strong>, and never tuned</td></tr>
       </tbody>
     </table>
     <p class="note warn">
       <strong>The gap at the bottom is the point of the next piece of work.</strong>
-      Everything about personalisation — the examples, the verdicts, the number four —
+      Everything about personalisation &#8212; the examples, the verdicts, the number four &#8212;
       has never been measured, because the audit runs against a blank history. Until
       that changes, every answer about it is an argument rather than a result.
     </p>
   </section>
 
   <hr class="rule">
-  <p class="foot">tested · one machine · no network</p>
+  <p class="foot">tested &#183; one machine &#183; no network</p>
 
 </div>

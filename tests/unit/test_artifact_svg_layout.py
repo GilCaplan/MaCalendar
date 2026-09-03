@@ -14,6 +14,7 @@ every diagram that packs text tightly.
 """
 from __future__ import annotations
 
+import html
 import pathlib
 import re
 
@@ -43,7 +44,11 @@ def _boxes(svg: str):
     for match in _TEXT.finditer(svg):
         attrs, inner = match.group(1), match.group(2)
         a = dict(_ATTR.findall(attrs))
-        label = re.sub(r"<[^>]+>", "", inner).strip()
+        # Decode entities before measuring: the pages are pure ASCII so they
+        # render without a charset declaration, which means one em-dash is
+        # seven characters of source. Measuring the source would make every
+        # label look far wider than it draws.
+        label = html.unescape(re.sub(r"<[^>]+>", "", inner)).strip()
         if not label:
             continue
         try:
