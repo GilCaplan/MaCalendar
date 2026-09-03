@@ -215,13 +215,31 @@
     <text x="468" y="346" font-size="8" fill="var(--muted)">appends</text>
 
     <!-- calendar window -->
-    <g data-panel="window" role="button" tabindex="0" aria-label="The calendar window on the laptop: a thin client with no parser inside.">
+    <g data-panel="window" role="button" tabindex="0" aria-label="The macOS app: the calendar, tasks, timer and coursework tabs you actually look at. It draws and records; it parses nothing.">
       <rect class="frame" x="478" y="128" width="122" height="82" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.5"/>
       <line x1="478" y1="144" x2="600" y2="144" stroke="var(--line)"/>
       <circle cx="488" cy="136" r="2" fill="var(--muted)"/><circle cx="496" cy="136" r="2" fill="var(--muted)"/>
-      <text x="539" y="162" text-anchor="middle" font-size="10.5" font-weight="600">calendar window</text>
-      <text x="539" y="178" text-anchor="middle" font-size="8.5" fill="var(--muted)">a thin client</text>
-      <text x="539" y="192" text-anchor="middle" font-size="8.5" fill="var(--muted)">records · posts · renders</text>
+      <text x="539" y="140" text-anchor="middle" font-size="8" fill="var(--muted)">the app you look at</text>
+      <!-- the tabs, because five domains is what this window actually is -->
+      <rect x="484" y="150" width="26" height="11" rx="2" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width=".8"/>
+      <text x="497" y="158.5" text-anchor="middle" font-size="6.5" fill="var(--amber)">month</text>
+      <rect x="513" y="150" width="22" height="11" rx="2" fill="none" stroke="var(--line)" stroke-width=".8"/>
+      <text x="524" y="158.5" text-anchor="middle" font-size="6.5" fill="var(--muted)">tasks</text>
+      <rect x="538" y="150" width="24" height="11" rx="2" fill="none" stroke="var(--line)" stroke-width=".8"/>
+      <text x="550" y="158.5" text-anchor="middle" font-size="6.5" fill="var(--muted)">timer</text>
+      <rect x="565" y="150" width="30" height="11" rx="2" fill="none" stroke="var(--line)" stroke-width=".8"/>
+      <text x="580" y="158.5" text-anchor="middle" font-size="6.5" fill="var(--muted)">course</text>
+      <!-- a month grid, so it reads as a calendar at a glance -->
+      <g stroke="var(--line)" stroke-width=".7" opacity=".85">
+        <line x1="486" y1="169" x2="592" y2="169"/><line x1="486" y1="180" x2="592" y2="180"/>
+        <line x1="486" y1="191" x2="592" y2="191"/>
+        <line x1="504" y1="166" x2="504" y2="196"/><line x1="522" y1="166" x2="522" y2="196"/>
+        <line x1="540" y1="166" x2="540" y2="196"/><line x1="558" y1="166" x2="558" y2="196"/>
+        <line x1="576" y1="166" x2="576" y2="196"/>
+      </g>
+      <rect x="524" y="171" width="14" height="6" rx="1.5" fill="var(--amber)" opacity=".75"/>
+      <rect x="560" y="182" width="14" height="6" rx="1.5" fill="var(--model)" opacity=".7"/>
+      <text x="539" y="207" text-anchor="middle" font-size="8.5" fill="var(--muted)">draws · records · posts — parses nothing</text>
     </g>
 
     <!-- thinking panel: floats past the laptop frame -->
@@ -276,8 +294,10 @@
       <line x1="726" y1="285" x2="638" y2="285" stroke="var(--muted)" marker-end="url(#mi)"/>
       <line x1="638" y1="301" x2="726" y2="301" stroke="var(--muted)" marker-end="url(#mi)"/>
       <text x="681" y="315" text-anchor="middle" font-size="8.5" fill="var(--muted)">what happened</text>
-      <text x="681" y="331" text-anchor="middle" font-size="9" fill="var(--muted)">two machines</text>
-      <text x="681" y="343" text-anchor="middle" font-size="9" fill="var(--muted)">no service</text>
+      <!-- what the two arrows actually travel over -->
+      <rect x="636" y="322" width="90" height="30" rx="5" fill="var(--panel)" stroke="var(--line)" stroke-dasharray="3 2"/>
+      <text x="681" y="334" text-anchor="middle" font-size="8" font-weight="600">private mesh VPN</text>
+      <text x="681" y="345" text-anchor="middle" font-size="7.5" fill="var(--muted)">your two machines only</text>
     </g>
 
     <!-- ============ THE PHONE ============ -->
@@ -358,11 +378,7 @@ const P = {
   brain: {
     tag:"the thesis", name:"the brain", title:"One brain",
     z:[352,256,1.9],
-    sum:`<p>One process on the laptop understands and executes every command. The calendar window
-    on the laptop and the phone in your pocket are both thin clients: <strong>neither contains a
-    parser</strong>. Both hand over what you said and render what comes back, and the only
-    difference between them is one field naming which device spoke — <code>"mac"</code> or
-    <code>"ios"</code>.</p>
+    sum:`<p>One process understands and executes everything. The laptop window and the phone are both thin clients — <strong>neither contains a parser</strong>.</p>
     <p class="figs">15 actions · 101 endpoints · ~34,000 lines · 930 tests</p>`,
     more:`<p>It was not always this way. The calendar window once carried its own private copy of
     the whole pipeline. The two copies drifted, and every fix had to be written twice or the
@@ -378,11 +394,8 @@ const P = {
   hear: {
     tag:"step 1 of 8", name:"hear", title:"It hears locally",
     z:[357,485,2.6],
-    sum:`<p>A speech-to-text model — Whisper <code>base</code>, 74M parameters — runs on the
-    laptop's own GPU from a locally cached copy. Sound in, words out; the recording never leaves
-    the machine.</p>
-    <p>The phone does not transcribe. It records, and sends the audio to the laptop — so both
-    devices are heard by the same ears, with the same vocabulary.</p>`,
+    sum:`<p>Speech becomes text on the laptop's own GPU, from a model already on disk.</p>
+    <p class="figs">Whisper base · 74M parameters · no network</p>`,
     more:`<p>This is the first of the three local models and the only one that touches sound.
     Everything after this line works on plain text, which is what lets the laptop and the phone
     share the rest of the pipeline exactly.</p>`
@@ -390,18 +403,14 @@ const P = {
   correct: {
     tag:"step 2 of 8", name:"correct", title:"374 words the dictionary doesn't know",
     z:[352,190,2.9],
-    sum:`<p>Before any parsing, the transcript is checked against a personal vocabulary — 374
-    words at last count. A word in that list can do three different things, kept deliberately
-    separate:</p>
-    <ul>
-      <li><strong>Fix a mishearing.</strong> The transcript is rewritten, and the misheard form is
-      remembered as an alias so next time it is an exact hit.</li>
-      <li><strong>Expand shorthand.</strong> Never substituted into your words — expanding would
-      edit what you said rather than correct it. It rides along as context instead.</li>
-      <li><strong>Carry a label.</strong> A word can imply what kind of task or event it belongs
-      to, so the label travels with it.</li>
-    </ul>`,
-    more:`<p>Two guard rails. Fuzzy matching never touches a list of protected everyday words, so
+    sum:`<p>374 personal words the dictionary does not have. Each can fix a mishearing, expand shorthand, or carry a label.</p>
+    <p class="figs">a fixed mishearing is remembered — next time it is an exact hit</p>`,
+    more:`<ul>
+      <li><strong>Fix a mishearing.</strong> The transcript is rewritten and the wrong form remembered, so the next one is an exact hit.</li>
+      <li><strong>Expand shorthand.</strong> Never substituted into your words — that would edit what you said. It rides along as context.</li>
+      <li><strong>Carry a label.</strong> A word can imply what kind of thing it belongs to, and the label travels with it.</li>
+    </ul>
+    <p>Two guard rails. Fuzzy matching never touches a list of protected everyday words, so
     a vocabulary name can never swallow the word <em>data</em>. And every vocabulary word is also
     fed to the speech model as a bias, nudging it to spell the word right in the first place —
     correction is the fallback, not the plan.</p>`
@@ -409,13 +418,8 @@ const P = {
   parse: {
     tag:"step 3 of 8", name:"parse", title:"Rules first",
     z:[352,222,2.9],
-    sum:`<p>A grammar model — spaCy's small English model, 13 MB — tags which word is the verb,
-    what it acts on, and where the times are. A table of <strong>76 verb→action mappings</strong>
-    then tries to read the sentence directly: "book", "move", "cancel", "add"&hellip; Nine of the
-    fifteen actions are reachable this way, and for those sentences no large model runs at
-    all.</p>
-    <p>The parser scores its own confidence, 0 to 1 — and that score is what the next step routes
-    on.</p>`,
+    sum:`<p>Keyword rules read the sentence first, with no large model at all — then score their own confidence.</p>
+    <p class="figs">76 verbs · 9 of the 15 actions reachable this way</p>`,
     more:`<p>The score starts at the fraction of required slots filled, then pays for its
     doubts:</p>
     <div class="tblwrap"><table>
@@ -433,16 +437,8 @@ const P = {
   route: {
     tag:"step 4 of 8", name:"route", title:"The 0.85 line",
     z:[310,256,2.4],
-    sum:`<p>Score ≥ 0.85 with no required slot missing → the rules' answer stands, in about a
-    tenth of a second. Anything below goes to the large model — Llama&nbsp;3.1&nbsp;8B, running on
-    the laptop — which takes 7.8&nbsp;s at the median.</p>
-    <svg viewBox="0 0 360 44" style="max-width:100%;height:auto" role="img"
-         aria-label="Of 89 corpus commands, 44 percent were answered by the rules and 56 percent by the model.">
-      <rect x="0" y="4" width="156" height="14" fill="var(--amber)"/>
-      <rect x="160" y="4" width="200" height="14" fill="var(--model)"/>
-      <text x="0" y="36" font-size="10.5" font-family="IBM Plex Mono,monospace" fill="var(--amber)">rules · 44% · ~0.1 s</text>
-      <text x="360" y="36" text-anchor="end" font-size="10.5" font-family="IBM Plex Mono,monospace" fill="var(--model)">model · 56% · 7.8 s</text>
-    </svg>`,
+    sum:`<p>Above the line the rules answer in a tenth of a second. Below it, the model reads the sentence instead.</p>
+    <p class="figs">0.85 · 44% answered by rules · 56% by the model</p>`,
     more:`<p>Measured on an 89-command corpus, run end to end through the real pipeline:</p>
     <div class="tblwrap"><table>
       <tr><th>path</th><th class="num">correct</th><th class="num">commands</th><th class="num">median</th></tr>
@@ -458,11 +454,8 @@ const P = {
   check: {
     tag:"step 5 of 8", name:"check", title:"Thirteen sober questions",
     z:[352,290,2.9],
-    sum:`<p>Whichever parser answered, the result passes 13 deterministic checks before anything
-    is written — the difference between <em>parseable</em> and <em>plausible</em>. A date in the
-    past parses perfectly and is almost always wrong.</p>
-    <p>Each check exists because something went wrong once. Every fix is announced in the reply
-    and the thinking panel, never applied silently.</p>`,
+    sum:`<p>Thirteen deterministic questions before anything is written — a date already past, an end before its start.</p>
+    <p class="figs">no model involved · every command, every path</p>`,
     more:`<p>Among them:</p>
     <div class="tblwrap"><table>
       <tr><th>what it catches</th><th>the ruling</th></tr>
@@ -482,10 +475,8 @@ const P = {
   write: {
     tag:"step 6 of 8", name:"write", title:"A file, and the answer now",
     z:[300,376,2.3],
-    sum:`<p>The result is written to a local database file and the reply comes back immediately —
-    you see the event <em>now</em>, before any slow second opinion. No sync service, no cloud
-    store: the calendar is a file on the laptop's disk, and that file is the single source of
-    truth for both devices.</p>`,
+    sum:`<p>Written to a file on the disk, and the answer comes straight back. Nothing waits.</p>
+    <p class="figs">one SQLite file · yours, on your machine</p>`,
     more:`<p>Deleting is held to a higher bar than creating. When the parser cannot identify what
     to delete, "I couldn't find it" is the designed answer — guessing at a deletion is worse than
     failing at one.</p>`
@@ -493,12 +484,8 @@ const P = {
   review: {
     tag:"step 7 of 8", name:"review", title:"The model reads everything — afterwards",
     z:[352,358,2.9],
-    sum:`<p>After the answer has already been delivered, the large model re-reads
-    <strong>every</strong> command on a background thread — including the ones the rules were
-    certain about. There is no confidence score high enough to skip it.</p>
-    <p>It is advisory: it reports what it would have done differently; it does not silently
-    rewrite your calendar. And because the answer already arrived, its seconds cost nothing you
-    can feel.</p>`,
+    sum:`<p>The model then re-reads <strong>every</strong> command, including the ones the rules were certain about. It reports; it does not rewrite.</p>
+    <p class="figs">on a background thread · costs you no time</p>`,
     more:`<p class="figs">On the 89-command corpus: proposed a correction on 37 · fixed 0 · broke 0</p>
     <p>That measurement is why it only advises. An earlier design let it apply what it proposed;
     audits then caught it overwriting answers that were already right, and the measured run showed
@@ -508,10 +495,8 @@ const P = {
   learn: {
     tag:"step 8 of 8", name:"learn", title:"Remembered, not retrained",
     z:[397,400,2.4],
-    sum:`<p>Every command is remembered with what it produced and your verdict on it. When a new
-    command arrives, the four most similar past commands are pasted into the model's prompt as
-    worked examples — <em>here is how this speaker's sentences were read correctly before</em>.</p>
-    <p>The model itself never changes. No fine-tuning; the learning lives in the prompt.</p>`,
+    sum:`<p>Your corrections come back as worked examples in the next prompt. The model itself never changes.</p>
+    <p class="figs">4 most similar past commands · no fine-tuning</p>`,
     more:`<p>Similarity is arithmetic, not another model: 60% word overlap plus 40% sequence
     resemblance, scored over the most recent past commands (a pool of up to 2,000). Your feedback
     tilts the ranking — a command you <em>corrected</em> gains +0.15, because corrections are the
@@ -524,15 +509,8 @@ const P = {
   models: {
     tag:"on the laptop", name:"models", title:"Three models, one machine",
     z:[174,238,2.4],
-    sum:`<div class="tblwrap"><table>
-      <tr><th>model</th><th class="num">size</th><th>decides</th></tr>
-      <tr><td>Whisper <code>base</code></td><td class="num">74 M</td><td>sound → words</td></tr>
-      <tr><td>spaCy small English</td><td class="num">13 MB</td><td>which word is the verb</td></tr>
-      <tr><td>Llama 3.1 8B</td><td class="num">4-bit</td><td>meaning — and judging meaning</td></tr>
-    </table></div>
-    <p>The 8B model is pinned in memory permanently — 5.8 GB resident — so no command ever pays a
-    load time. That is a reasonable thing to do <em>because</em> it is 8B; most sizing choices
-    here follow from that one.</p>`,
+    sum:`<p>Three, all on this machine: one hears, one reads grammar, one understands.</p>
+    <p class="figs">Whisper 74M · spaCy 13MB · Llama 3.1 8B, 5.8 GB resident</p>`,
     more:`<p>One loaded copy of the big model is asked six different questions: the cold parse
     when rules score low; the fill-in when rules got half the sentence; two flavours of
     after-the-fact review; naming a placeholder title; and a retry when an action matched nothing.
@@ -543,21 +521,17 @@ const P = {
   window: {
     tag:"on the laptop", name:"window", title:"The calendar window",
     z:[539,169,2.4],
-    sum:`<p>The calendar you look at on the laptop is a client. It records audio, posts it to the
-    brain, and draws the answer — which is exactly what the phone does, plus a keyboard and a
-    bigger screen. It contains no parser: when you speak to it, it hands the words over like any
-    other caller.</p>`,
-    more:`<p>Its former intelligence is the cautionary tale behind the whole design: it used to
-    own a private copy of the pipeline, and the two copies drifted until the same sentence could
-    mean different things depending on where you said it. Now, if a behaviour needs to exist on
-    the laptop, it is added to the brain — where the phone inherits it the same afternoon.</p>`
+    sum:`<p>The application you actually look at — calendar, tasks, timer, coursework. It draws and it records. <strong>It parses nothing.</strong></p>
+    <p class="figs">most of the ~34,000 lines live here</p>`,
+    more:`<p>Worth saying plainly, because the drawing makes the brain look like the whole system: by volume, this window <em>is</em> the project. Five domains of screens, direct editing, drag and drop, colour rules, stacking overlapping events.</p>
+    <p>What it does not have is a parser. It once did — the window carried its own copy of the whole pipeline, the two drifted, and every fix had to be written twice or the two surfaces disagreed. It now posts text to the brain exactly as the phone does, and about 1,200 lines of duplicated understanding were deleted.</p>
+    <p>The same rule decides what voice reaches: speech is good at "book the dentist Thursday at four" and poor at "log the last forty minutes to the third project". Where a screen is the better instrument, there is only a screen.</p>`
   },
   hud: {
     tag:"on the laptop", name:"thinking", title:"The thinking panel",
     z:[560,300,2.2],
-    sum:`<p>A small floating card that shows the assistant deciding — which words were corrected,
-    which path the sentence took, what the reviewer thought. It talks to <strong>nothing</strong>.
-    The brain appends one JSON line per step to a log file; the panel just tails the file.</p>`,
+    sum:`<p>Shows the reasoning as it happens — and talks to nothing. It reads a log file the brain appends to.</p>
+    <p class="figs">floats over anything · works with the calendar closed</p>`,
     more:`<p>That non-connection is the feature. Because it holds no link to any process, it can
     float over a full-screen app with the calendar closed — and a command spoken to the phone in
     another room still streams onto the laptop's screen, because the brain writes the same lines
@@ -566,29 +540,17 @@ const P = {
   link: {
     tag:"between the devices", name:"link", title:"One field of difference",
     z:[681,298,2.4],
-    sum:`<p>The phone reaches the laptop over a private network between your own two machines —
-    no relay, no third computer involved. Up the wire go the words you said; back comes what
-    happened.</p>
-    <p>The request carries one extra field — <code>source: "ios"</code> or <code>"mac"</code> —
-    and that is the <em>entire</em> difference between speaking to the phone and speaking to the
-    laptop. It labels the trace and the memory. It changes nothing about how the sentence is
-    read.</p>`,
-    more:`<p>This link is the system's only concession to networking at all — and it is a link
-    between two machines you own, not a dependency on a service.</p>`
+    sum:`<p>Both devices post text to the same brain over a private link between your own two machines — no server in between. One field says which spoke.</p>
+    <p class="figs">"mac" or "ios" — the entire difference</p>`,
+    more:`<p>The phone reaches the laptop over a private mesh VPN: the two machines address each other directly, wherever they are, and nothing is relayed through a company. It is the one network hop in the system, and it is between two devices you own.</p>
+    <p>What crosses it is a sentence and a reply — never a decision. The phone does not send "create an event on Thursday"; it sends what you said and renders what came back. That is why the same command behaves identically on both, and why a fix lands in one place.</p>
+    <p>The <code>source</code> field labels the trace, the vocabulary corrections and the command history. It defaults to <code>"test"</code> rather than to a real device — so a script that forgets to identify itself is harmless, and a real client that forgets is obvious.</p>`
   },
   phone: {
     tag:"the second surface", name:"phone", title:"The phone",
     z:[806,328,1.7],
-    sum:`<p>A full local copy of the calendar lives on the phone, so it works with the laptop off.
-    Reads come from the copy; changes wait their turn.</p>
-    <ul>
-      <li><strong>Edits are versioned.</strong> An edit quotes the version of the record it was
-      made against and is refused if the record has moved on. No merge, no guess — a refused edit
-      is shown to you instead.</li>
-      <li><strong>Spoken commands queue as sound.</strong> A command spoken while disconnected is
-      kept as the recording itself, not as a decided action. On reconnect the audio is sent and
-      decided fresh by the brain, rather than replaying a conclusion that may have gone stale.</li>
-    </ul>`,
+    sum:`<p>Holds a full copy and works with the laptop off. Speech recorded offline is kept as audio and decided fresh on reconnect — not replayed as a stale action.</p>
+    <p class="figs">edits quote the version they were made against</p>`,
     more:`<p>When a queued command finally runs, the result arrives as a notification — silently
     changing a calendar from a queue would be worse than not running the command at all.</p>
     <p>And a queued change the laptop actively refuses — an edit against a record that changed, a
@@ -598,12 +560,8 @@ const P = {
   sun: {
     tag:"time & sky", name:"sun", title:"Where the sun is",
     z:[928,490,2.3],
-    sum:`<p>Some days must not be scheduled over. <em>Which</em> days comes from the fixed
-    calendar's own arithmetic; <em>when they begin</em> comes from solar geometry at your
-    configured coordinates. Candle lighting is 18 minutes before sunset; the day ends at
-    nightfall, when the sun sits 8.5° below the horizon. Both are configurable.</p>
-    <p>Sunset drifts by more than three hours across the year — 16:38 in December, 19:51 in June —
-    so any rule written against dates alone is wrong for a whole season.</p>`,
+    sum:`<p>Which days are holy is arithmetic. What <em>time</em> they begin is the sun's position at your coordinates — and it moves three hours across a year.</p>
+    <p class="figs">checked against published times · worst gap 28 seconds</p>`,
     more:`<p class="figs">Verified against published times: 126 comparisons · six cities · worst disagreement 28 seconds</p>
     <p>Repeating events skip Shabbat and yom tov, bounded by those computed times rather than by
     midnight. Three exceptions, each with a reason. Meals are allowed — they are what the day is
@@ -615,10 +573,8 @@ const P = {
   cloud: {
     tag:"ground rule", name:"internet", title:"Never",
     z:[655,62,2.2],
-    sum:`<p>No account, no API key, no telemetry, no cloud transcription. The speech model runs
-    from a cached copy, the language model is served on the laptop itself, and the database is a
-    file. Unplug the router and everything on this page still works — except the phone reaching
-    the laptop.</p>`,
+    sum:`<p>No account, no key, no cloud transcription. A test fails the build if anything reaches the internet.</p>
+    <p class="figs">every model runs from a local file</p>`,
     more:`<p>This is enforced, not promised: a test in the suite blocks every network connection
     that is not the machine talking to itself, and fails the build if any code path tries to
     reach further. It has already caught one regression — a library quietly fetching its model
