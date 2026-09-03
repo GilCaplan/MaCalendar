@@ -120,10 +120,14 @@ def test_the_hebrew_calendar_works_offline(no_network):
 
 
 def test_the_database_works_offline(no_network, tmp_path, monkeypatch):
+    # Setting the variable is not enough: get_db() caches one instance on first
+    # call, so by this point it is already pointing at the shared scratch file
+    # and this test was quietly asserting on whatever else had written there.
     monkeypatch.setenv("MACALENDAR_DB", str(tmp_path / "c.db"))
     from assistant.actions.calendar.intent import CalendarIntent
-    from assistant.db import get_db
-    db = get_db()
+    import assistant.db as dbmod
+    monkeypatch.setattr(dbmod, "_db_instance", dbmod.CalendarDB(str(tmp_path / "c.db")))
+    db = dbmod.get_db()
     db.create_event(CalendarIntent(title="Offline event", date="2026-09-04",
                                    start_time="09:00", end_time="10:00"))
     assert [e["title"] for e in db.get_events_for_day(dt.date(2026, 9, 4))] == ["Offline event"]

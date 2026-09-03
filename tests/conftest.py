@@ -11,6 +11,7 @@ from __future__ import annotations
 # memory and vocabulary, where they became few-shot examples the assistant
 # learns from.
 import os as _os
+import sys
 import tempfile as _tempfile
 
 # torch, numpy/scipy and spaCy's BLAS each bring their own threading runtime.
@@ -90,14 +91,53 @@ import assistant.actions.clarify    # noqa: E402,F401
 _REAL_ACTIONS = dict(global_registry._actions)
 
 
+def _reset_server_singletons() -> None:
+    """Forget the API server's cached parser, rule parser and registry.
+
+    assistant.api.server builds an IntentParser and a RuleBasedParser once,
+    lazily, on first use — and each bakes in a snapshot of the registry at
+    that moment: IntentParser computes its Ollama JSON schema in __init__ from
+    whatever actions were registered then, and never rebuilds it. Whichever
+    test happens to touch the pipeline first freezes that snapshot for every
+    test that runs after it in the same process.
+
+    That is invisible until a test exercises the real pipeline without first
+    requesting registry_with_real_actions — the registry it sees is emptied by
+    isolated_registry below, and if that emptied state is what the parser
+    happens to construct itself from, every action but the two or three
+    imported as a side effect of _get_registry() vanishes from its schema for
+    the rest of the run. A later test asking for "buy milk and bread" then
+    gets "Unknown intent" with a full registry sitting right there, because
+    the object doing the parsing was never told.
+
+    Only resets a singleton that has actually been created — checking via
+    getattr rather than importing the module, since most tests never touch it
+    and importing it here would cost every one of them the price of pulling in
+    Flask and the rest of the API surface for nothing.
+    """
+    mod = sys.modules.get("assistant.api.server")
+    if mod is None:
+        return
+    mod._registry = None
+    mod._parser = None
+    mod._rule_parser = None
+
+
 @pytest.fixture(autouse=True)
 def isolated_registry():
-    """Reset the global ActionRegistry before each test."""
+    """Reset the global ActionRegistry before each test.
+
+    Also resets the API server's own parser singletons (see
+    _reset_server_singletons) — they are downstream of this registry and must
+    not survive it being cleared out from under them.
+    """
     original = dict(global_registry._actions)
     global_registry._actions.clear()
+    _reset_server_singletons()
     yield global_registry
     global_registry._actions.clear()
     global_registry._actions.update(original)
+    _reset_server_singletons()
 
 
 @pytest.fixture

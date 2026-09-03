@@ -17,11 +17,16 @@ import pytest
 
 
 @pytest.fixture
-def client(registry_with_real_actions, monkeypatch):
+def client(registry_with_real_actions, monkeypatch, tmp_path):
     # conftest swaps the global registry for a two-action dummy so unit tests
     # are not at the mercy of the real one; driving the server end to end needs
     # the real actions back, or every command parses to nothing.
     monkeypatch.setenv("MACALENDAR_NO_WARMUP", "1")
+    # A database of our own. These commands really do create events and tasks,
+    # and the scratch database is shared across the suite — writing "gym" into
+    # it broke a test elsewhere that asserted exactly what a given day held.
+    import assistant.db as dbmod
+    monkeypatch.setattr(dbmod, "_db_instance", dbmod.CalendarDB(str(tmp_path / "c.db")))
     logging.disable(logging.INFO)
     from assistant.api import server
     app = server.create_app()
