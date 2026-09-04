@@ -29,7 +29,29 @@ reminders also flip, and their provenance is calendar). Watch for: a
 wanted-task row flipping to event (over-reach of the occasion list), and
 invented default times on the new events.
 
-*(actual vs. expected: to be filled after the rerun)*
+**Actual (rerun @ 8a3e127, 2087 s):** direction confirmed on every slice,
+magnitude under prediction — overall 75.6 → **76.8%** (+1.2 vs +1.5–2
+predicted); event+event 56 → **59%** (predicted 63–67); event+task 41 →
+**43%**; task+task 35 flat ✓; simple 91 → 92, medium flat ✓; complex 44 → 46;
+deep path 79 → 81%. The flip itself works ("set a reminder for my meeting
+today" → `create_event`, sensible 10:00 default). The shortfall decomposes
+into three understood causes:
+1. **Novel — the replay-date/observance clash:** today's replays run on a
+   *Friday*, so every "tomorrow" event lands on Shabbat and the observance
+   gate **correctly refuses** it ("I didn't book 'meeting': that lands on
+   Shabbat") — the product is right, the dataset doesn't model Shabbat.
+   Cycle 1–2 gains are *understated* on Friday runs, and runs replayed on
+   different weekdays are not strictly comparable. Today's runs are all
+   Friday-consistent, so within-day deltas hold.
+2. Garble first-halves ("Mark reminder with these people" → `complete_todo`
+   misread) keep their rows failing even when the fixed half now works — as
+   predicted.
+3. The fast path mangled a two-reminder compound into todos titled
+   "meet james at work tomorrow at 9am" and literally **"then"** — queue #1's
+   evidence grows.
+**Verdict: graduated** (targeted slices clearly up, nothing down); dev-full
+confirm of C1+C2 next. Queue re-ranked: replay-date pinning added as a
+measurement-correctness item [Gil to confirm].
 
 ## Cycle 1 — dev-fast(250) baseline + hypothesis (2026-09-04, code @ 2588612)
 

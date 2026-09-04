@@ -16,17 +16,30 @@ needing one is marked **[Gil]** and is blocked until asked.
 
 - ✅ **C1 — remind + clock-time ⇒ event over LLM labels** (segment).
   73.2 → 76.0 overall; e+t 35 → 41. Predicted ~40 — on the nose.
-- 🔄 **C2 — dated occasion reminder ⇒ event** (segment; Gil's convention call
-  2026-09-04). Predicted e+e 56 → ~63–67, e+t 41 → ~44–46, overall +1.5–2 pt.
-  Rerun in flight @ 8a3e127.
+- ✅ **C2 — dated occasion reminder ⇒ event** (segment; Gil's convention call
+  2026-09-04). Actual @ 8a3e127: overall 76.8 (+1.2, predicted +1.5–2), e+e 59
+  (predicted 63–67), e+t 43. Direction right everywhere; shortfall decomposed
+  (see RESULTS.md): Friday-replay observance clash + garble halves + fast-path
+  mangle. Graduated.
 
 ## The queue
+
+0. **[Gil] Replay-date pinning** — harness (`engine_dataset_compare`), not the
+   engine. *Evidence (cycle 2):* replays use the real clock, so a Friday run
+   makes every "tomorrow" event land on Shabbat and the observance gate
+   correctly refuses it — the dataset doesn't model Shabbat, so the engine is
+   penalised for being right, gains are understated, and runs replayed on
+   different weekdays are not comparable. *Proposal:* pin the replay clock to
+   a fixed mid-week date (e.g. a Tuesday) inside the compare harness only;
+   re-baseline dev-fast once after. Measurement correctness, zero engine risk —
+   but it resets comparability, so it is Gil's call when.
 
 1. **Fast-path compound gate** — stage: generate (`fast_propose`).
    *Evidence:* the fast path mangles compounds it confidently commits:
    "Remind me to read book next week — and can you add Gloria…" → three
    garbage todos; "…at noon. **Also**, Please remind to get donuts…" swallowed
-   into one title. Fast 71% vs deep 79% on this slice.
+   into one title; cycle 2 added a todo titled literally **"then"** from
+   "…at 9am, and then Remind me of my meeting tomorrow". Fast 71% vs deep 81%.
    *Hypothesis:* when the rule parse is single-intent but the text carries a
    strong compound marker (" — and ", ". Also, ", "and then", ; with clauses),
    refuse the fast commit and take the deep track.
@@ -39,7 +52,9 @@ needing one is marked **[Gil]** and is blocked until asked.
    *Evidence:* explicit asks that name no title die as unknown: "Set a event
    for the evening" (0 created), "please set event on Tuesday", "Set reminder
    for three o'clock" (simple row, 0/0). The event-kind retry fires and still
-   gets nothing.
+   gets nothing. *(Scope note after C2: items the occasion rule flips DO get
+   sensible LLM defaults — "my meeting today" → 10:00 event — so this entry is
+   only the title-less/unknown remainder.)*
    *Hypothesis:* an event-kind item whose text literally asks to set an
    event/reminder AND names a when (date or time) but no title becomes a
    default-titled event ("Event", time from the words) instead of unknown.
