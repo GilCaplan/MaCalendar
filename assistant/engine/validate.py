@@ -402,6 +402,8 @@ def run_objects(state: EngineState, cfg) -> EngineState:
     for item, action, intent in pairs:
         if action in ("update_event", "delete_event"):
             _rule_anaphor_guard(state, intent, tl, rel, action)
+            if action == "update_event":
+                _rule_move_time_fill(state, intent, transcript)
             continue
         if action == "create_event":
             _rule_relative_date_pin(state, intent, rel, recur, ev_idx, n_events,
@@ -611,6 +613,46 @@ def _rule_due_date_pin(state, intent, rel, recur, td_idx, n_todos) -> None:
         if want and due != want:
             state.add_fix("validate", "due_date_pin", str(due), want)
             intent.due_date = want
+
+
+def _rule_move_time_fill(state, intent, transcript) -> None:
+    """"move my 1pm meeting tomorrow to 3pm" once "updated successfully" while
+    changing nothing — the model filed 1pm as the match and dropped the 3pm.
+    When an update matches BY time, names exactly one other spoken time, and
+    carries no new time, that other time is what the speaker was moving TO."""
+    ms = getattr(intent, "match_start_time", None)
+    if not ms or getattr(intent, "new_start_time", None):
+        return
+
+    def _key(t):
+        try:
+            h, mm = int(str(t)[:2]), int(str(t)[3:5])
+        except (ValueError, TypeError):
+            return None
+        return (h % 12, mm)              # 03:00 and 15:00 are one spoken "3";
+                                         # 9:30 and 9:00 are NOT one time
+
+    mkey = _key(ms)
+    if mkey is None:
+        return
+    others = {k for k in (_key(t) for t in spoken_times(transcript))
+              if k is not None and k != mkey}
+    # Exactly one distinct other spoken time means there is no ambiguity
+    # about the destination.
+    if len(others) != 1:
+        return
+    okey = others.pop()
+    cands = sorted(t for t in spoken_times(transcript) if _key(t) == okey)
+    try:
+        match_is_pm = int(str(ms)[:2]) >= 12
+    except ValueError:
+        return
+    # Prefer the reading in the same half of day as the matched event —
+    # moving a 1pm meeting "to 3" means 15:00, not 03:00.
+    pick = next((t for t in cands if (int(t[:2]) >= 12) == match_is_pm), cands[0])
+    intent.new_start_time = pick
+    state.add_fix("validate", "move_time_fill", "", pick,
+                  note=f"the other spoken time is where the {ms} event moves to")
 
 
 def _rule_cadence_round_and_announce(state, tl) -> None:

@@ -270,15 +270,16 @@ def _commit(state: EngineState, cfg) -> None:
             except TargetNotFound as nf:
                 # Empty slots surface as "I couldn't find …", which is the
                 # right answer when the target cannot be identified. Guessing
-                # is not. But a CONFIDENT parse that matches nothing is the one
-                # signature of the rules being wrong that only execution can
-                # reveal ("Walk Mark's dog" → complete_todo 'walk mark stalk'),
-                # so a fast-track single action earns one LLM second opinion
-                # before the not-found stands. Ownership of this recheck moves
-                # into step 6 when it is built.
+                # is not. But a parse that matches nothing is the one signature
+                # of a misread that only execution can reveal — the rules'
+                # "Walk Mark's dog" → complete_todo 'walk mark stalk', and the
+                # LLM's "night shift tomorrow 8pm–6am" → update_event on an
+                # event that never existed (run 9) — so a single-action command
+                # earns one second opinion before the not-found stands,
+                # whichever track produced it. Ownership of this recheck moves
+                # into step 6 when it absorbs the last of the old bolt-ons.
                 replacement = None
-                if state.parse_path == "fast" and len(state.items) == 1 \
-                        and not state.messages:
+                if len(state.items) == 1 and not state.messages:
                     replacement = _recheck_not_found(state, cfg, item)
                 if replacement is None:
                     state.messages.append(nf.message)

@@ -126,6 +126,20 @@ Examples:
 "two tasks due tomorrow: buy groceries and return the library book"
 → {"items": [{"kind": "task", "text": "buy groceries due tomorrow"},
              {"kind": "task", "text": "return the library book due tomorrow"}]}
+"set a meeting tomorrow at 1 pm, another one at 4 pm and then pizza at 6:30 at edo's"
+→ {"items": [{"kind": "event", "text": "set a meeting tomorrow at 1 pm"},
+             {"kind": "event", "text": "a meeting tomorrow at 4 pm"},
+             {"kind": "event", "text": "pizza at 6:30 at edo's tomorrow"}]}
+"tomorrow gym at 7 am and a meeting with Tal at 11"
+→ {"items": [{"kind": "event", "text": "gym at 7 am tomorrow"},
+             {"kind": "event", "text": "a meeting with Tal at 11 tomorrow"}]}
+"two events tomorrow, one at four o'clock meeting with Rei and one at 7 pm pizza with Ezra"
+→ {"items": [{"kind": "event", "text": "meeting with Rei at four o'clock tomorrow"},
+             {"kind": "event", "text": "pizza with Ezra at 7 pm tomorrow"}]}
+
+An event chain ("another one at X", "then Y at Z", "one at A and one at B")
+is one event PER time-and-activity — and a date said once for the chain
+("tomorrow") is repeated into each item, like a shared deadline.
 
 Return JSON: {"items": [{"kind": ..., "text": ...}, ...]}"""
 

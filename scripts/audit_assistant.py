@@ -296,11 +296,18 @@ def build_corpus(seed: int = 7) -> list[dict]:
         ("night shift on wednesday from 8 pm to 6 am", [("create_event", {"date": next_wd(2), "start_time": "20:00"})]),   # weekday-pinned: see above
         ("Netivim zoom 1800-2000 tonight", [("create_event", {"date": d(0), "start_time": "18:00", "end_time": "20:00"})]),
         ("Shabbat lunch at Ravid's this saturday 12:30", [("create_event", {"date": next_wd(5), "start_time": "12:30"})]),
-        ("meeting with Guri moved from 9:30 to 9 on wednesday", [("create_event|update_event", {})]),
+        # seeded below (chat loop can't carry seeds): meeting-move phrasing
         ("Haxaga TA session mondays at noon", [("create_event", {"start_time": "12:00", "recurrence": "weekly"})]),
         ("remind me to send Ravid the tzofim code", [("create_todo", {"titles_contain": ["Ravid"]})]),
         ("sadna on sunday the 15th at 9 am then driving lesson at 8 am", [("create_event", {"start_time": "09:00"}), ("create_event", {"start_time": "08:00"})]),
     ]
+    # "moved from 9:30 to 9" with the 9:30 meeting actually on the books: the
+    # honest answer is an update that lands at 9:00 (exercises move_time_fill).
+    C.append({"area": "from-chats", "shape": "chat-phrasing",
+              "text": "meeting with Guri moved from 9:30 to 9 on wednesday",
+              "expect": [("update_event", {"db_event_start": ("Guri", "09:00")})],
+              "seed": [{"title": "Meeting with Guri Karpas", "date": next_wd(2),
+                        "start_time": "09:30", "end_time": "10:30"}]})
     for text, expect in chat:
         C.append({"area": "from-chats", "shape": "chat-phrasing", "text": text, "expect": expect})
 

@@ -238,3 +238,43 @@ def test_a_series_is_left_to_db_level_skipping(cfg):
     st = _state("gym every saturday", [it])
     validate.run_objects(st, cfg)
     assert it.blocked is None
+
+
+# --- move_time_fill (run 9: "updated successfully" while changing nothing) ---
+
+def _upd_intent(**kw):
+    base = dict(match_title="meeting", match_date=None, match_start_time=None,
+                new_title=None, new_date=None, new_start_time=None)
+    base.update(kw)
+    return SimpleNamespace(**base)
+
+
+def test_move_time_fill_takes_the_other_spoken_time(cfg):
+    it = _item("update_event", _upd_intent(match_start_time="13:00"))
+    st = _state("move my 1pm meeting tomorrow to 3pm", [it])
+    validate.run_objects(st, cfg)
+    assert it.intent.new_start_time == "15:00"
+    assert "move_time_fill" in [f.rule for f in st.fixes]
+
+
+def test_move_time_fill_is_minute_aware(cfg):
+    """"from 9:30 to 9" — same hour, different minutes — must fill 09:00."""
+    it = _item("update_event", _upd_intent(match_start_time="09:30"))
+    st = _state("meeting with Guri moved from 9:30 to 9 on wednesday", [it])
+    validate.run_objects(st, cfg)
+    assert it.intent.new_start_time == "09:00"
+
+
+def test_move_time_fill_refuses_ambiguity(cfg):
+    it = _item("update_event", _upd_intent(match_start_time="13:00"))
+    st = _state("move my 1pm meeting to 3pm or maybe 5pm", [it])
+    validate.run_objects(st, cfg)
+    assert it.intent.new_start_time is None
+
+
+def test_move_time_fill_never_overwrites(cfg):
+    it = _item("update_event", _upd_intent(match_start_time="13:00",
+                                           new_start_time="16:00"))
+    st = _state("move my 1pm meeting to 3pm", [it])
+    validate.run_objects(st, cfg)
+    assert it.intent.new_start_time == "16:00"

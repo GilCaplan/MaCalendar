@@ -13,6 +13,7 @@ step 6, crosscheck, when that is built): the Mac GUI posts here too.
 """
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -139,3 +140,46 @@ def test_a_not_found_is_an_answer_not_an_error(monkeypatch, client):
 
     assert body["message"].startswith("I couldn't find")
     assert "Error:" not in body["message"]
+
+
+def test_a_deep_track_misread_gets_the_same_second_opinion(monkeypatch, client):
+    """Run 9's "night shift" case: the LLM read a create as an update of a
+    nonexistent event. The recheck now runs on ANY track's single-action
+    not-found, so the second opinion can flip it to the create it was."""
+    rp = MagicMock()
+    rp.analyze.return_value = SimpleNamespace(confidence=0.2, missing_slots=["x"],
+                                              intents=[])
+    monkeypatch.setattr(generate, "_get_rule_parser", lambda: rp)
+
+    parser = MagicMock()
+    parser.parse.side_effect = [
+        [("update_event", SimpleNamespace(match_title="night shift", match_date=None,
+                                          match_start_time="20:00", new_date=None,
+                                          new_start_time=None))],
+        [("create_event", CalendarIntent(title="Night shift", date="2026-09-09",
+                                         start_time="20:00", end_time="23:59"))],
+    ]
+    parser.parse_with_context.side_effect = Exception("no context parse")
+    parser.last_llm_ms = 1
+    parser.last_examples_used = 0
+    parser.last_raw_response = ""
+    monkeypatch.setattr(generate, "_get_parser", lambda cfg: parser)
+
+    registry = MagicMock()
+
+    def _get(name):
+        cls = MagicMock()
+        if name == "update_event":
+            cls.return_value.execute.side_effect = TargetNotFound(
+                "I couldn't find an event at 20:00 on 2026-09-09.")
+        else:
+            cls.return_value.execute.return_value = "Created event 'Night shift'."
+        return cls
+
+    registry.get.side_effect = _get
+    monkeypatch.setattr(generate, "get_registry", lambda: registry)
+
+    body = client.post("/voice/text", json={
+        "transcript": "night shift on wednesday from 8 pm to 6 am"}).get_json()
+    assert body["actions"] == ["create_event"]
+    assert "Created event" in body["message"]
