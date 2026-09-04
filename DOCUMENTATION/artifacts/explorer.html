@@ -207,9 +207,9 @@
       <text x="352" y="215" text-anchor="middle" font-size="10">3 · rules first</text>
     </g>
     <line x1="352" y1="222" x2="352" y2="226" stroke="var(--muted)" marker-end="url(#mi)"/>
-    <g data-panel="route" role="button" tabindex="0" aria-label="Step 4: the fast lane. A confident rule parse is written immediately and the deep track checks it from behind; anything else takes the deep track in front of you.">
+    <g data-panel="route" role="button" tabindex="0" aria-label="Step 4: the fast lane runs in parallel with the deep pipeline. A confident rule parse answers instantly while the deep track verifies behind it; anything uncertain takes the deep track in front of you.">
       <rect class="frame" x="282" y="228" width="141" height="22" rx="4" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="352" y="243" text-anchor="middle" font-size="10">4 · fast? ≥ 0.85</text>
+      <text x="352" y="243" text-anchor="middle" font-size="10">4 · fast lane ∥ deep</text>
     </g>
     <line x1="352" y1="250" x2="352" y2="254" stroke="var(--muted)" marker-end="url(#mi)"/>
     <g data-panel="split" role="button" tabindex="0" aria-label="Step 5: split the command into its independent items, then split again — two times is two events, a list is one task per thing.">
@@ -567,9 +567,9 @@ const P = {
     nobody has verified that 0.80 is the right price for a pronoun.</p>`
   },
   route: {
-    tag:"step 4 of 9", name:"route", title:"The 0.85 line — and the two tracks",
+    tag:"step 4 of 9", name:"route", title:"The fast lane — parallel, not instead",
     z:[310,239,2.4],
-    sum:`<p>A confident rule parse (&ge; 0.85, nothing missing) is written <em>immediately</em> — and the full pipeline still runs, behind the answer, as its checker. Anything else takes the pipeline in front of you.</p>
+    sum:`<p>Two lanes in parallel. A confident rule parse (&ge; 0.85, nothing missing) answers <em>instantly</em>, and the deep pipeline runs behind that answer as its verifier. Anything uncertain takes the deep pipeline in front of you instead.</p>
     <p class="figs">fast: instant &#183; deep: seconds &mdash; every command gets the deep look either way</p>`,
     more:`<p>Measured on the 94-command corpus (ASSISTANT_AUDIT_SUMMARY.md, runs 10&ndash;12):</p>
     <div class="tblwrap"><table>
