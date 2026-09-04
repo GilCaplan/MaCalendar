@@ -83,3 +83,18 @@ def test_the_chain_spec_uses_only_drawable_stages():
             assert stage in icons, (
                 f"CHAINS[{version!r}] references stage {stage!r}, which the panel "
                 "has no icon for")
+
+
+def test_every_chain_slot_has_in_depth_info():
+    """The panel's ⓘ button reads trace.STAGE_INFO[version][label]. A chain slot
+    without an entry is a step the panel renders but cannot explain — add its
+    (heading, body) to STAGE_INFO, at the depth of the explorer page."""
+    for version, spec in trace.CHAINS.items():
+        info = trace.STAGE_INFO.get(version, {})
+        for _stage, label in spec:
+            assert label in info, (
+                f"CHAINS[{version!r}] has a slot {label!r} with no STAGE_INFO "
+                "entry — add its (heading, body) so the ⓘ can explain it")
+            heading, body = info[label]
+            assert heading.strip() and body.strip(), (
+                f"STAGE_INFO[{version!r}][{label!r}] has an empty heading or body")

@@ -391,3 +391,99 @@ def test_a_minimised_card_stays_minimised_for_the_next_command(hud, bus):
     reader.poll()
     assert widget.panel.minimised
     assert widget.panel.step_count == 2
+
+
+# ---------------------------------------------------------------------------
+# The chain rail — the canonical CHAINS scaffold, rendered by brain version
+# ---------------------------------------------------------------------------
+
+def _rail_state(rail):
+    """(labels done, active label) — what the scaffold is showing."""
+    done = {rail._slots[i][1] for i in rail._done}
+    active = None if rail._active is None else rail._slots[rail._active][1]
+    return done, active
+
+
+def test_the_rail_names_the_current_brain_version(hud):
+    from assistant import trace
+    widget, _, _ = hud
+    widget.panel.begin("Mac")
+    assert widget.panel._rail is not None
+    assert widget.panel._rail._ver.text() == trace.BRAIN_VERSION
+
+
+def test_the_rail_lights_the_chain_in_order_as_steps_arrive(hud):
+    widget, _, _ = hud
+    p = widget.panel
+    p.begin("Mac")
+    p.add_step(_step("vocab", "Vocabulary"))
+    p.add_step(_step("rule", "Rules"))
+    done, active = _rail_state(p._rail)
+    assert "fix words" in done          # the earlier slot is behind us
+    assert active == "rules first"      # and the rule slot is live
+
+
+def test_the_rail_maps_the_two_rule_slots_in_chain_order(hud):
+    # segment/decompose also trace as `rule`; the second `rule` step must land
+    # on the second `rule` slot, not re-light the first.
+    widget, _, _ = hud
+    p = widget.panel
+    p.begin("Mac")
+    p.add_step(_step("rule", "Rules first"))
+    p.add_step(_step("rule", "Split"))
+    done, active = _rail_state(p._rail)
+    assert "rules first" in done
+    assert active == "split · split again"
+
+
+def test_a_finished_run_leaves_no_slot_active(hud):
+    widget, _, _ = hud
+    p = widget.panel
+    p.begin("Mac")
+    p.add_step(_step("vocab", "Vocabulary"))
+    p.finish({"message": "ok", "brain": "engine-v2"})
+    assert p._rail._finished and p._rail._active is None
+    assert "fix words" in {p._rail._slots[i][1] for i in p._rail._done}
+
+
+def test_the_info_dot_shows_the_in_depth_copy_on_a_real_click(hud):
+    # The ⓘ is a control — click it, don't call the handler. It must carry the
+    # explorer-depth copy and not raise when tapped (offscreen shows nothing).
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtTest import QTest
+    from assistant.calendar_ui.thinking_panel import _InfoDot, _Theme
+    dot = _InfoDot("Fix words", "corrected against your personal vocabulary", _Theme(True))
+    assert "Fix words" in dot.toolTip()
+    assert "vocabulary" in dot.toolTip()
+    QTest.mouseClick(dot, Qt.MouseButton.LeftButton)   # must not raise
+
+
+# ---------------------------------------------------------------------------
+# One-tap revert of a destructive background patch
+# ---------------------------------------------------------------------------
+
+def test_a_destructive_patch_step_shows_a_revert_button(hud):
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtTest import QTest
+    widget, _, _ = hud
+    p = widget.panel
+    p.begin("Mac")
+    got = []
+    p.revert_requested.connect(lambda specs: got.append(specs))
+    spec = {"kind": "todo", "body": {"title": "buy groceries", "list_name": "today"}}
+    p.add_step({"stage": "verify", "title": "Reviewed the answer",
+                "detail": "I removed a task I created by mistake.", "ms": 0,
+                "at_ms": 0, "ok": False, "data": {"revert": [spec]}})
+    assert len(p._notices) == 1
+    bar = p._notices[-1]
+    QTest.mouseClick(bar._btn, Qt.MouseButton.LeftButton)   # a real click, not the handler
+    assert got == [[spec]]
+    assert not bar._btn.isEnabled() and bar._btn.text() == "Reverted"
+
+
+def test_a_plain_step_shows_no_revert_button(hud):
+    widget, _, _ = hud
+    p = widget.panel
+    p.begin("Mac")
+    p.add_step(_step("execute", "Create Todo"))
+    assert p._notices == []

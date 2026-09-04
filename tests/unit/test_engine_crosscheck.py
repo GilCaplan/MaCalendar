@@ -266,7 +266,36 @@ def test_extra_row_is_removed_when_apply_is_on(cfg, monkeypatch):
     correction = engine._background_verify(st, cfg)
     assert db.get_todo(extra) is None
     assert correction["severity"] == "major"
+    # The removal carries one-tap revert: a ready-to-POST /todos body that
+    # re-creates exactly what was undone.
+    assert correction.get("revert"), "a destructive patch must offer a revert"
+    spec = correction["revert"][0]
+    assert spec["kind"] == "todo"
+    assert spec["body"]["title"] == "buy groceries"
+    assert spec["body"]["list_name"] == "today"
     try:
         db.delete_todo(keep)
     except Exception:
         pass
+
+
+def test_revert_spec_shapes_a_post_ready_body():
+    """The spec is exactly what POST /events / POST /todos accept, so a client
+    reverts by re-creating — no new endpoint, no db.py bypass."""
+    ev = {"title": "Gym", "date": "2026-11-03", "start_time": "07:00",
+          "end_time": "08:00", "location": "", "attendees": "Noa",
+          "recurrence": "", "color": "#0078d4", "id": 5, "source": "voice"}
+    assert engine._revert_spec("event", ev) == {"kind": "event", "body": {
+        "title": "Gym", "date": "2026-11-03", "start_time": "07:00",
+        "end_time": "08:00", "attendees": "Noa", "color": "#0078d4"}}
+    # a row missing a field a create needs can't be re-created — no false offer
+    assert engine._revert_spec("event", {"title": "x"}) is None
+    assert engine._revert_spec("event", None) is None
+
+    td = {"title": "buy milk", "list": "today", "priority": "high",
+          "due_date": "", "notes": "", "tags": ["Groceries"], "quantity": 3}
+    spec = engine._revert_spec("todo", td)
+    assert spec["kind"] == "todo"
+    assert spec["body"]["list_name"] == "today"       # the `list` column → POST `list_name`
+    assert spec["body"]["tags"] == ["Groceries"]
+    assert spec["body"]["quantity"] == 3

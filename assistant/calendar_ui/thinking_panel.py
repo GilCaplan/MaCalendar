@@ -25,9 +25,11 @@ from PyQt6.QtCore import (
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen
 from PyQt6.QtWidgets import (
     QDialog, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QLabel, QLayout,
-    QLineEdit, QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
+    QLineEdit, QPushButton, QScrollArea, QSizePolicy, QToolTip, QVBoxLayout,
+    QWidget,
 )
 
+from assistant import trace as _trace
 from assistant.calendar_ui import icons
 from assistant.calendar_ui import styles as _styles
 
@@ -326,6 +328,203 @@ class _StepRow(QWidget):
             x = 4 + d / 2
             p.drawLine(int(x), top + d + 3, int(x), self.height())
         p.end()
+
+
+class _InfoDot(QLabel):
+    """A small ⓘ beside a chain step — tap it for the in-depth "what this step
+    is", the same explanation the published explorer page gives. Shown as a
+    tooltip on tap (and on hover), so it costs no space until asked for."""
+
+    def __init__(self, heading: str, body: str, theme: _Theme, parent=None) -> None:
+        super().__init__("ⓘ", parent)   # ⓘ
+        self._heading = heading
+        self._body = body
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        # Rich text so the tooltip wraps instead of running off the screen edge.
+        self._rich = (f"<div style='max-width:260px'><b>{heading}</b><br>{body}</div>")
+        self.setToolTip(self._rich)
+        self.apply_theme(theme)
+
+    def apply_theme(self, theme: _Theme) -> None:
+        self.setStyleSheet(f"color: {theme.text2}; background: transparent;")
+
+    def mousePressEvent(self, _event) -> None:   # noqa: N802
+        QToolTip.showText(self.mapToGlobal(QPoint(self.width(), self.height())),
+                          self._rich, self)
+
+
+class _ChainRail(QFrame):
+    """The engine's canonical chain of thought (assistant.trace.CHAINS[brain]),
+    drawn as a compact scaffold that lights up as the live steps arrive — so the
+    card reads as the diagram's flow (fix words → rules first → split · split
+    again → …) and names the brain version, rather than as a bare list of raw
+    step titles. Each slot carries an ⓘ with the in-depth explanation.
+
+    It sits above the live per-step timeline, which still shows the real titles,
+    timings and details; this is the map, those are the journey. The mapping
+    from a live step to a slot is by stage, in order — so the two `rule` slots
+    and any stage the deep track self-skips resolve correctly."""
+
+    def __init__(self, brain: str, theme: _Theme, parent=None) -> None:
+        super().__init__(parent)
+        self._brain = brain
+        self._theme = theme
+        self._slots: list[tuple[str, str]] = list(_trace.CHAINS.get(brain, []))
+        self._done: set[int] = set()
+        self._active: int | None = None
+        self._ptr = 0
+        self._finished = False
+        self._rows: list[tuple[int, str, QLabel, QLabel, QLabel]] = []
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(10, 8, 10, 8)
+        lay.setSpacing(4)
+
+        head = QHBoxLayout()
+        head.setSpacing(6)
+        self._cap = QLabel("chain of thought")
+        cf = self._cap.font()
+        cf.setPointSize(max(9, cf.pointSize() - 2))
+        cf.setWeight(QFont.Weight.DemiBold)
+        self._cap.setFont(cf)
+        head.addWidget(self._cap)
+        head.addStretch(1)
+        self._ver = QLabel(brain)
+        vf = QFont()
+        vf.setFamilies(["SF Mono", "Menlo", "Consolas", "monospace"])
+        vf.setPointSize(max(8, self._ver.font().pointSize() - 3))
+        self._ver.setFont(vf)
+        head.addWidget(self._ver)
+        lay.addLayout(head)
+
+        for i, (stage, label) in enumerate(self._slots):
+            row = QHBoxLayout()
+            row.setSpacing(6)
+            icon = QLabel()
+            icon.setFixedSize(14, 14)
+            row.addWidget(icon)
+            text = QLabel(label)
+            tf = text.font()
+            tf.setPointSize(max(9, tf.pointSize() - 1))
+            text.setFont(tf)
+            row.addWidget(text)
+            row.addStretch(1)
+            state = QLabel("")
+            sf = QFont()
+            sf.setPointSize(max(8, state.font().pointSize() - 2))
+            state.setFont(sf)
+            row.addWidget(state)
+            info = _trace.stage_info(brain, label)
+            if info:
+                row.addWidget(_InfoDot(info[0], info[1], theme))
+            lay.addLayout(row)
+            self._rows.append((i, stage, icon, text, state))
+
+        self.apply_theme(theme)
+        self._render()
+
+    # -- state, driven by the live steps -----------------------------------
+
+    def observe(self, step: dict) -> None:
+        stage = step.get("stage", "")
+        if stage in ("stt", "memory", "error"):
+            return
+        for i in range(self._ptr, len(self._slots)):
+            if self._slots[i][0] == stage:
+                if self._active is not None:
+                    self._done.add(self._active)
+                self._active = i
+                self._ptr = i + 1
+                self._render()
+                return
+        # A stage that repeats past the pointer (a loop-back, an extra rule
+        # pass) re-lights the last slot of that stage rather than falling off.
+        for i in range(len(self._slots) - 1, -1, -1):
+            if self._slots[i][0] == stage:
+                self._active = i
+                self._render()
+                return
+
+    def finish(self) -> None:
+        if self._active is not None:
+            self._done.add(self._active)
+        self._active = None
+        self._finished = True
+        self._render()
+
+    def _render(self) -> None:
+        theme = self._theme
+        for i, stage, icon, text, state in self._rows:
+            if i in self._done:
+                color, label_col, mark = theme.green, theme.text, "✓"      # ✓
+            elif i == self._active and not self._finished:
+                color, label_col, mark = theme.accent, theme.text, "…"     # …
+            elif self._finished:
+                color, label_col, mark = theme.border, theme.text2, "skipped"
+            else:
+                color, label_col, mark = theme.border, theme.text2, ""
+            icon.setPixmap(icons.pixmap(_STAGE_ICONS.get(stage, "pending"), color, 12))
+            text.setStyleSheet(f"color: {label_col}; background: transparent;")
+            state.setText(mark)
+            state.setStyleSheet(f"color: {color}; background: transparent;")
+
+    def apply_theme(self, theme: _Theme) -> None:
+        self._theme = theme
+        self.setStyleSheet(
+            f"_ChainRail {{ background-color: {theme.surface}; border: 1px solid {theme.border};"
+            f" border-radius: {_styles.RADIUS_MD}px; }}"
+        )
+        self._cap.setStyleSheet(f"color: {theme.text2}; background: transparent;")
+        self._ver.setStyleSheet(f"color: {theme.text2}; background: transparent;")
+        self._render()
+
+
+class _RevertBar(QFrame):
+    """A visible "I changed this behind your answer — Revert?" notice for a
+    destructive background patch (the cross-check undid a row it decided you
+    didn't ask for). The button re-creates what was removed via the signal the
+    HUD wires to the API. Amber, not red: the system reviewing itself, and it's
+    undoable — nothing fatal."""
+
+    reverted = pyqtSignal(list)
+
+    def __init__(self, specs: list, message: str, theme: _Theme, parent=None) -> None:
+        super().__init__(parent)
+        self._specs = specs
+        self._theme = theme
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(10, 8, 10, 8)
+        lay.setSpacing(8)
+        self._msg = QLabel(message.strip() or "Undid an item.")
+        self._msg.setWordWrap(True)
+        lay.addWidget(self._msg, 1)
+        self._btn = QPushButton("Revert")
+        self._btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn.clicked.connect(self._do_revert)
+        lay.addWidget(self._btn)
+        self.apply_theme(theme)
+
+    def _do_revert(self) -> None:
+        self.reverted.emit(self._specs)
+        self._btn.setEnabled(False)
+        self._btn.setText("Reverted")
+        self._msg.setText("Put it back.")
+
+    def apply_theme(self, theme: _Theme) -> None:
+        self._theme = theme
+        on_orange = _styles.on_color(theme.orange)
+        self.setStyleSheet(
+            f"_RevertBar {{ background-color: {theme.surface}; border: 1px solid {theme.orange};"
+            f" border-radius: {_styles.RADIUS_MD}px; }}"
+        )
+        self._msg.setStyleSheet(f"color: {theme.orange}; background: transparent; border: none;")
+        self._btn.setStyleSheet(
+            f"QPushButton {{ background-color: {theme.orange}; color: {on_orange};"
+            f" border: none; border-radius: {_styles.RADIUS_SM}px; padding: 4px 12px;"
+            f" font-weight: 700; }}"
+            f"QPushButton:disabled {{ background: transparent; color: {theme.text2};"
+            f" border: 1px solid {theme.border}; }}"
+        )
 
 
 class _WordChip(QLabel):
@@ -650,12 +849,15 @@ class ThinkingPanel(QFrame):
 
     closed = pyqtSignal()
     retry_requested = pyqtSignal(int)
+    revert_requested = pyqtSignal(list)   # undo a destructive background patch
     resized = pyqtSignal()          # so the window can re-anchor it to its corner
 
     def __init__(self, parent=None, dark: bool = True) -> None:
         super().__init__(parent)
         self._theme = _Theme(dark)
         self._rows: list[_StepRow] = []
+        self._rail: _ChainRail | None = None
+        self._notices: list[_RevertBar] = []   # revert bars for the current run
         self._result_card: _ResultCard | None = None
         # Everything from earlier commands: step rows, dividers, result cards.
         # Kept only so it can be trimmed and re-themed; nothing reads it back.
@@ -854,11 +1056,22 @@ class ThinkingPanel(QFrame):
             self._body_lay.insertWidget(self._body_lay.indexOf(self._working), div)
 
         self._history.extend(self._rows)
+        self._history.extend(self._notices)
+        if self._rail is not None:
+            self._history.append(self._rail)
         if self._result_card is not None:
             self._history.append(self._result_card)
         self._rows = []
+        self._notices = []
+        self._rail = None
         self._result_card = None
         self._trim_history()
+
+        # The canonical chain for this run, lit up as its steps arrive. Built
+        # with the current brain — the version is corrected in finish() if an
+        # (older) trace names a different one.
+        self._rail = _ChainRail(_trace.BRAIN_VERSION, self._theme, self._body)
+        self._body_lay.insertWidget(self._body_lay.indexOf(self._working), self._rail)
 
         self._finished = False
         self._empty.hide()
@@ -887,8 +1100,17 @@ class ThinkingPanel(QFrame):
             prev.set_last(False)
         row.set_last(True)
         self._rows.append(row)
+        if self._rail is not None:
+            self._rail.observe(step)
         # keep the working row and the trailing stretch below the steps
         self._body_lay.insertWidget(self._body_lay.indexOf(self._working), row)
+        # A destructive background patch carries what it undid — show a Revert.
+        revert = (step.get("data") or {}).get("revert")
+        if revert:
+            bar = _RevertBar(revert, step.get("detail", ""), self._theme, self._body)
+            bar.reverted.connect(self.revert_requested)
+            self._notices.append(bar)
+            self._body_lay.insertWidget(self._body_lay.indexOf(self._working), bar)
         self._update_count()
         QTimer.singleShot(0, self._scroll_to_bottom)
 
@@ -899,6 +1121,8 @@ class ThinkingPanel(QFrame):
         self._brain = (result or {}).get("brain")
         self._finished = True
         self._working.hide()
+        if self._rail is not None:
+            self._rail.finish()
         if result:
             card = _ResultCard(result, self._theme, self._body)
             card.fix_word.connect(self._on_fix_word)
@@ -1142,8 +1366,12 @@ class ThinkingPanel(QFrame):
         self._working_lbl.setStyleSheet(f"color: {theme.text2}; background: transparent;")
         self._empty.setStyleSheet(f"color: {theme.text2}; background: transparent;")
         self._spinner.set_color(theme.accent)
+        if self._rail is not None:
+            self._rail.apply_theme(theme)
         for row in self._rows:
             row.apply_theme(theme)
+        for notice in self._notices:
+            notice.apply_theme(theme)
         if self._result_card is not None:
             self._result_card.apply_theme(theme)
         effect = self.graphicsEffect()

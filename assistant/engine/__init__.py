@@ -431,6 +431,7 @@ def _background_verify(state: EngineState, cfg) -> "dict | None":
 
     speech: list[str] = []
     refresh: set = set()
+    reverts: list = []
     severity = "minor"
 
     # A placeholder title ("meeting") is renamed before anything else — 22 of
@@ -469,10 +470,12 @@ def _background_verify(state: EngineState, cfg) -> "dict | None":
                 speech.append(f"Worth a look: {f.detail}.")
         elif f.type == "extra":
             if getattr(cfg, "self_check_apply", False):
-                undone = _remove_extra(state, f)
+                undone, spec = _remove_extra(state, f)
                 if undone:
                     severity = "major"
                     speech.append(undone)
+                    if spec:
+                        reverts.append(spec)
                     refresh.update(("events", "todos"))
             else:
                 severity = "major"
@@ -480,9 +483,25 @@ def _background_verify(state: EngineState, cfg) -> "dict | None":
 
     if not speech:
         return None
+    # Something was actually applied (a row added or removed) iff `refresh` was
+    # touched — advisory "worth a look" notes don't touch it. When it was, echo
+    # the change onto the Mac too: the trace's bus listener is still attached
+    # from the foreground run, so a late step reaches the HUD, carrying the
+    # revert spec for the panel's one-tap Revert. (iOS gets the same via its
+    # verify-token poll.) Advisory notes stay poll-only, as before — no Mac
+    # noise for a check that only had an opinion.
+    applied = bool(refresh)
     both = "both" if len(refresh) > 1 else (refresh.pop() if refresh else "")
-    return {"ok": False, "severity": severity, "patch": {},
-            "speech": " ".join(speech), "refresh": both}
+    if state.trace is not None and applied:
+        from assistant.trace import VERIFY
+        state.trace.mark()   # so this late notice reads ~0 s, not the whole gap
+        state.trace.step(VERIFY, "Reviewed the answer", " ".join(speech),
+                         ok=False, revert=reverts or None)
+    result = {"ok": False, "severity": severity, "patch": {},
+              "speech": " ".join(speech), "refresh": both}
+    if reverts:
+        result["revert"] = reverts
+    return result
 
 
 def _commit_missing_ask(state: EngineState, cfg, finding) -> "str | None":
@@ -508,21 +527,58 @@ def _commit_missing_ask(state: EngineState, cfg, finding) -> "str | None":
     return None
 
 
-def _remove_extra(state: EngineState, finding) -> "str | None":
-    """Delete a committed row the words never asked for (self_check_apply on)."""
+def _revert_spec(kind: str, row: "dict | None") -> "dict | None":
+    """A ready-to-POST body that re-creates a row the background check removed,
+    so a client can offer one-tap revert. Shaped for POST /events and POST
+    /todos — the endpoints every client already uses — so reverting is just a
+    re-create, no new endpoint and no bypass of db.py. None if the row is gone
+    or missing the fields a create needs."""
+    if not row:
+        return None
+    if kind == "event":
+        keys = ("title", "date", "start_time", "end_time", "attendees",
+                "location", "description", "color", "recurrence",
+                "recurrence_end", "category")
+        body = {k: row[k] for k in keys if row.get(k) not in (None, "")}
+        if not all(body.get(k) for k in ("title", "date", "start_time", "end_time")):
+            return None
+        return {"kind": "event", "body": body}
+    body = {
+        "title": (row.get("title") or "").strip(),
+        "list_name": row.get("list") or "today",     # the column is `list`; POST wants `list_name`
+        "priority": row.get("priority") or "none",
+        "due_date": row.get("due_date") or "",
+        "notes": row.get("notes") or "",
+        "tags": row.get("tags") or [],
+        "quantity": row.get("quantity") or 1,
+    }
+    if not body["title"]:
+        return None
+    return {"kind": "todo", "body": body}
+
+
+def _remove_extra(state: EngineState, finding) -> "tuple[str | None, dict | None]":
+    """Delete a committed row the words never asked for (self_check_apply on).
+
+    Returns (spoken note, revert spec). The spec captures the row *before* the
+    delete, so the review panel and the phone can offer one-tap revert; None if
+    the row couldn't be captured (then the note stands but revert isn't offered)."""
     from assistant.db import get_db
+    db = get_db()
     for ex in state.executed:
         if ex.item_id == finding.item_id and ex.ok and ex.record:
             kind, row_id = ex.record[0], ex.record[1]
             try:
                 if kind == "event":
-                    get_db().delete_event(row_id)
-                    return "I removed an event I created by mistake."
-                get_db().delete_todo(row_id)
-                return "I removed a task I created by mistake."
+                    spec = _revert_spec("event", db.get_event(row_id))
+                    db.delete_event(row_id)
+                    return "I removed an event I created by mistake.", spec
+                spec = _revert_spec("todo", db.get_todo(row_id))
+                db.delete_todo(row_id)
+                return "I removed a task I created by mistake.", spec
             except Exception:
-                return None
-    return None
+                return None, None
+    return None, None
 
 
 def _recheck_not_found(state: EngineState, cfg, item) -> "tuple | None":

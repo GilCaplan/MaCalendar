@@ -153,6 +153,7 @@ class ThinkingHUD(QWidget):
         self.panel = ThinkingPanel(self, dark=self._dark)
         self.panel.closed.connect(self._on_panel_closed)
         self.panel.retry_requested.connect(self._on_retry)
+        self.panel.revert_requested.connect(self._on_revert)
         self.panel.resized.connect(self._fit)
         lay.addWidget(self.panel)
         self.panel.show()          # the panel hides itself on construction
@@ -436,6 +437,30 @@ class ThinkingHUD(QWidget):
                 logger.warning("Retry of pending command %s failed: %s", pending_id, exc)
 
         threading.Thread(target=_post, daemon=True, name="hud-retry").start()
+
+    def _on_revert(self, specs: list) -> None:
+        """Undo a destructive background patch by re-creating what it removed.
+
+        Like retry, the write path lives in the API process, so each captured
+        body is re-POSTed to the endpoint that first created it (POST /events or
+        /todos). The GUI's change-poll picks the row back up."""
+        import threading
+
+        def _post() -> None:
+            try:
+                import requests
+                port = os.environ.get("MACALENDAR_API_PORT") or str(
+                    getattr(getattr(self._config, "api", None), "port", 8080))
+                key = getattr(getattr(self._config, "api", None), "key", None)
+                headers = {"X-API-Key": key} if key else {}
+                for spec in specs or []:
+                    path = "/events" if spec.get("kind") == "event" else "/todos"
+                    requests.post(f"http://127.0.0.1:{port}{path}",
+                                  json=spec.get("body") or {}, headers=headers, timeout=30)
+            except Exception as exc:
+                logger.warning("Revert failed: %s", exc)
+
+        threading.Thread(target=_post, daemon=True, name="hud-revert").start()
 
     def _show_menu(self, pos) -> None:
         menu = QMenu(self)

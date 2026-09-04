@@ -238,6 +238,13 @@ def create_app() -> Flask:
           • major: {"ok": false, "severity": "major", "action": "...", "parameters": {...},
                     "speech": "...", "refresh": "..."}
 
+        A destructive correction (the check undid a row it decided you didn't
+        ask for) also carries a "revert" list — ready-to-POST bodies that
+        re-create what was removed, one per removed row:
+          "revert": [{"kind": "event"|"todo", "body": {...POST /events|/todos...}}]
+        so the client can offer one-tap revert (re-POST the body). Absent when
+        nothing was removed.
+
         iOS re-executes major corrections via the normal REST endpoints
         and plays the speech string via AVSpeechSynthesizer.
         The token is consumed on first ready response.
@@ -268,6 +275,19 @@ def create_app() -> Flask:
         return _engine_run(transcript, trace=trace, source=source,
                            current_view=current_view, trace_run=trace_run,
                            supports_edit=supports_edit)
+
+    def _supports_edit(body: "dict[str, Any] | None" = None) -> bool:
+        """Does the caller declare it can render the needs_edit round-trip?
+
+        `/voice/text` gets it as a JSON bool; the audio routes carry it as a
+        multipart form field ("true"), so accept either. Absent (an older
+        client) → False, and it never sees a needs_edit response — the reason
+        the flag exists. This was only read on `/voice/text`, so the edit
+        round-trip could never fire on a real voice command, which arrives as
+        audio on `/voice/stream`."""
+        wren = (body or {}).get("supports_edit") if body is not None \
+            else request.form.get("supports_edit")
+        return str(wren).strip().lower() in ("1", "true", "yes", "on")
 
     if not _no_bg:
         start_pending_retry_loop(_run_transcript)
@@ -301,7 +321,8 @@ def create_app() -> Flask:
 
         logger.info("📱 Transcript: %s", transcript)
         trace.step(STT, "Heard", transcript, transcript=transcript)
-        return jsonify(_run_transcript(transcript, trace, source="ios"))
+        return jsonify(_run_transcript(transcript, trace, source="ios",
+                                       supports_edit=_supports_edit()))
 
     @app.post("/voice/stream")
     def voice_audio_stream():
@@ -316,13 +337,17 @@ def create_app() -> Flask:
         import queue as _queue
         from assistant.trace import Trace, STT, ERROR
 
+        # Read anything off the request here, in the request context — the
+        # worker below runs on a bare thread where `request` is gone.
         if "audio" in request.files:
             audio_bytes = request.files["audio"].read()
             text_cmd = None
+            edit_ok = _supports_edit()
         else:
             body = request.get_json(silent=True) or {}
             text_cmd = (body.get("transcript") or "").strip()
             audio_bytes = b""
+            edit_ok = _supports_edit(body)
             if not text_cmd:
                 return jsonify({"error": "Missing 'audio' file or 'transcript'", "code": 400}), 400
 
@@ -349,7 +374,8 @@ def create_app() -> Flask:
                         return
                     logger.info("📱 Transcript: %s", transcript)
                     trace.step(STT, "Heard", transcript, transcript=transcript)
-                result = _run_transcript(transcript, trace, source="ios")
+                result = _run_transcript(transcript, trace, source="ios",
+                                         supports_edit=edit_ok)
                 q.put({"type": "result", **result})
             except Exception as e:  # never leave the stream hanging
                 logger.exception("📱 Stream pipeline failed: %s", e)

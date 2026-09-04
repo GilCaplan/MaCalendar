@@ -163,7 +163,12 @@ pre-commit, budget honoured, exhaustion admitted in the reply. Background
 missing ask parsed and committed additively (minor), an extra row reported as
 major — ADVISORY unless `self_check_apply` is on, because the old always-on
 verifier measurably proposed far more than it fixed (78 proposals, 0 fixes,
-2026-08-28); the one-tap revert affordance is client work, queued. Gate:
+2026-08-28). **One-tap revert (done 2026-09-04):** when a removal *is* applied,
+`_remove_extra` captures the row first and the correction carries
+`revert: [{kind, body}]` — ready-to-POST `/events`/`/todos` bodies. An applied
+change is also echoed to the Mac HUD as a late `verify` step (the foreground
+trace's bus listener is still attached), carrying the same specs; the review
+panel's `_RevertBar` and the iOS banner re-POST them to undo. Gate:
 `engine_stage_check --stage crosscheck`.*
 
 ## The response contract (unchanged from the old brain)
@@ -195,20 +200,28 @@ every command so it can finally be calibrated from outcomes (row 57).
 
 ## The thinking panel renders by brain version (merge requirement)
 
-`assistant/trace.py` holds `BRAIN_VERSION` (currently `"engine-v2"`) and
-`CHAINS` — the single source of truth for how a brain's chain of thought
-reads, as ordered `(stage, short-label)` pairs matching the explorer diagram.
-The engine stamps `BRAIN_VERSION` onto every response (`resp["brain"]`, which
-iOS reads) and every trace-bus payload (`result["brain"]`, which the HUD
-reads), and `thinking_panel._ResultCard`/`finish` stashes it as `self._brain`.
+`assistant/trace.py` holds `BRAIN_VERSION` (currently `"engine-v2"`), `CHAINS`
+— the single source of truth for how a brain's chain of thought reads, as
+ordered `(stage, short-label)` pairs matching the explorer diagram — and
+`STAGE_INFO`, the in-depth "what this step is" copy behind each slot's ⓘ,
+mirroring the explorer page's per-stage aria-labels. The engine stamps
+`BRAIN_VERSION` onto every response (`resp["brain"]`, which iOS reads) and every
+trace-bus payload (`result["brain"]`, which the HUD reads), and
+`thinking_panel._ResultCard`/`finish` stashes it as `self._brain`.
 
-**At merge, the panel must render the engine's chain input→output** using that
-key so the card reads as the diagram's flow (fix words → rules first → split ·
-split again → repair · rules → make each item → write · label → compare), not
-as raw internal step titles. The hooks are all in place; what remains is the
-visual pass in `thinking_panel.py` (and the iOS `ThinkingView`) that groups the
-live steps under the `CHAINS[brain]` scaffold and shows the version. Bump
-`BRAIN_VERSION` whenever the pipeline's shape changes so an old trace still
-renders in its old format. A future claim-check can assert the explorer
-diagram's step labels equal `CHAINS["engine-v2"]`, the same drift-guard the
-other artifact numbers get.
+**Both panels render this chain as a scaffold** (done as of 2026-09-04). A
+`_ChainRail` (Mac `thinking_panel.py`) and the mirrored `chainRail` (iOS
+`ThinkingView`) draw the `CHAINS[brain]` slots as a compact rail above the live
+timeline, naming the version and lighting each slot done / active / skipped as
+the live steps arrive (mapped to slots by stage, in order — the two `rule`
+slots and any self-skipped stage resolve correctly). Each slot carries an ⓘ
+that reveals `STAGE_INFO[brain][label]` as a tooltip (Mac) / popover (iOS). The
+raw per-step timeline still shows below, with its real titles and timings — the
+rail is the map, the steps the journey.
+
+Keeping it honest: bump `BRAIN_VERSION` whenever the pipeline's shape changes so
+an old trace still renders in its old format; add the new slots' `STAGE_INFO`.
+`test_panel_agreement` fails the build if a `CHAINS` slot has no `STAGE_INFO`
+entry, and `test_stage_info_parity` fails if the iOS Swift copy
+(`EngineChain.scaffold`) drifts from the Python source. A future claim-check
+can also assert the explorer diagram's step labels equal `CHAINS["engine-v2"]`.

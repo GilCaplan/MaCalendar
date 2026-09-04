@@ -36,14 +36,22 @@ stage → rerun; small subset for big deltas, upsize to avoid overfitting.
 
 ## In flight / next
 
-- Cutting the system over to the engine + retiring the old brain (this thread).
+- **Client/UI** (endorsed 2026-09-04) — all three done:
+  - ✅ iOS edit-transcription sheet — server threads `supports_edit` through the
+    audio routes; iOS shows the editor on `needs_edit` and resubmits.
+  - ✅ Thinking panel renders *by brain version* — a `CHAINS[BRAIN_VERSION]`
+    scaffold rail with per-step ⓘ (in-depth copy from `trace.STAGE_INFO`), Mac
+    panel + iOS `ThinkingView`; iOS red→amber consistency fix folded in. See
+    `ENGINE.md`'s render section. **HUD needs a restart to show it.**
+  - ✅ One-tap revert — a destructive background patch carries `revert` specs
+    (ready-to-POST bodies); Mac `_RevertBar` + iOS banner re-create what was
+    undone. Dormant until `self_check_apply` is on (removals are advisory by
+    default). **HUD needs a restart to show it.**
 - Next tuning target: the event-drop on event+task compounds (metric:
   count-correctness, slice: event+task).
-- **Backlog (after the deep track is improved, not before):** add fast-rule-parser
-  rules mined from the user's real data + the dataset; and fix the cross-check
-  matcher's false "not covered" findings (a deep-track tune — surfaced live).
-- Proposed, not yet built: an explicit precision/invention metric; each cycle
-  stating its target metric+slice up front.
+- **Backlog — user-gated, do not start unprompted:** add fast-rule-parser rules
+  mined from the user's real data + the dataset. Only on Gil's explicit say-so,
+  and only after the deep track is improved — not on my own initiative.
 
 ## Working notes
 
