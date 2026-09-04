@@ -10,14 +10,12 @@ from __future__ import annotations
 import datetime
 import logging
 import os
-import re
 import sqlite3
 from typing import Any
 
 import yaml
 from flask import Flask, jsonify, request
 
-from assistant.actions import ActionRegistry
 from assistant.config import AppConfig, ConfigError, load_config as _load_config_file
 
 
@@ -31,7 +29,6 @@ def load_config(path: str = "config.yaml") -> AppConfig:
         except ConfigError:
             return AppConfig()
 from assistant.db import get_db
-from assistant.exceptions import AssistantError, TargetNotFound
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +36,6 @@ logger = logging.getLogger(__name__)
 # App factory
 # ---------------------------------------------------------------------------
 
-_registry: ActionRegistry | None = None
-_parser = None
-_rule_parser = None
 _stt = None
 
 # ---------------------------------------------------------------------------
@@ -54,273 +48,6 @@ _verify_store: dict = {}
 _verify_lock = _threading.Lock()
 
 
-def _get_registry() -> ActionRegistry:
-    global _registry
-    if _registry is None:
-        import assistant.actions.calendar         # noqa: F401  triggers @register
-        import assistant.actions.todo             # noqa: F401
-        import assistant.actions.clarify          # noqa: F401
-        import assistant.actions.workout_routine  # noqa: F401
-        import assistant.actions.schedule_workout  # noqa: F401
-        _registry = ActionRegistry()
-    return _registry
-
-
-def _get_parser():
-    global _parser
-    if _parser is None:
-        from assistant.intent.parser import IntentParser
-        cfg = load_config()
-        _parser = IntentParser(cfg, _get_registry())
-        if cfg.llm_engine == "ollama" and cfg.ollama.warm_up:
-            _threading.Thread(target=_parser.warm_up, daemon=True).start()
-    return _parser
-
-
-def _get_rule_parser():
-    global _rule_parser
-    if _rule_parser is None:
-        from assistant.intent.rule_parser import (
-            RuleBasedParser,
-            _RULE_PARSER_AVAILABLE,
-        )
-        if _RULE_PARSER_AVAILABLE:
-            _rule_parser = RuleBasedParser(_get_registry())
-    return _rule_parser
-
-
-
-_WEEKDAY_WORDS = {
-    "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4,
-    "saturday": 5, "sunday": 6,
-    "mon": 0, "tue": 1, "tues": 1, "wed": 2, "thu": 3, "thur": 3, "thurs": 3,
-    "fri": 4, "sat": 5, "sun": 6,
-}
-
-# Cadences the data model cannot express. recurrence is one of daily,
-# weekly or monthly, so each of these gets silently rounded to something
-# else and produces a confidently wrong series: "every other tuesday"
-# became a single event, "twice a week" became once a week on the wrong
-# day. Saying so is better than approximating without mentioning it.
-_UNSUPPORTED_CADENCE = [
-    (r"\bevery\s+other\b|\bfortnight|\bbi-?weekly\b|\balternate\s+\w+days?\b",
-     "every other week"),
-    (r"\b(twice|three times|3 times|two times)\s+(a|per)\s+(week|day|month)\b",
-     "more than once a period"),
-    (r"\bevery\s+(weekday|week\s?day)\b", "weekdays only"),
-    (r"\bevery\s+\w+day\s+and\s+\w+day\b", "two days a week"),
-]
-
-# "until" names the boundary you stop at, not the last one you keep — "until
-# Oct 6th" means the series does not include 6 October. Say "through" or
-# "including" to keep it. English is genuinely ambiguous here and both readings
-# are defensible; this is the owner's, stated plainly, so it is the one
-# implemented rather than guessed at per sentence.
-_INCLUSIVE_END = r"\b(through|thru|including|inclusive|up to and including|end of)\b"
-_EXCLUSIVE_END = r"\b(until|till|til|up to|up until|before)\b"
-
-
-def _end_is_exclusive(text: str) -> bool:
-    """Does this sentence's end-date word exclude the day it names?"""
-    import re as _re2
-    t = text.lower()
-    if _re2.search(_INCLUSIVE_END, t):
-        return False
-    return bool(_re2.search(_EXCLUSIVE_END, t))
-
-
-#: Words that carry no instruction on their own. A transcript made only of
-#: these is a false start, not a command.
-_FILLER = frozenset({
-    "a", "an", "the", "um", "uh", "er", "hmm", "ok", "okay", "yes", "yeah",
-    "no", "nope", "yep", "so", "and", "but", "well", "just", "please",
-})
-
-
-def is_trivial_transcript(text: str) -> bool:
-    """True when there is nothing here to act on.
-
-    Four of these reached the parser and were remembered as real commands:
-    "Execute.", "Execute a...", "No.", "I need a b-". A stop word said on its
-    own, a false start abandoned after a syllable, a stray acknowledgement —
-    each was parsed, executed against nothing, and then sat in the history as
-    an example of how this user speaks.
-
-    They are worse than harmless. The command memory feeds the model worked
-    examples, and a run of junk teaches it that junk is normal.
-    """
-    words = [w for w in re.findall(r"[a-z0-9']+", (text or "").lower()) if w]
-    if not words:
-        return True
-    meaningful = [w for w in words if w not in _FILLER and len(w) > 1]
-    # One meaningful word is an instruction only if it names something to do,
-    # and by this point the stop words are already gone — so it does not.
-    return len(meaningful) < 2
-
-
-def _named_weekdays(text: str) -> set:
-    """Weekday numbers named in the text, for anchoring a weekly series."""
-    import re as _re2
-    return {n for w, n in _WEEKDAY_WORDS.items()
-            if _re2.search(rf"\b{w}s?\b", text)}
-
-def _unsupported_cadence(text: str) -> "str | None":
-    import re as _re2
-    for pat, label in _UNSUPPORTED_CADENCE:
-        if _re2.search(pat, text):
-            return label
-    return None
-
-def _run_server_verify(token: str, transcript: str, rule_result, executed=None,
-                       records=None, memory_id=None) -> None:
-    """Background self-check for a voice command (any parse path).
-
-    The LLM re-reasons over the transcript, what was executed, and the user's
-    similar past commands. Unlike the original iOS design (which handed the
-    correction to the phone to re-execute), corrections are applied HERE on
-    the Mac — minor patches via db.update_*, major ones as delete + re-run —
-    and the phone only polls GET /voice/verify/<token> to learn what happened
-    (speech to say, what to refresh).
-
-      • {"ok": true}
-      • {"ok": false, "severity": "minor"|"major", "applied": bool,
-         "speech": "...", "refresh": "events"|"todos"|""}
-    """
-    result: dict = {"ok": True}
-    try:
-        parser = _get_parser()
-        if executed:
-            correction = parser.verify_actions_async(transcript, executed)
-        else:
-            correction = parser.verify_fast_path_async(transcript, rule_result)
-
-        if correction is not None:
-            severity = correction.get("severity", "major")
-            speech = correction.get("speech", "")
-            applied = False
-            refresh = ""
-            db = get_db()
-            recs = list(records or [])
-            try:
-                if not load_config().self_check_apply:
-                    raise ValueError("self-check is advisory (config self_check_apply=false)")
-                if severity == "minor":
-                    import re as _re
-                    patch = {k: v for k, v in (correction.get("patch") or {}).items() if v not in (None, "")}
-                    # Be conservative: the verifier over-proposes. Only accept a time if that
-                    # clock time is actually spoken in the command; never accept a date change
-                    # (the parser + sanity pass own dates); accept a title only when the
-                    # current title is a placeholder.
-                    spoken = _spoken_times(transcript)
-                    for k in ("start_time", "end_time", "new_start_time", "new_end_time"):
-                        if k in patch and _hhmm(patch[k]) not in spoken:
-                            patch.pop(k)
-                    for k in ("date", "new_date", "recur_until", "match_date"):
-                        patch.pop(k, None)
-                    if "title" in patch or "new_title" in patch:
-                        cur = ""
-                        for rtype, rid, _a in recs:
-                            if rtype == "event":
-                                ev = db.get_event(rid); cur = (ev or {}).get("title", "")
-                        if cur.strip().lower() not in {"meeting", "set meeting", "event", "appointment", "activity", "task", ""}:
-                            patch.pop("title", None); patch.pop("new_title", None)
-                    patch = {k: v for k, v in patch.items() if k not in ("description", "location", "attendees", "list_name", "new_list", "priority", "new_priority")}
-                    # never let a malformed date/time through (e.g. an echoed placeholder)
-                    for k in ("date", "new_date", "recur_until"):
-                        if k in patch and not _re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(patch[k])):
-                            patch.pop(k)
-                    for k in ("start_time", "end_time"):
-                        if k in patch and not _re.fullmatch(r"\d{1,2}:\d{2}", str(patch[k])):
-                            patch.pop(k)
-                    if not patch:
-                        raise ValueError("patch had no valid fields")
-                    for rtype, rid, _act in recs:
-                        if rtype == "event":
-                            db.update_event(rid, **patch); refresh = "events"; applied = True
-                        elif rtype == "todo":
-                            db.update_todo(rid, **{k: v for k, v in patch.items() if k in ("title", "list_name")})
-                            refresh = "todos"; applied = True
-                else:
-                    executed_names = [n for n, _ in (executed or [])]
-                    # The verdict decides *whether* to change something; the
-                    # parser decides *what to*. Asked to author the replacement
-                    # itself the verifier proposed create_todo for "Walk Mark's
-                    # dog today at 2:30PM" — which states a time and is an
-                    # event — and wanted to redo a correct complete_todo as
-                    # update_todo. Re-reading the sentence with the full parser
-                    # gets both right, and its agreement with what already ran
-                    # is the signal that the verdict was a false alarm.
-                    _re_parsed = [(n, i) for n, i in (parser.parse(transcript) or [])
-                                  if n != "unknown"]
-                    if not _re_parsed:
-                        raise ValueError("re-parse produced nothing usable")
-                    if len(_re_parsed) > 1:
-                        raise ValueError("re-parse ambiguous — refusing to undo and redo")
-                    if [n for n, _ in _re_parsed] == executed_names:
-                        raise ValueError("parser agrees with what ran — false alarm")
-
-                    action, _authored = _re_parsed[0]
-                    params = (_authored.model_dump(exclude_none=True)
-                              if hasattr(_authored, "model_dump") else {})
-                    action_cls = _get_registry().get(action)
-                    if action == "create_event" and "create_todo" in executed_names and not _spoken_times(transcript):
-                        raise ValueError("refusing task→event flip without a spoken time")
-                    if action in executed_names:
-                        raise ValueError("major correction proposes the same action")
-                    # Undo-and-redo means *replacing* a record. Now that the
-                    # check also runs on queries, clarifications and commands
-                    # that failed, there may be no record to replace — and
-                    # "what do I have Thursday?" must never leave a new event
-                    # behind because the verifier decided it sounded like one.
-                    # Creating something the user never asked to create is a
-                    # worse failure than answering a question imperfectly.
-                    _undoable = [r for r in recs if r[2].startswith("create_")]
-                    if not _undoable:
-                        raise ValueError(
-                            "nothing was created to replace — reporting the disagreement "
-                            "instead of writing a new record")
-                    if action_cls is not None and action.startswith(("create_",)):
-                        for rtype, rid, act in _undoable:
-                            (db.delete_event if rtype == "event" else db.delete_todo)(rid)
-                        intent = action_cls.intent_model(**params)
-                        action_cls().execute(intent, load_config())
-                        refresh = "events" if "event" in action else "todos" if "todo" in action else ""
-                        applied = True
-                        if memory_id is not None:
-                            from assistant.intent.memory import get_memory
-                            get_memory().set_feedback(memory_id, "corrected",
-                                                      [{"action": action, "parameters": params}],
-                                                      notes="llm self-check")
-            except Exception as exc:
-                logger.warning("📱 Self-check correction not applied: %s", exc)
-            result = {"ok": False, "severity": severity, "applied": applied,
-                      "speech": speech if applied else "", "refresh": refresh}
-            # NLU bug corpus — the server path never wrote here before
-            try:
-                from assistant.pipeline import Pipeline as _Pipeline
-                _Pipeline._append_scenario_bug(
-                    transcript, issue_type=f"self_check/{severity}",
-                    details=f"executed={executed and [n for n, _ in executed]} correction={correction} applied={applied}",
-                )
-            except Exception:
-                pass
-        logger.info("📱 Self-check token=%s result=%s", token[:8], result)
-    except Exception as exc:
-        logger.warning("📱 Self-check failed: %s", exc)
-        result = {"ok": True}  # assume correct on error — don't confuse the user
-
-    with _verify_lock:
-        if token in _verify_store:
-            _verify_store[token]["correction"] = result
-            _verify_store[token]["ready"] = True
-
-    # Purge expired tokens (housekeeping)
-    now = _time.time()
-    with _verify_lock:
-        for t in [t for t, e in _verify_store.items() if e["expires"] < now]:
-            _verify_store.pop(t, None)
-
-
 def build_stt(cfg):
     """STT provider per config.stt_engine (shared with the Mac pipeline)."""
     if cfg.stt_engine == "mlx":
@@ -331,118 +58,6 @@ def build_stt(cfg):
         return GoogleSTT(cfg.google_stt)
     from assistant.stt.whisper_stt import WhisperSTT
     return WhisperSTT(cfg.whisper)
-
-
-def _hhmm(v) -> str:
-    import re as _re
-    m = _re.match(r"^\s*(\d{1,2}):(\d{2})", str(v))
-    return f"{int(m.group(1)):02d}:{m.group(2)}" if m else ""
-
-
-def _at_times(text: str) -> set[str]:
-    """Times introduced by "at" — i.e. when something starts.
-
-    "dinner with Danny at 8 pm" states a start. The model sometimes reads such a
-    time as the END and invents an earlier start, booking 18:00–20:00 for an
-    8 pm dinner. Knowing which times were spoken as "at X" lets that be undone.
-    """
-    import re as _re
-    out: set[str] = set()
-    t = text.lower().replace(".", ":")
-    for m in _re.finditer(r"\bat\s+(?:around\s+|about\s+|roughly\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm|a:m|p:m)?\b", t):
-        h, mm, ap = int(m.group(1)), m.group(2) or "00", (m.group(3) or "").replace(":", "")
-        if h > 24:
-            continue
-        if ap == "pm" and h < 12:
-            h += 12
-        if ap == "am" and h == 12:
-            h = 0
-        out.add(f"{h % 24:02d}:{mm}")
-        if not ap and h <= 12:                      # bare hour: both readings
-            out.add(f"{(h + 12) % 24:02d}:{mm}")
-    return out
-
-
-def _spoken_times(text: str) -> set[str]:
-    """All clock times a command mentions, as HH:MM (both 12h readings for bare hours)."""
-    import re as _re
-    out: set[str] = set()
-    t = text.lower().replace(".", ":")
-    for m in _re.finditer(r"\b(\d{1,2})(?::(\d{2}))?\s*(am|pm|a:m|p:m)?\b", t):
-        h, mm, ap = int(m.group(1)), m.group(2) or "00", (m.group(3) or "").replace(":", "")
-        if h > 24:
-            continue
-        if ap == "pm" and h < 12: h += 12
-        if ap == "am" and h == 12: h = 0
-        out.add(f"{h % 24:02d}:{mm}")
-        if not ap and h <= 12:
-            out.add(f"{(h + 12) % 24:02d}:{mm}")
-    for m in _re.finditer(r"\b(\d{2})(\d{2})\b", t):          # 1930, 0915
-        h, mm = int(m.group(1)), m.group(2)
-        if h < 24 and int(mm) < 60:
-            out.add(f"{h:02d}:{mm}")
-    if "noon" in t: out.add("12:00")
-    if "midnight" in t: out.add("00:00")
-    return out
-
-
-# Words that name no particular thing. "meeting" and "appointment" are real
-# event types but say nothing on their own, and the rule parser reaches for
-# them when it cannot find a better noun. A title *starting* with one is just
-# as unusable as the bare word: "event with yotem" tells you as little.
-_CONTENTLESS_TITLES = {
-    "event", "events", "meeting", "meetings", "set meeting", "appointment",
-    "activity", "session", "thing", "item", "task", "reminder",
-}
-
-# The subset that names nothing at all. "meeting" is a real kind of event and
-# survives being qualified; "event" never does.
-_EMPTY_NOUNS = {"event", "events", "activity", "thing", "item"}
-
-
-def _is_placeholder_title(title: str, cfg) -> bool:
-    """Would this title be useless in a calendar?"""
-    t = (title or "").strip().lower().strip(" .-")
-    if not t:
-        return True
-    configured = {k.lower() for k in getattr(cfg.nlu, "event_keywords", [])}
-    if t in _CONTENTLESS_TITLES | configured:
-        return True
-    # "event with yotem" is as unreadable as "event". But "meeting with Adin"
-    # is a perfectly good title, and so is "Meeting with Ravid at Kems" — a
-    # meeting is a real kind of thing, where an "event" is not. So only the
-    # genuinely empty nouns disqualify a title they lead; the rest have to be
-    # bare to count.
-    #
-    # Worth saying that this rule is doing less than it looks: all 27 generic
-    # titles in a week of flagged commands were bare words. The led-by case is
-    # here because it costs nothing, not because it was measured.
-    first, _, rest = t.partition(" ")
-    return bool(rest) and first in _EMPTY_NOUNS and \
-        rest.split(" ", 1)[0] in ("with", "for", "to", "on", "at", "about", "re")
-
-
-def _fix_title_now(transcript: str, event_id: int, keyword: str) -> "str | None":
-    """Ask the LLM to name the event, and patch it. Returns the new title."""
-    try:
-        new_title = _get_parser().fix_title_async(transcript, keyword)
-        if new_title and new_title.strip().lower() != keyword.strip().lower():
-            get_db().update_event(event_id, title=new_title.strip())
-            logger.info("Title fixed for event %s: %r → %r", event_id, keyword, new_title)
-            return new_title.strip()
-    except Exception as exc:
-        logger.debug("Title fix failed for event %s: %s", event_id, exc)
-    return None
-
-
-def _fix_title_bg(transcript: str, event_id: int, keyword: str) -> None:
-    try:
-        new_title = _get_parser().fix_title_async(transcript, keyword)
-        if new_title and new_title.strip().lower() != keyword.strip().lower():
-            get_db().update_event(event_id, title=new_title.strip())
-            logger.info("📱 Title fixed for event %s: %r → %r", event_id, keyword, new_title)
-    except Exception as e:
-        logger.debug("📱 Title fix skipped: %s", e)
 
 
 def _get_stt():
@@ -458,15 +73,17 @@ def warm_up_components() -> None:
     the first phone command doesn't pay 10–20 s of cold starts."""
     def _go() -> None:
         import time as _t
+        from assistant.engine import generate as _gen, load_config as _engine_cfg
         t0 = _t.perf_counter()
-        for name, fn in (("rule parser", _get_rule_parser), ("whisper", _get_stt),
-                         ("llm parser", _get_parser)):
+        for name, fn in (("rule parser", _gen._get_rule_parser),
+                         ("whisper", _get_stt),
+                         ("llm parser", lambda: _gen._get_parser(_engine_cfg()))):
             try:
                 fn()
             except Exception as e:
                 logger.warning("Warm-up of %s failed: %s", name, e)
         try:
-            rp = _get_rule_parser()
+            rp = _gen._get_rule_parser()
             if rp is not None:
                 rp.analyze("meeting tomorrow at 3pm")  # forces spaCy + datetime models
         except Exception:
@@ -486,8 +103,13 @@ def _llm_reachable(cfg) -> bool:
 
 
 def start_pending_retry_loop(run_transcript, interval: float = 30.0) -> None:
-    """Daemon: whenever the LLM is reachable, re-run queued commands (max 5 tries each)."""
+    """Daemon: whenever the LLM is reachable, re-run queued commands (max 5
+    tries each). Queued inputs are the engine's step-0 case in the flesh —
+    several commands parked while the model was away — so they are coalesced
+    into ("…")and("…") batches under the token budget and each batch costs one
+    parse; overflow batches run sequentially."""
     def _loop() -> None:
+        from assistant.engine import coalesce
         from assistant.intent.memory import get_memory
         while True:
             _time.sleep(interval)
@@ -499,16 +121,26 @@ def start_pending_retry_loop(run_transcript, interval: float = 30.0) -> None:
                 cfg = load_config()
                 if not _llm_reachable(cfg):
                     continue
+                live = []
                 for row in rows:
                     if row["attempts"] >= 5:
                         mem.resolve_pending(row["id"], "failed", "gave up after 5 attempts")
-                        continue
-                    logger.info("📱 Retrying queued command #%s: %s", row["id"], row["transcript"])
-                    result = run_transcript(row["transcript"])
-                    if result.get("parse") == "error":
-                        mem.bump_pending(row["id"])
-                    else:
-                        mem.resolve_pending(row["id"], "done", result.get("message", ""))
+                    elif (row["transcript"] or "").strip():
+                        live.append(row)   # empties would desync the batch map
+                budget = int(getattr(cfg.engine, "coalesce_max_tokens", 300))
+                taken = 0
+                for batch in coalesce([r["transcript"] for r in live], budget):
+                    n = batch.count(")and(") + 1 if ")and(" in batch else 1
+                    batch_rows = live[taken:taken + n]
+                    taken += n
+                    logger.info("📱 Retrying %d queued command(s): %s",
+                                len(batch_rows), batch[:80])
+                    result = run_transcript(batch)
+                    for row in batch_rows:
+                        if result.get("parse") == "error":
+                            mem.bump_pending(row["id"])
+                        else:
+                            mem.resolve_pending(row["id"], "done", result.get("message", ""))
             except Exception as e:
                 logger.warning("📱 Pending retry loop error: %s", e)
     _threading.Thread(target=_loop, daemon=True, name="pending-retry").start()
@@ -612,809 +244,15 @@ def create_app() -> Flask:
 
     def _run_transcript(transcript: str, trace: "Trace | None" = None,
                         source: str = "ios", current_view: str = "month",
-                        trace_run: str | None = None) -> dict[str, Any]:
-        """Parse and execute a transcript; return the API response dict.
-
-        Builds a stage-by-stage ``trace`` (the "thinking log" shown on the
-        phone) and records the command in the personalisation memory.
-        """
-        from assistant.intent.rule_parser import RULE_THRESHOLD, RuleParserSkip
-        from assistant.intent.context import ContextMemory
-        from assistant.pipeline import _strip_stop_keyword
-        from assistant.stt.vocab import apply_vocab
-        from assistant.trace import (
-            Trace, VOCAB, RULE, LLM, VALIDATE, EXECUTE, DONE, ERROR,
-        )
-        trace = trace or Trace(source=source)
-        # A caller that has already opened a run on the bus (the Mac GUI does,
-        # so its HUD shows steps as they happen) passes its id in. Stream into
-        # that run instead of publishing a second one at the end, which would
-        # draw the same command twice.
-        if trace_run:
-            from assistant import trace_bus as _tb
-            trace.on_step(lambda st: _tb.publish_step(trace_run, st.to_dict()))
-        parser = _get_parser()
-        rule_parser = _get_rule_parser()
-        cfg = load_config()
-
-        raw_transcript = transcript
-        # Parity with the Mac pipeline: drop trailing "execute"/"done"/… stop words
-        transcript = _strip_stop_keyword(transcript, cfg.audio.stop_phrases)
-        if is_trivial_transcript(transcript):
-            # Ignored completely: not parsed, not executed, and above all not
-            # remembered. Recording it would make a false start part of the
-            # record of how this user talks.
-            logger.info("Ignoring a transcript with nothing in it: %r", raw_transcript[:40])
-            trace.step(DONE, "Nothing to do",
-                       "Heard a stop word or a false start, nothing to act on.")
-            return {"message": "", "actions": [], "refresh": "", "parse": "ignored",
-                    "corrections": [], "trace": trace.to_list(), "memory_id": None}
-
-        # Personal vocabulary auto-correct
-        transcript, vocab_fixes = apply_vocab(transcript, source=source)
-        corrections = [c.to_dict() for c in vocab_fixes]
-        trace.step(VOCAB, "Vocabulary",
-                   ("Fixed " + ", ".join(f"{c.original}→{c.replacement}" for c in vocab_fixes))
-                   if vocab_fixes else "No corrections needed",
-                   transcript=transcript, corrections=corrections or None)
-
-        parsed = None
-        parse_path = "llm"
-        rule_result = None
-        llm_ms = 0
-
-        def _parse_one(segment: str, rule_parser, parser):
-            """Parse one separated segment: rules first, then the LLM.
-
-            Same order the whole-transcript path uses; a segment is short
-            enough that the rules usually settle it without an LLM call, which
-            is the entire point of splitting.
-            """
-            if rule_parser is not None:
-                try:
-                    rr = rule_parser.analyze(segment, current_view=current_view)
-                    if rr.confidence >= RULE_THRESHOLD and not rr.missing_slots:
-                        return rr.intents
-                    try:
-                        return parser.parse_with_context(segment, rr)
-                    except Exception:
-                        pass
-                except RuleParserSkip:
-                    pass
-            try:
-                return parser.parse(segment)
-            except Exception as exc:
-                logger.warning("Segment parse failed for %r: %s", segment[:50], exc)
-                return None
-
-        def _llm_step(title: str) -> None:
-            nonlocal llm_ms
-            llm_ms += parser.last_llm_ms
-            trace.step(LLM, title,
-                       f"{cfg.llm_engine}:{getattr(cfg, cfg.llm_engine).model} · "
-                       f"{parser.last_examples_used} history example(s) used",
-                       raw=(parser.last_raw_response or "")[:1500] or None,
-                       examples=parser.last_examples_used)
-
-        # Batched commands: "[gym tomorrow at 7am] [lunch with Tal at noon]".
-        #
-        # A client with several commands in hand sends them as one request with
-        # each wrapped in brackets. They are split back apart here and parsed
-        # independently, which is what makes this cheaper rather than more
-        # expensive: a short single command usually settles on the rule path
-        # for no LLM call at all, where the joined sentence would have needed
-        # one to untangle it. What is actually saved is the review — the
-        # self-check runs once per request, so three batched commands cost one
-        # LLM call instead of three.
-        #
-        # Brackets rather than "and" because a delimiter has to be something
-        # that cannot occur inside a command, and "and" very much can:
-        # "meeting with Tal and Ravid" is one event, not two.
-        _bracketed = re.findall(r"\[([^\[\]]+)\]", transcript)
-        if len(_bracketed) > 1:
-            _segs = [s.strip() for s in _bracketed if s.strip()]
-            logger.info("Batched request: %d bracketed commands", len(_segs))
-            trace.step(RULE, "Split into commands",
-                       f"{len(_segs)} batched: " + " · ".join(s[:40] for s in _segs))
-            _all: list = []
-            for _seg in _segs:
-                _got = _parse_one(_seg, rule_parser, parser)
-                if _got:
-                    _all.extend(_got)
-            if _all:
-                parsed = _all
-                parse_path = "batch"
-            # Whatever happens, the brackets must not reach the parser or the
-            # stored title — an event called "[gym]" helps nobody.
-            transcript = " ".join(_segs)
-
-        # Event separator: split one recording into independent commands so
-        # each short single-event half can hit the rule fast-path instead of
-        # asking the LLM to untangle both at once. This was Mac-only while the
-        # GUI had its own pipeline; it belongs here now that this is the only
-        # brain, and the phone gains it by moving.
-        separator = (cfg.audio.event_separator or "").strip()
-        if parsed is None and separator:
-            _segs = [s.strip() for s in
-                     re.split(re.escape(separator), transcript, flags=re.IGNORECASE)
-                     if s.strip()]
-            if len(_segs) > 1:
-                logger.info("Separator %r split transcript into %d segments", separator, len(_segs))
-                trace.step(RULE, "Split into segments",
-                           f"{len(_segs)} commands separated by “{separator}”")
-                _all: list = []
-                for _seg in _segs:
-                    _got = _parse_one(_seg, rule_parser, parser)
-                    if _got:
-                        _all.extend(_got)
-                if _all:
-                    parsed = _all
-                    parse_path = "separator"
-
-        if parsed is None and rule_parser is not None:
-            try:
-                rule_result = rule_parser.analyze(transcript, current_view=current_view)
-                if rule_result.confidence >= RULE_THRESHOLD and not rule_result.missing_slots:
-                    parsed = rule_result.intents
-                    parse_path = "rule"
-                    logger.info(
-                        "📱 Rule fast-path: confidence=%.2f actions=%s",
-                        rule_result.confidence, [n for n, _ in parsed],
-                    )
-                    trace.step(RULE, "Rule parser",
-                               f"Confident ({rule_result.confidence:.2f}) — no LLM needed: "
-                               + ", ".join(n for n, _ in parsed),
-                               confidence=round(rule_result.confidence, 2),
-                               actions=[n for n, _ in parsed])
-                else:
-                    logger.info(
-                        "📱 Rule partial handoff: confidence=%.2f missing=%s",
-                        rule_result.confidence, rule_result.missing_slots,
-                    )
-                    trace.step(RULE, "Rule parser",
-                               f"Partial ({rule_result.confidence:.2f})"
-                               + (f", missing {', '.join(rule_result.missing_slots)}" if rule_result.missing_slots else "")
-                               + " — asking the LLM to fill gaps",
-                               confidence=round(rule_result.confidence, 2),
-                               missing=list(rule_result.missing_slots) or None)
-                    try:
-                        parsed = parser.parse_with_context(transcript, rule_result)
-                        parse_path = "hybrid"
-                        _llm_step("LLM (hybrid)")
-                    except AssistantError as e:
-                        trace.step(LLM, "LLM (hybrid)", f"Failed: {e} — retrying full parse", ok=False)
-                        parsed = None  # fall through to full LLM below
-            except RuleParserSkip as e:
-                logger.debug("📱 Rule parser skipped: %s", e)
-                trace.step(RULE, "Rule parser", f"Skipped: {e}")
-            except Exception as e:
-                # Any other rule-parser failure is a bug in the fast path, not a
-                # reason to lose the command: hand it to the LLM instead.
-                logger.warning("📱 Rule parser error (falling back to the LLM): %s", e)
-                trace.step(RULE, "Rule parser", f"Failed, using the LLM: {e}", ok=False)
-
-        if parsed is None:
-            try:
-                parsed = parser.parse(transcript)
-                _llm_step("LLM parse")
-            except AssistantError as e:
-                logger.warning("📱 Parse error: %s", e)
-                from assistant.pipeline import Pipeline as _Pipeline
-                _threading.Thread(
-                    target=_Pipeline._append_nlu_log,
-                    args=(transcript, "llm", False, [], [], False, f"parse_error: {e}", "ios"),
-                    daemon=True,
-                ).start()
-                msg = str(e)
-                pending_id = None
-                retryable = any(w in msg.lower() for w in ("offline", "timed out", "timeout", "connection"))
-                if retryable:
-                    try:
-                        from assistant.intent.memory import get_memory
-                        pending_id = get_memory().add_pending(transcript, msg, source=source)
-                    except Exception as pe:
-                        logger.warning("📱 Could not queue command: %s", pe)
-                if "offline" in msg.lower():
-                    msg = ("The AI model on your Mac (Ollama) is offline. I saved this command and "
-                           "will run it automatically when the model is back — or tap Retry.")
-                elif retryable:
-                    msg = "The model took too long. I saved this command — tap Retry to try again."
-                trace.step(ERROR, "Parse failed", str(e)
-                           + (" — queued for retry" if pending_id else ""), ok=False)
-                _record_memory(cfg, raw_transcript, transcript, "llm", [], msg, False, llm_ms, trace, [],
-                               source=source)
-                resp = {"message": msg, "actions": [], "refresh": "", "parse": "error",
-                        "transcript": transcript, "original_transcript": raw_transcript,
-                        "corrections": corrections, "trace": trace.to_list(),
-                        "uncertain_words": _uncertain(transcript)}
-                if pending_id:
-                    resp["pending_id"] = pending_id
-                return resp
-
-        parsed, fixes = _normalise_intents(parsed, transcript,
-                                           rule_actions=list(rule_result.raw_slots) if rule_result is not None else [])
-        if fixes:
-            trace.step(VALIDATE, "Sanity fixes", "; ".join(fixes))
-        logger.info("📱 Parsed actions: %s", [a for a, _ in parsed])
-        trace.step(VALIDATE, "Validated",
-                   ", ".join(f"{n}({', '.join(f'{k}={v}' for k, v in _intent_summary(i).items())})"
-                             for n, i in parsed) or "no actions",
-                   actions=[{"action": n, "parameters": _intent_summary(i)} for n, i in parsed])
-
-        messages: list[str] = []
-        action_names: list[str] = []
-        refresh_set: set[str] = set()
-        records: list[tuple[str, int, str, int]] = []
-        ctx = ContextMemory()
-
-        for idx, (action_name, intent) in enumerate(parsed):
-            if action_name == "unknown":
-                logger.warning("📱 Unknown intent for transcript: %s", transcript)
-                messages.append("Sorry, I didn't understand that.")
-                trace.step(EXECUTE, "Unknown intent", "The model returned no recognisable action", ok=False)
-                continue
-            registry = _get_registry()
-            action_cls = registry.get(action_name)
-            if action_cls is None:
-                logger.warning("📱 No action class for: %s", action_name)
-                trace.step(EXECUTE, action_name, "No such action registered", ok=False)
-                continue
-            try:
-                ev_before, td_before = ctx.last_event_id, ctx.last_todo_id
-                try:
-                    result = action_cls().execute(intent, cfg)
-                except TargetNotFound as nf:
-                    # Same escalation the Mac pipeline does. The phone runs its
-                    # own parse/execute loop in this process, so this has to be
-                    # written twice or the two surfaces disagree — and the one
-                    # that reported "I couldn't find a task matching 'walk mark
-                    # stalk'" was this one.
-                    #
-                    # Without the explicit catch the bare `except Exception`
-                    # below turns a legitimate "nothing matched" into
-                    # "Error: ..." on a failed step, which is worse than what
-                    # it replaced.
-                    _eligible = (parse_path == "rule" and len(parsed) == 1
-                                 and not messages)
-                    _replacement = None
-                    if _eligible:
-                        trace.step(RULE, "Nothing matched — rechecking",
-                                   f"{action_name.replace('_', ' ')} found no target "
-                                   "— asking the LLM instead")
-                        try:
-                            _retried = parser.parse(transcript) or []
-                        except Exception as _e:
-                            trace.step(LLM, "LLM", f"Unavailable ({_e}) — keeping the answer",
-                                       ok=False)
-                            _retried = []
-                        _cand = [(n, i) for n, i in _retried if n != "unknown"]
-                        if len(_cand) == 1 and _cand[0][0] != action_name:
-                            _replacement = _cand[0]
-                        elif _cand:
-                            trace.step(LLM, "LLM",
-                                       "Agrees — the target really is missing", ok=False)
-                    if _replacement is None:
-                        messages.append(nf.message)
-                        trace.step(EXECUTE, action_name.replace("_", " ").title(),
-                                   nf.message, ok=False)
-                        continue
-                    action_name, intent = _replacement
-                    action_cls = registry.get(action_name)
-                    if action_cls is None:
-                        messages.append(nf.message)
-                        continue
-                    trace.step(LLM, "LLM",
-                               f"Re-read it as {action_name.replace('_', ' ')}")
-                    result = action_cls().execute(intent, cfg)
-                logger.info("📱 Action %s → %s", action_name, result)
-                messages.append(result or "")
-                action_names.append(action_name)
-                if ctx.last_event_id != ev_before and ctx.last_event_id is not None:
-                    records.append(("event", ctx.last_event_id, action_name, idx))
-                if ctx.last_todo_id != td_before and ctx.last_todo_id is not None:
-                    records.append(("todo", ctx.last_todo_id, action_name, idx))
-                trace.step(EXECUTE, action_name.replace("_", " ").title(), result or "done")
-                if "event" in action_name:
-                    refresh_set.add("events")
-                elif "todo" in action_name:
-                    refresh_set.add("todos")
-            except Exception as e:
-                logger.exception("📱 Action %s failed: %s", action_name, e)
-                messages.append(f"Error: {e}")
-                trace.step(EXECUTE, action_name.replace("_", " ").title(), f"Failed: {e}", ok=False)
-
-        if "events" in refresh_set and "todos" in refresh_set:
-            refresh = "both"
-        elif refresh_set:
-            refresh = refresh_set.pop()
-        else:
-            refresh = ""
-
-        if parse_path == "rule":
-            for rtype, rid, act, _idx in records:
-                if rtype == "event" and act == "create_event":
-                    ev = get_db().get_event(rid)
-                    if ev and _is_placeholder_title(ev["title"], cfg):
-                        # Fixed before answering, not after. This used to run on
-                        # a daemon thread, so the reply said "Created event
-                        # 'meeting'" and the better title arrived seconds later
-                        # — by which time the answer had been read and judged.
-                        # 22 of the 37 titles on flagged commands were the bare
-                        # word "meeting", every one of them eligible for a fix
-                        # that landed too late to count.
-                        #
-                        # It costs an LLM call on a path whose whole point is
-                        # avoiding one, but only for events the rules could not
-                        # name, and an instant wrong title is worth less than a
-                        # slower right one: a calendar full of "meeting" cannot
-                        # be read back.
-                        better = _fix_title_now(transcript, rid, ev["title"])
-                        if better:
-                            trace.step(RULE, "Named the event",
-                                       f"“{ev['title']}” → “{better}”")
-                            messages = [m.replace(f"'{ev['title']}'", f"'{better}'")
-                                        for m in messages]
-
-        # Cadences the model cannot represent are approximated silently, and the
-        # approximation is always wrong in a way you would not accept if told:
-        # "every other tuesday" became one event, "every weekday" put prayer on
-        # Shabbat. It still does what it can — refusing outright would be worse
-        # than a series you can edit — but it says what it did.
-        _cadence = _unsupported_cadence(transcript.lower())
-        if _cadence and any(n == "create_event" for n, _ in parsed):
-            _made = next((i for n, i in parsed if n == "create_event"), None)
-            _as = getattr(_made, "recurrence", None) or "one-off"
-            messages.append(
-                f"Note: I can only repeat daily, weekly or monthly, so "
-                f"\u201c{_cadence}\u201d became {_as} — adjust it if that is wrong."
-            )
-            trace.step(VALIDATE, "Cadence approximated",
-                       f"{_cadence} → {_as}; the model has no way to express the first",
-                       ok=False)
-
-        response_msg = " ".join(m for m in messages if m)
-        logger.info("📱 Response: %s | refresh=%s | parse=%s", response_msg, refresh or "none", parse_path)
-
-        # NLU tracking
-        from assistant.pipeline import Pipeline as _Pipeline
-        _success = bool(action_names)
-        _failure_reason = "" if _success else ("unknown_intent" if not any(a != "unknown" for a, _ in parsed) else "action_failed")
-        _threading.Thread(
-            target=_Pipeline._append_nlu_log,
-            args=(transcript, parse_path, parse_path == "rule",
-                  action_names or [a for a, _ in parsed if a != "unknown"],
-                  messages if _success else [],
-                  _success, _failure_reason, "ios"),
-            daemon=True,
-        ).start()
-
-        # For rule-path results: kick off background LLM verification
-        # and hand the iOS app a token it can poll with GET /voice/verify/<token>
-        # Rule fast-path parity with the Mac: a placeholder title ("meeting",
-        # "set meeting", …) gets a proper title from the LLM in the background.
-        trace.step(DONE, "Done", f"{parse_path} path · {trace.total_ms / 1000:.1f} s total", path=parse_path)
-        # The rule parser's own score, kept rather than discarded. It is what the
-        # routing decision turns on, and without it there is no way to ask later
-        # whether 0.85 is in the right place — you cannot bucket outcomes by a
-        # number you never wrote down. -1 means the rules never scored this one:
-        # they refused the sentence outright, or it arrived already parsed.
-        scored = getattr(rule_result, "confidence", None)
-        memory_id = _record_memory(cfg, raw_transcript, transcript, parse_path,
-                                   [(n, i) for n, i in parsed if n != "unknown"],
-                                   response_msg, _success, llm_ms, trace, records,
-                                   source=source,
-                                   confidence=float(scored) if scored is not None else -1.0)
-
-        # A retry is a correction the speaker already gave, by doing it again.
-        # Runs here because a pair only completes when the second command
-        # arrives, and on a daemon thread because nothing waits on it — the
-        # answer has already gone back. Idempotent, so repeating it is free.
-        def _was_a_retry(wrong: str, right: str) -> bool:
-            """Ask the model whether the second command is a retry of the first.
-
-            The structural rules cannot tell a correction from two things the
-            speaker genuinely wanted. "book the dentist at nine" followed by
-            "book the dentist at ten" is a retry if the first was a mishearing
-            and two appointments if it was not — and only the words can say
-            which. A reader is good at that; timing is not.
-
-            Refusing on doubt is deliberate: a wrong correction is pasted into
-            future prompts as an example of how this user speaks, so the cost
-            of a false yes is much higher than of a false no.
-            """
-            answer = parser.call_llm_json(
-                "You judge whether a second voice command was a RETRY of the first — "
-                "the speaker being misheard or misunderstood, and saying it again — "
-                "or a SEPARATE thing they also wanted. Answer only with JSON: "
-                '{\"retry\": true} or {\"retry\": false}. '
-                "Say false unless it is clearly the same request restated.",
-                f"FIRST (was deleted): {wrong}\nSECOND: {right}",
-            )
-            return bool(answer.get("retry") is True)
-
-        def _mine_reformulations() -> None:
-            try:
-                from assistant.intent.memory import get_memory
-                for pair in get_memory().learn_from_reformulations(verify=_was_a_retry):
-                    logger.info("Learned from a retry: %r -> %r (%.0fs apart)",
-                                pair["wrong"][:48], pair["right"][:48], pair["gap_sec"])
-            except Exception as exc:                 # never let this affect a command
-                logger.debug("Reformulation pass failed: %s", exc)
-
-        if not _no_bg and getattr(cfg.nlu, "memory_enabled", True):
-            _threading.Thread(target=_mine_reformulations, daemon=True,
-                              name="reformulations").start()
-
-        # Background self-check: the LLM re-reasons over the transcript, what
-        # ran, and this user's history, and fixes the record if it disagrees.
-        #
-        # It runs on EVERY command. It used to be skipped in three places, and
-        # each gap was a command the rules decided alone with nothing ever
-        # looking at it again:
-        #
-        #   • queries and clarifications were excluded as "nothing to correct".
-        #     There is no record to patch, true — but "what do I have Thursday"
-        #     answered from the wrong day is still wrong, and the check is what
-        #     notices.
-        #   • a command that failed got no check at all, which is backwards:
-        #     failing is when a second opinion is most likely to help.
-        #   • only actions the rules had matched were passed along.
-        #
-        # A read-only or failed command can still be judged; what changes is
-        # that there is nothing to undo, which _run_server_verify already
-        # handles — a correction with no record to apply to reports
-        # applied=False rather than touching anything.
-        verify_token: str | None = None
-        checkable = [(n, i) for n, i in parsed if n != "unknown"]
-        if cfg.verify_fast_path and (checkable or transcript.strip()):
-            import uuid
-            verify_token = str(uuid.uuid4())
-            with _verify_lock:
-                _verify_store[verify_token] = {
-                    "ready": False,
-                    "correction": None,
-                    "expires": _time.time() + 120,
-                }
-            _threading.Thread(
-                target=_run_server_verify,
-                args=(verify_token, transcript, rule_result, checkable, records, memory_id),
-                daemon=True,
-            ).start()
-
-        resp: dict = {
-            "message": response_msg,
-            "actions": action_names,
-            "refresh": refresh,
-            "parse": parse_path,
-            "transcript": transcript,
-            "original_transcript": raw_transcript,
-            "corrections": corrections,
-            "trace": trace.to_list(),
-            "uncertain_words": _uncertain(transcript),
-        }
-        if memory_id is not None:
-            resp["memory_id"] = memory_id
-        if verify_token:
-            resp["verify_token"] = verify_token
-
-        # Let the Mac's own window show what the phone just did. The GUI is a
-        # separate process, so it can't see this Trace directly.
-        try:
-            from assistant import trace_bus
-            if trace_run:
-                trace_bus.publish_result(trace_run, {
-                    "transcript": transcript,
-                    "message": response_msg,
-                    "actions": action_names,
-                    "corrections": corrections,
-                    "memory_id": memory_id,
-                })
-                return resp
-            trace_bus.publish(trace.source, resp["trace"], {
-                "transcript": transcript,
-                "message": response_msg,
-                "actions": action_names,
-                "corrections": corrections,
-                "memory_id": memory_id,
-            })
-        except Exception:
-            pass
-        return resp
-
-    def _uncertain(transcript: str) -> list:
-        try:
-            from assistant.stt.vocab import get_vocab
-            return get_vocab().suggestions(transcript)
-        except Exception:
-            return []
-
-    _RECUR_WORDS = [(r"\bevery\s*day\b|\bdaily\b", "daily"), (r"\bevery\s+\w+day\b|\bweekly\b|\b(?:mon|tues|wednes|thurs|fri|satur|sun)days\b", "weekly"),
-                    (r"\bevery\s+month\b|\bmonthly\b", "monthly")]
-    _JUNK_TITLES = {"task", "tasks", "todo", "event", "events", "reminder", "list", "item", "items"}
-
-
-    _WD = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6,
-           "mon": 0, "tue": 1, "tues": 1, "wed": 2, "thu": 3, "thur": 3, "thurs": 3, "fri": 4, "sat": 5, "sun": 6}
-
-    def _relative_dates(transcript: str) -> list:
-        """Deterministic reading of relative-date phrases, in order of appearance.
-        Returns ISO dates. 'thursday' = coming Thursday (today if today is Thursday),
-        'next thursday' = the one after that when today is Thursday, else the coming one
-        in *next* week; 'tomorrow', 'today/tonight', 'the 19th' handled too."""
-        import datetime as _dt, re as _re
-        today = _dt.date.today(); out = []
-        t = transcript.lower()
-        pat = _re.compile(r"\b(day after tomorrow|tomorrow|today|tonight|this evening|this morning|"
-                          r"(?:next|this|coming)\s+(?:week\s+(?:on\s+)?)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)s?|"
-                          r"(monday|tuesday|wednesday|thursday|friday|saturday|sunday)s?|"
-                          r"(?:on\s+)?the\s+(\d{1,2})(?:st|nd|rd|th)\b)")
-        # "the 12th of August" / "August the 12th" name a month explicitly — the
-        # bare-ordinal branch below must not claim those and resolve them to the
-        # next 12th of *any* month, overriding what was said.
-        _MONTHS = ("january|february|march|april|may|june|july|august|september|"
-                   "october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec")
-        for m in pat.finditer(t):
-            full = m.group(1)
-            if full == "day after tomorrow":
-                out.append((today + _dt.timedelta(days=2)).isoformat())
-            elif full == "tomorrow":
-                out.append((today + _dt.timedelta(days=1)).isoformat())
-            elif full in ("today", "tonight", "this evening", "this morning"):
-                out.append(today.isoformat())
-            elif m.group(2):                                   # next/this <weekday>
-                wd = _WD[m.group(2)]; days = (wd - today.weekday()) % 7
-                if full.startswith("next"):
-                    days = (7 - today.weekday()) + wd     # that weekday in NEXT calendar week
-                out.append((today + _dt.timedelta(days=days)).isoformat())
-            elif m.group(3):                                   # bare weekday → coming one (today if today)
-                wd = _WD[m.group(3)]; days = (wd - today.weekday()) % 7
-                out.append((today + _dt.timedelta(days=days)).isoformat())
-            elif m.group(4):                                   # the 19th → this month if not past, else next
-                around = t[max(0, m.start() - 18):m.end() + 18]
-                if _re.search(rf"\b(?:{_MONTHS})\b", around):
-                    continue                                   # a month was named — leave it to the parser
-                n = int(m.group(4)); d0 = today
-                for _ in range(3):
-                    try:
-                        cand = d0.replace(day=n)
-                    except ValueError:
-                        cand = None
-                    if cand and cand >= today:
-                        out.append(cand.isoformat()); break
-                    d0 = (d0.replace(day=1) + _dt.timedelta(days=32)).replace(day=1)
-        return out
-
-    _EVENING_WORDS = re.compile(r"\b(dinner|drinks?|beer|pub|bar|party|pregame|pizza|kems|movie|cinema|show|concert|tonight|evening|night|maariv|mincha)\b", re.I)
-
-    def _bare_hour_pm(transcript: str, hhmm: str) -> str | None:
-        """'Kems tomorrow at 8' → 20:00. A bare hour (no am/pm) between 1 and 8 is far
-        more often PM in calendar speech; 7–8 only when evening words are present."""
-        m = re.match(r"(\d{2}):(\d{2})", hhmm or "")
-        if not m:
-            return None
-        h = int(m.group(1))
-        if not (1 <= h <= 8):
-            return None
-        tl = transcript.lower()
-        # was this hour spoken with am/pm or as 24h?  then leave it
-        if re.search(rf"\b{h}(?::\d{{2}})?\s*(?:am|a\.m\.)\b", tl) or re.search(rf"\b0?{h}:\d{{2}}\b(?!\s*pm)", tl) and re.search(rf"\b(?:0{h}|{h+12}):", tl):
-            return None
-        if re.search(rf"\b{h}(?::\d{{2}})?\s*(?:pm|p\.m\.)\b", tl):
-            return None
-        if not re.search(rf"\b(?:at\s+)?{h}(?::\d{{2}})?\b", tl):
-            return None
-        if h <= 6 or _EVENING_WORDS.search(tl):
-            return f"{h + 12:02d}:{m.group(2)}"
-        return None
-
-    def _normalise_intents(parsed, transcript: str, rule_actions=()):
-        """Cheap deterministic guards on top of whatever parser produced the intents:
-        • create_event dated in the past → next occurrence (LLMs pick yesterday's weekday)
-        • recurrence words in the transcript but none on the intent → set it
-        • hybrid junk: an extra create_event with a generic title and no real time
-        Returns (parsed, list_of_human_readable_fixes)."""
-        import datetime as _dt, re as _re
-        today = _dt.date.today(); fixes = []; out = []
-        tl = transcript.lower()
-        recur = next((v for pat, v in _RECUR_WORDS if _re.search(pat, tl)), None)
-        n_events = sum(1 for n, _ in parsed if n == "create_event")
-        n_todos = sum(1 for n, _ in parsed if n == "create_todo")
-        rel = _relative_dates(transcript)
-        # Captured BEFORE the loop below starts overwriting dates in place —
-        # evidence of whether the model already told events apart, not
-        # whether they still look that way partway through this pass.
-        _orig_event_dates = {getattr(i, "date", None) for n, i in parsed if n == "create_event"}
-        ev_idx = 0
-        td_idx = 0
-        for name, intent in parsed:
-            if name in ("update_event", "delete_event"):
-                # "the event I just made / the last one" → anaphor, never a title guess.
-                if _re.search(r"\b(just (made|created|added|set|scheduled)|last (event|one)|the one i just|you just)\b", tl) \
-                        and not getattr(intent, "match_date", None) and not getattr(intent, "match_start_time", None):
-                    if (getattr(intent, "match_title", "") or "").lower() != "it":
-                        fixes.append(f"match_title '{intent.match_title}'→'it' (refers to the last event)")
-                        intent.match_title = "it"
-                # A day named in the sentence but no match_date → pin the search to that day
-                # (the first date phrase is the event being referred to; a second one is the move-to date).
-                elif rel and not getattr(intent, "match_date", None):
-                    fixes.append(f"match_date →{rel[0]} (said in the sentence)")
-                    intent.match_date = rel[0]
-                    if name == "update_event" and len(rel) > 1 and not getattr(intent, "new_date", None):
-                        intent.new_date = rel[1]
-                out.append((name, intent)); continue
-            if name == "create_event":
-                d = getattr(intent, "date", None)
-                # Deterministic relative dates beat the model's guess: one phrase → all
-                # events; N phrases for N events → positional. But "one phrase" only
-                # means "every event" when the model *also* gave every event the same
-                # date — if it already told them apart (typically via its own absolute-
-                # date parsing, e.g. "the 17th of September"), that's evidence it
-                # resolved distinct dates correctly, and collapsing them onto one
-                # relative phrase corrupts the ones the relative-date reader never even
-                # saw. A real command: "...walk Moxdog next week... the 17th of
-                # September... the 19th of September..." — "Tuesday" (bare, said twice)
-                # was the only relative phrase, and it silently overwrote two already-
-                # correct absolute dates onto the Tuesday date.
-                if rel and not recur:
-                    if len(set(rel)) == 1:
-                        want = rel[0] if len(_orig_event_dates) <= 1 else None
-                    else:
-                        want = rel[ev_idx] if ev_idx < len(rel) and len(rel) == n_events else None
-                    if want and d != want:
-                        fixes.append(f"date {d}→{want} ('{transcript[:30]}…' says so)"); intent.date = want; d = want
-                ev_idx += 1
-                if d:
-                    try:
-                        dd = _dt.date.fromisoformat(d)
-                        if dd < today:
-                            # Roll a past date forward without throwing away what was
-                            # actually said. Within a week back it's a weekday that has
-                            # just gone ("Monday" said on Wednesday) → same weekday next
-                            # week. Further back the speaker named a calendar day, so
-                            # keep that day and month and move to next year.
-                            # (This used to advance one day at a time, which always
-                            # landed on today: "August 12 2026" became today's date.)
-                            if (today - dd).days <= 7:
-                                bump = dd
-                                while bump < today:
-                                    bump += _dt.timedelta(days=7)
-                            else:
-                                try:
-                                    bump = dd.replace(year=dd.year + 1)
-                                except ValueError:              # 29 Feb → 28 Feb
-                                    bump = dd.replace(year=dd.year + 1, day=28)
-                            intent.date = bump.isoformat(); fixes.append(f"date {d}→{intent.date} (was in the past)")
-                    except ValueError:
-                        pass
-                if recur and not getattr(intent, "recurrence", None):
-                    intent.recurrence = recur; fixes.append(f"recurrence={recur}")
-
-                # A weekly series has to start on the day it names. "standup
-                # every sunday and tuesday at 9am" produced two series both
-                # beginning today, a Wednesday — 106 events, not one of them on
-                # a Sunday or a Tuesday. The recurrence was right and the anchor
-                # was whatever the model happened to pick.
-                # "until Oct 6th" stops before the 6th; "through Oct 6th" keeps
-                # it. The model has no idea which the speaker meant and always
-                # produced the inclusive one.
-                _ru = getattr(intent, "recur_until", None)
-                if _ru and getattr(intent, "recurrence", None) and _end_is_exclusive(tl):
-                    try:
-                        _rd = _dt.date.fromisoformat(str(_ru))
-                        _excl = (_rd - _dt.timedelta(days=1)).isoformat()
-                        intent.recur_until = _excl
-                        fixes.append(f"recur_until {_ru}→{_excl} "
-                                     f"(\u201cuntil\u201d excludes the day it names)")
-                    except ValueError:
-                        pass
-
-                if getattr(intent, "recurrence", None) == "weekly":
-                    named = _named_weekdays(tl)
-                    try:
-                        dd = _dt.date.fromisoformat(str(intent.date))
-                    except (TypeError, ValueError):
-                        dd = None
-                    if named and dd is not None and dd.weekday() not in named:
-                        # Whichever named day comes soonest, counting today.
-                        ahead = min((w - today.weekday()) % 7 for w in named)
-                        anchored = today + _dt.timedelta(days=ahead)
-                        fixes.append(f"date {intent.date}→{anchored.isoformat()} "
-                                     f"(weekly series must start on the day it names)")
-                        intent.date = anchored.isoformat()
-                # A time the speaker introduced with "at" is when the thing
-                # STARTS. The model sometimes files it as the end and invents an
-                # earlier start — "dinner with Danny at 8 pm" came out 18:00–20:00.
-                _at = _at_times(transcript)
-                _s, _e = getattr(intent, "start_time", None), getattr(intent, "end_time", None)
-                if _e and _e in _at and _s and _s not in _at:
-                    try:
-                        _hh, _mm = map(int, _e.split(":"))
-                        intent.start_time = _e
-                        intent.end_time = f"{(_hh + 1) % 24:02d}:{_mm:02d}"
-                        fixes.append(f"start {_s}→{_e} ('at {_e}' is when it starts)")
-                    except ValueError:
-                        pass
-
-                # A morning word next to the event's own name means morning, even
-                # when the model came back with an afternoon time: "Shacharit at
-                # 6:30" was booked at 18:30. The guard below only ever declined to
-                # ADD pm — it never took one away.
-                _title_l = (getattr(intent, "title", "") or "").lower()
-                # Scoped to this event's OWN title: one "Shacharit" in a sentence
-                # must not drag every other event in it back twelve hours.
-                _morning = re.search(r"\b(?:shacharit|breakfast|sunrise)\b", _title_l)
-                _st = getattr(intent, "start_time", None) or ""
-                if _morning and re.fullmatch(r"1[2-9]:\d{2}|2[0-3]:\d{2}", _st):
-                    _hh, _mm = map(int, _st.split(":"))
-                    _am = f"{_hh - 12:02d}:{_mm:02d}"
-                    if f"{_hh - 12}:{_mm:02d}" in transcript or str(_hh - 12) in transcript:
-                        intent.start_time = _am
-                        _end = getattr(intent, "end_time", None)
-                        if _end:
-                            try:
-                                _eh, _em = map(int, _end.split(":"))
-                                intent.end_time = f"{max(0, _eh - 12):02d}:{_em:02d}"
-                            except ValueError:
-                                pass
-                        fixes.append(f"{_st}→{_am} (a morning event)")
-
-                pm = _bare_hour_pm(transcript, getattr(intent, "start_time", None) or "")
-                if pm and not re.search(r"\b(?:morning|breakfast|shacharit|am)\b", tl):
-                    old_s, old_e = intent.start_time, getattr(intent, "end_time", None)
-                    intent.start_time = pm
-                    if old_e:
-                        try:
-                            hh, mm = map(int, old_e.split(":")); intent.end_time = f"{(hh + 12) % 24:02d}:{mm:02d}"
-                        except Exception:
-                            pass
-                    fixes.append(f"bare hour {old_s}→{pm} (PM)")
-                if "create_todo" in rule_actions and "create_event" not in rule_actions and not _spoken_times(transcript):
-                    fixes.append(f"dropped event '{getattr(intent, 'title', '')}' — rule parser saw a task and no clock time was spoken"); continue
-                t = (getattr(intent, "title", "") or "").strip().lower()
-                if n_events > 0 and t in _JUNK_TITLES and any(n2 == "create_todo" for n2, _ in parsed):
-                    fixes.append(f"dropped junk event '{t}'"); continue
-            elif name == "create_todo":
-                # Deadlines got no deterministic date resolution at all — only
-                # events did — so "due next monday" was left as whatever the
-                # model guessed, which was a Sunday. Same treatment as events:
-                # one date phrase applies to every task, N phrases for N tasks
-                # are positional.
-                due = getattr(intent, "due_date", None)
-                if rel and not recur:
-                    if len(set(rel)) == 1:
-                        want = rel[0]
-                    else:
-                        want = rel[td_idx] if td_idx < len(rel) and len(rel) == n_todos else None
-                    if want and due != want:
-                        fixes.append(f"due {due}→{want} ('{transcript[:30]}…' says so)")
-                        intent.due_date = want
-                td_idx += 1
-
-            out.append((name, intent))
-        return out, fixes
-
-    def _intent_summary(intent) -> dict:
-        try:
-            return intent.model_dump(exclude_none=True, exclude_defaults=True)
-        except Exception:
-            return {}
-
-    def _record_memory(cfg, raw, transcript, parse_path, actions, result, success,
-                       llm_ms, trace, records, *, source: str = "ios",
-                       confidence: float = -1.0) -> int | None:
-        if not getattr(cfg.nlu, "memory_enabled", True):
-            return None
-        try:
-            from assistant.intent.memory import get_memory
-            return get_memory().record(
-                transcript=transcript, raw_transcript=raw, source=source,
-                parse_path=parse_path, actions=actions, result=result,
-                success=success, llm_ms=llm_ms, total_ms=trace.total_ms, records=records,
-                confidence=confidence,
-            )
-        except Exception as e:
-            logger.warning("📱 Memory record failed: %s", e)
-            return None
+                        trace_run: str | None = None,
+                        supports_edit: bool = False) -> dict[str, Any]:
+        """The brain lives in assistant.engine now — the 7-step deep track
+        (DOCUMENTATION/ENGINE.md). This wrapper exists so every voice route
+        and the pending-retry loop share one entry point."""
+        from assistant.engine import run_transcript as _engine_run
+        return _engine_run(transcript, trace=trace, source=source,
+                           current_view=current_view, trace_run=trace_run,
+                           supports_edit=supports_edit)
 
     if not _no_bg:
         start_pending_retry_loop(_run_transcript)
@@ -1543,8 +381,31 @@ def create_app() -> Flask:
         view = (body.get("current_view") or "month").strip().lower()
         logger.info("%s Text command: %s", "🖥️" if src == "mac" else "📱", transcript)
         run = (body.get("trace_run") or "").strip() or None
+        # A client that can show the "edit the transcription" round-trip says
+        # so; older clients never see a needs_edit response.
+        edit_ok = bool(body.get("supports_edit"))
+        # The round-trip's second half: `edited_from` carries the transcript
+        # the gate doubted. A changed word teaches the vocabulary an alias (so
+        # the same mishearing auto-corrects next time); an untouched resubmit
+        # earns each doubted word a confirmation toward being whitelisted.
+        # Either way the gate is bypassed for THIS resubmission — asking twice
+        # about the same words would be nagging.
+        edited_from = (body.get("edited_from") or "").strip()
+        if edited_from:
+            from assistant.engine import transcript as _engine_transcript
+            if edited_from.strip().lower() != transcript.lower():
+                learned = _engine_transcript.learn_from_edit(edited_from, transcript, src)
+                if learned:
+                    logger.info("Learned from a transcript edit: %s",
+                                ", ".join(f"{w}→{r}" for w, r in learned))
+            else:
+                promoted = _engine_transcript.confirm_unchanged(transcript)
+                if promoted:
+                    logger.info("Whitelisted after repeated confirmation: %s",
+                                ", ".join(promoted))
+            edit_ok = False
         return jsonify(_run_transcript(transcript, source=src, current_view=view,
-                                       trace_run=run))
+                                       trace_run=run, supports_edit=edit_ok))
 
     # ------------------------------------------------------------------
     # Personal vocabulary (STT auto-correct)
@@ -2733,5 +1594,4 @@ def create_app() -> Flask:
         get_db().delete_calendar_source(source_id)
         return jsonify({"deleted": source_id})
 
-    app._normalise_intents = _normalise_intents   # exposed for tests
     return app

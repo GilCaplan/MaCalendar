@@ -879,6 +879,10 @@ class ThinkingPanel(QFrame):
         QTimer.singleShot(0, self._scroll_to_bottom)
 
     def finish(self, result: dict | None = None) -> None:
+        # The brain that produced this run (assistant.trace.BRAIN_VERSION),
+        # stamped on the result. The key the panel matches its render format
+        # to, so an engine trace and an older one can display differently.
+        self._brain = (result or {}).get("brain")
         self._finished = True
         self._working.hide()
         if result:

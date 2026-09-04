@@ -272,6 +272,10 @@ def build_corpus(seed: int = 7) -> list[dict]:
 
     # --- adversarial -------------------------------------------------------
     C.append({"area": "adversarial", "shape": "ambiguous/no-time", "text": "set a meeting with Tal", "expect": [("clarify|create_event", {})]})
+    C.append({"area": "adversarial", "shape": "observance-gate", "text": "book a gym session this saturday at 10 am",
+              "expect": [], "reply_contains": "didn't book"})
+    C.append({"area": "adversarial", "shape": "observance-meal-ok", "text": "shabbat dinner this friday at 7:30 pm",
+              "expect": [("create_event", {"start_time": "19:30"})]})
     C.append({"area": "adversarial", "shape": "task-not-event", "text": "remind me to call Ravid", "expect": [("create_todo", {"titles_contain": ["Ravid"]})]})
     C.append({"area": "adversarial", "shape": "event-not-task", "text": "remind me about the dentist tomorrow at 9 am", "expect": [("create_event", {"date": d(1), "start_time": "09:00"})]})
     C.append({"area": "adversarial", "shape": "misheard-names", "text": "meet Ravid at the french bakery in Jerusalem after shacharis at 9 am tomorrow",
@@ -282,21 +286,28 @@ def build_corpus(seed: int = 7) -> list[dict]:
     # --- realistic phrasings lifted from the user's own chats ----------------
     chat = [
         ("coffee friday 9:15 at the French Bakery with Ravid", [("create_event", {"date": next_wd(4), "start_time": "09:15", "title_contains": "Ravid"})]),
-        ("Kems tomorrow at 8 with Ravid and Ezra", [("create_event", {"date": d(1), "start_time": "20:00"})]),
+        ("Kems on tuesday at 8 with Ravid and Ezra", [("create_event", {"date": next_wd(1), "start_time": "20:00"})]),   # weekday-pinned: a Friday 8pm would (rightly) hit the observance gate
         ("pregame at our place wednesday 8:30 pm", [("create_event", {"date": next_wd(2), "start_time": "20:30", "title_contains": "pregame"})]),
         ("bowling tuesday night for Rei's birthday", [("create_event", {"date": next_wd(1), "title_contains": "bowling"})]),
         ("zoom with Alon thursday at 3 pm", [("create_event", {"date": next_wd(3), "start_time": "15:00", "title_contains": "Alon"})]),
         ("lunch 12:30 with Tal on campus tomorrow", [("create_event", {"date": d(1), "start_time": "12:30", "title_contains": "Tal"})]),
         ("tennis wednesday at 17:30", [("create_event", {"date": next_wd(2), "start_time": "17:30", "title_contains": "tennis"})]),
         ("pick up the package from Parcel Home on Hazayit on friday", [("create_todo|create_event", {})]),
-        ("night shift tomorrow from 8 pm to 6 am", [("create_event", {"date": d(1), "start_time": "20:00"})]),
+        ("night shift on wednesday from 8 pm to 6 am", [("create_event", {"date": next_wd(2), "start_time": "20:00"})]),   # weekday-pinned: see above
         ("Netivim zoom 1800-2000 tonight", [("create_event", {"date": d(0), "start_time": "18:00", "end_time": "20:00"})]),
         ("Shabbat lunch at Ravid's this saturday 12:30", [("create_event", {"date": next_wd(5), "start_time": "12:30"})]),
-        ("meeting with Guri moved from 9:30 to 9 on wednesday", [("create_event|update_event", {})]),
+        # seeded below (chat loop can't carry seeds): meeting-move phrasing
         ("Haxaga TA session mondays at noon", [("create_event", {"start_time": "12:00", "recurrence": "weekly"})]),
         ("remind me to send Ravid the tzofim code", [("create_todo", {"titles_contain": ["Ravid"]})]),
         ("sadna on sunday the 15th at 9 am then driving lesson at 8 am", [("create_event", {"start_time": "09:00"}), ("create_event", {"start_time": "08:00"})]),
     ]
+    # "moved from 9:30 to 9" with the 9:30 meeting actually on the books: the
+    # honest answer is an update that lands at 9:00 (exercises move_time_fill).
+    C.append({"area": "from-chats", "shape": "chat-phrasing",
+              "text": "meeting with Guri moved from 9:30 to 9 on wednesday",
+              "expect": [("update_event", {"db_event_start": ("Guri", "09:00")})],
+              "seed": [{"title": "Meeting with Guri Karpas", "date": next_wd(2),
+                        "start_time": "09:30", "end_time": "10:30"}]})
     for text, expect in chat:
         C.append({"area": "from-chats", "shape": "chat-phrasing", "text": text, "expect": expect})
 
@@ -304,7 +315,12 @@ def build_corpus(seed: int = 7) -> list[dict]:
     for i in range(12):
         p, pl, t = rnd.choice(people), rnd.choice(places), rnd.choice(topics)
         hh = rnd.choice([9, 10, 11, 13, 14, 15, 16, 17, 19]); mm = rnd.choice(["00", "30"])
-        wd = rnd.randrange(7); disp = f"{hh if hh <= 12 else hh - 12}{':' + mm if mm != '00' else ''} {'am' if hh < 12 else 'pm'}"
+        wd = rnd.randrange(7)
+        # Friday evening / Shabbat land in the observance gate's territory —
+        # that policy is asserted by its own cases; these measure parsing.
+        if wd == 5 or (wd == 4 and hh >= 17):
+            wd = (wd + 2) % 7
+        disp = f"{hh if hh <= 12 else hh - 12}{':' + mm if mm != '00' else ''} {'am' if hh < 12 else 'pm'}"
         text = rnd.choice([f"meeting with {p} on {WD_NAMES[wd]} at {disp} about {t}",
                            f"set {t} with {p} at {pl} on {WD_NAMES[wd]} at {disp}",
                            f"{WD_NAMES[wd]} {disp} {t} with {p}"])
@@ -416,6 +432,12 @@ def _check(case: dict, resp: dict, db) -> tuple[bool, list[str], dict]:
                 problems.append(f"'{f['db_event_absent']}' still in DB")
                 exp_hit[idx] = False
 
+    # A case can pin the REPLY rather than a DB effect — the observance gate's
+    # correct answer is a refusal that explains itself, not a row.
+    want_reply = case.get("reply_contains")
+    if want_reply and want_reply.lower() not in (resp.get("message") or "").lower():
+        problems.append(f"reply lacks '{want_reply}': {resp.get('message', '')[:120]!r}")
+
     counts = {
         "expected": len(exp),
         "recall_hits": sum(exp_hit),
@@ -496,9 +518,13 @@ def run(args) -> dict:
 
         trace = resp.get("trace") or []
         stage_ms = {s["stage"]: stage_ms_get(trace, s["stage"]) for s in trace}
+        rules = [r_ for st in trace for r_ in (st.get("data", {}) or {}).get("rules", [])]
+        loops = sum(1 for st in trace if st.get("title") == "Looping back")
+        findings = [f for st in trace for f in (st.get("data", {}) or {}).get("findings", [])]
         r = {"i": i, "area": case["area"], "shape": case["shape"], "text": case["text"],
              "parse": resp.get("parse"), "actions": resp.get("actions"), "message": resp.get("message", "")[:160],
              "first_ms": first_ms, "settle_ms": settle_ms, "llm_ms": stage_ms.get("llm", 0), "rule_ms": stage_ms.get("rule", 0),
+             "stage_ms": stage_ms, "rules": rules, "loops": loops, "findings": findings,
              "corrections": resp.get("corrections"), "verify": verify,
              "ok_quick": ok_quick, "ok_settled": ok_settled, "problems": problems_settled or problems_quick,
              "counts": counts_settled,
@@ -587,7 +613,8 @@ def write_report(data: dict, path: str, args) -> None:
         "— accuracy alone doesn't distinguish missing something asked for from producing something extra",
         f"- **Time to first result:** p50 {_pct([r['first_ms'] for r in R], .5)/1000:.1f} s · p95 {_pct([r['first_ms'] for r in R], .95)/1000:.1f} s  ·  "
         f"**time to settled:** p50 {_pct([r['settle_ms'] for r in R], .5)/1000:.1f} s · p95 {_pct([r['settle_ms'] for r in R], .95)/1000:.1f} s",
-        f"- Parse paths: " + ", ".join(f"{p} {sum(1 for r in R if r['parse']==p)}" for p in ("rule", "hybrid", "llm", "error")),
+        f"- Parse paths: " + ", ".join(f"{p} {sum(1 for r in R if r['parse']==p)}"
+                                       for p in sorted({r["parse"] or "-" for r in R})),
         "",
         "## By area",
         "",
@@ -601,7 +628,7 @@ def write_report(data: dict, path: str, args) -> None:
                      f"{rec:.0%} | {prec:.0%} | "
                      f"{_pct([r['first_ms'] for r in xs], .5)/1000:.1f} s | {_pct([r['first_ms'] for r in xs], .95)/1000:.1f} s | {_pct([r['settle_ms'] for r in xs], .5)/1000:.1f} s |")
     lines += ["", "## By parse path", "", "| Path | n | quick ✓ | settled ✓ | recall | precision | first p50 | first p95 | LLM ms p50 |", "|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
-    for p in ("rule", "hybrid", "llm", "error"):
+    for p in sorted({r["parse"] or "-" for r in R}):
         xs = [r for r in R if r["parse"] == p]
         if xs:
             rec, prec, _c = _recall_precision(xs)
@@ -620,6 +647,29 @@ def write_report(data: dict, path: str, args) -> None:
         lines.append(f"  - fixed: “{r['text']}” → {r['verify']}")
     for r in broke[:5]:
         lines.append(f"  - broke: “{r['text']}” → {r['verify']}")
+    stages = ("stt", "vocab", "rule", "llm", "validate", "execute", "verify")
+    lines += ["", "## Engine stages (latency; a slow or misbehaving stage is fixed in ITS module)", "",
+              "| Stage | ran on | ms p50 | ms p95 |", "|---|---:|---:|---:|"]
+    for st in stages:
+        xs = [r["stage_ms"][st] for r in R if r.get("stage_ms", {}).get(st)]
+        if xs:
+            lines.append(f"| {st} | {len(xs)}/{n} | {int(_pct(xs, .5))} | {int(_pct(xs, .95))} |")
+    rule_counts = {}
+    for r in R:
+        for rule in r.get("rules", []):
+            rule_counts[rule] = rule_counts.get(rule, 0) + 1
+    if rule_counts:
+        lines += ["", "## Named-rule fixes applied", "", "| Rule | times |", "|---|---:|"]
+        for rule, c in sorted(rule_counts.items(), key=lambda kv: -kv[1]):
+            lines.append(f"| {rule} | {c} |")
+    looped = [r for r in R if r.get("loops")]
+    found = [f for r in R for f in r.get("findings", [])]
+    lines += ["", "## Cross-check (step 6)", "",
+              f"- Findings: {len(found)} ({', '.join(sorted(set(found))) or 'none'}) across "
+              f"{sum(1 for r in R if r.get('findings'))} command(s); loop-backs on {len(looped)} "
+              f"command(s) ({sum(r['loops'] for r in looped)} re-entries total).",
+              f"- Budget exhausted (answer flagged as unsure): "
+              f"{sum(1 for r in R if 'not sure I caught every part' in (r['message'] or ''))}."]
     lines += ["", "## By shape (failures first)", "", "| Shape | n | settled ✓ | first p50 |", "|---|---:|---:|---:|"]
     shapes = sorted({r["shape"] for r in R}, key=lambda s: (sum(r["ok_settled"] for r in R if r["shape"] == s) / max(1, sum(1 for r in R if r["shape"] == s))))
     for s in shapes:

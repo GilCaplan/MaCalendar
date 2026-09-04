@@ -38,14 +38,20 @@ speaking and seeing the result. No embedding model; no classifier model.
 Full table, including which config key sets each and why the sizes were chosen:
 `DOCUMENTATION/MODELS.md`.
 
-## NLU Parse Path
+## NLU Parse Path — the engine (`assistant/engine/`, contracts in [ENGINE.md](ENGINE.md))
 ```
 Voice command
-  → RuleBasedParser (7-phase, spaCy + Recognizers-Text)
-       ├─ confidence ≥ 0.85 → execute immediately + background LLM verify
-       │     └─ verify: ok (silent) | minor (patch) | major (undo + redo)
-       ├─ partial → parse_with_context() [LLM fills gaps from pre-analysis]
-       └─ skip/complex → full IntentParser.parse() [LLM from scratch]
+  → 1 transcript   vocabulary repair + confidence gate (needs_edit round-trip)
+  → fast track?    rule parser confident on the whole input
+       ├─ yes → commit instantly (<1s) + deep track behind it (step 6 patches)
+       └─ no  → deep track in foreground, stages streamed to the HUD:
+            2 segment     split into typed items (events / tasks / review)
+            3 decompose   two times = two events; "5 apples" = (apples, 5)
+            4 validate    named rules + observance gate; repairs are traced
+            5 generate    per item: rules first, LLM fills gaps
+            → commit      execute via the action registry
+            7 label       category / tag read-back
+            6 crosscheck  raw text vs. produced objects → loop back (≤3)
 ```
 
 ## Log prefixes
@@ -60,7 +66,7 @@ Voice command
 | Onboarding | `assistant/stt/vocab_onboarding.py` | First-run interview (6 questions) + opt-in starter packs (prayer/Shabbat, holidays, Israeli life, family, life events). iOS `VocabOnboardingView`, Mac `VocabDialog › Set up…`. |
 | Command memory (RAG) | `assistant/intent/memory.py` | Every command → executed intents → result → timings in `~/.assistant_tools/nlu_memory.db`. Edits/deletes of a voice-created record within 24 h become `corrected`/`rejected` feedback (hooked in `db.update_event/delete_event/update_todo/delete_todo`). `few_shot_block()` injects the k most similar examples (dates masked) into the LLM system prompt (`nlu.memory_examples`). Also holds the **pending queue** of commands that failed because the LLM was offline; the API server retries them every 30 s. |
 | Trace | `assistant/trace.py` | Stage-by-stage "thinking" log with ms timings. Returned in `/voice` responses and streamed live as NDJSON from `POST /voice/stream` (iOS `ThinkingView`, toggle in Settings › Voice). |
-| Self-check | `IntentParser.verify_actions_async` + `server._run_server_verify` | After execution on **any** path, a background LLM call re-reasons over transcript + executed actions + user history and applies minor patches / undo-redo on the Mac; phone polls `GET /voice/verify/<token>` for the outcome. |
+| Self-check | `assistant/engine/crosscheck.py` (step 6) | The engine's cross-check: the LLM lists what the raw text mentions, code diffs that against what was produced, and a deterministic router blames the stage to re-run (≤3 re-entries). On the fast track it patches the committed answer — tiered, destructive patches visible; phone polls `GET /voice/verify/<token>` for the outcome. |
 | Benchmark | `scripts/benchmark_models.py` → `DOCUMENTATION/MODEL_BENCHMARK.md` | Accuracy + latency of Ollama models on real commands. |
 
 New endpoints: `GET/POST /vocab`, `POST /vocab/alias`, `DELETE /vocab/<word>[?alias=]`, `PATCH /vocab/settings`, `POST /vocab/preview`, `GET/POST /vocab/onboarding`, `GET /memory`, `GET /memory/similar?q=`, `POST /memory/<id>/feedback`, `DELETE /memory/<id>`, `GET /pending`, `POST /pending/<id>/retry`, `DELETE /pending/<id>`, `POST /voice/stream`. `/health` now reports `llm_status` (`ok` / `offline` / model not pulled).

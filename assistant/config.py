@@ -200,10 +200,30 @@ class NLUConfig(BaseModel):
     # silently patches it with a proper title derived from the full transcript.
     event_keywords: List[str] = ["meeting", "appointment", "activity"]
     # Few-shot personalisation: inject the k most similar past commands
-    # (with user corrections) into the LLM prompt. 0 = off.
-    memory_examples: int = 4
+    # (with user corrections) into the LLM prompt. 0 = off — run 7 measured
+    # no effect at k=4 (98% vs 97%, and 100% on the only path that reads
+    # them), so the engine ships without it; rows 74/76 are the experiments
+    # that would justify turning it back on.
+    memory_examples: int = 0
     # Record every command + outcome to ~/.assistant_tools/nlu_memory.db
     memory_enabled: bool = True
+
+
+class EngineConfig(BaseModel):
+    """The engine's knobs (DOCUMENTATION/ENGINE.md). Stage behaviour only —
+    the routing threshold stays with the rule parser."""
+    # Step 1's gate: when the vocabulary doubts a word, ask the speaker to
+    # check the transcription before anything executes (clients that declared
+    # supports_edit only). Off = proceed with the best guess + tap-a-word.
+    confirm_transcript: bool = False
+    # Step 6 on the fast track: cross-check every command, or only ones the
+    # rules were less sure about. Decided by loop telemetry, not by taste.
+    reconcile: Literal["always", "uncertain"] = "always"
+    # Escape hatch: route everything through the foreground deep track.
+    fast_track: bool = True
+    # Step 0: queued commands are coalesced into one ("…")and("…") input up
+    # to this budget; overflow runs sequentially.
+    coalesce_max_tokens: int = 300
 
 
 class AppConfig(BaseModel):
@@ -234,6 +254,7 @@ class AppConfig(BaseModel):
     todo: TodoConfig = TodoConfig()
     api: ApiConfig = ApiConfig()
     nlu: NLUConfig = NLUConfig()
+    engine: EngineConfig = EngineConfig()
     theme: Literal["light", "dark"] = "dark"
     ui: UIConfig = UIConfig()
     hebrew_calendar: HebrewCalendarConfig = HebrewCalendarConfig()

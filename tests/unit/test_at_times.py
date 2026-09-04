@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from assistant.api.server import _at_times
+from assistant.engine.validate import at_times as _at_times
 
 
 @pytest.mark.parametrize("said, expected", [

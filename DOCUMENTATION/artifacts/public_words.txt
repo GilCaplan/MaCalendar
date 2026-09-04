@@ -41,3 +41,7 @@ israel
 # check occasionally flags an innocent one. Prefer rewording the sentence — it
 # is usually clearer anyway — over adding the word here. Everything above
 # should be a word that genuinely had to appear.
+# generic terms for Jewish prayer and Torah reading — the observance gate's
+# own category names on the engine explainer, not personal details
+davening
+leyning

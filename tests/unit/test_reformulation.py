@@ -225,12 +225,12 @@ def test_a_false_start_is_never_treated_as_a_command(said):
     They are worse than harmless: the memory feeds the model worked examples,
     so a run of junk teaches it that junk is how this person speaks.
     """
-    from assistant.api.server import is_trivial_transcript
+    from assistant.engine.transcript import is_trivial_transcript
     assert is_trivial_transcript(said), f"{said!r} should be ignored outright"
 
 
 @pytest.mark.parametrize("said", ["gym tomorrow", "buy milk", "lunch at noon",
                                   "what do I have today", "delete the meeting"])
 def test_a_real_command_is_not_mistaken_for_a_false_start(said):
-    from assistant.api.server import is_trivial_transcript
+    from assistant.engine.transcript import is_trivial_transcript
     assert not is_trivial_transcript(said), f"{said!r} is a real command"

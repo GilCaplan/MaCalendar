@@ -529,3 +529,26 @@ def _public_words() -> set[str]:
         return set()
     return {line.strip().lower() for line in path.read_text().splitlines()
             if line.strip() and not line.startswith("#")}
+
+
+def test_the_named_rule_count_matches_validate(all_prose):
+    """"Fifteen named rules" on the explorer must track the module that owns
+    them — a rule added without updating the page is how numbers rot."""
+    import assistant.engine.validate as v
+    n = sum(1 for name in dir(v) if name.startswith("_rule_"))
+    word = _word(n)
+    for name, text in all_prose.items():
+        if "named rule" not in text.lower():
+            continue
+        assert re.search(rf"\b({n}|{word})\s+named rules", text, re.I), (
+            f"validate.py holds {n} named rules; {name} quotes a different count")
+
+
+def test_the_loop_budget_matches_crosscheck(all_prose):
+    from assistant.engine.crosscheck import MAX_REENTRIES
+    word = _word(MAX_REENTRIES)
+    for name, text in all_prose.items():
+        if "loop" not in text.lower() or "re-runs the stage" not in text.lower():
+            continue
+        assert re.search(rf"at most {word} times", text, re.I), (
+            f"the loop budget is {MAX_REENTRIES}; {name} says otherwise")

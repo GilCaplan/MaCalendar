@@ -5,6 +5,30 @@
 
 ---
 
+## The Engine — `assistant/engine/` (THE BRAIN)
+
+> Contracts frozen — read `DOCUMENTATION/ENGINE.md` before touching a stage.
+
+| What | Location |
+|------|----------|
+| Orchestrator `run_transcript` (response contract, track selection) | `engine/__init__.py` |
+| Commit (only DB touchpoint; TargetNotFound recheck `_recheck_not_found`) | `engine/__init__.py` |
+| `EngineState` / `Item` / `Fix` dataclasses (the inter-stage contract) | `engine/state.py` |
+| Step 1: stop words, trivial filter, vocab, `needs_edit` gate | `engine/transcript.py` |
+| Step 2: deterministic splits + (gated) LLM segmentation | `engine/segment.py` |
+| Step 3: time-list → two events, task lists, quantities | `engine/decompose.py` |
+| Step 4: the named rules (`past_date_bump`, `bare_hour_pm`, …) + observance gate | `engine/validate.py` |
+| Step 5: `fast_propose` (fast track) + per-item parse | `engine/generate.py` |
+| Step 6: BLAME router + MAX_REENTRIES (implementation pending) | `engine/crosscheck.py` |
+| Step 7: label read-back | `engine/label.py` |
+| Contract pins | `tests/unit/test_engine_contracts.py` |
+| Intake lock + `coalesce()` (step 0) | `engine/__init__.py` |
+| Background verify + patch tiers (`_background_verify`) | `engine/__init__.py` |
+| Gate learning (`learn_from_edit`, `confirm_unchanged`, confirms sidecar) | `engine/transcript.py` |
+| Shared LLM transport (`call_json`, MACALENDAR_LLM_DISABLED guard) | `engine/llm.py` |
+| Per-stage live gates | `scripts/engine_stage_check.py` |
+| Mac gate dialog (`ask_transcript_edit`, STATUS_EDIT) | `calendar_ui/window.py`, `pipeline.py` |
+
 ## Database — `assistant/db.py`
 
 | What | Location |
@@ -56,7 +80,7 @@
 
 ---
 
-## NLU Pipeline — `assistant/pipeline.py`
+## GUI voice client — `assistant/pipeline.py` (records + posts; NEVER parses)
 
 | What | Location |
 |------|----------|
