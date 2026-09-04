@@ -192,6 +192,21 @@ def run(state: EngineState, cfg) -> EngineState:
                 f"Sorry, I couldn't read this part: “{item.text[:60]}”.")
             out.append(item)
             continue
+        if item.kind == "task" and (not got or all(n == "unknown" for n, _ in got)):
+            # Segmentation already judged these words a to-do; a parse that
+            # comes back empty for them is the model failing the words, not
+            # the words failing to be a task ("submit the Haxaga grades" →
+            # unknown, run 12). The item text IS the task.
+            from assistant.actions.todo.intent import CreateTodoIntent
+            try:
+                item.action = "create_todo"
+                item.intent = CreateTodoIntent(titles=[item.text.strip()])
+                state.add_fix("generate", "task_fallback", "", item.text[:40],
+                              note="a task-kind item never parses to nothing")
+                out.append(item)
+                continue
+            except Exception:
+                pass
         if not got:
             out.append(item)
             continue

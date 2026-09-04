@@ -158,6 +158,21 @@ here.) Likewise "add tasks: A, B, pay C" is exactly three items, never more.
 Return JSON: {"items": [{"kind": ..., "text": ...}, ...]}"""
 
 
+_SCHEDULE_WORDS = frozenset(
+    "due today tomorrow tonight next this on at am pm oclock o'clock the a an "
+    "of in for by until till week month monday tuesday wednesday thursday "
+    "friday saturday sunday morning afternoon evening night".split())
+
+
+def _schedule_only(text: str) -> bool:
+    """"due tomorrow", "at 5 pm" — scheduling words with nothing scheduled.
+    As a split part it is residue of the phrasing, not a request (run 12: a
+    stray "due tomorrow" part became a phantom create)."""
+    words = [w for w in re.findall(r"[a-z0-9':]+", text.lower()) if w]
+    return bool(words) and all(w in _SCHEDULE_WORDS or w.replace(":", "").isdigit()
+                               for w in words)
+
+
 def _llm_segments(state: EngineState, cfg) -> "list[Item] | None":
     """One schema-constrained call, only when the words even suggest compounding
     — and biased to under-split (see module docstring). None = keep one item."""
@@ -190,7 +205,8 @@ def _llm_segments(state: EngineState, cfg) -> "list[Item] | None":
     # or a phantom row (run 11: one header ate a real task, another became a
     # third create). Drop headers; their due-phrase is already distributed
     # into the real items by the prompt's shared-deadline policy.
-    parts = [(k, t) for k, t in parts if not _HEADER_RE.match(t)]
+    parts = [(k, t) for k, t in parts if not _HEADER_RE.match(t)
+             and not _schedule_only(t)]
     if len(parts) <= 1:
         return None
     # Under-split bias, enforced: a "split" that produced a fragment (a lone

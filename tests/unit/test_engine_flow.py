@@ -262,3 +262,19 @@ def test_repeated_attempt_messages_fold_into_one(monkeypatch):
     monkeypatch.setattr(crosscheck, "run", always_missing)
     out = engine.run_transcript("add christmas thing to calendar", source="test")
     assert out["message"].count("couldn't read") == 1
+
+
+def test_a_task_kind_item_never_parses_to_nothing(monkeypatch, cfg):
+    from assistant.engine.state import EngineState, Item
+    parser = MagicMock()
+    parser.parse.return_value = [("unknown", SimpleNamespace())]
+    parser.last_llm_ms = 1
+    parser.last_examples_used = 0
+    parser.last_raw_response = ""
+    monkeypatch.setattr(generate, "_get_parser", lambda c: parser)
+    monkeypatch.setattr(generate, "_get_rule_parser", lambda: None)
+    st = EngineState(raw_text="x", text="x")
+    st.items = [Item(id="item_1", kind="task", text="submit the Haxaga grades")]
+    generate.run(st, cfg)
+    assert st.items[0].action == "create_todo"
+    assert st.items[0].intent.titles == ["submit the Haxaga grades"]

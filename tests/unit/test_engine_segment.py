@@ -133,3 +133,13 @@ def test_a_header_with_a_due_phrase_is_still_a_header(cfg, monkeypatch):
     st = _seg("two tasks due tomorrow: buy groceries and return the library book", cfg)
     assert len(st.items) == 2
     assert all("due tomorrow" in it.text for it in st.items)
+
+
+def test_a_schedule_only_fragment_is_dropped(cfg, monkeypatch):
+    monkeypatch.setattr(engine_llm, "call_json", lambda *a, **k: ({"items": [
+        {"kind": "task", "text": "buy groceries due tomorrow"},
+        {"kind": "task", "text": "due tomorrow"},
+        {"kind": "task", "text": "return the library book due tomorrow"},
+    ]}, 4))
+    st = _seg("two tasks due tomorrow: buy groceries and return the library book", cfg)
+    assert len(st.items) == 2
