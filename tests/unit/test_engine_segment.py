@@ -153,3 +153,33 @@ def test_a_timed_reminder_is_an_event(cfg):
 def test_an_untimed_reminder_stays_a_task(cfg):
     st = _seg("remind me to call Ravid", cfg)
     assert st.items[0].kind == "task"
+
+
+# --- cycle 1: the pinned reminder rule is enforced over the LLM's labels ---
+
+def test_a_timed_reminder_mislabelled_task_by_the_llm_becomes_an_event(cfg, monkeypatch):
+    """Cycle 1 of the dataset loop (dev-fast 250): 'create a birthday wish
+    reminder for tomorrow at 10 AM' was split correctly but labelled task, so
+    it landed as a todo and generate's event-kind retry never fired — the
+    event half of a compound was mis-kinded far more often than dropped. The
+    deterministic rule (remind + clock time ⇒ calendar) now corrects the
+    label; same rule on both paths."""
+    monkeypatch.setattr(engine_llm, "call_json", lambda *a, **k: ({"items": [
+        {"kind": "task", "text": "set a reminder for my meeting today"},
+        {"kind": "task", "text": "create a birthday wish reminder for tomorrow at 10 AM"},
+    ]}, 5))
+    st = _seg("Olly, set a reminder for my meeting today and create a birthday "
+              "wish reminder for tomorrow at 10 AM", cfg)
+    kinds = [it.kind for it in st.items]
+    assert kinds[1] == "event"     # clock time ⇒ calendar, whatever the label said
+    assert kinds[0] == "task"      # date-only is not flipped — the rule is clock-gated
+
+
+def test_enforce_pinned_kinds_is_narrow():
+    f = segment._enforce_pinned_kinds
+    assert f("task", "remind me to go to my doctors at 4pm") == "event"
+    assert f("task", "a reminder for the meeting at 3pm") == "event"
+    assert f("task", "remind me to buy milk") == "task"                 # no time
+    assert f("task", "add milk to the grocery list at 4pm") == "task"   # no remind wording
+    assert f("event", "gym at 7") == "event"                            # never flips away from event
+    assert f("review", "remind me what is at 4pm") == "review"          # only task labels corrected

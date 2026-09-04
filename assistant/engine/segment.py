@@ -50,6 +50,25 @@ _CLOCKISH_RE = re.compile(
     r"\b\d{1,2}(:\d{2})?\s*(am|pm|a\.m\.|p\.m\.)\b|\b\d{1,2}:\d{2}\b|\bat\s+\d{1,2}\b|"
     r"\b(noon|midnight|tonight|morning|evening|afternoon)\b", re.I)
 
+# Any remind-flavoured wording — the verb or the noun ("a birthday wish
+# reminder for tomorrow at 10 AM" carries no "remind me to").
+_REMINDISH_RE = re.compile(r"\bremind(?:er)?s?\b", re.I)
+
+
+def _enforce_pinned_kinds(kind: str, text: str) -> str:
+    """The pinned reminder rule, enforced over the LLM's own labels.
+
+    `_kind_of` (the deterministic reading) already flips remind + clock-time to
+    the calendar — but on the deep path the LLM's kind label used to win
+    unchecked, so "create a birthday wish reminder for tomorrow at 10 AM"
+    landed as a todo, and generate's event-kind retry (which keys off
+    kind == "event") never fired. Cycle 1 of the dataset loop measured this as
+    the top event+task failure mode: the event half wasn't dropped, it was
+    mis-kinded. Same rule, both paths — no new convention."""
+    if kind == "task" and _REMINDISH_RE.search(text) and _CLOCKISH_RE.search(text):
+        return "event"
+    return kind
+
 
 def _kind_of(text: str) -> str:
     t = text.strip()
@@ -210,6 +229,7 @@ def _llm_segments(state: EngineState, cfg) -> "list[Item] | None":
              for d in raw_items if isinstance(d, dict)]
     parts = [(k if k in ("event", "task", "review") else _kind_of(t), t)
              for k, t in parts if t]
+    parts = [(_enforce_pinned_kinds(k, t), t) for k, t in parts]
     # An enumeration HEADER ("add tasks", "two tasks due tomorrow") is not a
     # request — it announces the list. Kept as an item it parses to unknown
     # or a phantom row (run 11: one header ate a real task, another became a
