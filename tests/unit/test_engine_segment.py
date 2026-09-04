@@ -172,7 +172,9 @@ def test_a_timed_reminder_mislabelled_task_by_the_llm_becomes_an_event(cfg, monk
               "wish reminder for tomorrow at 10 AM", cfg)
     kinds = [it.kind for it in st.items]
     assert kinds[1] == "event"     # clock time ⇒ calendar, whatever the label said
-    assert kinds[0] == "task"      # date-only is not flipped — the rule is clock-gated
+    # cycle 2 (Gil, 2026-09-04) extended the convention: a date-only reminder
+    # ABOUT an occasion ("for my meeting today") is also a calendar entry.
+    assert kinds[0] == "event"
 
 
 def test_enforce_pinned_kinds_is_narrow():
@@ -183,3 +185,29 @@ def test_enforce_pinned_kinds_is_narrow():
     assert f("task", "add milk to the grocery list at 4pm") == "task"   # no remind wording
     assert f("event", "gym at 7") == "event"                            # never flips away from event
     assert f("review", "remind me what is at 4pm") == "review"          # only task labels corrected
+
+
+# --- cycle 2: a dated occasion reminder is a calendar entry ----------------
+
+def test_a_dated_occasion_reminder_becomes_an_event(cfg, monkeypatch):
+    """Cycle 2 (product convention, Gil 2026-09-04): a reminder ABOUT an
+    occasion — meeting, party, get-together — with a date is a calendar entry
+    even without a clock time. The errand form ("remind me to <verb>") keeps
+    cycle 1's clock gate."""
+    monkeypatch.setattr(engine_llm, "call_json", lambda *a, **k: ({"items": [
+        {"kind": "task", "text": "set a reminder for my meeting today"},
+        {"kind": "task", "text": "remind me of my meeting tomorrow"},
+    ]}, 5))
+    st = _seg("set a reminder for my meeting today and remind me of my meeting "
+              "tomorrow", cfg)
+    assert [it.kind for it in st.items] == ["event", "event"]
+
+
+def test_the_errand_form_keeps_the_clock_gate():
+    f = segment._enforce_pinned_kinds
+    assert f("task", "remind me to buy a present for the wedding on Sunday") == "task"  # to-verb errand
+    assert f("task", "set a reminder for my meeting today") == "event"       # occasion + date
+    assert f("task", "remind me of my meeting tomorrow") == "event"
+    assert f("task", "reminder for a meeting I have on Tuesday") == "event"
+    assert f("task", "set a reminder for my meeting") == "task"              # occasion, no date
+    assert f("task", "remind me about the thing tomorrow") == "task"         # date, no occasion-noun

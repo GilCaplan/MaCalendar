@@ -54,18 +54,45 @@ _CLOCKISH_RE = re.compile(
 # reminder for tomorrow at 10 AM" carries no "remind me to").
 _REMINDISH_RE = re.compile(r"\bremind(?:er)?s?\b", re.I)
 
+# The "remind me to <verb> …" errand form — stays a task unless clock-timed.
+_REMIND_TO_VERB_RE = re.compile(r"\bremind\s+\w+\s+to\b", re.I)
+
+# An occasion someone attends (not an errand someone does) …
+_OCCASION_RE = re.compile(
+    r"\b(meeting|appointment|party|get-?together|dinner|lunch|brunch|breakfast|"
+    r"birthday|anniversary|wedding|funeral|concert|recital|interview|class|"
+    r"lesson|shiur|conference|ceremony|event)\b", re.I)
+
+# … said with a date reference (a weekday, a relative day, an ordinal, a month).
+_DATED_RE = re.compile(
+    r"\b(today|tomorrow|tonight)\b|"
+    r"\b(next|this|on)\s+(week|month|monday|tuesday|wednesday|thursday|friday|"
+    r"saturday|sunday|weekend)\b|"
+    r"\bthe\s+\d{1,2}(st|nd|rd|th)?\b|"
+    r"\b(january|february|march|april|may|june|july|august|september|october|"
+    r"november|december)\b", re.I)
+
 
 def _enforce_pinned_kinds(kind: str, text: str) -> str:
-    """The pinned reminder rule, enforced over the LLM's own labels.
+    """The pinned reminder rules, enforced over the LLM's own labels.
 
-    `_kind_of` (the deterministic reading) already flips remind + clock-time to
-    the calendar — but on the deep path the LLM's kind label used to win
-    unchecked, so "create a birthday wish reminder for tomorrow at 10 AM"
-    landed as a todo, and generate's event-kind retry (which keys off
-    kind == "event") never fired. Cycle 1 of the dataset loop measured this as
-    the top event+task failure mode: the event half wasn't dropped, it was
-    mis-kinded. Same rule, both paths — no new convention."""
-    if kind == "task" and _REMINDISH_RE.search(text) and _CLOCKISH_RE.search(text):
+    Cycle 1 (dataset loop): `_kind_of` flips remind + clock-time to the
+    calendar, but on the deep path the LLM's kind label won unchecked — so
+    "create a birthday wish reminder for tomorrow at 10 AM" landed as a todo
+    and generate's event-kind retry (which keys off kind == "event") never
+    fired. The event half of a compound was mis-kinded, not dropped.
+
+    Cycle 2 (product convention, Gil 2026-09-04): a reminder ABOUT an occasion
+    with a date is a calendar entry even without a clock time — "set a
+    reminder for my meeting today", "remind me of my meeting tomorrow" — while
+    the errand form "remind me to <verb> …" stays a task unless clock-timed
+    (cycle 1's rule)."""
+    if kind != "task" or not _REMINDISH_RE.search(text):
+        return kind
+    if _CLOCKISH_RE.search(text):
+        return "event"
+    if (not _REMIND_TO_VERB_RE.search(text)
+            and _OCCASION_RE.search(text) and _DATED_RE.search(text)):
         return "event"
     return kind
 

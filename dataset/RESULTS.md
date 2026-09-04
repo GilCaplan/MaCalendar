@@ -4,6 +4,33 @@ Every meaningful run, newest first. **Always: metric + slice + the commit that
 produced it.** Baselines are replayed, not frozen — cite the score report and
 md5, not "the dataset".
 
+## Cycle 2 — the date-only occasion reminder (2026-09-04, base @ e956763)
+
+**Reading (from cycle-1-fix failures):** 6 of 8 listed event+event failures and
+several event+task ones hinge on one form — a reminder **about/of/for an
+occasion-noun with a date but no clock time** ("set a reminder for my meeting
+today", "remind me of my meeting tomorrow", "the get-together on Sunday").
+Product convention decided by Gil (2026-09-04): **occasion-nouns → event** —
+the about/of/for-noun form with any date reference becomes a calendar event;
+"remind me to \<verb\> …" stays a task (clock time still flips it, per cycle 1).
+Also flagged, not chased this cycle: the deep path *invented* a full event
+("New Event", conference room, 10:00) from garbled text — an invention/precision
+failure the count metric barely sees; and task+task's remaining failures are
+mostly capability/convention gaps ("create a new list", contentless "give an
+entry to this list") — low clean upside.
+
+**Hypothesis (cycle 2):** extending segment's `_enforce_pinned_kinds` — flip an
+LLM "task" label to "event" when the text is remind-ish, NOT the "remind me to
+\<verb\>" form, and has an occasion-noun plus a date reference — will fix ~3 of
+12 event+event failures and ~1–2 event+task ones. **Expected:** event+event
+56% → ~63–67%, event+task 41% → ~44–46%, overall +1.5–2 pt (→ ~77.5–78%);
+task+task flat; simple/medium flat-to-slightly-up (single date-only occasion
+reminders also flip, and their provenance is calendar). Watch for: a
+wanted-task row flipping to event (over-reach of the occasion list), and
+invented default times on the new events.
+
+*(actual vs. expected: to be filled after the rerun)*
+
 ## Cycle 1 — dev-fast(250) baseline + hypothesis (2026-09-04, code @ 2588612)
 
 **Measurement** (metric: count-correctness; slice: dev-fast ranks 1–250;
