@@ -128,8 +128,15 @@ def check_llm() -> Check:
             pulled = any(n.startswith(want.split(":")[0]) for n in names)
             c.add(True, f"ollama reachable at {cfg.ollama.base_url}")
             c.add(pulled, f"model {want} {'pulled' if pulled else 'NOT pulled'}")
+            if pulled:
+                # listed != working — confirm it actually generates a token.
+                g = requests.post(f"{cfg.ollama.base_url}/api/generate",
+                                  json={"model": want, "prompt": "hi", "stream": False,
+                                        "options": {"num_predict": 1}}, timeout=30)
+                c.add(g.ok and bool(g.json().get("response") is not None),
+                      "model generates (a real one-token completion)")
         except Exception as e:
-            c.add(False, f"ollama unreachable at {cfg.ollama.base_url} — {e}")
+            c.add(False, f"ollama unreachable/not generating at {cfg.ollama.base_url} — {e}")
     else:
         key = getattr(getattr(cfg, engine, object()), "api_key", "")
         c.add(bool(key), f"{engine} api key {'present' if key else 'MISSING'}")
@@ -199,8 +206,10 @@ def check_engine(deep: bool = False) -> Check:
                          {"transcript": "what do I have today", "source": "test"}, timeout=60)
             got_brain = r.get("brain")
             trace_stages = {s.get("stage") for s in r.get("trace", [])}
-            c.add(got_brain == BRAIN_VERSION, f"live path answers, tagged brain={got_brain}")
+            c.add(got_brain == BRAIN_VERSION, f"live FAST path answers, tagged brain={got_brain}")
             c.add(bool(trace_stages), f"trace produced ({len(trace_stages)} stages: {', '.join(sorted(trace_stages))})")
+            c.info("live probe exercises the fast path only; deep-path stages "
+                   "(segment/decompose/LLM/crosscheck) are covered by --deep / engine_stage_check")
         except Exception as e:
             c.add(False, f"live engine probe failed — {e}")
     else:
