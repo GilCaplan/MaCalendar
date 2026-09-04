@@ -278,3 +278,45 @@ def test_a_task_kind_item_never_parses_to_nothing(monkeypatch, cfg):
     generate.run(st, cfg)
     assert st.items[0].action == "create_todo"
     assert st.items[0].intent.titles == ["submit the Haxaga grades"]
+
+
+def test_an_event_kind_item_gets_a_kind_primed_retry(monkeypatch, cfg):
+    """The missing-event signature: segmentation says event, the parse says
+    todo, and the event half used to die silently — tasks had a fallback,
+    events didn't."""
+    from assistant.engine.state import EngineState, Item
+    parser = MagicMock()
+    parser.parse.side_effect = [
+        [("create_todo", SimpleNamespace(title="send calendar", titles=["send calendar"]))],
+        [("create_event", SimpleNamespace(title="Brunch with James and Alice",
+                                          date="2026-09-08", start_time="11:00",
+                                          end_time="12:00"))],
+    ]
+    parser.last_llm_ms = 1
+    parser.last_examples_used = 0
+    parser.last_raw_response = ""
+    monkeypatch.setattr(generate, "_get_parser", lambda c: parser)
+    monkeypatch.setattr(generate, "_get_rule_parser", lambda: None)
+    st = EngineState(raw_text="x", text="x")
+    st.items = [Item(id="item_1", kind="event",
+                     text="send a calendar invite to James and Alice for brunch at 11 am")]
+    generate.run(st, cfg)
+    assert st.items[0].action == "create_event"
+    assert parser.parse.call_args_list[1][0][0].startswith("set an event: ")
+    assert "event_kind_retry" in [f.rule for f in st.fixes]
+
+
+def test_a_confident_event_parse_is_not_retried(monkeypatch, cfg):
+    from assistant.engine.state import EngineState, Item
+    parser = MagicMock()
+    parser.parse.return_value = [("create_event", SimpleNamespace(
+        title="gym", date="2026-09-08", start_time="07:00", end_time="08:00"))]
+    parser.last_llm_ms = 1
+    parser.last_examples_used = 0
+    parser.last_raw_response = ""
+    monkeypatch.setattr(generate, "_get_parser", lambda c: parser)
+    monkeypatch.setattr(generate, "_get_rule_parser", lambda: None)
+    st = EngineState(raw_text="x", text="x")
+    st.items = [Item(id="item_1", kind="event", text="gym tuesday at 7am")]
+    generate.run(st, cfg)
+    assert parser.parse.call_count == 1

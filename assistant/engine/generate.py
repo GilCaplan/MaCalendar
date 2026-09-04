@@ -192,6 +192,23 @@ def run(state: EngineState, cfg) -> EngineState:
                 f"Sorry, I couldn't read this part: “{item.text[:60]}”.")
             out.append(item)
             continue
+        if item.kind == "event" and got is not None and \
+                not any(("event" in n or n in ("clarify", "query_schedule"))
+                        for n, _ in got if n != "unknown"):
+            # Segmentation judged these words an EVENT; a parse that yields
+            # only todos or unknowns contradicts that judgment. Tasks have a
+            # fallback — events silently died instead (the missing-event
+            # signature: 72% of event+task failures). One retry, restating
+            # segment's own judgment in the words.
+            try:
+                retried = _get_parser(cfg).parse(f"set an event: {item.text}")
+                _llm_trace(state, _get_parser(cfg), cfg, f"Kind retry {item.id}")
+            except Exception:
+                retried = None
+            if retried and any("event" in n for n, _ in retried if n != "unknown"):
+                state.add_fix("generate", "event_kind_retry", "", item.text[:40],
+                              note="the parse contradicted the item's event kind")
+                got = retried
         if item.kind == "task" and (not got or all(n == "unknown" for n, _ in got)):
             # Segmentation already judged these words a to-do; a parse that
             # comes back empty for them is the model failing the words, not

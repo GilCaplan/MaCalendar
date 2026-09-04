@@ -42,23 +42,23 @@ def _task_item(id, title, text=""):
 
 def test_all_asks_covered_means_no_findings(cfg, monkeypatch):
     monkeypatch.setattr(engine_llm, "call_json", lambda *a, **k: ({"asks": [
-        {"kind": "event", "words": "gym tomorrow at 7am"},
+        {"kind": "event", "words": "gym on tuesday at 7am"},
         {"kind": "task", "words": "buy milk"},
     ]}, 4))
     st = _state_with([_event_item("item_1", "gym"),
                       _task_item("item_2", "buy milk")],
-                     text="book gym tomorrow at 7am and remind me to buy milk")
+                     text="book gym on tuesday at 7am and remind me to buy milk")
     crosscheck.run(st, cfg)
     assert st.findings == []
 
 
 def test_a_missing_ask_is_found_and_blamed_on_segment(cfg, monkeypatch):
     monkeypatch.setattr(engine_llm, "call_json", lambda *a, **k: ({"asks": [
-        {"kind": "event", "words": "gym tomorrow at 7am"},
+        {"kind": "event", "words": "gym on tuesday at 7am"},
         {"kind": "task", "words": "buy milk"},
     ]}, 4))
     st = _state_with([_event_item("item_1", "gym")],
-                     text="book gym tomorrow at 7am and remind me to buy milk")
+                     text="book gym on tuesday at 7am and remind me to buy milk")
     crosscheck.run(st, cfg)
     assert [f.type for f in st.findings] == ["missing"]
     assert st.findings[0].blamed_stage == "segment"
@@ -102,7 +102,7 @@ def test_loop_back_reruns_segment_with_the_mistake(cfg, monkeypatch):
     """First pass merges two asks into one item; the cross-check notices the
     missing task; the re-run (with the mistake in the prompt) splits properly
     and the second check is clean."""
-    text = "book gym tomorrow at 7am and remind me to buy milk"
+    text = "book gym on tuesday at 7am and remind me to buy milk"
 
     calls = {"n": 0}
 
@@ -111,13 +111,13 @@ def test_loop_back_reruns_segment_with_the_mistake(cfg, monkeypatch):
         if "split ONE voice command" in system:      # segment
             if "do not repeat them" in system:       # the retry, mistake attached
                 return {"items": [
-                    {"kind": "event", "text": "book gym tomorrow at 7am"},
+                    {"kind": "event", "text": "book gym on tuesday at 7am"},
                     {"kind": "task", "text": "remind me to buy milk"},
                 ]}, 2
             return {"items": [{"kind": "event", "text": text}]}, 2
         # extraction: always the true two asks
         return {"asks": [
-            {"kind": "event", "words": "gym tomorrow at 7am"},
+            {"kind": "event", "words": "gym on tuesday at 7am"},
             {"kind": "task", "words": "buy milk"},
         ]}, 2
 

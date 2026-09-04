@@ -43,11 +43,21 @@ _TASK_RE = re.compile(
     r"\b(?:to-?do list|task list)\b", re.I)
 
 
+# A clock time inside a "remind" phrasing flips it to the calendar: the
+# product rule (pinned in the corpus) is "remind me to call Ravid" = task,
+# "remind me about the dentist tomorrow at 9 am" = event.
+_CLOCKISH_RE = re.compile(
+    r"\b\d{1,2}(:\d{2})?\s*(am|pm|a\.m\.|p\.m\.)\b|\b\d{1,2}:\d{2}\b|\bat\s+\d{1,2}\b|"
+    r"\b(noon|midnight|tonight|morning|evening|afternoon)\b", re.I)
+
+
 def _kind_of(text: str) -> str:
     t = text.strip()
     if _REVIEW_RE.search(t):
         return "review"
     if _TASK_RE.search(t):
+        if re.search(r"\bremind", t, re.I) and _CLOCKISH_RE.search(t):
+            return "event"
         return "task"
     return "event"
 

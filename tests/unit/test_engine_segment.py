@@ -143,3 +143,13 @@ def test_a_schedule_only_fragment_is_dropped(cfg, monkeypatch):
     ]}, 4))
     st = _seg("two tasks due tomorrow: buy groceries and return the library book", cfg)
     assert len(st.items) == 2
+
+
+def test_a_timed_reminder_is_an_event(cfg):
+    st = _seg("remind me about the dentist tomorrow at 9 am", cfg)
+    assert st.items[0].kind == "event"
+
+
+def test_an_untimed_reminder_stays_a_task(cfg):
+    st = _seg("remind me to call Ravid", cfg)
+    assert st.items[0].kind == "task"

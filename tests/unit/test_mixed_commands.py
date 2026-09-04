@@ -42,7 +42,7 @@ def _say(client, text):
 
 
 def test_an_event_and_a_task_in_one_sentence_make_both(client):
-    body, actions = _say(client, "book gym tomorrow at 7am and remind me to buy milk")
+    body, actions = _say(client, "book gym on tuesday at 7am and remind me to buy milk")
     assert actions == ["create_event", "create_todo"], actions
     assert "gym" in body["message"].lower() and "milk" in body["message"].lower(), (
         "both records should be named in the reply")
@@ -54,13 +54,13 @@ def test_a_mixed_command_is_answered_by_the_rules_alone(client):
     An event and a task are different actions with different slots, so both fit
     in one pass. Two events would not — see below.
     """
-    body, _ = _say(client, "book gym tomorrow at 7am and remind me to buy milk")
+    body, _ = _say(client, "book gym on tuesday at 7am and remind me to buy milk")
     assert body["parse"] == "fast", f"expected the fast track, got {body['parse']}"
 
 
 def test_a_mixed_command_asks_the_client_to_refresh_both_surfaces(client):
     """A calendar that redrew and a task list that did not would be half-right."""
-    body, _ = _say(client, "book gym tomorrow at 7am and remind me to buy milk")
+    body, _ = _say(client, "book gym on tuesday at 7am and remind me to buy milk")
     assert body["refresh"] == "both", body["refresh"]
 
 
@@ -83,6 +83,6 @@ def test_every_record_from_one_sentence_is_written(client, tmp_path):
     db = get_db()
     before_ev = len(db.get_events_for_month(2026, 9))
     before_td = len(db.get_todos())
-    _say(client, "book gym tomorrow at 7am and remind me to buy milk")
+    _say(client, "book gym on tuesday at 7am and remind me to buy milk")
     assert len(db.get_events_for_month(2026, 9)) > before_ev, "the event was not written"
     assert len(db.get_todos()) > before_td, "the task was not written"
