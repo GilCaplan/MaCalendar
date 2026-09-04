@@ -342,3 +342,25 @@ result says the REAL history specifically may be worth k=4. Queued: the
 same A/B on the engine (`--memory --memory-k {0,4}` corpus runs) before
 touching the default — the finding transfers only if the engine's LLM path
 benefits the way the old one did.
+
+### Runs 12–13 — the engine's memory A/B: personalisation does NOT transfer (2026-09-04)
+
+Run 12 (k=0, with round 4's header fix): **95%** — same five failures as
+run 11; the header fix's real mechanisms turned out to live elsewhere
+(an unknown-parse on a bare task fragment, and a schedule-only "due
+tomorrow" part), both fixed as round 5 and pinned by tests, to be
+measured in the next run.
+
+Run 13 (k=4 against a copy of the real history): **80%** — fixed 0,
+broke 14 (recall 96%→78%, p50 5.7s→8.6s). The old brain gains +3 from
+the same memory (its A-sweep, same day); the engine LOSES 15. The
+mechanism fits the architecture change: the engine prompts the LLM
+PER ITEM with short fragment texts, and whole-command multi-action
+examples retrieved for a fragment teach it the wrong output shape —
+retrieval noise the old whole-transcript prompting never saw. So
+`nlu.memory_examples: 0` is now EVIDENCE-BACKED for the engine, not
+inherited; if personalisation returns it must be per-item-shaped
+(retrieve by item text, reformat examples as single-item parses) — a
+designed experiment, not a default. This also retroactively explains
+run 9 (98%→run 7's number) vs run 12: the engine was never getting the
+old brain's +3, and doesn't need it to beat the old brain's live 92/95.
