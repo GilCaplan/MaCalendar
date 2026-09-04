@@ -265,16 +265,28 @@ def test_move_time_fill_is_minute_aware(cfg):
     assert it.intent.new_start_time == "09:00"
 
 
-def test_move_time_fill_refuses_ambiguity(cfg):
-    it = _item("update_event", _upd_intent(match_start_time="13:00"))
-    st = _state("move my 1pm meeting to 3pm or maybe 5pm", [it])
+def test_move_time_fill_reads_from_to_over_the_model(cfg):
+    """Run 10: the parser filed "from 9:30" as the DESTINATION. The explicit
+    from/to words override whatever the model filled, both sides."""
+    it = _item("update_event", _upd_intent(new_date="2026-09-09",
+                                           new_start_time="09:30"))
+    st = _state("meeting with Guri moved from 9:30 to 9 on wednesday", [it])
     validate.run_objects(st, cfg)
-    assert it.intent.new_start_time is None
+    assert it.intent.match_start_time == "09:30"
+    assert it.intent.new_start_time == "09:00"
 
 
-def test_move_time_fill_never_overwrites(cfg):
+def test_move_time_fill_to_phrase_beats_a_wrong_fill(cfg):
     it = _item("update_event", _upd_intent(match_start_time="13:00",
                                            new_start_time="16:00"))
     st = _state("move my 1pm meeting to 3pm", [it])
     validate.run_objects(st, cfg)
-    assert it.intent.new_start_time == "16:00"
+    assert it.intent.new_start_time == "15:00"   # the spoken "to 3pm" wins
+
+
+def test_move_time_fill_sets_the_match_from_the_other_time(cfg):
+    it = _item("update_event", _upd_intent())
+    st = _state("move my 1pm meeting tomorrow to 3pm", [it])
+    validate.run_objects(st, cfg)
+    assert it.intent.match_start_time == "13:00"
+    assert it.intent.new_start_time == "15:00"

@@ -616,43 +616,67 @@ def _rule_due_date_pin(state, intent, rel, recur, td_idx, n_todos) -> None:
 
 
 def _rule_move_time_fill(state, intent, transcript) -> None:
-    """"move my 1pm meeting tomorrow to 3pm" once "updated successfully" while
-    changing nothing — the model filed 1pm as the match and dropped the 3pm.
-    When an update matches BY time, names exactly one other spoken time, and
-    carries no new time, that other time is what the speaker was moving TO."""
+    """"moved from 9:30 to 9" once became new_start_time=09:30 — the origin
+    filed as the destination — and "move my 1pm meeting to 3pm" updated
+    nothing. The words "from X" and "to Y" are deterministic: X is which
+    event is meant, Y is where it goes, and an explicit reading beats
+    whatever the model filed (same doctrine as relative_date_pin)."""
+    tl = transcript.lower().replace(".", ":")
+    _T = r"(\d{1,2}(?::\d{2})?)\s*(am|pm|a:m|p:m)?"
+
+    def _resolve(num: str, ap: str, prefer_pm: "bool | None") -> str:
+        h, mm = (num.split(":") + ["00"])[:2]
+        h = int(h)
+        ap = (ap or "").replace(":", "")
+        if ap == "pm" and h < 12:
+            h += 12
+        elif ap == "am" and h == 12:
+            h = 0
+        elif not ap and 1 <= h <= 11 and prefer_pm:
+            h += 12
+        return f"{h:02d}:{mm}"
+
+    m = re.search(rf"\bfrom\s+{_T}\s+to\s+{_T}\b", tl)
+    if m:
+        src_pm = (m.group(2) or "").startswith("p") or None
+        src = _resolve(m.group(1), m.group(2), None)
+        dst = _resolve(m.group(3), m.group(4),
+                       prefer_pm=int(str(src)[:2]) >= 12 if src_pm is None else src_pm)
+        changed = []
+        if getattr(intent, "match_start_time", None) != src:
+            intent.match_start_time = src
+            changed.append(f"match {src}")
+        if getattr(intent, "new_start_time", None) != dst:
+            intent.new_start_time = dst
+            changed.append(f"new {dst}")
+        if changed:
+            state.add_fix("validate", "move_time_fill", "", " ".join(changed),
+                          note="“from X to Y” says which event and where it goes")
+        return
+
+    m = re.search(rf"\bto\s+{_T}\b", tl)
+    if not m:
+        return
+    # A destination without a "from": the OTHER spoken time (if exactly one)
+    # is which event is meant.
+    dst_raw = _resolve(m.group(1), m.group(2), None)
     ms = getattr(intent, "match_start_time", None)
-    if not ms or getattr(intent, "new_start_time", None):
-        return
-
-    def _key(t):
-        try:
-            h, mm = int(str(t)[:2]), int(str(t)[3:5])
-        except (ValueError, TypeError):
-            return None
-        return (h % 12, mm)              # 03:00 and 15:00 are one spoken "3";
-                                         # 9:30 and 9:00 are NOT one time
-
-    mkey = _key(ms)
-    if mkey is None:
-        return
-    others = {k for k in (_key(t) for t in spoken_times(transcript))
-              if k is not None and k != mkey}
-    # Exactly one distinct other spoken time means there is no ambiguity
-    # about the destination.
-    if len(others) != 1:
-        return
-    okey = others.pop()
-    cands = sorted(t for t in spoken_times(transcript) if _key(t) == okey)
-    try:
-        match_is_pm = int(str(ms)[:2]) >= 12
-    except ValueError:
-        return
-    # Prefer the reading in the same half of day as the matched event —
-    # moving a 1pm meeting "to 3" means 15:00, not 03:00.
-    pick = next((t for t in cands if (int(t[:2]) >= 12) == match_is_pm), cands[0])
-    intent.new_start_time = pick
-    state.add_fix("validate", "move_time_fill", "", pick,
-                  note=f"the other spoken time is where the {ms} event moves to")
+    prefer_pm = int(str(ms)[:2]) >= 12 if ms else None
+    others = {t for t in spoken_times(transcript)
+              if (int(t[:2]) % 12, t[3:5]) != (int(dst_raw[:2]) % 12, dst_raw[3:5])}
+    other_keys = {(int(t[:2]) % 12, t[3:5]) for t in others}
+    if not ms and len(other_keys) == 1:
+        k = other_keys.pop()
+        cands = sorted(t for t in others if (int(t[:2]) % 12, t[3:5]) == k)
+        intent.match_start_time = cands[-1] if len(cands) > 1 else cands[0]
+        ms = intent.match_start_time
+        prefer_pm = int(ms[:2]) >= 12
+    dst = _resolve(m.group(1), m.group(2), prefer_pm)
+    if getattr(intent, "new_start_time", None) != dst:
+        old = getattr(intent, "new_start_time", None)
+        intent.new_start_time = dst
+        state.add_fix("validate", "move_time_fill", str(old or ""), dst,
+                      note="“to X” is where it moves")
 
 
 def _rule_cadence_round_and_announce(state, tl) -> None:
