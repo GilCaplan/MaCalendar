@@ -44,6 +44,11 @@ from assistant.exceptions import AssistantError, TargetNotFound
 
 logger = logging.getLogger(__name__)
 
+
+def _brain_version() -> str:
+    from assistant.trace import BRAIN_VERSION
+    return BRAIN_VERSION
+
 # Step 0, half one: one command at a time. Flask serves requests on threads,
 # and two commands interleaving would race the anaphora context ("the one I
 # just made") and the per-run trace. Waiting here is the intake queue — FIFO,
@@ -223,6 +228,7 @@ def _run_locked(text, trace, source, current_view, trace_run,
         "corrections": state.corrections,
         "trace": trace.to_list(),
         "uncertain_words": _transcript.uncertain_words(state.text),
+        "brain": _brain_version(),
     }
     if state.memory_id is not None:
         resp["memory_id"] = state.memory_id
@@ -668,6 +674,7 @@ def _publish(state: EngineState, resp: dict, trace_run: "str | None") -> None:
             "actions": resp["actions"],
             "corrections": state.corrections,
             "memory_id": state.memory_id,
+            "brain": _brain_version(),
         }
         if trace_run:
             trace_bus.publish_result(trace_run, payload)

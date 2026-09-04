@@ -13,6 +13,31 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+# The brain that produced a trace, and the shape its chain of thought reads in.
+# ONE source of truth, imported by the engine (which stamps BRAIN_VERSION onto
+# every trace and response), by the thinking panel (which renders by it), and
+# by the explorer diagram's claim-check. Bump this when the pipeline's shape
+# changes so the panel can render an old trace in its old format and a new one
+# in the new — the version is the key the panel matches its output format to.
+BRAIN_VERSION = "engine-v2"
+
+# Per-version display spec: the ordered chain of thought the panel should show
+# for that brain, as (stage, short label) pairs matching the explorer diagram.
+# A brain version the panel does not know falls back to raw stage titles.
+CHAINS = {
+    "engine-v2": [
+        ("vocab",    "fix words"),
+        ("rule",     "rules first"),
+        ("rule",     "split \u00b7 split again"),
+        ("validate", "repair \u00b7 rules"),
+        ("llm",      "make each item"),
+        ("execute",  "write \u00b7 label"),
+        ("verify",   "compare"),
+        ("done",     "done"),
+    ],
+}
+
+
 # Stage names (stable — the iOS timeline keys icons off these)
 STT = "stt"
 VOCAB = "vocab"

@@ -192,3 +192,23 @@ every command so it can finally be calibrated from outcomes (row 57).
 3. Run the audit; read the per-stage lines, not just the headline.
 4. If you believe the *contract* is wrong: that is a design change — take it
    to TASKS.md, don't slip it into a fix.
+
+## The thinking panel renders by brain version (merge requirement)
+
+`assistant/trace.py` holds `BRAIN_VERSION` (currently `"engine-v2"`) and
+`CHAINS` — the single source of truth for how a brain's chain of thought
+reads, as ordered `(stage, short-label)` pairs matching the explorer diagram.
+The engine stamps `BRAIN_VERSION` onto every response (`resp["brain"]`, which
+iOS reads) and every trace-bus payload (`result["brain"]`, which the HUD
+reads), and `thinking_panel._ResultCard`/`finish` stashes it as `self._brain`.
+
+**At merge, the panel must render the engine's chain input→output** using that
+key so the card reads as the diagram's flow (fix words → rules first → split ·
+split again → repair · rules → make each item → write · label → compare), not
+as raw internal step titles. The hooks are all in place; what remains is the
+visual pass in `thinking_panel.py` (and the iOS `ThinkingView`) that groups the
+live steps under the `CHAINS[brain]` scaffold and shows the version. Bump
+`BRAIN_VERSION` whenever the pipeline's shape changes so an old trace still
+renders in its old format. A future claim-check can assert the explorer
+diagram's step labels equal `CHAINS["engine-v2"]`, the same drift-guard the
+other artifact numbers get.

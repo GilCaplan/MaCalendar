@@ -131,6 +131,11 @@ def _kind_for(action_name: str) -> str:
     return "other"
 
 
+def _friendly(item_id: str) -> str:
+    """item_1 -> "part 1", item_1-2 -> "part 1.2" — legible in the trace chain."""
+    return "part " + item_id.replace("item_", "").replace("-", ".")
+
+
 def _llm_trace(state: EngineState, parser, cfg, title: str) -> None:
     from assistant.trace import LLM
     state.llm_ms += parser.last_llm_ms
@@ -154,12 +159,12 @@ def _parse_item(item: Item, state: EngineState, cfg) -> "list | None":
             if rr.confidence >= RULE_THRESHOLD and not rr.missing_slots:
                 if state.trace:
                     from assistant.trace import RULE
-                    state.trace.step(RULE, f"Rules read {item.id}",
+                    state.trace.step(RULE, f"Read {_friendly(item.id)}",
                                      f"{rr.confidence:.2f}: " + ", ".join(n for n, _ in rr.intents))
                 return rr.intents
             try:
                 got = parser.parse_with_context(item.text, rr)
-                _llm_trace(state, parser, cfg, f"LLM filled {item.id}")
+                _llm_trace(state, parser, cfg, f"Read {_friendly(item.id)}")
                 return got
             except Exception:
                 pass
@@ -168,7 +173,7 @@ def _parse_item(item: Item, state: EngineState, cfg) -> "list | None":
         except Exception:
             pass
     got = parser.parse(item.text)
-    _llm_trace(state, parser, cfg, f"LLM read {item.id}")
+    _llm_trace(state, parser, cfg, f"Read {_friendly(item.id)}")
     return got
 
 
@@ -202,7 +207,7 @@ def run(state: EngineState, cfg) -> EngineState:
             # segment's own judgment in the words.
             try:
                 retried = _get_parser(cfg).parse(f"set an event: {item.text}")
-                _llm_trace(state, _get_parser(cfg), cfg, f"Kind retry {item.id}")
+                _llm_trace(state, _get_parser(cfg), cfg, f"Re-read {_friendly(item.id)} as an event")
             except Exception:
                 retried = None
             if retried and any("event" in n for n, _ in retried if n != "unknown"):

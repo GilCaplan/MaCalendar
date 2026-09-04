@@ -320,3 +320,27 @@ def test_a_confident_event_parse_is_not_retried(monkeypatch, cfg):
     st.items = [Item(id="item_1", kind="event", text="gym tuesday at 7am")]
     generate.run(st, cfg)
     assert parser.parse.call_count == 1
+
+
+def test_the_brain_version_is_stamped_on_every_command(monkeypatch, cfg):
+    """The panel matches its chain-of-thought render format to this key, so it
+    must be present on both the response (iOS reads it) and the trace-bus
+    payload (the HUD reads it). Losing it silently would make the panel fall
+    back to a generic render."""
+    from assistant.trace import BRAIN_VERSION
+    rr = SimpleNamespace(confidence=0.97, missing_slots=[],
+                         intents=[("query_schedule", SimpleNamespace())])
+    rp = MagicMock(); rp.analyze.return_value = rr
+    monkeypatch.setattr(generate, "_get_rule_parser", lambda: rp)
+    _fake_registry(monkeypatch, {"query_schedule": ["clear"]})
+    out = engine.run_transcript("what do I have today", source="test")
+    assert out["brain"] == BRAIN_VERSION
+
+
+def test_the_diagram_chain_labels_exist_for_this_version():
+    """CHAINS is the single spec the panel and the explorer diagram share."""
+    from assistant.trace import BRAIN_VERSION, CHAINS
+    assert BRAIN_VERSION in CHAINS
+    stages = {s for s, _label in CHAINS[BRAIN_VERSION]}
+    from assistant.trace import VOCAB, RULE, VALIDATE, LLM, EXECUTE, VERIFY, DONE
+    assert stages <= {VOCAB, RULE, VALIDATE, LLM, EXECUTE, VERIFY, DONE}
