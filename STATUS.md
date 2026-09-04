@@ -3,17 +3,18 @@
 **One-screen reference. A fresh conversation reads this first, then CLAUDE.md.**
 Keep it current and short; details live in the files it points to.
 
-_Updated 2026-09-04._
+_Updated 2026-09-04 — engine live in production._
 
 ## The state
 
 - **The brain is being rebuilt** as `assistant/engine/` (8 stages, frozen
   contracts) on branch `engine-v2`. `DOCUMENTATION/ENGINE.md` is the contract
   reference.
-- **NOT yet cut over.** The live Mac/phone assistant still runs the OLD brain
-  from the `main` checkout. Cutover = merge `engine-v2` → `main`; in progress.
-- The old brain is archived at `retired/old-brain-v1/` (+ git tag
-  `pre-engine-v2`) for revert/compare.
+- **LIVE in production (cut over 2026-09-04, merge bce502e).** The engine is
+  the brain on `main`; smoke-verified (parse=fast, brain=engine-v2).
+- The old brain is archived at `retired/old-brain-v1/` (+ tag `pre-engine-v2`).
+  Rollback: `git reset --hard 4c61f82` (keeps the dataset work, drops the
+  engine) then relaunch.
 
 ## Primary evaluation
 
