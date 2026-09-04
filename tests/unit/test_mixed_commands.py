@@ -64,6 +64,18 @@ def test_a_mixed_command_asks_the_client_to_refresh_both_surfaces(client):
     assert body["refresh"] == "both", body["refresh"]
 
 
+import requests as _requests
+
+
+def _ollama_running() -> bool:
+    try:
+        return _requests.get("http://localhost:11434/api/tags", timeout=3).status_code == 200
+    except Exception:
+        return False
+
+
+@pytest.mark.skipif(not _ollama_running(),
+                    reason="needs Ollama — the deep-track LLM segmentation of a shopping list")
 def test_a_list_of_things_to_buy_makes_exactly_its_items(client):
     """"buy milk and buy bread" is two tasks — never one merged row, never an
     invented "buy groceries". The split is the engine's decompose stage now

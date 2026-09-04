@@ -24,7 +24,7 @@ import pytest
 
 import assistant.trace as trace
 
-ICONS_DIR = (pathlib.Path(__file__).resolve().parents[1]
+ICONS_DIR = (pathlib.Path(__file__).resolve().parents[2]
              / "assistant" / "calendar_ui" / "icons")
 
 # The stage constants the engine (and the old brain) can put on a trace.
