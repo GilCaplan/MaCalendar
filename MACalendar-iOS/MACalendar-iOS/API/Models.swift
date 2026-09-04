@@ -161,14 +161,20 @@ struct VoiceResponse: Codable {
     let memoryId: Int?               // row in the command memory (for feedback)
     let pendingId: Int?              // set when the command was queued (LLM offline/slow)
     let uncertainWords: [UncertainWord]?
+    // parse == "needs_edit": the host doubts these words and executed nothing —
+    // show the transcription editor and resubmit. Same list as uncertainWords,
+    // but its presence (with the parse value) is the signal to gate.
+    let needsEdit: [UncertainWord]?
+    let brain: String?               // assistant.trace.BRAIN_VERSION that answered
 
     enum CodingKeys: String, CodingKey {
-        case message, actions, refresh, parse, transcript, corrections, trace
+        case message, actions, refresh, parse, transcript, corrections, trace, brain
         case verifyToken = "verify_token"
         case originalTranscript = "original_transcript"
         case memoryId = "memory_id"
         case pendingId = "pending_id"
         case uncertainWords = "uncertain_words"
+        case needsEdit = "needs_edit"
     }
 }
 
@@ -306,6 +312,16 @@ struct VerifyResult: Codable {
     let parameters: [String: AnyCodable]? // major: corrected params
     let speech: String?         // TTS string for user
     let refresh: String?        // "events" | "todos" | ""
+    let revert: [RevertItem]?   // destructive: rows removed, re-POST to undo
+}
+
+/// One row a destructive background patch removed. `body` is exactly what
+/// POST /events / POST /todos accept, so reverting is a re-create (one tap).
+struct RevertItem: Codable, Identifiable {
+    var id = UUID()
+    let kind: String                 // "event" | "todo"
+    let body: [String: AnyCodable]
+    enum CodingKeys: String, CodingKey { case kind, body }
 }
 
 struct Holiday: Codable, Equatable, Identifiable {

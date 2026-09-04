@@ -297,6 +297,19 @@ class APIClient: ObservableObject {
         return try decode([Holiday].self, from: data)
     }
 
+    /// Undo a destructive background patch by re-creating what the host removed.
+    /// Each item's `body` is exactly what its create endpoint accepts, so this
+    /// is a plain re-POST — no special revert endpoint, no db bypass.
+    func revert(_ items: [RevertItem]) async {
+        burstRefresh(seconds: 10)
+        for item in items {
+            let path = item.kind == "event" ? "/events" : "/todos"
+            let body = item.body.mapValues { $0.value }
+            _ = try? await request(path, method: "POST", body: body)
+        }
+        requestRefresh()
+    }
+
     func createEvent(_ fields: [String: Any]) async throws -> Int {
         burstRefresh(seconds: 10)
         do {
@@ -659,12 +672,21 @@ class APIClient: ObservableObject {
         return list.examples
     }
 
-    func sendText(_ transcript: String) async throws -> VoiceResponse {
+    /// - Parameters:
+    ///   - editedFrom: the transcript the host doubted, when this is the second
+    ///     half of a needs_edit round-trip. Present ⇒ the host bypasses the gate
+    ///     for this resubmission and learns from the change (or the confirmation).
+    ///   - supportsEdit: this client can render the "edit the transcription"
+    ///     sheet, so the host may return a needs_edit response.
+    func sendText(_ transcript: String, editedFrom: String? = nil,
+                  supportsEdit: Bool = false) async throws -> VoiceResponse {
         // Identify the client. The server treats an unlabelled caller as a
         // test, so that a curl during development cannot masquerade as a
         // command you actually gave the phone.
-        let data = try await request("/voice/text", method: "POST",
-                                     body: ["transcript": transcript, "source": "ios"])
+        var body: [String: Any] = ["transcript": transcript, "source": "ios"]
+        if supportsEdit { body["supports_edit"] = true }
+        if let editedFrom { body["edited_from"] = editedFrom }
+        let data = try await request("/voice/text", method: "POST", body: body)
         return try decode(VoiceResponse.self, from: data)
     }
 
@@ -700,7 +722,7 @@ class APIClient: ObservableObject {
     /// Streaming variant of sendAudio: POST /voice/stream returns NDJSON —
     /// one {"type":"step",...} line per pipeline stage, then {"type":"result",...}.
     /// `onStep` fires on the main actor as each stage arrives.
-    func sendAudioStreaming(_ audioData: Data,
+    func sendAudioStreaming(_ audioData: Data, supportsEdit: Bool = false,
                             onStep: @escaping (TraceStep) -> Void) async throws -> VoiceResponse {
         guard !base.isEmpty, let url = URL(string: base + "/voice/stream") else {
             throw APIError.badURL
@@ -713,6 +735,13 @@ class APIClient: ObservableObject {
         let boundary = UUID().uuidString
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         var body = Data()
+        // Declare we can show the edit-transcription sheet, so the host may gate
+        // a doubtful transcript behind a needs_edit round-trip.
+        if supportsEdit {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"supports_edit\"\r\n\r\n".data(using: .utf8)!)
+            body.append("true\r\n".data(using: .utf8)!)
+        }
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"audio\"; filename=\"audio.wav\"\r\n".data(using: .utf8)!)
         body.append("Content-Type: audio/wav\r\n\r\n".data(using: .utf8)!)

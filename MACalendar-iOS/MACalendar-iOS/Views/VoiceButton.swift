@@ -22,6 +22,10 @@ struct VoiceButton: View {
     @State private var showThinking = false
     @State private var fixWord: String? = nil
     @State private var showFix = false
+    /// Set when the host returns needs_edit — drives the transcription editor.
+    @State private var editRequest: EditRequest?
+    /// Rows a destructive background self-check removed — drives the Revert banner.
+    @State private var pendingRevert: [RevertItem] = []
 
     enum Status { case idle, recording, review, thinking, speaking }
     /// Audio captured but not yet sent — the user can Redo / Add more / Send.
@@ -80,6 +84,13 @@ struct VoiceButton: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: canReopen)
+        .sheet(item: $editRequest) { req in
+            EditTranscriptionSheet(text: req.text, doubtful: req.doubtful) { corrected in
+                resubmitEdited(corrected, editedFrom: req.text)
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
     }
 
     private var micButton: some View {
@@ -142,6 +153,12 @@ struct VoiceButton: View {
                             finished = true
                         }
                     }
+                },
+                revertItems: pendingRevert,
+                onRevert: {
+                    let items = pendingRevert
+                    pendingRevert = []
+                    Task { await api.revert(items) }
                 }
             )
             .presentationDetents([.medium, .large])
@@ -291,7 +308,7 @@ struct VoiceButton: View {
                     // Always stream: the Mac reports each stage as it happens, so the
                     // calendar can refresh the moment an action executes (first version)
                     // and again when the self-check has finished (fixed version).
-                    let response = try await api.sendAudioStreaming(audioData) { step in
+                    let response = try await api.sendAudioStreaming(audioData, supportsEdit: true) { step in
                         if settings.showThinking {
                             if steps.count == 1, steps[0].title == "Sending" { steps = [] }
                             steps.append(step)
@@ -375,13 +392,26 @@ struct VoiceButton: View {
     }
 
     private func handleResponse(_ response: VoiceResponse) async {
-        api.burstRefresh()   // poll every second for a while so both devices settle together
         lastResponse = response
         if let t = response.trace, !t.isEmpty, steps.isEmpty || !settings.showThinking {
             steps = t
         }
         finished = true
         finishedAt = Date()
+
+        // The host doubts a few words and executed nothing — show the
+        // transcription editor and resubmit the corrected text. The edit is
+        // learned on the host, so the same mishearing won't ask again. Nothing
+        // ran, so skip the refresh/verify/speak below.
+        if response.parse == "needs_edit" {
+            showThinking = false
+            status = .idle
+            editRequest = EditRequest(text: response.transcript ?? "",
+                                      doubtful: response.needsEdit ?? response.uncertainWords ?? [])
+            return
+        }
+
+        api.burstRefresh()   // poll every second for a while so both devices settle together
         onRefresh?(response.refresh)
         onResponse?(response)
 
@@ -391,9 +421,11 @@ struct VoiceButton: View {
             api.pollVerify(token: token) { result in
                 await MainActor.run {
                     let speech = result.speech ?? ""
+                    let undone = result.revert ?? []
                     steps.append(TraceStep(stage: "verify", title: "Self-check",
                                            detail: speech.isEmpty ? "Corrected the \(result.severity ?? "") issue" : speech,
-                                           ms: 0, atMs: (steps.last?.atMs ?? 0), ok: true))
+                                           ms: 0, atMs: (steps.last?.atMs ?? 0), ok: undone.isEmpty))
+                    if !undone.isEmpty { pendingRevert = undone }   // offer one-tap revert
                     if let r = result.refresh, !r.isEmpty { onRefresh?(r) }
                     if !speech.isEmpty && settings.speakReplies { player.speak(speech, voiceIdentifier: settings.ttsVoice) }
                 }
@@ -409,6 +441,100 @@ struct VoiceButton: View {
             }
         }
         status = .idle
+    }
+
+    /// Second half of the needs_edit round-trip: send the corrected transcript
+    /// back as text (with `editedFrom` so the host bypasses the gate and learns
+    /// the fix), then run the normal response flow.
+    private func resubmitEdited(_ corrected: String, editedFrom: String) {
+        status = .thinking
+        finished = false
+        if settings.showThinking {
+            steps.append(TraceStep(stage: "vocab", title: "Using your edit",
+                                   detail: corrected, ms: 0,
+                                   atMs: steps.last?.atMs ?? 0, ok: true))
+            showThinking = true
+        }
+        Task {
+            do {
+                let r = try await api.sendText(corrected, editedFrom: editedFrom, supportsEdit: true)
+                await handleResponse(r)
+            } catch {
+                await MainActor.run {
+                    if settings.showThinking {
+                        steps.append(TraceStep(stage: "error", title: "Couldn't send the edit",
+                                               detail: error.localizedDescription, ms: 0,
+                                               atMs: steps.last?.atMs ?? 0, ok: false))
+                    }
+                    finished = true
+                    status = .idle
+                }
+            }
+        }
+    }
+}
+
+/// What the host doubted — drives the transcription editor sheet.
+struct EditRequest: Identifiable {
+    let id = UUID()
+    let text: String
+    let doubtful: [UncertainWord]
+}
+
+/// The "edit the transcription" sheet: shown when the host returns needs_edit.
+/// The user fixes any misheard words (or sends as-is) and the corrected text is
+/// resubmitted. Sending unchanged tells the host its guess was right — which is
+/// how a doubted word earns trust and stops being asked about.
+private struct EditTranscriptionSheet: View {
+    let text: String
+    let doubtful: [UncertainWord]
+    let onSubmit: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var edited: String
+    @FocusState private var focused: Bool
+
+    init(text: String, doubtful: [UncertainWord], onSubmit: @escaping (String) -> Void) {
+        self.text = text
+        self.doubtful = doubtful
+        self.onSubmit = onSubmit
+        _edited = State(initialValue: text)
+    }
+
+    var body: some View {
+        NavigationView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("A couple of words looked uncertain. Fix anything that's wrong, or send it as-is.")
+                    .font(.subheadline).foregroundColor(.secondary)
+                if !doubtful.isEmpty {
+                    Text("Unsure: " + doubtful.map { w in
+                        w.candidate.map { "\(w.heard) → \($0)?" } ?? w.heard
+                    }.joined(separator: ", "))
+                        .font(.caption).foregroundColor(.orange)
+                }
+                TextEditor(text: $edited)
+                    .frame(minHeight: 90)
+                    .padding(6)
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(10)
+                    .focused($focused)
+                    .autocorrectionDisabled()
+                Spacer()
+            }
+            .padding(20)
+            .navigationTitle("Check the transcription")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Send") {
+                        onSubmit(edited.trimmingCharacters(in: .whitespacesAndNewlines))
+                        dismiss()
+                    }
+                    .disabled(edited.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .onAppear { focused = true }
+        }
     }
 }
 
