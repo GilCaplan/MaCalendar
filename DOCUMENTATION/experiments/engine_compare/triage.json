@@ -27,5 +27,27 @@
     "set reminder for tomorrows meeting with {client name} and also add this one also.",
     "new scenario, time or calendar to new list and also please create a list of Due payment those who not received more then 10 Months."
   ],
-  "note": "old-system rows are behavior, not ground truth; each flip needs triage (old right / new right / both wrong) by a human or a judge model that is not the system under test"
+  "note": "old-system rows are behavior, not ground truth; each flip needs triage (old right / new right / both wrong) by a human or a judge model that is not the system under test",
+  "triage_2026-09-03": {
+    "method": "provenance intent + both systems' recorded actions_json + engine reply text; per the dataset owner's tip, do-nothing passes on query/remove rows checked against the intent field before counting as regressions",
+    "verdicts": {
+      "engine wrong (real, actionable)": [
+        "remove 'table' from furniture \u2014 remove-intent CREATED a task ('Added remove table from furniture')",
+        "calendar invite for brunch + also \u2014 the event half became a second task (kind confusion)",
+        "party saturday + Monday the 20th \u2014 second event dropped (under-split)",
+        "does my daughter have a recital? \u2014 query row; engine INVENTED a task from 'project one is due'",
+        "add 'christmas' to calendar \u2014 per-item ParseError every loop attempt (single-quoted title); also exposed duplicate apology messages, fixed same day"
+      ],
+      "ambiguous / junk rows (not counted as regressions)": [
+        "Mark reminder with these people\u2026 \u2014 'Mark' name-vs-verb; utterance genuinely odd",
+        "set reminder \u2026 {client name} and also add this one also \u2014 template placeholder row",
+        "new scenario, time or calendar to new list\u2026 \u2014 word salad"
+      ]
+    },
+    "themes_for_next_cycle": [
+      "remove/query intents must never yield a create (2 of 5 real regressions)",
+      "single-quoted tokens break intent parsing ('christmas')",
+      "event+task kind confusion on formal phrasings ('send a calendar invite')"
+    ]
+  }
 }

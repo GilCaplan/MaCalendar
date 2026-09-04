@@ -238,3 +238,27 @@ def test_the_wrapper_round_trips_through_segment(cfg):
     st = EngineState(raw_text=batch, text=batch)
     segment.run(st, cfg)
     assert [it.text for it in st.items] == ["gym tomorrow at 7am", "buy milk"]
+
+
+def test_repeated_attempt_messages_fold_into_one(monkeypatch):
+    """A loop-back that fails the same way each attempt must apologise once,
+    not once per re-entry (found live: three identical "couldn't read"s)."""
+    from assistant.exceptions import ParseError
+    monkeypatch.setattr(generate, "fast_propose", lambda state, cfg: False)
+
+    def failing_run(state, cfg):
+        state.messages.append("Sorry, I couldn't read this part: “x”.")
+        return state
+
+    monkeypatch.setattr(generate, "run", failing_run)
+    import assistant.engine.crosscheck as crosscheck
+
+    def always_missing(state, cfg):
+        from assistant.engine.state import CheckFinding
+        state.findings = [CheckFinding(type="missing", item_id=None,
+                                       detail="d", blamed_stage="segment")]
+        return state
+
+    monkeypatch.setattr(crosscheck, "run", always_missing)
+    out = engine.run_transcript("add christmas thing to calendar", source="test")
+    assert out["message"].count("couldn't read") == 1

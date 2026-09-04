@@ -193,7 +193,14 @@ def _run_locked(text, trace, source, current_view, trace_run,
         return _parse_error_response(state, cfg, e)
 
     # -- bookkeeping: reply, memory, logs, trace bus ------------------------
-    response_msg = " ".join(m for m in state.messages if m)
+    # A loop-back re-runs generate, and a per-item failure message from each
+    # attempt survives on the state — saying "I couldn't read this part"
+    # three times is one apology and two bugs. Consecutive duplicates fold.
+    deduped: list = []
+    for m in state.messages:
+        if m and (not deduped or m != deduped[-1]):
+            deduped.append(m)
+    response_msg = " ".join(deduped)
     action_names = [ex.action for ex in state.executed if ex.ok]
     logger.info("%s Response: %s | refresh=%s | parse=%s",
                 "🖥️" if source == "mac" else "📱",
