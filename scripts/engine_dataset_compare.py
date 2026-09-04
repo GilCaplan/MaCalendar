@@ -60,7 +60,14 @@ import time
 
 WORKTREE = pathlib.Path(__file__).resolve().parents[1]
 MAIN = pathlib.Path("/Users/USER/Desktop/Personal_Projects/MACalendar")
+# The dataset is first-class now: dataset/ in the tree (inputs committed,
+# baseline dbs gitignored+local). Falls back to the dataset owner's original
+# location in the main checkout until the merge migrates it (see dataset/DATASET.md).
+_LOCAL = WORKTREE / "dataset"
 EXP = MAIN / "DOCUMENTATION" / "experiments" / "memory_scaling"
+DATASET_INPUTS = _LOCAL / "inputs" if (_LOCAL / "inputs").exists() else EXP / "dataset"
+DATASET_FIXTURE = (_LOCAL / "inputs" / "hwu64_sample.json") if (_LOCAL / "inputs" / "hwu64_sample.json").exists() else EXP / "hwu64_sample.json"
+DATASET_BASELINE = _LOCAL / "baseline" if (_LOCAL / "baseline").exists() else EXP / "output"
 
 # --- isolate BEFORE importing anything from assistant ----------------------
 _TMP = tempfile.mkdtemp(prefix="engine_compare_")
@@ -139,8 +146,8 @@ def _stamp_ranks(pairs: list[tuple[str, int]]) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--source", type=pathlib.Path,
-                    default=EXP / "output" / "dummy_3000.db")
-    ap.add_argument("--fixture", type=pathlib.Path, default=EXP / "hwu64_sample.json")
+                    default=DATASET_BASELINE / "dummy_3000.db")
+    ap.add_argument("--fixture", type=pathlib.Path, default=DATASET_FIXTURE)
     ap.add_argument("--limit", type=int, default=150)
     ap.add_argument("--min-rank", type=int, default=0)
     ap.add_argument("--max-rank", type=int, default=0)

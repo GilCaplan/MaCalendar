@@ -1,9 +1,16 @@
 # Working on this project
 
-Short version of the things that are easy to get wrong here. The architecture
-lives in `DOCUMENTATION/SYSTEM.md` (and `SYSTEM_MAC.md` / `SYSTEM_IPHONE.md`);
-the engine's stage contracts live in `DOCUMENTATION/ENGINE.md`; this file is
-about the workflow.
+Short version of the things that are easy to get wrong here. **Read `STATUS.md`
+first** — it is the one-screen "where we are" and points everywhere else. The
+architecture lives in `DOCUMENTATION/SYSTEM.md`; the engine's stage contracts
+in `DOCUMENTATION/ENGINE.md`; the dataset and how we improve against it in
+`dataset/DATASET.md`; this file is the workflow.
+
+**Keep this file lean.** It is the always-loaded rulebook, not a changelog —
+every line earns its place by preventing a mistake that has or would happen.
+When you add a rule, cut or tighten an older one; when a rule stops applying
+(a retired feature), delete it. Detail belongs in the doc a rule points to,
+not here.
 
 ## The shape of it
 
@@ -144,28 +151,33 @@ thread. A test that builds the app wants routes, not models.
 
 ## Measuring a change to the assistant
 
-Do not judge an NLU change by trying a couple of phrasings. The harness runs a
-corpus of ~89 commands through the real path and reports recall, precision and
-accuracy by area and by parse path (`fast` / `deep`):
+**The verification dataset is the primary evaluation** — `dataset/DATASET.md`
+is the full reference (3000 real utterances, subsets, metrics, the recursive
+loop). Run the engine on a subset, compare to the ground truth, read which
+component failed, fix that one, rerun; small subset for big deltas, upsize to
+avoid overfitting:
 
-    python -m scripts.audit_assistant                 # full
-    python -m scripts.audit_assistant --limit 20      # smoke
-    python -m scripts.audit_assistant --area tasks
+    python -m scripts.engine_dataset_compare --max-rank 150   # dev-fast (~22 min)
+    python -m scripts.engine_dataset_compare --max-rank 600   # dev-full
+    python -m scripts.engine_dataset_compare --min-rank 601   # held-out (sealed)
 
-It writes `DOCUMENTATION/ASSISTANT_AUDIT.md` — overwritten every run, so
-conclusions go in `DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md`. That file also
-holds the engine's baseline: the retired brain's last numbers (run 7, 98%
-exact match), which is what a rebuilt stage has to beat. `--memory` replays
-against a *copy* of the real history, `--memory-k N` sets the retrieval count;
-run 7 measured no k=4 effect, so the engine defaults memory injection off.
+The loop protocol is `DOCUMENTATION/experiments/ITERATION_PROTOCOL.md`; results
+go in `dataset/RESULTS.md`.
 
-**Read the shape table with the sample size next to it.** Several rows are
-n=1, and a 0% there is one command, not a trend.
+**Always name the metric with the number.** "70→72" is meaningless in a vacuum;
+"count-correct 73.5%→75% on event+task" is a result. There are five metrics
+(count-correctness, missing-half, date-collapse, garbage-titles,
+parse-path/latency), each with slices — never report a score without saying
+which metric and which slice, in chat and in the md files alike.
 
-`scripts/weekly_review.py` reports real usage rather than the corpus, and is
-the honest instrument for "is it actually any good". It reports a **flag
-rate** and refuses to compute an accuracy below three approvals; it also
-drops verdicts that arrive in bursts (a backlog being cleared is not a
+The hand-written corpus (`scripts/audit_assistant.py` →
+`DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md`) is now only a **regression floor**:
+a fast smoke that nothing the old brain could do got worse. Not the primary
+number.
+
+`scripts/weekly_review.py` reports real usage — the honest instrument once the
+engine is live. It reports a **flag rate** and refuses an accuracy below three
+approvals; it drops verdicts arriving in bursts (a cleared backlog is not a
 judgement).
 
 ## Things that have bitten before
@@ -257,3 +269,9 @@ explainer pages.
 Commit messages explain what was wrong and how it was found, not just what
 changed. Branch rather than committing to `main`. `config.yaml` is gitignored;
 mirror any new setting into `config.example.yaml`.
+
+**Retiring a system version:** when a design is replaced, keep the old one in
+`retired/<version-name>/` — its distinctive files plus a `README` — and tag the
+last commit that ran it (`git tag <version-name>`), so it can be reverted or
+compared. The tag is the full-fidelity truth; the folder is the quick
+reference. Never just delete a superseded brain.

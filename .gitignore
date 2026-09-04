@@ -52,3 +52,6 @@ MACalendar.app/
 DOCUMENTATION/NLU_TRACKING.md
 DOCUMENTATION/SCENARIO_BUG.md
 DOCUMENTATION/ASSISTANT_AUDIT.md.json
+dataset/baseline/
+dataset/experiments/
+dataset/snapshots/*/

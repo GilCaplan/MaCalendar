@@ -1,0 +1,90 @@
+# The verification dataset
+
+The project's primary evaluation. It replaces the hand-written audit corpus as
+the baseline: the corpus (`scripts/audit_assistant.py`) stays only as a fast
+regression floor. This is what we measure the engine against.
+
+## What it is
+
+3,000 real voice utterances from **HWU-64** (Liu et al., IWSDS 2019, CC BY 4.0)
+— calendar/reminder commands — plus synthetic **compounds** built by joining
+two real utterances of a known kind. That construction is the ground truth: an
+`event+event` compound must produce ≥2 events, `event+task` ≥1 of each, and so
+on — no human labelling needed.
+
+    inputs/history_{60,300,1000,3000}.json   nested tiers, the frozen inputs
+    inputs/hwu64_sample.json                 provenance: scenario/intent/complexity/compound-kind per prompt
+    baseline/dummy_{N}.db                     the OLD brain's recorded behaviour (regenerable, gitignored)
+    experiments/                              run outputs (gitignored)
+    METRICS.md                                the metric definitions (canonical)
+    RESULTS.md                                per-implementation results log
+    snapshots/                                code snapshots of meaningful iterations, to revert/compare
+
+**Frozen vs regenerable.** Only `inputs/*.json` are frozen, checked-in ground
+truth. The `dummy_*.db` baselines are *replayed through the LLM* (~75%
+determinism) and are **not** bit-reproducible — cite a run's score report and
+the db's md5, never "the dataset" as if the db were fixed.
+
+## The subsets (the ladder)
+
+Tiers are nested and complexity-interleaved, so a contiguous rank slice is
+naturally stratified.
+
+| rung | ranks | n | ~time (8B, serial) | one flipped prompt = | use |
+|---|---|---|---|---|---|
+| dev-fast | 1–150 | 150 | ~22 min | 0.67 pt | rapid single-component cycles |
+| dev-full | 1–600 | 600 | ~90 min | 0.17 pt | confirm a fast win |
+| held-out | 601–3000 | 2400 | ~7 h | 0.04 pt | generalisation — **never mined** |
+
+Dev (1–600) is the only region we inspect/tune against. Held-out (601–3000) is
+sealed: measured, never used to pick a fix, so its delta is the honest
+generalisation claim.
+
+## The metrics — and always name which one
+
+**A score means nothing without its metric.** "70→72" is noise; "count-correct
+73.5%→75.0% on event+task" is a result. Always state metric + slice.
+
+| metric | needs provenance? | what it catches |
+|---|---|---|
+| **count-correctness** (right # of events/tasks) | yes — dataset-only | the core one; multi-item drops and duplicate-item invention |
+| **missing-half** (which side drops on event+task) | yes — dataset-only | *what* to fix, not just pass/fail |
+| cross-event date collapse (2+ events, same date+time) | no — general | a compound flattened to one time |
+| garbage titles (a leaked "then"/"also" as a title) | no — general | title defects (proxy, not true quality) |
+| parse-path distribution + latency percentiles | no — general | operational; slice by anything |
+
+**Provenance-dependent vs general is the load-bearing distinction** (from
+METRICS.md): the provenance metrics need `hwu64_sample.json` to know what
+"correct" is and only work on this constructed data; the general ones compute
+from actions/timing alone and are what transfers to real usage later. Do not
+flatten the two.
+
+Slices applied: by complexity (simple/medium/complex), by compound kind
+(event+event / task+task / event+task), missing-half, by parse path.
+
+The metrics are the dataset owner's `scripts/score_dataset_run.py`
+(`load_provenance`, `score_db`, `compare`, `write_report`) — imported, never
+reimplemented.
+
+## The recursive loop
+
+The whole point: run the engine on a subset's inputs (prompts, timed to mimic
+real-time use), compare the produced actions against the construction ground
+truth via the metrics, read *which component* failed, change that one
+component, rerun. Start on the small subset for big deltas; upsize as deltas
+shrink so we don't overfit to a small slice.
+
+    python -m scripts.engine_dataset_compare --max-rank 150    # dev-fast
+    python -m scripts.engine_dataset_compare --max-rank 600    # dev-full
+    python -m scripts.engine_dataset_compare --min-rank 601    # held-out
+
+One cycle: cluster dev failures by the guilty stage → pick ONE pile → change
+only that stage (contracts frozen) → measure the targeted metric+slice →
+graduate to the next rung if it clearly moved, else drop. Full protocol:
+`DOCUMENTATION/experiments/ITERATION_PROTOCOL.md`.
+
+## Reverting / comparing an iteration
+
+`snapshots/<label>/` keeps a meaningful iteration's changed files, and every
+result in `RESULTS.md` cites the commit that produced it — so a component can
+be reverted or A/B'd against an earlier version.
