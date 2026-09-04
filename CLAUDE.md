@@ -65,6 +65,31 @@ canonical contract reference — open it before touching any stage.
   deterministic reading found nothing, and every LLM call is
   schema-constrained and grounded on the raw transcript.
 
+## The review panel is downstream of the pipeline
+
+The thinking panel and the iOS timeline draw a command's chain of thought from
+its trace — so **the panel is downstream of the pipeline's shape, and a
+revamp that does not update it draws the old system's chain for the new one.**
+`assistant/trace.py` holds the single source of truth: `BRAIN_VERSION` (the
+key the panel matches its render format to, stamped on every response and
+trace-bus payload) and `CHAINS` (the ordered `(stage, label)` spec per version
+that matches the explorer diagram).
+
+When you change the pipeline's shape — add, rename or remove a stage; change
+the order; split or merge steps — do all of these in the same change:
+
+1. **Bump `BRAIN_VERSION`** so an old trace still renders in its old format.
+2. **Update `CHAINS`** with the new version's chain, and any new stage's icon
+   in `thinking_panel._STAGE_ICONS` (ship the `.svg`).
+3. **Update the panel render** (`thinking_panel.py` + iOS `ThinkingView`) and
+   the explorer diagram, per `DOCUMENTATION/ENGINE.md`'s render section.
+
+**If you miss it, the build catches you.** `tests/unit/test_panel_agreement.py`
+ties the engine's stage set, the panel's icons and `CHAINS` together and goes
+red naming what to update; `test_engine_flow.py` pins that the version is
+stamped on every command. Treat a red there like a red artifact-claim: it is
+the panel telling you it no longer matches the machine.
+
 ## It never touches the internet
 
 Whisper runs on the GPU from a cached model, the LLM is Ollama on localhost,
