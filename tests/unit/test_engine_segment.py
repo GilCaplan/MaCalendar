@@ -110,3 +110,26 @@ def test_loop_back_mistakes_reach_the_prompt(cfg, monkeypatch):
     st.mistakes = ["you merged two independent requests"]
     segment.run(st, cfg)
     assert "merged two independent requests" in seen["system"]
+
+
+def test_enumeration_headers_are_dropped_from_a_split(cfg, monkeypatch):
+    """Run 11: "add tasks:" survived as an item and parsed to unknown, eating
+    a real task; "two tasks due tomorrow" became a phantom third create."""
+    monkeypatch.setattr(engine_llm, "call_json", lambda *a, **k: ({"items": [
+        {"kind": "task", "text": "add tasks"},
+        {"kind": "task", "text": "submit the Haxaga grades"},
+        {"kind": "task", "text": "pay rent"},
+    ]}, 4))
+    st = _seg("add tasks: submit the Haxaga grades and pay rent", cfg)
+    assert [it.text for it in st.items] == ["submit the Haxaga grades", "pay rent"]
+
+
+def test_a_header_with_a_due_phrase_is_still_a_header(cfg, monkeypatch):
+    monkeypatch.setattr(engine_llm, "call_json", lambda *a, **k: ({"items": [
+        {"kind": "task", "text": "two tasks due tomorrow"},
+        {"kind": "task", "text": "buy groceries due tomorrow"},
+        {"kind": "task", "text": "return the library book due tomorrow"},
+    ]}, 4))
+    st = _seg("two tasks due tomorrow: buy groceries and return the library book", cfg)
+    assert len(st.items) == 2
+    assert all("due tomorrow" in it.text for it in st.items)

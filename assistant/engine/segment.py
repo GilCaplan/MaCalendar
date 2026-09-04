@@ -75,6 +75,12 @@ def _deterministic_segments(text: str, cfg) -> "tuple[list[str], str | None]":
 # absence is a free proof the input is one item — the LLM is never consulted.
 _COMPOUND_HINT = re.compile(r"\b(and|then|also|plus|after that)\b|,|;", re.I)
 
+# "add tasks", "two tasks due tomorrow", "3 reminders" — announces a list,
+# requests nothing.
+_HEADER_RE = re.compile(
+    r"^(?:please\s+)?(?:add|set|create|make|new|two|three|four|\d+)\s+"
+    r"(?:tasks?|events?|reminders?|things?)(?:\s+due\s+\w+)?\s*:?$", re.I)
+
 _SEGMENT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -179,6 +185,12 @@ def _llm_segments(state: EngineState, cfg) -> "list[Item] | None":
              for d in raw_items if isinstance(d, dict)]
     parts = [(k if k in ("event", "task", "review") else _kind_of(t), t)
              for k, t in parts if t]
+    # An enumeration HEADER ("add tasks", "two tasks due tomorrow") is not a
+    # request — it announces the list. Kept as an item it parses to unknown
+    # or a phantom row (run 11: one header ate a real task, another became a
+    # third create). Drop headers; their due-phrase is already distributed
+    # into the real items by the prompt's shared-deadline policy.
+    parts = [(k, t) for k, t in parts if not _HEADER_RE.match(t)]
     if len(parts) <= 1:
         return None
     # Under-split bias, enforced: a "split" that produced a fragment (a lone
