@@ -17,7 +17,8 @@ on — no human labelling needed.
     baseline/dummy_{N}.db                     the OLD brain's recorded behaviour (regenerable, gitignored)
     experiments/                              run outputs (gitignored)
     METRICS.md                                the metric definitions (canonical)
-    RESULTS.md                                per-implementation results log
+    RESULTS.md                                per-implementation results log (prose: hypotheses, actual-vs-expected)
+    loop_log.csv                              one row per measurement run — timestamps, duration, commit, metrics; the plottable trajectory
     snapshots/                                code snapshots of meaningful iterations, to revert/compare
 
 **Frozen vs regenerable.** Only `inputs/*.json` are frozen, checked-in ground

@@ -83,6 +83,14 @@ what teaches the next step.
 7. Unit-test every fix in its stage's file; the corpus smoke
    (`audit_assistant --limit 20`) is the regression floor.
 
+**Every measurement run also appends one row to `dataset/loop_log.csv`** —
+baseline, fix rerun, upsize confirm, held-out check alike: started/finished
+timestamps, duration, commit, slice, every metric column, and a one-line
+summary. `RESULTS.md` is the prose understanding; the csv is the machine-
+readable trajectory, so the whole improvement process can be plotted
+(metric-vs-time / metric-vs-cycle) when it concludes. A run that isn't logged
+there didn't happen.
+
 ## Coarse-to-fine: when to climb the ladder
 
 Start on **dev-fast** — early fixes move many rows and a noisy slice still
