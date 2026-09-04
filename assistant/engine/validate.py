@@ -406,6 +406,9 @@ def run_objects(state: EngineState, cfg) -> EngineState:
                 _rule_move_time_fill(state, intent, transcript)
             continue
         if action == "create_event":
+            _rule_create_from_remove_guard(state, item, intent)
+            if item.action != "create_event" or item.intent is None:
+                continue
             _rule_relative_date_pin(state, intent, rel, recur, ev_idx, n_events,
                                     orig_event_dates, transcript)
             ev_idx += 1
