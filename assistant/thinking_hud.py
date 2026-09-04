@@ -488,6 +488,16 @@ class _BusReader:
             return -1.0
 
     def poll(self) -> None:
+        # A liveness beat for `assistant doctor`, throttled well below the
+        # 120ms poll so it costs nothing.
+        import time as _t
+        if _t.time() - getattr(self, "_last_beat", 0) > 5:
+            self._last_beat = _t.time()
+            try:
+                from assistant.heartbeat import beat
+                beat("hud")
+            except Exception:
+                pass
         entries, self._offset = trace_bus.read_since(self._offset)
         for entry in entries:
             try:

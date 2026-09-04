@@ -925,6 +925,14 @@ class CalendarWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def _poll_status(self) -> None:
+        import time as _t
+        if _t.time() - getattr(self, "_last_beat", 0) > 5:
+            self._last_beat = _t.time()
+            try:
+                from assistant.heartbeat import beat
+                beat("gui")
+            except Exception:
+                pass
         """Drain pipeline.status_queue on the main thread (called by QTimer)."""
         if self._pipeline is None:
             return

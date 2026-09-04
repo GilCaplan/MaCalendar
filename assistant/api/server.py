@@ -207,6 +207,21 @@ def create_app() -> Flask:
             "db": db.path,
         })
 
+    @app.post("/heartbeat")
+    def heartbeat():
+        """A device (the phone, another client) reports it is alive and
+        connected. `assistant doctor` reads the last beat per source to tell a
+        connected surface from a silent one. Records server-side under the
+        source name so no client needs shared-filesystem access."""
+        body = request.get_json(silent=True) or {}
+        src = (body.get("source") or "unknown").strip().lower()[:32]
+        try:
+            from assistant.heartbeat import beat
+            beat(f"client-{src}", device=body.get("device"))
+        except Exception:
+            pass
+        return jsonify({"ok": True})
+
     # ------------------------------------------------------------------
     # Background verification polling (iOS)
     # ------------------------------------------------------------------

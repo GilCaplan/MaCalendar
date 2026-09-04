@@ -1,0 +1,762 @@
+2026-09-03 12:42:21,507  INFO      assistant.api.server — 📱 Text command: what do I have today
+2026-09-03 12:42:22,392  INFO      assistant.intent.parser — Ollama model llama3.1:8b warmed (keep_alive=30m)
+2026-09-03 12:42:25,113  INFO      assistant.intent.rule_parser — spaCy model loaded (lazy).
+2026-09-03 12:42:25,577  INFO      assistant.intent.rule_parser — DateTime recognizer loaded (lazy).
+2026-09-03 12:42:25,597  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['query_schedule']
+2026-09-03 12:42:25,598  INFO      assistant.api.server — 📱 Parsed actions: ['query_schedule']
+2026-09-03 12:42:25,600  INFO      assistant.api.server — 📱 Action query_schedule → Your schedule is clear today. Nothing planned.
+2026-09-03 12:42:25,601  INFO      assistant.api.server — 📱 Response: Your schedule is clear today. Nothing planned. | refresh=none | parse=rule
+2026-09-03 12:42:25,622  INFO      assistant.api.server — 📱 Text command: set a meeting tomorrow at 2 pm with Ravid at Kems
+2026-09-03 12:42:25,699  INFO      assistant.api.server — 📱 Rule fast-path: confidence=1.00 actions=['create_event']
+2026-09-03 12:42:25,699  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:42:25,722  INFO      assistant.api.server — 📱 Action create_event → Created event 'meeting with ravid' on Friday, Sep 4, 2026 from 2 PM to 3 PM.
+2026-09-03 12:42:25,723  INFO      assistant.api.server — 📱 Response: Created event 'meeting with ravid' on Friday, Sep 4, 2026 from 2 PM to 3 PM. | refresh=events | parse=rule
+2026-09-03 12:42:27,646  INFO      assistant.api.server — 📱 Self-check token=d2ccf624 result={'ok': True}
+2026-09-03 12:42:30,609  INFO      assistant.api.server — 📱 Self-check token=09c22906 result={'ok': True}
+2026-09-03 12:42:30,900  INFO      assistant.api.server — 📱 Text command: set a meeting tomorrow at 9:30 am with Tal at the French Bakery
+2026-09-03 12:42:31,051  INFO      assistant.api.server — 📱 Rule fast-path: confidence=1.00 actions=['create_event']
+2026-09-03 12:42:31,052  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:42:31,056  INFO      assistant.api.server — 📱 Action create_event → Created event 'meeting with tal' on Friday, Sep 4, 2026 from 9:30 AM to 10:30 AM.
+2026-09-03 12:42:31,057  INFO      assistant.api.server — 📱 Response: Created event 'meeting with tal' on Friday, Sep 4, 2026 from 9:30 AM to 10:30 AM. | refresh=events | parse=rule
+2026-09-03 12:42:33,749  INFO      assistant.api.server — 📱 Self-check token=c0eba11d result={'ok': True}
+2026-09-03 12:42:33,946  INFO      assistant.api.server — 📱 Text command: set a meeting tomorrow at 6:15 pm with Rei at Golda
+2026-09-03 12:42:34,044  INFO      assistant.api.server — 📱 Rule fast-path: confidence=1.00 actions=['create_event']
+2026-09-03 12:42:34,044  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:42:34,047  INFO      assistant.api.server — 📱 Action create_event → Created event 'meeting with rei' on Friday, Sep 4, 2026 from 6:15 PM to 7:15 PM.
+2026-09-03 12:42:34,047  INFO      assistant.api.server — 📱 Response: Created event 'meeting with rei' on Friday, Sep 4, 2026 from 6:15 PM to 7:15 PM. | refresh=events | parse=rule
+2026-09-03 12:42:36,694  INFO      assistant.api.server — 📱 Self-check token=1ea1b3d4 result={'ok': True}
+2026-09-03 12:42:36,915  INFO      assistant.api.server — 📱 Text command: dentist appointment on thursday at 9 am
+2026-09-03 12:42:42,307  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:42:42,313  INFO      assistant.api.server — 📱 Action create_event → Created event 'dentist appointment' on Thursday, Sep 3, 2026 from 9 AM to 10 AM.
+2026-09-03 12:42:42,313  INFO      assistant.api.server — 📱 Response: Created event 'dentist appointment' on Thursday, Sep 3, 2026 from 9 AM to 10 AM. | refresh=events | parse=llm
+2026-09-03 12:42:53,149  INFO      assistant.api.server — 📱 Self-check token=9527a204 result={'ok': True}
+2026-09-03 12:42:53,307  INFO      assistant.api.server — 📱 Text command: lunch with Tal at noon on the 19th
+2026-09-03 12:42:59,258  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:42:59,274  INFO      assistant.api.server — 📱 Action create_event → Created event 'lunch with Tal' on Saturday, Sep 19, 2026 from 12 PM to 1 PM.
+2026-09-03 12:42:59,274  INFO      assistant.api.server — 📱 Response: Created event 'lunch with Tal' on Saturday, Sep 19, 2026 from 12 PM to 1 PM. | refresh=events | parse=llm
+2026-09-03 12:43:09,835  INFO      assistant.api.server — 📱 Self-check token=534b39b2 result={'ok': True}
+2026-09-03 12:43:10,011  INFO      assistant.api.server — 📱 Text command: add gym at 6 am for one hour tomorrow
+2026-09-03 12:43:10,075  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.85 actions=['create_event']
+2026-09-03 12:43:10,076  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:43:10,079  INFO      assistant.api.server — 📱 Action create_event → Created event 'gym' on Friday, Sep 4, 2026 from 6 AM to 7 AM.
+2026-09-03 12:43:10,079  INFO      assistant.api.server — 📱 Response: Created event 'gym' on Friday, Sep 4, 2026 from 6 AM to 7 AM. | refresh=events | parse=rule
+2026-09-03 12:43:16,135  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'gym at 6 am for one hour'}
+2026-09-03 12:43:16,141  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:43:16,142  INFO      assistant.api.server — 📱 Self-check token=ebc59cfe result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:43:16,222  INFO      assistant.api.server — 📱 Text command: meeting with Ravid from 3 to 4:30 pm today
+2026-09-03 12:43:23,047  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:43:23,086  INFO      assistant.api.server — 📱 Action create_event → Created event 'Meeting with Ravid' on Thursday, Sep 3, 2026 from 3 PM to 4:30 PM.
+2026-09-03 12:43:23,087  INFO      assistant.api.server — 📱 Response: Created event 'Meeting with Ravid' on Thursday, Sep 3, 2026 from 3 PM to 4:30 PM. | refresh=events | parse=llm
+2026-09-03 12:43:35,323  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'Meeting with Ravid from 3 to 4:30 pm'}
+2026-09-03 12:43:35,339  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:43:35,340  INFO      assistant.api.server — 📱 Self-check token=c2cc7f8b result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:43:35,452  INFO      assistant.api.server — 📱 Text command: set an event next wednesday at 2pm technion talk regarding project funds
+2026-09-03 12:43:35,495  INFO      assistant.api.server — 📱 Rule fast-path: confidence=1.00 actions=['create_event']
+2026-09-03 12:43:35,495  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:43:35,497  INFO      assistant.api.server — 📱 Action create_event → Created event 'event' on Wednesday, Sep 9, 2026 from 2 PM to 3 PM.
+2026-09-03 12:43:37,774  INFO      assistant.api.server — Title fixed for event 8: 'event' → 'Technion Talk Regarding Project Funds'
+2026-09-03 12:43:37,774  INFO      assistant.api.server — 📱 Response: Created event 'Technion Talk Regarding Project Funds' on Wednesday, Sep 9, 2026 from 2 PM to 3 PM. | refresh=events | parse=rule
+2026-09-03 12:43:49,388  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'Technion Talk - Project Funds for TA Costs'}
+2026-09-03 12:43:49,399  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:43:49,400  INFO      assistant.api.server — 📱 Self-check token=ec05f370 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:43:49,507  INFO      assistant.api.server — 📱 Text command: Mincha Maariv at shul tonight at 7:15
+2026-09-03 12:43:55,415  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:43:55,420  INFO      assistant.api.server — 📱 Action create_event → Created event 'Mincha Maariv' on Thursday, Sep 3, 2026 from 7:15 PM to 8:15 PM.
+2026-09-03 12:43:55,420  INFO      assistant.api.server — 📱 Response: Created event 'Mincha Maariv' on Thursday, Sep 3, 2026 from 7:15 PM to 8:15 PM. | refresh=events | parse=llm
+2026-09-03 12:44:04,837  INFO      assistant.api.server — 📱 Self-check token=74ee09d5 result={'ok': True}
+2026-09-03 12:44:04,876  INFO      assistant.api.server — 📱 Text command: Limud Torah at Ohel Ari on tuesday at 9 pm
+2026-09-03 12:44:11,460  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:44:11,468  INFO      assistant.api.server — 📱 Action create_event → Created event 'Limud Torah' on Tuesday, Sep 8, 2026 from 9 PM to 10 PM.
+2026-09-03 12:44:11,468  INFO      assistant.api.server — 📱 Response: Created event 'Limud Torah' on Tuesday, Sep 8, 2026 from 9 PM to 10 PM. | refresh=events | parse=llm
+2026-09-03 12:44:20,778  INFO      assistant.api.server — 📱 Self-check token=1126c543 result={'ok': True}
+2026-09-03 12:44:20,890  INFO      assistant.api.server — 📱 Text command: coffee with Ezra friday morning at 9:15 at the French Bakery
+2026-09-03 12:44:26,242  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:44:26,247  INFO      assistant.api.server — 📱 Action create_event → Created event 'Coffee with Ezra' on Friday, Sep 4, 2026 from 9:15 AM to 10:15 AM.
+2026-09-03 12:44:26,247  INFO      assistant.api.server — 📱 Response: Created event 'Coffee with Ezra' on Friday, Sep 4, 2026 from 9:15 AM to 10:15 AM. | refresh=events | parse=llm
+2026-09-03 12:44:35,303  INFO      assistant.api.server — 📱 Self-check token=3202d2f3 result={'ok': True}
+2026-09-03 12:44:35,441  INFO      assistant.api.server — 📱 Text command: driving lesson thursday 8 am
+2026-09-03 12:44:40,653  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:44:40,659  INFO      assistant.api.server — 📱 Action create_event → Created event 'driving lesson' on Thursday, Sep 3, 2026 from 8 AM to 9 AM.
+2026-09-03 12:44:40,659  INFO      assistant.api.server — 📱 Response: Created event 'driving lesson' on Thursday, Sep 3, 2026 from 8 AM to 9 AM. | refresh=events | parse=llm
+2026-09-03 12:44:50,027  INFO      assistant.api.server — 📱 Self-check token=350699bd result={'ok': True}
+2026-09-03 12:44:50,154  INFO      assistant.api.server — 📱 Text command: schedule a zoom with Guri Karpas about the robotics project on monday at 4:30 pm
+2026-09-03 12:44:50,321  INFO      assistant.api.server — 📱 Rule fast-path: confidence=1.00 actions=['create_event']
+2026-09-03 12:44:50,322  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:44:50,328  INFO      assistant.api.server — 📱 Action create_event → Created event 'guri karpas' on Monday, Sep 7, 2026 from 4:30 PM to 5:30 PM.
+2026-09-03 12:44:50,329  INFO      assistant.api.server — 📱 Response: Created event 'guri karpas' on Monday, Sep 7, 2026 from 4:30 PM to 5:30 PM. | refresh=events | parse=rule
+2026-09-03 12:44:53,909  INFO      assistant.api.server — 📱 Self-check token=c7c222a5 result={'ok': True}
+2026-09-03 12:44:53,989  INFO      assistant.api.server — 📱 Text command: book a haircut for tuesday at half past two
+2026-09-03 12:44:54,060  INFO      assistant.api.server — 📱 Rule partial handoff: confidence=0.67 missing=['title']
+2026-09-03 12:45:01,666  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:45:01,670  INFO      assistant.api.server — 📱 Action create_event → Created event 'Haircut' on Tuesday, Sep 8, 2026 from 2:30 PM to 3 PM.
+2026-09-03 12:45:01,670  INFO      assistant.api.server — 📱 Response: Created event 'Haircut' on Tuesday, Sep 8, 2026 from 2:30 PM to 3 PM. | refresh=events | parse=hybrid
+2026-09-03 12:45:12,609  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'Haircut on Tuesday'}
+2026-09-03 12:45:12,615  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:45:12,616  INFO      assistant.api.server — 📱 Self-check token=e833d1e2 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:45:12,741  INFO      assistant.api.server — 📱 Text command: set a meeting for me tomorrow at 4pm execute
+2026-09-03 12:45:12,780  INFO      assistant.api.server — 📱 Rule fast-path: confidence=1.00 actions=['create_event']
+2026-09-03 12:45:12,780  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:45:12,782  INFO      assistant.api.server — 📱 Action create_event → Created event 'meeting' on Friday, Sep 4, 2026 from 4 PM to 5 PM.
+2026-09-03 12:45:14,996  INFO      assistant.api.server — 📱 Response: Created event 'meeting' on Friday, Sep 4, 2026 from 4 PM to 5 PM. | refresh=events | parse=rule
+2026-09-03 12:45:23,547  INFO      assistant.api.server — 📱 Self-check token=8f21e1bb result={'ok': True}
+2026-09-03 12:45:23,809  INFO      assistant.api.server — 📱 Text command: meeting tomorrow at 2 sorry not 2, 3 pm with Adin for the project
+2026-09-03 12:45:29,999  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:45:30,006  INFO      assistant.api.server — 📱 Action create_event → Created event 'Meeting with Adin for the project' on Friday, Sep 4, 2026 from 3 PM to 5 PM.
+2026-09-03 12:45:30,006  INFO      assistant.api.server — 📱 Response: Created event 'Meeting with Adin for the project' on Friday, Sep 4, 2026 from 3 PM to 5 PM. | refresh=events | parse=llm
+2026-09-03 12:45:42,756  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'start_time': '14:00'}
+2026-09-03 12:45:42,763  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:45:42,764  INFO      assistant.api.server — 📱 Self-check token=49269392 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:45:42,907  INFO      assistant.api.server — 📱 Text command: set a meeting tomorrow at 1 pm, another one at 4 pm and then pizza at 6:30 pm tomorrow
+2026-09-03 12:45:58,263  INFO      assistant.api.server — 📱 Parsed actions: ['create_event', 'create_event', 'create_event']
+2026-09-03 12:45:58,288  INFO      assistant.api.server — 📱 Action create_event → Created event 'Meeting' on Friday, Sep 4, 2026 from 1 PM to 5 PM.
+2026-09-03 12:45:58,295  INFO      assistant.api.server — 📱 Action create_event → Created event 'Meeting' on Friday, Sep 4, 2026 from 4 PM to 8 PM.
+2026-09-03 12:45:58,305  INFO      assistant.api.server — 📱 Action create_event → Created event 'Pizza' on Friday, Sep 4, 2026 from 6:30 PM to 7:30 PM.
+2026-09-03 12:45:58,306  INFO      assistant.api.server — 📱 Response: Created event 'Meeting' on Friday, Sep 4, 2026 from 1 PM to 5 PM. Created event 'Meeting' on Friday, Sep 4, 2026 from 4 PM to 8 PM. Created event 'Pizza' on Friday, Sep 4, 2026 from 6:30 PM to 7:30 PM. | refresh=events | parse=llm
+2026-09-03 12:46:09,322  INFO      assistant.api.server — 📱 Self-check token=ece1ae9f result={'ok': True}
+2026-09-03 12:46:09,519  INFO      assistant.api.server — 📱 Text command: walk Kyra the dog at 3:30 pm today and then go to shul for Mincha Maariv at 7:30 pm
+2026-09-03 12:46:20,723  INFO      assistant.api.server — 📱 Parsed actions: ['create_event', 'create_event']
+2026-09-03 12:46:20,730  INFO      assistant.api.server — 📱 Action create_event → Created event 'Walk Kyra' on Thursday, Sep 3, 2026 from 3:30 PM to 4:30 PM.
+2026-09-03 12:46:20,733  INFO      assistant.api.server — 📱 Action create_event → Created event 'Mincha Maariv' on Thursday, Sep 3, 2026 from 7:30 PM to 8:30 PM.
+2026-09-03 12:46:20,733  INFO      assistant.api.server — 📱 Response: Created event 'Walk Kyra' on Thursday, Sep 3, 2026 from 3:30 PM to 4:30 PM. Created event 'Mincha Maariv' on Thursday, Sep 3, 2026 from 7:30 PM to 8:30 PM. | refresh=events | parse=llm
+2026-09-03 12:46:32,024  INFO      assistant.api.server — 📱 Self-check token=4785046f result={'ok': True}
+2026-09-03 12:46:32,134  INFO      assistant.api.server — 📱 Text command: tomorrow gym at 7 am and a meeting with Tal at 11
+2026-09-03 12:46:41,900  INFO      assistant.api.server — 📱 Parsed actions: ['create_event', 'create_event']
+2026-09-03 12:46:41,904  INFO      assistant.api.server — 📱 Action create_event → Created event 'Gym' on Friday, Sep 4, 2026 from 7 AM to 8 AM.
+2026-09-03 12:46:41,906  INFO      assistant.api.server — 📱 Action create_event → Created event 'Meeting with Tal' on Friday, Sep 4, 2026 from 11 AM to 12 PM.
+2026-09-03 12:46:41,906  INFO      assistant.api.server — 📱 Response: Created event 'Gym' on Friday, Sep 4, 2026 from 7 AM to 8 AM. Created event 'Meeting with Tal' on Friday, Sep 4, 2026 from 11 AM to 12 PM. | refresh=events | parse=llm
+2026-09-03 12:46:54,002  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'Gym and meeting with Tal', 'end_time': '12:00'}
+2026-09-03 12:46:54,009  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:46:54,010  INFO      assistant.api.server — 📱 Self-check token=2fd95613 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:46:54,055  INFO      assistant.api.server — 📱 Text command: on thursday I have Shacharit at 6:30 am, a lecture at 10 and dinner with Danny at 8 pm
+2026-09-03 12:47:09,488  INFO      assistant.api.server — 📱 Parsed actions: ['create_event', 'create_event', 'create_event']
+2026-09-03 12:47:09,493  INFO      assistant.api.server — 📱 Action create_event → Created event 'Shacharit' on Thursday, Sep 3, 2026 from 6:30 AM to 7:30 AM.
+2026-09-03 12:47:09,495  INFO      assistant.api.server — 📱 Action create_event → Created event 'Lecture' on Thursday, Sep 3, 2026 from 10 AM to 11 AM.
+2026-09-03 12:47:09,497  INFO      assistant.api.server — 📱 Action create_event → Created event 'Dinner with Danny' on Thursday, Sep 3, 2026 from 8 PM to 9 PM.
+2026-09-03 12:47:09,498  INFO      assistant.api.server — 📱 Response: Created event 'Shacharit' on Thursday, Sep 3, 2026 from 6:30 AM to 7:30 AM. Created event 'Lecture' on Thursday, Sep 3, 2026 from 10 AM to 11 AM. Created event 'Dinner with Danny' on Thursday, Sep 3, 2026 from 8 PM to 9 PM. | refresh=events | parse=llm
+2026-09-03 12:47:20,059  INFO      assistant.api.server — 📱 Self-check token=c2090cbc result={'ok': True}
+2026-09-03 12:47:20,123  INFO      assistant.api.server — 📱 Text command: two events tomorrow, one at four o'clock meeting with Rei and one at seven pm pizza with Ezra
+2026-09-03 12:47:27,296  INFO      assistant.api.server — 📱 Parsed actions: ['create_event', 'create_event']
+2026-09-03 12:47:27,307  INFO      assistant.api.server — 📱 Action create_event → Created event 'Meeting with Rei' on Friday, Sep 4, 2026 from 4 PM to 5 PM.
+2026-09-03 12:47:27,310  INFO      assistant.api.server — 📱 Action create_event → Created event 'Pizza with Ezra' on Friday, Sep 4, 2026 from 7 PM to 8 PM.
+2026-09-03 12:47:27,310  INFO      assistant.api.server — 📱 Response: Created event 'Meeting with Rei' on Friday, Sep 4, 2026 from 4 PM to 5 PM. Created event 'Pizza with Ezra' on Friday, Sep 4, 2026 from 7 PM to 8 PM. | refresh=events | parse=llm
+2026-09-03 12:47:38,940  INFO      assistant.api.server — 📱 Self-check token=20dfb622 result={'ok': True}
+2026-09-03 12:47:39,223  INFO      assistant.api.server — 📱 Text command: meeting with Ravid tomorrow at 2 pm and dentist on thursday at 9 am
+2026-09-03 12:47:50,665  INFO      assistant.api.server — 📱 Parsed actions: ['create_event', 'create_event']
+2026-09-03 12:47:50,676  INFO      assistant.api.server — 📱 Action create_event → Created event 'Meeting with Ravid' on Friday, Sep 4, 2026 from 2 PM to 4 PM.
+2026-09-03 12:47:50,681  INFO      assistant.api.server — 📱 Action create_event → Created event 'Dentist appointment' on Thursday, Sep 3, 2026 from 9 AM to 10 AM.
+2026-09-03 12:47:50,681  INFO      assistant.api.server — 📱 Response: Created event 'Meeting with Ravid' on Friday, Sep 4, 2026 from 2 PM to 4 PM. Created event 'Dentist appointment' on Thursday, Sep 3, 2026 from 9 AM to 10 AM. | refresh=events | parse=llm
+2026-09-03 12:48:05,352  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'Meeting with Ravid tomorrow at 2 pm', 'date': '2026-09-04'}
+2026-09-03 12:48:05,360  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:48:05,361  INFO      assistant.api.server — 📱 Self-check token=9ba0ffe9 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:48:05,459  INFO      assistant.api.server — 📱 Text command: set lunch with Tal on monday at noon and coffee with Ezra on friday at 9
+2026-09-03 12:48:05,542  INFO      assistant.api.server — 📱 Rule partial handoff: confidence=0.63 missing=[]
+2026-09-03 12:48:19,335  INFO      assistant.api.server — 📱 Parsed actions: ['create_event', 'create_event']
+2026-09-03 12:48:19,340  INFO      assistant.api.server — 📱 Action create_event → Created event 'lunch with Tal' on Monday, Sep 7, 2026 from 12 PM to 1 PM.
+2026-09-03 12:48:19,342  INFO      assistant.api.server — 📱 Action create_event → Created event 'coffee with Ezra' on Friday, Sep 4, 2026 from 9 AM to 10 AM.
+2026-09-03 12:48:19,342  INFO      assistant.api.server — 📱 Response: Created event 'lunch with Tal' on Monday, Sep 7, 2026 from 12 PM to 1 PM. Created event 'coffee with Ezra' on Friday, Sep 4, 2026 from 9 AM to 10 AM. | refresh=events | parse=hybrid
+2026-09-03 12:48:30,115  INFO      assistant.api.server — 📱 Self-check token=61577005 result={'ok': True}
+2026-09-03 12:48:30,196  INFO      assistant.api.server — 📱 Text command: gym tomorrow at 6 am, tuesday at 6 am and friday at 6 am
+2026-09-03 12:48:42,357  INFO      assistant.api.server — 📱 Parsed actions: ['create_event', 'create_event', 'create_event']
+2026-09-03 12:48:42,363  INFO      assistant.api.server — 📱 Action create_event → Created event 'Gym' on Friday, Sep 4, 2026 from 6 AM to 6 AM.
+2026-09-03 12:48:42,366  INFO      assistant.api.server — 📱 Action create_event → Created event 'Gym' on Tuesday, Sep 8, 2026 from 6 AM to 6 AM.
+2026-09-03 12:48:42,369  INFO      assistant.api.server — 📱 Action create_event → Created event 'Gym' on Friday, Sep 4, 2026 from 6 AM to 6 AM.
+2026-09-03 12:48:42,369  INFO      assistant.api.server — 📱 Response: Created event 'Gym' on Friday, Sep 4, 2026 from 6 AM to 6 AM. Created event 'Gym' on Tuesday, Sep 8, 2026 from 6 AM to 6 AM. Created event 'Gym' on Friday, Sep 4, 2026 from 6 AM to 6 AM. | refresh=events | parse=llm
+2026-09-03 12:48:54,387  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'Gym sessions'}
+2026-09-03 12:48:54,396  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:48:54,396  INFO      assistant.api.server — 📱 Self-check token=2e7a66da result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:48:54,523  INFO      assistant.api.server — 📱 Text command: schedule gym every monday at 6 am
+2026-09-03 12:48:54,567  INFO      assistant.api.server — 📱 Rule partial handoff: confidence=0.63 missing=['date']
+2026-09-03 12:48:59,857  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:48:59,885  INFO      assistant.api.server — 📱 Action create_event → Created recurring weekly event 'gym' starting on Monday, Sep 7, 2026.
+2026-09-03 12:48:59,885  INFO      assistant.api.server — 📱 Response: Created recurring weekly event 'gym' starting on Monday, Sep 7, 2026. | refresh=events | parse=hybrid
+2026-09-03 12:49:12,007  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'gym every monday', 'date': 'next Monday'}
+2026-09-03 12:49:12,020  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:49:12,021  INFO      assistant.api.server — 📱 Self-check token=bee84402 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:49:12,248  INFO      assistant.api.server — 📱 Text command: daily Shacharit at 6:30 am
+2026-09-03 12:49:17,738  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:49:17,845  INFO      assistant.api.server — 📱 Action create_event → Created recurring daily event 'daily Shacharit' starting on Thursday, Sep 3, 2026.
+2026-09-03 12:49:17,845  INFO      assistant.api.server — 📱 Response: Created recurring daily event 'daily Shacharit' starting on Thursday, Sep 3, 2026. | refresh=events | parse=llm
+2026-09-03 12:49:27,156  INFO      assistant.api.server — 📱 Self-check token=de00bfeb result={'ok': True}
+2026-09-03 12:49:27,413  INFO      assistant.api.server — 📱 Text command: weekly Netivim zoom on wednesdays at 7 pm
+2026-09-03 12:49:34,138  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:49:34,148  INFO      assistant.api.server — 📱 Action create_event → Created recurring weekly event 'Netivim zoom' starting on Wednesday, Sep 9, 2026.
+2026-09-03 12:49:34,148  INFO      assistant.api.server — 📱 Response: Created recurring weekly event 'Netivim zoom' starting on Wednesday, Sep 9, 2026. | refresh=events | parse=llm
+2026-09-03 12:49:45,297  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'date': '2026-09-03'}
+2026-09-03 12:49:45,309  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:49:45,310  INFO      assistant.api.server — 📱 Self-check token=473c4761 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:49:45,514  INFO      assistant.api.server — 📱 Text command: set a meeting at 4pm today, but it is only 20 minutes meeting with one moment meeting with reards, okay, then let's do another meeting from 6 from 6 o'clock to 640 meetings with kids for project defense
+2026-09-03 12:49:54,822  INFO      assistant.api.server — 📱 Parsed actions: ['create_event', 'create_event']
+2026-09-03 12:49:54,827  INFO      assistant.api.server — 📱 Action create_event → Created event 'Meeting with Reards' on Thursday, Sep 3, 2026 from 4 PM to 4:20 PM.
+2026-09-03 12:49:54,830  INFO      assistant.api.server — 📱 Action create_event → Created event 'Meetings with Kids for Project Defense' on Thursday, Sep 3, 2026 from 6 PM to 8 PM.
+2026-09-03 12:49:54,830  INFO      assistant.api.server — 📱 Response: Created event 'Meeting with Reards' on Thursday, Sep 3, 2026 from 4 PM to 4:20 PM. Created event 'Meetings with Kids for Project Defense' on Thursday, Sep 3, 2026 from 6 PM to 8 PM. | refresh=events | parse=llm
+2026-09-03 12:50:09,163  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'Meeting with Reards'}
+2026-09-03 12:50:09,173  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:50:09,174  INFO      assistant.api.server — 📱 Self-check token=5a1f467d result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:50:09,323  INFO      assistant.api.server — 📱 Text command: a meeting for me tomorrow at two one sorry one pm and four pm and then another one a pizza party at 6.30 pm at edo's
+2026-09-03 12:50:20,278  INFO      assistant.api.server — 📱 Parsed actions: ['create_event', 'create_event']
+2026-09-03 12:50:20,283  INFO      assistant.api.server — 📱 Action create_event → Created event 'Meeting' on Friday, Sep 4, 2026 from 1 PM to 4 PM.
+2026-09-03 12:50:20,285  INFO      assistant.api.server — 📱 Action create_event → Created event 'Pizza Party' on Friday, Sep 4, 2026 from 6:30 PM to 7:30 PM.
+2026-09-03 12:50:20,286  INFO      assistant.api.server — 📱 Response: Created event 'Meeting' on Friday, Sep 4, 2026 from 1 PM to 4 PM. Created event 'Pizza Party' on Friday, Sep 4, 2026 from 6:30 PM to 7:30 PM. | refresh=events | parse=llm
+2026-09-03 12:50:33,219  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'Meeting for me tomorrow at two one sorry one pm and four pm'}
+2026-09-03 12:50:33,235  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:50:33,236  INFO      assistant.api.server — 📱 Self-check token=d7360acc result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:50:33,434  INFO      assistant.api.server — 📱 Text command: remind me to buy milk
+2026-09-03 12:50:33,493  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['create_todo']
+2026-09-03 12:50:33,493  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 12:50:33,522  INFO      assistant.api.server — 📱 Action create_todo → Added 'buy milk' to Today tagged Groceries.
+2026-09-03 12:50:33,522  INFO      assistant.api.server — 📱 Response: Added 'buy milk' to Today tagged Groceries. | refresh=todos | parse=rule
+2026-09-03 12:50:38,001  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'action': 'create_todo'}
+2026-09-03 12:50:38,007  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:50:38,007  INFO      assistant.api.server — 📱 Self-check token=13cbd8cc result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:50:38,208  INFO      assistant.api.server — 📱 Text command: add a task to call the dentist
+2026-09-03 12:50:38,241  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['create_todo']
+2026-09-03 12:50:38,242  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 12:50:38,243  INFO      assistant.api.server — 📱 Action create_todo → Added 'call the dentist' to Today tagged Errands.
+2026-09-03 12:50:38,243  INFO      assistant.api.server — 📱 Response: Added 'call the dentist' to Today tagged Errands. | refresh=todos | parse=rule
+2026-09-03 12:50:42,975  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'action': 'create_event'}
+2026-09-03 12:50:42,989  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:50:42,990  INFO      assistant.api.server — 📱 Self-check token=809eb051 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:50:43,186  INFO      assistant.api.server — 📱 Text command: add buy milk, eggs and bread to my list
+2026-09-03 12:50:43,230  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['create_todo']
+2026-09-03 12:50:43,230  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 12:50:43,233  INFO      assistant.api.server — 📱 Action create_todo → Added 'buy milk', 'buy eggs' and 'buy bread' to Today tagged Groceries.
+2026-09-03 12:50:43,233  INFO      assistant.api.server — 📱 Response: Added 'buy milk', 'buy eggs' and 'buy bread' to Today tagged Groceries. | refresh=todos | parse=rule
+2026-09-03 12:50:48,456  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'titles': ['buy milk, eggs and bread']}
+2026-09-03 12:50:48,461  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:50:48,461  INFO      assistant.api.server — 📱 Self-check token=0fe2db94 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:50:48,674  INFO      assistant.api.server — 📱 Text command: i want to buy chicken and rice
+2026-09-03 12:50:48,703  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['create_todo']
+2026-09-03 12:50:48,703  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 12:50:48,705  INFO      assistant.api.server — 📱 Action create_todo → Added 'buy chicken' and 'buy rice' to Today tagged Groceries.
+2026-09-03 12:50:48,705  INFO      assistant.api.server — 📱 Response: Added 'buy chicken' and 'buy rice' to Today tagged Groceries. | refresh=todos | parse=rule
+2026-09-03 12:50:54,198  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'titles': ['buy chicken and rice']}
+2026-09-03 12:50:54,208  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:50:54,209  INFO      assistant.api.server — 📱 Self-check token=cd2522ae result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:50:54,415  INFO      assistant.api.server — 📱 Text command: remind me to buy chicken, rice and olive oil
+2026-09-03 12:50:54,480  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['create_todo']
+2026-09-03 12:50:54,481  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 12:50:54,485  INFO      assistant.api.server — 📱 Action create_todo → Added 'buy chicken', 'buy rice' and 'buy olive oil' to Today tagged Groceries.
+2026-09-03 12:50:54,485  INFO      assistant.api.server — 📱 Response: Added 'buy chicken', 'buy rice' and 'buy olive oil' to Today tagged Groceries. | refresh=todos | parse=rule
+2026-09-03 12:50:59,550  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'titles': ['buy chicken, rice and olive oil']}
+2026-09-03 12:50:59,559  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:50:59,560  INFO      assistant.api.server — 📱 Self-check token=96165929 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:50:59,683  INFO      assistant.api.server — 📱 Text command: remind me to call mom and dad
+2026-09-03 12:50:59,729  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['create_todo']
+2026-09-03 12:50:59,729  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 12:50:59,731  INFO      assistant.api.server — 📱 Action create_todo → Added 'call mom' and 'call dad' to Today.
+2026-09-03 12:50:59,731  INFO      assistant.api.server — 📱 Response: Added 'call mom' and 'call dad' to Today. | refresh=todos | parse=rule
+2026-09-03 12:51:08,745  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=major action='create_event' patch=None
+2026-09-03 12:51:08,752  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:51:08,753  INFO      assistant.api.server — 📱 Self-check token=0c84c213 result={'ok': False, 'severity': 'major', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:51:08,985  INFO      assistant.api.server — 📱 Text command: remind me to buy a birthday gift for mom and dad
+2026-09-03 12:51:09,022  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['create_todo']
+2026-09-03 12:51:09,023  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 12:51:09,026  INFO      assistant.api.server — 📱 Action create_todo → Added 'buy a birthday gift for mom and dad' to Today.
+2026-09-03 12:51:09,026  INFO      assistant.api.server — 📱 Response: Added 'buy a birthday gift for mom and dad' to Today. | refresh=todos | parse=rule
+2026-09-03 12:51:14,663  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'titles': ['buy a birthday gift for mom', 'buy a birthday gift for dad']}
+2026-09-03 12:51:14,669  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:51:14,670  INFO      assistant.api.server — 📱 Self-check token=5f2e8e1d result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:51:14,714  INFO      assistant.api.server — 📱 Text command: add a task to submit the NLP homework
+2026-09-03 12:51:14,747  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['create_todo']
+2026-09-03 12:51:14,747  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 12:51:14,750  INFO      assistant.api.server — 📱 Action create_todo → Added 'submit the nlp homework' to Today tagged Coursework.
+2026-09-03 12:51:14,750  INFO      assistant.api.server — 📱 Response: Added 'submit the nlp homework' to Today tagged Coursework. | refresh=todos | parse=rule
+2026-09-03 12:51:19,102  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'action': 'create_event'}
+2026-09-03 12:51:19,112  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:51:19,112  INFO      assistant.api.server — 📱 Self-check token=d1273368 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:51:19,170  INFO      assistant.api.server — 📱 Text command: I need to finish the robotics report and email Alon
+2026-09-03 12:51:19,219  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['create_todo']
+2026-09-03 12:51:19,219  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 12:51:19,221  INFO      assistant.api.server — 📱 Action create_todo → Added 'finish the robotics report' and 'email alon' to Today.
+2026-09-03 12:51:19,221  INFO      assistant.api.server — 📱 Response: Added 'finish the robotics report' and 'email alon' to Today. | refresh=todos | parse=rule
+2026-09-03 12:51:24,651  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'titles': ['finish the robotics report', 'email alon']}
+2026-09-03 12:51:24,660  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:51:24,660  INFO      assistant.api.server — 📱 Self-check token=28d33633 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:51:24,926  INFO      assistant.api.server — 📱 Text command: add tasks: submit the Haxaga grades, prepare Netivim slides, pay rent
+2026-09-03 12:51:25,043  INFO      assistant.api.server — 📱 Rule partial handoff: confidence=0.00 missing=['titles']
+2026-09-03 12:51:31,856  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 12:51:31,864  INFO      assistant.api.server — 📱 Action create_todo → Added 'submit Haxaga grades', 'prepare Netivim slides' and 'pay rent' to Today.
+2026-09-03 12:51:31,864  INFO      assistant.api.server — 📱 Response: Added 'submit Haxaga grades', 'prepare Netivim slides' and 'pay rent' to Today. | refresh=todos | parse=hybrid
+2026-09-03 12:51:46,720  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'titles': ['submit Haxaga grades', 'prepare Netivim slides', 'pay rent']}
+2026-09-03 12:51:46,745  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:51:46,746  INFO      assistant.api.server — 📱 Self-check token=6ec9b81e result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:51:46,871  INFO      assistant.api.server — 📱 Text command: remind me tomorrow to send the syllabus to Guri
+2026-09-03 12:51:46,913  INFO      assistant.api.server — 📱 Rule fast-path: confidence=1.00 actions=['create_todo']
+2026-09-03 12:51:46,913  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 12:51:46,914  INFO      assistant.api.server — 📱 Action create_todo → Added 'send the syllabus to guri' to Today tagged Coursework.
+2026-09-03 12:51:46,914  INFO      assistant.api.server — 📱 Response: Added 'send the syllabus to guri' to Today tagged Coursework. | refresh=todos | parse=rule
+2026-09-03 12:51:51,638  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'action': 'create_event'}
+2026-09-03 12:51:51,646  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:51:51,647  INFO      assistant.api.server — 📱 Self-check token=9538a3d8 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:51:51,834  INFO      assistant.api.server — 📱 Text command: add task submit NLP homework due friday
+2026-09-03 12:51:51,862  INFO      assistant.api.server — 📱 Rule fast-path: confidence=1.00 actions=['create_todo']
+2026-09-03 12:51:51,862  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 12:51:51,863  INFO      assistant.api.server — 📱 Action create_todo → Added 'submit nlp homework' to Today tagged Coursework.
+2026-09-03 12:51:51,864  INFO      assistant.api.server — 📱 Response: Added 'submit nlp homework' to Today tagged Coursework. | refresh=todos | parse=rule
+2026-09-03 12:51:56,546  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'titles': ['submit NLP homework due Friday']}
+2026-09-03 12:51:56,552  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:51:56,553  INFO      assistant.api.server — 📱 Self-check token=97d75dda result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:51:56,816  INFO      assistant.api.server — 📱 Text command: two tasks due tomorrow: buy groceries and return the library book
+2026-09-03 12:51:56,864  INFO      assistant.api.server — 📱 Rule partial handoff: confidence=0.32 missing=['date', 'start_time']
+2026-09-03 12:52:02,886  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 12:52:02,892  INFO      assistant.api.server — 📱 Action create_todo → Added 'buy groceries' and 'return the library book' to Today.
+2026-09-03 12:52:02,892  INFO      assistant.api.server — 📱 Response: Added 'buy groceries' and 'return the library book' to Today. | refresh=todos | parse=hybrid
+2026-09-03 12:52:15,566  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'action': 'create_todo', 'parameters': {'tags': ['Groceries']}}
+2026-09-03 12:52:15,576  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:52:15,576  INFO      assistant.api.server — 📱 Self-check token=66093e42 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:52:15,811  INFO      assistant.api.server — 📱 Text command: add buy a gift for Tamar due thursday and book the driving test due next monday
+2026-09-03 12:52:15,863  INFO      assistant.api.server — 📱 Rule partial handoff: confidence=0.54 missing=['start_time', 'start_time']
+2026-09-03 12:52:26,500  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo', 'create_todo']
+2026-09-03 12:52:26,512  INFO      assistant.api.server — 📱 Action create_todo → Added 'buy a gift for Tamar' to Today.
+2026-09-03 12:52:26,514  INFO      assistant.api.server — 📱 Action create_todo → Added 'book the driving test' to Today.
+2026-09-03 12:52:26,515  INFO      assistant.api.server — 📱 Response: Added 'buy a gift for Tamar' to Today. Added 'book the driving test' to Today. | refresh=todos | parse=hybrid
+2026-09-03 12:52:40,131  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'titles': ['book the driving test'], 'due_date': '2026-09-10'}
+2026-09-03 12:52:40,143  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:52:40,144  INFO      assistant.api.server — 📱 Self-check token=e9633955 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:52:40,167  INFO      assistant.api.server — 📱 Text command: put milk and bananas on the groceries list
+2026-09-03 12:52:40,209  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['create_todo']
+2026-09-03 12:52:40,209  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 12:52:40,211  INFO      assistant.api.server — 📱 Action create_todo → Added 'milk' and 'bananas' to Today tagged Groceries.
+2026-09-03 12:52:40,211  INFO      assistant.api.server — 📱 Response: Added 'milk' and 'bananas' to Today tagged Groceries. | refresh=todos | parse=rule
+2026-09-03 12:52:46,242  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'tags': ['Groceries']}
+2026-09-03 12:52:46,251  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:52:46,252  INFO      assistant.api.server — 📱 Self-check token=48b1cc1f result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:52:46,403  INFO      assistant.api.server — 📱 Text command: add to my general list: renew passport
+2026-09-03 12:52:46,429  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['create_todo']
+2026-09-03 12:52:46,429  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 12:52:46,431  INFO      assistant.api.server — 📱 Action create_todo → Added 'renew passport' to General tagged Errands.
+2026-09-03 12:52:46,431  INFO      assistant.api.server — 📱 Response: Added 'renew passport' to General tagged Errands. | refresh=todos | parse=rule
+2026-09-03 12:53:02,778  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'list_name': 'today'}
+2026-09-03 12:53:02,793  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:53:02,794  INFO      assistant.api.server — 📱 Self-check token=ec5f70d7 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:53:02,974  INFO      assistant.api.server — 📱 Text command: remind me to call Ima
+2026-09-03 12:53:03,008  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['create_todo']
+2026-09-03 12:53:03,008  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 12:53:03,009  INFO      assistant.api.server — 📱 Action create_todo → Added 'call ima' to Today.
+2026-09-03 12:53:03,009  INFO      assistant.api.server — 📱 Response: Added 'call ima' to Today. | refresh=todos | parse=rule
+2026-09-03 12:53:08,288  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'action': 'create_event'}
+2026-09-03 12:53:08,297  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:53:08,298  INFO      assistant.api.server — 📱 Self-check token=09e4ee72 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:53:08,432  INFO      assistant.api.server — 📱 Text command: [TASKS VIEW] i need to buy some groceries, i need rice and chicken, the chicken i need to get far away, the rice i can get at whole foods
+2026-09-03 12:53:20,169  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo', 'create_todo']
+2026-09-03 12:53:20,181  INFO      assistant.api.server — 📱 Action create_todo → Added 'buy rice' to Today tagged Groceries.
+2026-09-03 12:53:20,185  INFO      assistant.api.server — 📱 Action create_todo → Added 'get far away' and 'chicken' to Today.
+2026-09-03 12:53:20,185  INFO      assistant.api.server — 📱 Response: Added 'buy rice' to Today tagged Groceries. Added 'get far away' and 'chicken' to Today. | refresh=todos | parse=llm
+2026-09-03 12:53:34,745  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'titles': ['buy some groceries', 'buy rice', 'get far away', 'chicken']}
+2026-09-03 12:53:34,754  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:53:34,754  INFO      assistant.api.server — 📱 Self-check token=a8ded14b result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:53:34,936  INFO      assistant.api.server — 📱 Text command: move my 1pm meeting tomorrow to 3pm
+2026-09-03 12:53:34,990  INFO      assistant.api.server — 📱 Rule partial handoff: confidence=0.10 missing=['match_title']
+2026-09-03 12:53:41,287  INFO      assistant.api.server — 📱 Parsed actions: ['update_event']
+2026-09-03 12:53:41,293  INFO      assistant.api.server — 📱 Action update_event → Updated 'Meeting with Tal' successfully.
+2026-09-03 12:53:41,293  INFO      assistant.api.server — 📱 Response: Updated 'Meeting with Tal' successfully. | refresh=events | parse=hybrid
+2026-09-03 12:53:59,697  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'new_start_time': '15:00'}
+2026-09-03 12:53:59,710  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:53:59,711  INFO      assistant.api.server — 📱 Self-check token=d37580e1 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:53:59,901  INFO      assistant.api.server — 📱 Text command: move the meeting with Tal to 4:30 pm
+2026-09-03 12:53:59,935  INFO      assistant.api.server — 📱 Rule fast-path: confidence=1.00 actions=['update_event']
+2026-09-03 12:53:59,935  INFO      assistant.api.server — 📱 Parsed actions: ['update_event']
+2026-09-03 12:53:59,937  INFO      assistant.api.server — 📱 Action update_event → Updated 'Meeting with Tal' successfully.
+2026-09-03 12:53:59,937  INFO      assistant.api.server — 📱 Response: Updated 'Meeting with Tal' successfully. | refresh=events | parse=rule
+2026-09-03 12:54:05,659  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'new_start_time': '16:30'}
+2026-09-03 12:54:05,669  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:54:05,670  INFO      assistant.api.server — 📱 Self-check token=e92a3c10 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:54:05,897  INFO      assistant.api.server — 📱 Text command: extend the meeting with Tal tomorrow until 3 pm
+2026-09-03 12:54:05,920  INFO      assistant.api.server — 📱 Rule partial handoff: confidence=0.00 missing=['match_title']
+2026-09-03 12:54:13,433  INFO      assistant.api.server — 📱 Parsed actions: ['update_event']
+2026-09-03 12:54:13,438  INFO      assistant.api.server — 📱 Response: I couldn't find an event at 14:00 on 2026-09-04. | refresh=none | parse=hybrid
+2026-09-03 12:54:27,124  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'match_start_time': '14:00', 'new_end_time': '15:00'}
+2026-09-03 12:54:27,135  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:54:27,135  INFO      assistant.api.server — 📱 Self-check token=1566fb56 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:54:27,413  INFO      assistant.api.server — 📱 Text command: rename the meeting with Tal to robotics sync
+2026-09-03 12:54:27,452  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['update_event']
+2026-09-03 12:54:27,452  INFO      assistant.api.server — 📱 Parsed actions: ['update_event']
+2026-09-03 12:54:27,453  INFO      assistant.api.server — 📱 Action update_event → Updated 'robotics sync' successfully.
+2026-09-03 12:54:27,453  INFO      assistant.api.server — 📱 Response: Updated 'robotics sync' successfully. | refresh=events | parse=rule
+2026-09-03 12:54:31,739  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'new_title': 'robotics sync with Tal'}
+2026-09-03 12:54:31,744  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:54:31,745  INFO      assistant.api.server — 📱 Self-check token=c00c88b9 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:54:31,846  INFO      assistant.api.server — 📱 Text command: delete the pizza party on friday
+2026-09-03 12:54:31,879  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.86 actions=['delete_event']
+2026-09-03 12:54:31,879  INFO      assistant.api.server — 📱 Parsed actions: ['delete_event']
+2026-09-03 12:54:31,881  INFO      assistant.api.server — 📱 Action delete_event → Deleted 'Pizza party' from your calendar.
+2026-09-03 12:54:31,881  INFO      assistant.api.server — 📱 Response: Deleted 'Pizza party' from your calendar. | refresh=events | parse=rule
+2026-09-03 12:54:36,433  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'match_date': '2026-09-04'}
+2026-09-03 12:54:36,436  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:54:36,437  INFO      assistant.api.server — 📱 Self-check token=80608616 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:54:36,543  INFO      assistant.api.server — 📱 Text command: cancel my 1 pm meeting tomorrow
+2026-09-03 12:54:36,566  INFO      assistant.api.server — 📱 Rule fast-path: confidence=1.00 actions=['delete_event']
+2026-09-03 12:54:36,566  INFO      assistant.api.server — 📱 Parsed actions: ['delete_event']
+2026-09-03 12:54:36,568  INFO      assistant.api.server — 📱 Action delete_event → Deleted 'Meeting with Tal' from your calendar.
+2026-09-03 12:54:36,568  INFO      assistant.api.server — 📱 Response: Deleted 'Meeting with Tal' from your calendar. | refresh=events | parse=rule
+2026-09-03 12:54:42,820  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'action': 'create_event'}
+2026-09-03 12:54:42,834  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:54:42,834  INFO      assistant.api.server — 📱 Self-check token=b4588863 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:54:43,046  INFO      assistant.api.server — 📱 Text command: move the pizza party to saturday night 8 pm
+2026-09-03 12:54:43,086  INFO      assistant.api.server — 📱 Rule fast-path: confidence=1.00 actions=['update_event']
+2026-09-03 12:54:43,086  INFO      assistant.api.server — 📱 Parsed actions: ['update_event']
+2026-09-03 12:54:43,088  INFO      assistant.api.server — 📱 Action update_event → Updated 'Pizza party' successfully.
+2026-09-03 12:54:43,088  INFO      assistant.api.server — 📱 Response: Updated 'Pizza party' successfully. | refresh=events | parse=rule
+2026-09-03 12:54:48,352  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'new_start_time': '20:00'}
+2026-09-03 12:54:48,355  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:54:48,355  INFO      assistant.api.server — 📱 Self-check token=b60330ba result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:54:48,524  INFO      assistant.api.server — 📱 Text command: what do I have on tomorrow
+2026-09-03 12:54:48,549  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['query_schedule']
+2026-09-03 12:54:48,549  INFO      assistant.api.server — 📱 Parsed actions: ['query_schedule']
+2026-09-03 12:54:48,550  INFO      assistant.api.server — 📱 Action query_schedule → Your schedule is clear tomorrow. Nothing planned.
+2026-09-03 12:54:48,550  INFO      assistant.api.server — 📱 Response: Your schedule is clear tomorrow. Nothing planned. | refresh=none | parse=rule
+2026-09-03 12:54:51,749  INFO      assistant.api.server — 📱 Self-check token=cc95f9d7 result={'ok': True}
+memory: replaying against a copy of the real history (80 KB)
+Running 92 cases against scratch DB /var/folders/0f/nk3dnvrd54jbjz_qn40_ynwh0000gn/T/macal_audit_0xv0wbff/calendar.db
+
+✓ [rule  ]    110ms/  5217ms  set a meeting tomorrow at 2 pm with Ravid at Kems  → ['create_event'] · self-check: ok
+✓ [rule  ]    212ms/  3050ms  set a meeting tomorrow at 9:30 am with Tal at the French Bakery  → ['create_event'] · self-check: ok
+✓ [rule  ]    117ms/  2942ms  set a meeting tomorrow at 6:15 pm with Rei at Golda  → ['create_event'] · self-check: ok
+✓ [llm   ]   5428ms/ 16363ms  dentist appointment on thursday at 9 am  → ['create_event'] · self-check: ok
+✓ [llm   ]   6000ms/ 16668ms  lunch with Tal at noon on the 19th  → ['create_event'] · self-check: ok
+✓ [rule  ]     87ms/  6191ms  add gym at 6 am for one hour tomorrow  → ['create_event'] · self-check: minor not applied
+✓ [llm   ]   6955ms/ 19214ms  meeting with Ravid from 3 to 4:30 pm today  → ['create_event'] · self-check: minor not applied
+✓ [rule  ]   2346ms/ 14030ms  set an event next wednesday at 2pm technion talk regarding project fun  → ['create_event'] · self-check: minor not applied
+✓ [llm   ]   5928ms/ 15347ms  Mincha Maariv at shul tonight at 7:15  → ['create_event'] · self-check: ok
+✓ [llm   ]   6618ms/ 15999ms  Limud Torah at Ohel Ari on tuesday at 9 pm  → ['create_event'] · self-check: ok
+✓ [llm   ]   5381ms/ 14530ms  coffee with Ezra friday morning at 9:15 at the French Bakery  → ['create_event'] · self-check: ok
+✓ [llm   ]   5238ms/ 14642ms  driving lesson thursday 8 am  → ['create_event'] · self-check: ok
+✓ [rule  ]    237ms/  3824ms  schedule a zoom with Guri Karpas about the robotics project on monday   → ['create_event'] · self-check: ok
+✓ [hybrid]   7706ms/ 18743ms  book a haircut for tuesday at half past two  → ['create_event'] · self-check: minor not applied
+✓ [rule  ]   2274ms/ 11050ms  set a meeting for me tomorrow at 4pm execute  → ['create_event'] · self-check: ok
+✓ [llm   ]   6220ms/ 19081ms  meeting tomorrow at 2 sorry not 2, 3 pm with Adin for the project  → ['create_event'] · self-check: minor not applied
+✓ [llm   ]  15499ms/ 26585ms  set a meeting tomorrow at 1 pm, another one at 4 pm and then pizza at   → ['create_event', 'create_event', 'create_event'] · self-check: ok
+✓ [llm   ]  11240ms/ 22595ms  walk Kyra the dog at 3:30 pm today and then go to shul for Mincha Maar  → ['create_event', 'create_event'] · self-check: ok
+✓ [llm   ]   9785ms/ 21906ms  tomorrow gym at 7 am and a meeting with Tal at 11  → ['create_event', 'create_event'] · self-check: minor not applied
+✓ [llm   ]  15466ms/ 26042ms  on thursday I have Shacharit at 6:30 am, a lecture at 10 and dinner wi  → ['create_event', 'create_event', 'create_event'] · self-check: ok
+✓ [llm   ]   7248ms/ 19067ms  two events tomorrow, one at four o'clock meeting with Rei and one at s  → ['create_event', 'create_event'] · self-check: ok
+✓ [llm   ]  11529ms/ 26222ms  meeting with Ravid tomorrow at 2 pm and dentist on thursday at 9 am  → ['create_event', 'create_event'] · self-check: minor not applied
+✓ [hybrid]  13904ms/ 24706ms  set lunch with Tal on monday at noon and coffee with Ezra on friday at  → ['create_event', 'create_event'] · self-check: ok
+✓ [llm   ]  12195ms/ 24315ms  gym tomorrow at 6 am, tuesday at 6 am and friday at 6 am  → ['create_event', 'create_event', 'create_event'] · self-check: minor not applied
+✓ [hybrid]   5374ms/ 17709ms  schedule gym every monday at 6 am  → ['create_event'] · self-check: minor not applied
+✓ [llm   ]   5619ms/ 15128ms  daily Shacharit at 6:30 am  → ['create_event'] · self-check: ok
+✓ [llm   ]   6765ms/ 18086ms  weekly Netivim zoom on wednesdays at 7 pm  → ['create_event'] · self-check: minor not applied
+✗ [llm   ]   9365ms/ 23793ms  set a meeting at 4pm today, but it is only 20 minutes meeting with one  → ['create_event', 'create_event'] · self-check: minor not applied
+      ! no event matching {'date': '2026-09-03', 'start_time': '18:00', 'end_time': '18:40'} in DB [('Meeting with Reards', '2026-09-03', '16:00'), ('Meetings with Kids
+✗ [llm   ]  10986ms/ 24089ms  a meeting for me tomorrow at two one sorry one pm and four pm and then  → ['create_event', 'create_event'] · self-check: minor not applied
+      ! missing action create_event (got ['create_event', 'create_event'])
+      ! no event matching {'date': '2026-09-04', 'start_time': '13:00', 'end_time': '14:00'} in DB [('Meeting', '2026-09-04', '13:00'), ('Pizza Party', '2026-09-04', '1
+✓ [rule  ]    102ms/  4750ms  remind me to buy milk  → ['create_todo'] · self-check: minor not applied
+✓ [rule  ]     44ms/  4946ms  add a task to call the dentist  → ['create_todo'] · self-check: minor not applied
+✓ [rule  ]     64ms/  5474ms  add buy milk, eggs and bread to my list  → ['create_todo'] · self-check: minor not applied
+✓ [rule  ]     44ms/  5713ms  i want to buy chicken and rice  → ['create_todo'] · self-check: minor not applied
+✓ [rule  ]     88ms/  5237ms  remind me to buy chicken, rice and olive oil  → ['create_todo'] · self-check: minor not applied
+✓ [rule  ]     61ms/  9296ms  remind me to call mom and dad  → ['create_todo'] · self-check: major not applied
+✓ [rule  ]     54ms/  5720ms  remind me to buy a birthday gift for mom and dad  → ['create_todo'] · self-check: minor not applied
+✓ [rule  ]     43ms/  4431ms  add a task to submit the NLP homework  → ['create_todo'] · self-check: minor not applied
+✓ [rule  ]     64ms/  5739ms  I need to finish the robotics report and email Alon  → ['create_todo'] · self-check: minor not applied
+✓ [hybrid]   6964ms/ 21921ms  add tasks: submit the Haxaga grades, prepare Netivim slides, pay ren  → ['create_todo'] · self-check: minor not applied
+✓ [rule  ]     61ms/  4952ms  remind me tomorrow to send the syllabus to Guri  → ['create_todo'] · self-check: minor not applied
+✓ [rule  ]     37ms/  4956ms  add task submit NLP homework due friday  → ['create_todo'] · self-check: minor not applied
+✓ [hybrid]   6105ms/ 18968ms  two tasks due tomorrow: buy groceries and return the library book  → ['create_todo'] · self-check: minor not applied
+✓ [hybrid]  10735ms/ 24341ms  add buy a gift for Tamar due thursday and book the driving test due ne  → ['create_todo', 'create_todo'] · self-check: minor not applied
+✓ [rule  ]     58ms/  6218ms  put milk and bananas on the groceries list  → ['create_todo'] · self-check: minor not applied
+✓ [rule  ]     41ms/ 16560ms  add to my general list: renew passport  → ['create_todo'] · self-check: minor not applied
+✓ [rule  ]     45ms/  5434ms  remind me to call Ima  → ['create_todo'] · self-check: minor not applied
+✗ [llm   ]  11800ms/ 26488ms  [TASKS VIEW] i need to buy some groceries, i need rice and chicken, th  → ['create_todo', 'create_todo'] · self-check: minor not applied
+      ! extra actions ['create_todo']
+      ! expected 2 todos, got 3: ['buy rice', 'get far away', 'chicken']
+✓ [hybrid]   6373ms/ 24948ms  move my 1pm meeting tomorrow to 3pm  → ['update_event'] · self-check: minor not applied
+✓ [rule  ]     48ms/  5988ms  move the meeting with Tal to 4:30 pm  → ['update_event'] · self-check: minor not applied
+✗ [hybrid]   7558ms/ 21479ms  extend the meeting with Tal tomorrow until 3 pm  → [] · self-check: minor not applied
+      ! missing action update_event (got [])
+      ! expected 'Meeting with Tal' ending 15:00; have [('Meeting with Tal', '14:00')]
+✓ [rule  ]     54ms/  4420ms  rename the meeting with Tal to robotics sync  → ['update_event'] · self-check: minor not applied
+✓ [rule  ]     44ms/  4681ms  delete the pizza party on friday  → ['delete_event'] · self-check: minor not applied
+✓ [rule  ]     32ms/  6475ms  cancel my 1 pm meeting tomorrow  → ['delete_event'] · self-check: minor not applied
+✓ [rule  ]     54ms/  5472ms  move the pizza party to saturday night 8 pm  → ['update_event'] · self-check: minor not applied
+✓ [rule  ]     30ms/  3385ms  what do I have on tomorrow  → ['query_schedule'] · self-check: ok2026-09-03 12:54:51,922  INFO      assistant.api.server — 📱 Text command: what's on my schedule today
+2026-09-03 12:54:51,949  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['query_schedule']
+2026-09-03 12:54:51,949  INFO      assistant.api.server — 📱 Parsed actions: ['query_schedule']
+2026-09-03 12:54:51,950  INFO      assistant.api.server — 📱 Action query_schedule → Your schedule is clear today. Nothing planned.
+2026-09-03 12:54:51,950  INFO      assistant.api.server — 📱 Response: Your schedule is clear today. Nothing planned. | refresh=none | parse=rule
+2026-09-03 12:54:54,820  INFO      assistant.api.server — 📱 Self-check token=7017c9ff result={'ok': True}
+2026-09-03 12:54:55,036  INFO      assistant.api.server — 📱 Text command: what do I have this week
+2026-09-03 12:54:55,060  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['query_schedule']
+2026-09-03 12:54:55,060  INFO      assistant.api.server — 📱 Parsed actions: ['query_schedule']
+2026-09-03 12:54:55,060  INFO      assistant.api.server — 📱 Action query_schedule → Your schedule is clear this week. Nothing planned.
+2026-09-03 12:54:55,060  INFO      assistant.api.server — 📱 Response: Your schedule is clear this week. Nothing planned. | refresh=none | parse=rule
+2026-09-03 12:54:57,518  INFO      assistant.api.server — 📱 Self-check token=90686453 result={'ok': True}
+2026-09-03 12:54:57,652  INFO      assistant.api.server — 📱 Text command: set a meeting with Ravid tomorrow at 2 pm and remind me to buy a gift for him
+2026-09-03 12:54:57,708  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['create_event', 'create_todo']
+2026-09-03 12:54:57,710  INFO      assistant.api.server — 📱 Parsed actions: ['create_event', 'create_todo']
+2026-09-03 12:54:57,713  INFO      assistant.api.server — 📱 Action create_event → Created event 'meeting with ravid' on Friday, Sep 4, 2026 from 2 PM to 3 PM.
+2026-09-03 12:54:57,719  INFO      assistant.api.server — 📱 Action create_todo → Added 'buy a gift for him' to Today.
+2026-09-03 12:54:57,721  INFO      assistant.api.server — 📱 Response: Created event 'meeting with ravid' on Friday, Sep 4, 2026 from 2 PM to 3 PM. Added 'buy a gift for him' to Today. | refresh=both | parse=rule
+2026-09-03 12:55:03,215  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'action': 'create_event'}
+2026-09-03 12:55:03,221  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:55:03,221  INFO      assistant.api.server — 📱 Self-check token=512748d2 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:55:03,420  INFO      assistant.api.server — 📱 Text command: add a task to prepare slides and set a lecture on wednesday at 10 am
+2026-09-03 12:55:03,469  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['create_todo', 'create_event']
+2026-09-03 12:55:03,470  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo', 'create_event']
+2026-09-03 12:55:03,471  INFO      assistant.api.server — 📱 Action create_todo → Added 'prepare slides' to Today.
+2026-09-03 12:55:03,478  INFO      assistant.api.server — 📱 Action create_event → Created event 'lecture' on Wednesday, Sep 9, 2026 from 10 AM to 11 AM.
+2026-09-03 12:55:03,479  INFO      assistant.api.server — 📱 Response: Added 'prepare slides' to Today. Created event 'lecture' on Wednesday, Sep 9, 2026 from 10 AM to 11 AM. | refresh=both | parse=rule
+2026-09-03 12:55:10,565  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'titles': ['prepare slides', 'set a lecture'], 'due_date': '2026-09-08'}
+2026-09-03 12:55:10,576  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:55:10,577  INFO      assistant.api.server — 📱 Self-check token=9972a0d4 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:55:10,729  INFO      assistant.api.server — 📱 Text command: tomorrow: Shacharit at 6:30, Haxaga TA at 12, dinner with Ezra at 8 pm, and remind me to pay rent
+2026-09-03 12:55:30,301  INFO      assistant.api.server — 📱 Parsed actions: ['create_event', 'create_event', 'create_event', 'create_todo']
+2026-09-03 12:55:30,311  INFO      assistant.api.server — 📱 Action create_event → Created event 'Shacharit' on Friday, Sep 4, 2026 from 6:30 AM to 7:30 AM.
+2026-09-03 12:55:30,314  INFO      assistant.api.server — 📱 Action create_event → Created event 'Haxaga TA' on Friday, Sep 4, 2026 from 12 PM to 1 PM.
+2026-09-03 12:55:30,316  INFO      assistant.api.server — 📱 Action create_event → Created event 'Dinner with Ezra' on Friday, Sep 4, 2026 from 8 PM to 9 PM.
+2026-09-03 12:55:30,324  INFO      assistant.api.server — 📱 Action create_todo → Added 'pay rent' to Today.
+2026-09-03 12:55:30,324  INFO      assistant.api.server — 📱 Response: Created event 'Shacharit' on Friday, Sep 4, 2026 from 6:30 AM to 7:30 AM. Created event 'Haxaga TA' on Friday, Sep 4, 2026 from 12 PM to 1 PM. Created event 'Dinner with Ezra' on Friday, Sep 4, 2026 from 8 PM to 9 PM. Added 'pay rent' to Today. | refresh=both | parse=llm
+2026-09-03 12:55:43,386  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'end_time': '21:00'}
+2026-09-03 12:55:43,396  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:55:43,397  INFO      assistant.api.server — 📱 Self-check token=b0914b07 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:55:43,470  INFO      assistant.api.server — 📱 Text command: set a meeting with Tal
+2026-09-03 12:55:43,494  INFO      assistant.api.server — 📱 Rule partial handoff: confidence=0.37 missing=['date', 'start_time']
+2026-09-03 12:55:53,901  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:55:53,920  INFO      assistant.api.server — 📱 Action create_event → Created event 'meeting with Tal' on Friday, Sep 4, 2026 from 10 AM to 11 AM.
+2026-09-03 12:55:53,920  INFO      assistant.api.server — 📱 Response: Created event 'meeting with Tal' on Friday, Sep 4, 2026 from 10 AM to 11 AM. | refresh=events | parse=hybrid
+2026-09-03 12:56:04,190  INFO      assistant.api.server — 📱 Self-check token=9b8429d0 result={'ok': True}
+2026-09-03 12:56:04,224  INFO      assistant.api.server — 📱 Text command: remind me to call Ravid
+2026-09-03 12:56:04,249  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['create_todo']
+2026-09-03 12:56:04,250  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 12:56:04,255  INFO      assistant.api.server — 📱 Action create_todo → Added 'call ravid' to Today.
+2026-09-03 12:56:04,255  INFO      assistant.api.server — 📱 Response: Added 'call ravid' to Today. | refresh=todos | parse=rule
+2026-09-03 12:56:10,646  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'action': 'create_event'}
+2026-09-03 12:56:10,655  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:56:10,656  INFO      assistant.api.server — 📱 Self-check token=aee3f35c result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:56:10,684  INFO      assistant.api.server — 📱 Text command: remind me about the dentist tomorrow at 9 am
+2026-09-03 12:56:10,715  INFO      assistant.api.server — 📱 Rule fast-path: confidence=1.00 actions=['create_event']
+2026-09-03 12:56:10,716  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:56:10,723  INFO      assistant.api.server — 📱 Action create_event → Created event 'dentist' on Friday, Sep 4, 2026 from 9 AM to 10 AM.
+2026-09-03 12:56:10,723  INFO      assistant.api.server — 📱 Response: Created event 'dentist' on Friday, Sep 4, 2026 from 9 AM to 10 AM. | refresh=events | parse=rule
+2026-09-03 12:56:13,933  INFO      assistant.api.server — 📱 Self-check token=85212aaa result={'ok': True}
+2026-09-03 12:56:14,108  INFO      assistant.api.server — 📱 Text command: meet Ravid at the french bakery in Jerusalem after shacharis at 9 am tomorrow
+2026-09-03 12:56:14,134  INFO      assistant.stt.vocab — Vocab corrections (test): shacharis→Shacharit, Ravid→Ravid, Jerusalem→Jerusalem
+2026-09-03 12:56:26,220  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:56:26,223  INFO      assistant.api.server — 📱 Action create_event → Created event 'Meet Ravid' on Friday, Sep 4, 2026 from 9 AM to 10 AM.
+2026-09-03 12:56:26,223  INFO      assistant.api.server — 📱 Response: Created event 'Meet Ravid' on Friday, Sep 4, 2026 from 9 AM to 10 AM. | refresh=events | parse=llm
+2026-09-03 12:56:39,431  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'Meet Ravid at the French bakery in Jerusalem after Shacharit'}
+2026-09-03 12:56:39,441  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:56:39,442  INFO      assistant.api.server — 📱 Self-check token=fb21d14c result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:56:39,649  INFO      assistant.api.server — 📱 Text command: I had a meeting today at 8:30 pm with Nurit to work on the project
+2026-09-03 12:56:53,236  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:56:53,242  INFO      assistant.api.server — 📱 Action create_event → Created event 'Meeting with Nurit' on Thursday, Sep 3, 2026 from 8:30 PM to 9:30 PM.
+2026-09-03 12:56:53,242  INFO      assistant.api.server — 📱 Response: Created event 'Meeting with Nurit' on Thursday, Sep 3, 2026 from 8:30 PM to 9:30 PM. | refresh=events | parse=llm
+2026-09-03 12:57:10,185  INFO      assistant.api.server — 📱 Self-check token=cbcdd364 result={'ok': True}
+2026-09-03 12:57:10,272  INFO      assistant.api.server — 📱 Text command: coffee friday 9:15 at the French Bakery with Ravid
+2026-09-03 12:57:16,004  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:57:16,007  INFO      assistant.api.server — 📱 Action create_event → Created event 'Coffee with Ravid' on Friday, Sep 4, 2026 from 9:15 AM to 10:15 AM.
+2026-09-03 12:57:16,007  INFO      assistant.api.server — 📱 Response: Created event 'Coffee with Ravid' on Friday, Sep 4, 2026 from 9:15 AM to 10:15 AM. | refresh=events | parse=llm
+2026-09-03 12:57:27,639  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'Coffee with Ravid on Friday'}
+2026-09-03 12:57:27,650  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:57:27,651  INFO      assistant.api.server — 📱 Self-check token=522667fb result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:57:27,896  INFO      assistant.api.server — 📱 Text command: Kems tomorrow at 8 with Ravid and Ezra
+2026-09-03 12:57:35,609  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:57:35,616  INFO      assistant.api.server — 📱 Action create_event → Created event 'Meeting with Ravid and Ezra' on Friday, Sep 4, 2026 from 8 PM to 9 PM.
+2026-09-03 12:57:35,616  INFO      assistant.api.server — 📱 Response: Created event 'Meeting with Ravid and Ezra' on Friday, Sep 4, 2026 from 8 PM to 9 PM. | refresh=events | parse=llm
+2026-09-03 12:57:54,136  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'Meeting with Ravid and Ezra at Kems'}
+2026-09-03 12:57:54,150  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:57:54,151  INFO      assistant.api.server — 📱 Self-check token=53145c40 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:57:54,429  INFO      assistant.api.server — 📱 Text command: pregame at our place wednesday 8:30 pm
+2026-09-03 12:58:01,149  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:58:01,154  INFO      assistant.api.server — 📱 Action create_event → Created event 'pregame' on Wednesday, Sep 9, 2026 from 8:30 PM to 10:30 PM.
+2026-09-03 12:58:01,154  INFO      assistant.api.server — 📱 Response: Created event 'pregame' on Wednesday, Sep 9, 2026 from 8:30 PM to 10:30 PM. | refresh=events | parse=llm
+2026-09-03 12:58:09,837  INFO      assistant.api.server — 📱 Self-check token=41201a74 result={'ok': True}
+2026-09-03 12:58:09,953  INFO      assistant.api.server — 📱 Text command: bowling tuesday night for Rei's birthday
+2026-09-03 12:58:09,970  INFO      assistant.stt.vocab — Vocab corrections (test): Rei's→Edo's
+2026-09-03 12:58:14,712  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:58:14,718  INFO      assistant.api.server — 📱 Action create_event → Created event 'bowling' on Tuesday, Sep 8, 2026 from 10 PM to 1 AM.
+2026-09-03 12:58:14,718  INFO      assistant.api.server — 📱 Response: Created event 'bowling' on Tuesday, Sep 8, 2026 from 10 PM to 1 AM. | refresh=events | parse=llm
+2026-09-03 12:58:25,134  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': "Edo's birthday bowling"}
+2026-09-03 12:58:25,148  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:58:25,148  INFO      assistant.api.server — 📱 Self-check token=fbf10cf8 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:58:25,290  INFO      assistant.api.server — 📱 Text command: zoom with Alon thursday at 3 pm
+2026-09-03 12:58:31,387  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:58:31,394  INFO      assistant.api.server — 📱 Action create_event → Created event 'Zoom with Alon' on Thursday, Sep 3, 2026 from 3 PM to 4 PM.
+2026-09-03 12:58:31,394  INFO      assistant.api.server — 📱 Response: Created event 'Zoom with Alon' on Thursday, Sep 3, 2026 from 3 PM to 4 PM. | refresh=events | parse=llm
+2026-09-03 12:58:43,128  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'Zoom with Alon on Thursday', 'date': '2026-09-03'}
+2026-09-03 12:58:43,138  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:58:43,139  INFO      assistant.api.server — 📱 Self-check token=2e22680c result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:58:43,238  INFO      assistant.api.server — 📱 Text command: lunch 12:30 with Tal on campus tomorrow
+2026-09-03 12:58:48,361  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:58:48,366  INFO      assistant.api.server — 📱 Action create_event → Created event 'Lunch with Tal' on Friday, Sep 4, 2026 from 12:30 PM to 1:30 PM.
+2026-09-03 12:58:48,366  INFO      assistant.api.server — 📱 Response: Created event 'Lunch with Tal' on Friday, Sep 4, 2026 from 12:30 PM to 1:30 PM. | refresh=events | parse=llm
+2026-09-03 12:58:59,324  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'Lunch with Tal on campus'}
+2026-09-03 12:58:59,330  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:58:59,330  INFO      assistant.api.server — 📱 Self-check token=43594b38 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:58:59,487  INFO      assistant.api.server — 📱 Text command: tennis wednesday at 17:30
+2026-09-03 12:59:05,176  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:59:05,181  INFO      assistant.api.server — 📱 Action create_event → Created event 'Tennis' on Wednesday, Sep 9, 2026 from 5:30 PM to 6:30 PM.
+2026-09-03 12:59:05,181  INFO      assistant.api.server — 📱 Response: Created event 'Tennis' on Wednesday, Sep 9, 2026 from 5:30 PM to 6:30 PM. | refresh=events | parse=llm
+2026-09-03 12:59:13,867  INFO      assistant.api.server — 📱 Self-check token=6454e16c result={'ok': True}
+2026-09-03 12:59:13,995  INFO      assistant.api.server — 📱 Text command: pick up the package from Parcel Home on Hazayit on friday
+2026-09-03 12:59:14,029  INFO      assistant.api.server — 📱 Rule fast-path: confidence=1.00 actions=['create_todo']
+2026-09-03 12:59:14,029  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 12:59:14,034  INFO      assistant.api.server — 📱 Action create_todo → Added 'pick up package' to Today tagged Errands.
+2026-09-03 12:59:14,034  INFO      assistant.api.server — 📱 Response: Added 'pick up package' to Today tagged Errands. | refresh=todos | parse=rule
+2026-09-03 12:59:18,084  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'action': 'create_event'}
+2026-09-03 12:59:18,094  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:59:18,095  INFO      assistant.api.server — 📱 Self-check token=92e316f1 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:59:18,180  INFO      assistant.api.server — 📱 Text command: night shift tomorrow from 8 pm to 6 am
+2026-09-03 12:59:18,211  INFO      assistant.api.server — 📱 Rule partial handoff: confidence=0.10 missing=['match_title']
+2026-09-03 12:59:23,618  INFO      assistant.api.server — 📱 Parsed actions: ['update_event']
+2026-09-03 12:59:23,620  INFO      assistant.api.server — 📱 Response: I couldn't find an event matching 'night shift'. | refresh=none | parse=hybrid
+2026-09-03 12:59:34,031  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'new_start_time': '22:00'}
+2026-09-03 12:59:34,041  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:59:34,041  INFO      assistant.api.server — 📱 Self-check token=48daf5b8 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:59:34,231  INFO      assistant.api.server — 📱 Text command: Netivim zoom 1800-2000 tonight
+2026-09-03 12:59:39,350  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:59:39,368  INFO      assistant.api.server — 📱 Action create_event → Created event 'Netivim Zoom' on Thursday, Sep 3, 2026 from 6 PM to 8 PM.
+2026-09-03 12:59:39,368  INFO      assistant.api.server — 📱 Response: Created event 'Netivim Zoom' on Thursday, Sep 3, 2026 from 6 PM to 8 PM. | refresh=events | parse=llm
+2026-09-03 12:59:49,601  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'Netivim Zoom tonight'}
+2026-09-03 12:59:49,612  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 12:59:49,613  INFO      assistant.api.server — 📱 Self-check token=1bcc82e5 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 12:59:49,684  INFO      assistant.api.server — 📱 Text command: Shabbat lunch at Ravid's this saturday 12:30
+2026-09-03 12:59:49,703  INFO      assistant.stt.vocab — Vocab corrections (test): Ravid's→Ravid
+2026-09-03 12:59:56,009  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 12:59:56,012  INFO      assistant.api.server — 📱 Action create_event → Created event 'Shabbat lunch at Ravid' on Saturday, Sep 5, 2026 from 12:30 PM to 1:30 PM.
+2026-09-03 12:59:56,012  INFO      assistant.api.server — 📱 Response: Created event 'Shabbat lunch at Ravid' on Saturday, Sep 5, 2026 from 12:30 PM to 1:30 PM. | refresh=events | parse=llm
+2026-09-03 13:00:05,066  INFO      assistant.api.server — 📱 Self-check token=44115f38 result={'ok': True}
+2026-09-03 13:00:05,301  INFO      assistant.api.server — 📱 Text command: meeting with Guri moved from 9:30 to 9 on wednesday
+2026-09-03 13:00:05,342  INFO      assistant.api.server — 📱 Rule fast-path: confidence=1.00 actions=['update_event']
+2026-09-03 13:00:05,342  INFO      assistant.api.server — 📱 Parsed actions: ['update_event']
+2026-09-03 13:00:08,373  INFO      assistant.api.server — 📱 Response: I couldn't find an event matching 'guri'. | refresh=none | parse=rule
+2026-09-03 13:00:19,293  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'new_start_time': '09:00'}
+2026-09-03 13:00:19,307  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 13:00:19,308  INFO      assistant.api.server — 📱 Self-check token=8cff239e result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 13:00:19,492  INFO      assistant.api.server — 📱 Text command: Haxaga TA session mondays at noon
+2026-09-03 13:00:23,483  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 13:00:23,492  INFO      assistant.api.server — 📱 Action create_event → Created recurring weekly event 'Haxaga TA session' starting on Monday, Sep 7, 2026.
+2026-09-03 13:00:23,492  INFO      assistant.api.server — 📱 Response: Created recurring weekly event 'Haxaga TA session' starting on Monday, Sep 7, 2026. | refresh=events | parse=llm
+2026-09-03 13:00:34,156  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'Haxaga TA session'}
+2026-09-03 13:00:34,169  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 13:00:34,170  INFO      assistant.api.server — 📱 Self-check token=992bf823 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 13:00:34,322  INFO      assistant.api.server — 📱 Text command: remind me to send Ravid the tzofim code
+2026-09-03 13:00:34,349  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.95 actions=['create_todo']
+2026-09-03 13:00:34,349  INFO      assistant.api.server — 📱 Parsed actions: ['create_todo']
+2026-09-03 13:00:34,353  INFO      assistant.api.server — 📱 Action create_todo → Added 'send ravid the tzofim code' to Today.
+2026-09-03 13:00:34,353  INFO      assistant.api.server — 📱 Response: Added 'send ravid the tzofim code' to Today. | refresh=todos | parse=rule
+2026-09-03 13:00:38,398  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'action': 'create_todo'}
+2026-09-03 13:00:38,406  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 13:00:38,406  INFO      assistant.api.server — 📱 Self-check token=fd424e3f result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 13:00:38,502  INFO      assistant.api.server — 📱 Text command: sadna on sunday the 15th at 9 am then driving lesson at 8 am
+2026-09-03 13:00:48,642  INFO      assistant.api.server — 📱 Parsed actions: ['create_event', 'create_event']
+2026-09-03 13:00:48,661  INFO      assistant.api.server — 📱 Action create_event → Created event 'Driving Lesson' on Sunday, Sep 6, 2026 from 8 AM to 9 AM.
+2026-09-03 13:00:48,663  INFO      assistant.api.server — 📱 Action create_event → Created event 'Sadna' on Tuesday, Sep 15, 2026 from 9 AM to 10 AM.
+2026-09-03 13:00:48,663  INFO      assistant.api.server — 📱 Response: Created event 'Driving Lesson' on Sunday, Sep 6, 2026 from 8 AM to 9 AM. Created event 'Sadna' on Tuesday, Sep 15, 2026 from 9 AM to 10 AM. | refresh=events | parse=llm
+2026-09-03 13:01:00,622  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'Sadna on Sunday the 15th at 9 am'}
+2026-09-03 13:01:00,632  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 13:01:00,632  INFO      assistant.api.server — 📱 Self-check token=e9715bb7 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 13:01:00,776  INFO      assistant.api.server — 📱 Text command: sunday 9 am the NLP seminar with Yotam
+2026-09-03 13:01:06,996  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 13:01:07,003  INFO      assistant.api.server — 📱 Action create_event → Created event 'NLP seminar with Yotam' on Sunday, Sep 6, 2026 from 9 AM to 10 AM.
+2026-09-03 13:01:07,003  INFO      assistant.api.server — 📱 Response: Created event 'NLP seminar with Yotam' on Sunday, Sep 6, 2026 from 9 AM to 10 AM. | refresh=events | parse=llm
+2026-09-03 13:01:15,826  INFO      assistant.api.server — 📱 Self-check token=07537b85 result={'ok': True}
+2026-09-03 13:01:16,089  INFO      assistant.api.server — 📱 Text command: meeting with Tal on monday at 9 am about Netivim
+2026-09-03 13:01:22,321  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 13:01:22,327  INFO      assistant.api.server — 📱 Action create_event → Created event 'Meeting with Tal' on Monday, Sep 7, 2026 from 9 AM to 10 AM.
+2026-09-03 13:01:22,327  INFO      assistant.api.server — 📱 Response: Created event 'Meeting with Tal' on Monday, Sep 7, 2026 from 9 AM to 10 AM. | refresh=events | parse=llm
+2026-09-03 13:01:31,053  INFO      assistant.api.server — 📱 Self-check token=f2440ff0 result={'ok': True}
+2026-09-03 13:01:31,118  INFO      assistant.api.server — 📱 Text command: set the robotics project with Ofir at Jerusalem on friday at 1 pm
+2026-09-03 13:01:31,139  INFO      assistant.stt.vocab — Vocab corrections (test): at Jerusalem→Park Jerusalem
+2026-09-03 13:01:31,157  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.90 actions=['create_event']
+2026-09-03 13:01:31,157  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 13:01:31,159  INFO      assistant.api.server — 📱 Action create_event → Created event 'robotics project' on Friday, Sep 4, 2026 from 1 PM to 2 PM.
+2026-09-03 13:01:31,160  INFO      assistant.api.server — 📱 Response: Created event 'robotics project' on Friday, Sep 4, 2026 from 1 PM to 2 PM. | refresh=events | parse=rule
+2026-09-03 13:01:35,698  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'robotics project with Ofir Park Jerusalem'}
+2026-09-03 13:01:35,704  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 13:01:35,705  INFO      assistant.api.server — 📱 Self-check token=6432603c result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 13:01:35,823  INFO      assistant.api.server — 📱 Text command: meeting with Ravid on monday at 9:30 am about Bagrut prep
+2026-09-03 13:01:42,086  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 13:01:42,093  INFO      assistant.api.server — 📱 Action create_event → Created event 'Meeting with Ravid' on Monday, Sep 7, 2026 from 9:30 AM to 10:30 AM.
+2026-09-03 13:01:42,093  INFO      assistant.api.server — 📱 Response: Created event 'Meeting with Ravid' on Monday, Sep 7, 2026 from 9:30 AM to 10:30 AM. | refresh=events | parse=llm
+2026-09-03 13:01:50,748  INFO      assistant.api.server — 📱 Self-check token=a51ad3d1 result={'ok': True}
+2026-09-03 13:01:50,969  INFO      assistant.api.server — 📱 Text command: meeting with Ravid on friday at 4 pm about Haxaga
+2026-09-03 13:01:57,202  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 13:01:57,207  INFO      assistant.api.server — 📱 Action create_event → Created event 'Meeting with Ravid' on Friday, Sep 4, 2026 from 4 PM to 5 PM.
+2026-09-03 13:01:57,207  INFO      assistant.api.server — 📱 Response: Created event 'Meeting with Ravid' on Friday, Sep 4, 2026 from 4 PM to 5 PM. | refresh=events | parse=llm
+2026-09-03 13:02:05,976  INFO      assistant.api.server — 📱 Self-check token=f6d54354 result={'ok': True}
+2026-09-03 13:02:06,242  INFO      assistant.api.server — 📱 Text command: friday 11 am Netivim with Eitan
+2026-09-03 13:02:12,343  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 13:02:12,348  INFO      assistant.api.server — 📱 Action create_event → Created event 'Netivim with Eitan' on Friday, Sep 4, 2026 from 11 AM to 12 PM.
+2026-09-03 13:02:12,348  INFO      assistant.api.server — 📱 Response: Created event 'Netivim with Eitan' on Friday, Sep 4, 2026 from 11 AM to 12 PM. | refresh=events | parse=llm
+2026-09-03 13:02:20,993  INFO      assistant.api.server — 📱 Self-check token=3ff78fa0 result={'ok': True}
+2026-09-03 13:02:21,122  INFO      assistant.api.server — 📱 Text command: meeting with Ezra on friday at 7 pm about the robotics project
+2026-09-03 13:02:27,206  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 13:02:27,211  INFO      assistant.api.server — 📱 Action create_event → Created event 'Meeting with Ezra' on Friday, Sep 4, 2026 from 7 PM to 9 PM.
+2026-09-03 13:02:27,211  INFO      assistant.api.server — 📱 Response: Created event 'Meeting with Ezra' on Friday, Sep 4, 2026 from 7 PM to 9 PM. | refresh=events | parse=llm
+2026-09-03 13:02:35,869  INFO      assistant.api.server — 📱 Self-check token=acf09609 result={'ok': True}
+2026-09-03 13:02:35,993  INFO      assistant.api.server — 📱 Text command: set the NLP seminar with Eitan at Feldman on sunday at 7:30 pm
+2026-09-03 13:02:36,027  INFO      assistant.api.server — 📱 Rule fast-path: confidence=1.00 actions=['create_event']
+2026-09-03 13:02:36,027  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 13:02:36,028  INFO      assistant.api.server — 📱 Action create_event → Created event 'nlp seminar' on Sunday, Sep 6, 2026 from 7:30 PM to 8:30 PM.
+2026-09-03 13:02:36,028  INFO      assistant.api.server — 📱 Response: Created event 'nlp seminar' on Sunday, Sep 6, 2026 from 7:30 PM to 8:30 PM. | refresh=events | parse=rule
+2026-09-03 13:02:38,431  INFO      assistant.api.server — 📱 Self-check token=a20c3f85 result={'ok': True}
+2026-09-03 13:02:38,642  INFO      assistant.api.server — 📱 Text command: meeting with Adin on sunday at 2 pm about Haxaga
+2026-09-03 13:02:44,773  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 13:02:44,778  INFO      assistant.api.server — 📱 Action create_event → Created event 'Meeting with Adin about Haxaga' on Sunday, Sep 6, 2026 from 2 PM to 4 PM.
+2026-09-03 13:02:44,778  INFO      assistant.api.server — 📱 Response: Created event 'Meeting with Adin about Haxaga' on Sunday, Sep 6, 2026 from 2 PM to 4 PM. | refresh=events | parse=llm
+2026-09-03 13:02:53,387  INFO      assistant.api.server — 📱 Self-check token=df25f6f7 result={'ok': True}
+2026-09-03 13:02:53,543  INFO      assistant.api.server — 📱 Text command: wednesday 2:30 pm Netivim with Ezra
+2026-09-03 13:02:59,572  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 13:02:59,577  INFO      assistant.api.server — 📱 Action create_event → Created event 'Netivim with Ezra' on Wednesday, Sep 9, 2026 from 2:30 PM to 3:30 PM.
+2026-09-03 13:02:59,577  INFO      assistant.api.server — 📱 Response: Created event 'Netivim with Ezra' on Wednesday, Sep 9, 2026 from 2:30 PM to 3:30 PM. | refresh=events | parse=llm
+2026-09-03 13:03:08,267  INFO      assistant.api.server — 📱 Self-check token=1088a0f0 result={'ok': True}
+2026-09-03 13:03:08,360  INFO      assistant.api.server — 📱 Text command: set Netivim with Adin at Technion on friday at 10 am
+2026-09-03 13:03:08,378  INFO      assistant.stt.vocab — Vocab corrections (test): Technion on→Technion dorms
+2026-09-03 13:03:08,395  INFO      assistant.api.server — 📱 Rule fast-path: confidence=0.90 actions=['create_event']
+2026-09-03 13:03:08,395  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 13:03:08,397  INFO      assistant.api.server — 📱 Action create_event → Created event 'netivim' on Friday, Sep 4, 2026 from 10 AM to 11 AM.
+2026-09-03 13:03:08,397  INFO      assistant.api.server — 📱 Response: Created event 'netivim' on Friday, Sep 4, 2026 from 10 AM to 11 AM. | refresh=events | parse=rule
+2026-09-03 13:03:12,916  INFO      assistant.intent.parser — 🖥️ Background verify correction — severity=minor action=None patch={'title': 'Netivim with Adin at Technion dorms'}
+2026-09-03 13:03:12,925  WARNING   assistant.api.server — 📱 Self-check correction not applied: self-check is advisory (config self_check_apply=false)
+2026-09-03 13:03:12,926  INFO      assistant.api.server — 📱 Self-check token=dc8d3f06 result={'ok': False, 'severity': 'minor', 'applied': False, 'speech': '', 'refresh': ''}
+2026-09-03 13:03:13,078  INFO      assistant.api.server — 📱 Text command: monday 5:30 pm Bagrut prep with Rei
+2026-09-03 13:03:19,095  INFO      assistant.api.server — 📱 Parsed actions: ['create_event']
+2026-09-03 13:03:19,101  INFO      assistant.api.server — 📱 Action create_event → Created event 'Bagrut prep with Rei' on Monday, Sep 7, 2026 from 5:30 PM to 6:30 PM.
+2026-09-03 13:03:19,101  INFO      assistant.api.server — 📱 Response: Created event 'Bagrut prep with Rei' on Monday, Sep 7, 2026 from 5:30 PM to 6:30 PM. | refresh=events | parse=llm
+2026-09-03 13:03:27,740  INFO      assistant.api.server — 📱 Self-check token=ccf75d00 result={'ok': True}
+
+✓ [rule  ]     35ms/  3101ms  what's on my schedule today  → ['query_schedule'] · self-check: ok
+✓ [rule  ]     31ms/  2602ms  what do I have this week  → ['query_schedule'] · self-check: ok
+✓ [rule  ]     81ms/  5757ms  set a meeting with Ravid tomorrow at 2 pm and remind me to buy a gift  → ['create_event', 'create_todo'] · self-check: minor not applied
+✓ [rule  ]     73ms/  7297ms  add a task to prepare slides and set a lecture on wednesday at 10 am  → ['create_todo', 'create_event'] · self-check: minor not applied
+✓ [llm   ]  19621ms/ 32732ms  tomorrow: Shacharit at 6:30, Haxaga TA at 12, dinner with Ezra at 8 pm  → ['create_event', 'create_event', 'create_event', 'create_todo'] · self-check: minor not applied
+✓ [hybrid]  10460ms/ 20731ms  set a meeting with Tal  → ['create_event'] · self-check: ok
+✓ [rule  ]     44ms/  6448ms  remind me to call Ravid  → ['create_todo'] · self-check: minor not applied
+✓ [rule  ]     49ms/  3398ms  remind me about the dentist tomorrow at 9 am  → ['create_event'] · self-check: ok
+✓ [llm   ]  12133ms/ 25513ms  meet Ravid at the french bakery in Jerusalem after shacharis at 9 am tom  → ['create_event'] · self-check: minor not applied
+✓ [llm   ]  13619ms/ 30609ms  I had a meeting today at 8:30 pm with Nurit to work on the project  → ['create_event'] · self-check: ok
+✓ [llm   ]   5755ms/ 17598ms  coffee friday 9:15 at the French Bakery with Ravid  → ['create_event'] · self-check: minor not applied
+✓ [llm   ]   7736ms/ 26508ms  Kems tomorrow at 8 with Ravid and Ezra  → ['create_event'] · self-check: minor not applied
+✓ [llm   ]   6748ms/ 15502ms  pregame at our place wednesday 8:30 pm  → ['create_event'] · self-check: ok
+✓ [llm   ]   4786ms/ 15316ms  bowling tuesday night for Rei's birthday  → ['create_event'] · self-check: minor not applied
+✓ [llm   ]   6121ms/ 17924ms  zoom with Alon thursday at 3 pm  → ['create_event'] · self-check: minor not applied
+✓ [llm   ]   5150ms/ 16232ms  lunch 12:30 with Tal on campus tomorrow  → ['create_event'] · self-check: minor not applied
+✓ [llm   ]   5711ms/ 14492ms  tennis wednesday at 17:30  → ['create_event'] · self-check: ok
+✓ [rule  ]     52ms/  4166ms  pick up the package from Parcel Home on Hazayit on friday  → ['create_todo'] · self-check: minor not applied
+✗ [hybrid]   5455ms/ 16030ms  night shift tomorrow from 8 pm to 6 am  → [] · self-check: minor not applied
+      ! missing action create_event (got [])
+      ! no event matching {'date': '2026-09-04', 'start_time': '20:00'} in DB []
+✓ [llm   ]   5155ms/ 15431ms  Netivim zoom 1800-2000 tonight  → ['create_event'] · self-check: minor not applied
+✓ [llm   ]   6341ms/ 15590ms  Shabbat lunch at Ravid's this saturday 12:30  → ['create_event'] · self-check: ok
+✗ [rule  ]   3091ms/ 14164ms  meeting with Guri moved from 9:30 to 9 on wednesday  → [] · self-check: minor not applied
+      ! missing action create_event|update_event (got [])
+      ! no event matching {} in DB []
+✓ [llm   ]   4021ms/ 14815ms  Haxaga TA session mondays at noon  → ['create_event'] · self-check: minor not applied
+✓ [rule  ]     44ms/  4165ms  remind me to send Ravid the tzofim code  → ['create_todo'] · self-check: minor not applied
+✓ [llm   ]  10179ms/ 22257ms  sadna on sunday the 15th at 9 am then driving lesson at 8 am  → ['create_event', 'create_event'] · self-check: minor not applied
+✓ [llm   ]   6244ms/ 15288ms  sunday 9 am the NLP seminar with Yotam  → ['create_event'] · self-check: ok
+✓ [llm   ]   6253ms/ 15002ms  meeting with Tal on monday at 9 am about Netivim  → ['create_event'] · self-check: ok
+✓ [rule  ]     57ms/  4680ms  set the robotics project with Ofir at Jerusalem on friday at 1 pm  → ['create_event'] · self-check: minor not applied
+✓ [llm   ]   6290ms/ 15121ms  meeting with Ravid on monday at 9:30 am about Bagrut prep  → ['create_event'] · self-check: ok
+✓ [llm   ]   6253ms/ 15255ms  meeting with Ravid on friday at 4 pm about Haxaga  → ['create_event'] · self-check: ok
+✓ [llm   ]   6118ms/ 14858ms  friday 11 am Netivim with Eitan  → ['create_event'] · self-check: ok
+✓ [llm   ]   6111ms/ 14861ms  meeting with Ezra on friday at 7 pm about the robotics project  → ['create_event'] · self-check: ok
+✓ [rule  ]     44ms/  2622ms  set the NLP seminar with Eitan at Feldman on sunday at 7:30 pm  → ['create_event'] · self-check: ok
+✓ [llm   ]   6151ms/ 14881ms  meeting with Adin on sunday at 2 pm about Haxaga  → ['create_event'] · self-check: ok
+✓ [llm   ]   6051ms/ 14795ms  wednesday 2:30 pm Netivim with Ezra  → ['create_event'] · self-check: ok
+✓ [rule  ]     47ms/  4697ms  set Netivim with Adin at Technion on friday at 10 am  → ['create_event'] · self-check: minor not applied
+✓ [llm   ]   6040ms/ 14801ms  monday 5:30 pm Bagrut prep with Rei  → ['create_event'] · self-check: ok
+
+Report: DOCUMENTATION/experiments/memory_scaling/A_k1.md

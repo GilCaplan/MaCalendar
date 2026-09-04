@@ -1,0 +1,24 @@
+2026-09-03 12:26:41  waiting for the already-running dataset-A k=4 job to finish, if any
+2026-09-03 12:26:41  clear to proceed
+2026-09-03 12:26:41  start A_k0: .venv/bin/python3 -m scripts.audit_assistant --out DOCUMENTATION/experiments/memory_scaling/A_k0.md --memory --memory-k 0
+2026-09-03 12:42:21  done  A_k0 (exit 0)
+2026-09-03 12:42:21  start A_k1: .venv/bin/python3 -m scripts.audit_assistant --out DOCUMENTATION/experiments/memory_scaling/A_k1.md --memory --memory-k 1
+2026-09-03 13:03:28  done  A_k1 (exit 0)
+2026-09-03 13:03:28  start A_k2: .venv/bin/python3 -m scripts.audit_assistant --out DOCUMENTATION/experiments/memory_scaling/A_k2.md --memory --memory-k 2
+2026-09-03 13:30:09  done  A_k2 (exit 0)
+2026-09-03 13:30:09  skip A_k4 (already exists)
+2026-09-03 13:30:09  start A_k8: .venv/bin/python3 -m scripts.audit_assistant --out DOCUMENTATION/experiments/memory_scaling/A_k8.md --memory --memory-k 8
+2026-09-03 13:57:35  done  A_k8 (exit 0)
+2026-09-03 13:57:35  building dataset B (held-out day, corrupted row removed)
+2026-09-03 13:57:35  start B_k0: .venv/bin/python3 -m scripts.audit_assistant --out DOCUMENTATION/experiments/memory_scaling/B_k0.md --memory --memory-k 0 --memory-source DOCUMENTATION/experiments/memory_scaling/dataset_b_heldout.db
+2026-09-03 13:57:35  done  B_k0 (exit 2)
+2026-09-03 13:57:35  start B_k4: .venv/bin/python3 -m scripts.audit_assistant --out DOCUMENTATION/experiments/memory_scaling/B_k4.md --memory --memory-k 4 --memory-source DOCUMENTATION/experiments/memory_scaling/dataset_b_heldout.db
+2026-09-03 13:57:35  done  B_k4 (exit 2)
+2026-09-03 13:57:35  building the external pool (this is the long one)
+./DOCUMENTATION/experiments/memory_scaling/run_overnight.sh: line 69: 71871 Terminated: 15          $PY -m scripts.build_memory_scaling_pool >> "$EXP/build.log" 2>&1
+2026-09-03 16:46:35  pool build finished (or already complete)
+dummy_60.db: 60 rows, matches history_60.json exactly
+dummy_300.db: 300 rows, matches history_300.json exactly
+dummy_1000.db: 1000 rows, matches history_1000.json exactly
+REFUSING to write dummy_3000.db: only 2431/3000 of history_3000.json's rows have been built yet (build is still running, or hasn't reached row 2431 — re-run --slice-tiers once it has)
+2026-09-03 16:46:35  start C_k0_shared: .venv/bin/python3 -m scripts.audit_assistant --out DOCUMENTATION/experiments/memory_scaling/C_k0_shared.md --memory --memory-k 0 --memory-source DOCUMENTATION/experiments/memory_scaling/pool_3000.db

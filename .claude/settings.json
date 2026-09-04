@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk '{print $2, $11, $12, $13, $14}')",
+      "Bash(git -C /Users/USER/Desktop/Personal_Projects/MACalendar status --short)",
+      "Bash(git -C /Users/USER/Desktop/Personal_Projects/MACalendar stash list)"
+    ]
+  }
+}
