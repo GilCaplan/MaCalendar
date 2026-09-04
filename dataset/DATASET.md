@@ -32,9 +32,9 @@ naturally stratified.
 
 | rung | ranks | n | ~time (8B, serial) | one flipped prompt = | use |
 |---|---|---|---|---|---|
-| dev-fast | 1–150 | 150 | ~22 min | 0.67 pt | rapid single-component cycles |
-| dev-full | 1–600 | 600 | ~90 min | 0.17 pt | confirm a fast win |
-| held-out | 601–3000 | 2400 | ~7 h | 0.04 pt | generalisation — **never mined** |
+| dev-fast | 1–250 | 250 | ~80 min | 0.40 pt | rapid single-component cycles |
+| dev-full | 1–600 | 600 | ~3¼ h | 0.17 pt | confirm a fast win |
+| held-out | 601–3000 | 2400 | ~13 h | 0.04 pt | generalisation — **never mined** |
 
 Dev (1–600) is the only region we inspect/tune against. Held-out (601–3000) is
 sealed: measured, never used to pick a fix, so its delta is the honest
@@ -70,17 +70,23 @@ reimplemented.
 
 The whole point: run the engine on a subset's inputs (prompts, timed to mimic
 real-time use), compare the produced actions against the construction ground
-truth via the metrics, read *which component* failed, change that one
-component, rerun. Start on the small subset for big deltas; upsize as deltas
-shrink so we don't overfit to a small slice.
+truth via the metrics, read *which component* failed and *why*, change that one
+component, rerun. **Start on the smallest rich-enough slice (dev-fast) — never
+the full 3000 as the working loop — and upsize as deltas shrink** so we don't
+overfit to a small slice.
 
-    python -m scripts.engine_dataset_compare --max-rank 150    # dev-fast
-    python -m scripts.engine_dataset_compare --max-rank 600    # dev-full
-    python -m scripts.engine_dataset_compare --min-rank 601    # held-out
+    python -m scripts.engine_dataset_compare --limit 0 --max-rank 250  # dev-fast (~80 min)
+    python -m scripts.engine_dataset_compare --limit 0 --max-rank 600  # dev-full
+    python -m scripts.engine_dataset_compare --limit 0 --min-rank 601  # held-out
 
-One cycle: cluster dev failures by the guilty stage → pick ONE pile → change
-only that stage (contracts frozen) → measure the targeted metric+slice →
-graduate to the next rung if it clearly moved, else drop. Full protocol:
+(`--limit 0` disables the default 150-row cap so the rank slice is taken whole.)
+
+Each cycle is a **hypothesis**: predict which component you're changing and what
+metric+slice you expect to move (and by how much), run it, then compare actual
+vs. expected — and note any novel/unexpected effects — in `RESULTS.md`. A score
+is a pointer, not the point: read the breakdown (`by_complexity`/
+`by_compound_kind`) and the failing rows to understand what it *means*. One
+component per cycle, big-picture design and contracts frozen. Full protocol:
 `DOCUMENTATION/experiments/ITERATION_PROTOCOL.md`.
 
 ## Reverting / comparing an iteration

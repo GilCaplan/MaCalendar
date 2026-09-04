@@ -31,8 +31,12 @@ hand-written audit corpus is now only a regression floor.
 ## The loop
 
 `dataset/DATASET.md` + `DOCUMENTATION/experiments/ITERATION_PROTOCOL.md`:
-run a subset → compare to ground truth via the metrics → fix the one guilty
-stage → rerun; small subset for big deltas, upsize to avoid overfitting.
+a supervised-ML loop — run the **smallest rich-enough subset** (dev-fast, ranks
+1–250, ~80 min; **never the full 3000 as the working loop**) → score via the
+metrics →
+understand *why* (read the breakdown + the failing rows, not just the number) →
+**hypothesise** and fix ONE component's implementation (design frozen) → rerun →
+compare actual vs. expected in `RESULTS.md` → upsize only as gains slow.
 
 ## In flight / next
 
@@ -47,8 +51,19 @@ stage → rerun; small subset for big deltas, upsize to avoid overfitting.
     (ready-to-POST bodies); Mac `_RevertBar` + iOS banner re-create what was
     undone. Dormant until `self_check_apply` is on (removals are advisory by
     default). **HUD needs a restart to show it.**
-- Next tuning target: the event-drop on event+task compounds (metric:
-  count-correctness, slice: event+task).
+- **Deep-track improvement loop — RUNNING (started 2026-09-04 ~14:20).**
+  Cycle-1 measurement in flight: dev-fast (`--limit 0 --max-rank 250`),
+  scratch-isolated, background; outputs land in
+  `DOCUMENTATION/experiments/engine_compare/` (`triage.json`,
+  `engine_run.score.md`; the previous run is preserved in `pre_loop_last/`).
+  **If a session ends mid-loop, resume here:** read that output → interpret the
+  breakdown + the event+task failing rows → write the cycle-1 hypothesis in
+  `dataset/RESULTS.md` → fix ONE stage → rerun dev-fast. First lead: the
+  event-drop on event+task compounds (metric: count-correctness, slice:
+  event+task); suspect mechanisms: segment under-split + `_kind_of` labelling
+  the merged compound "task" (it starts with task phrasing) vs. generate
+  dropping a vague event half as unknown. Protocol:
+  `DOCUMENTATION/experiments/ITERATION_PROTOCOL.md`.
 - **Backlog — user-gated, do not start unprompted:** add fast-rule-parser rules
   mined from the user's real data + the dataset. Only on Gil's explicit say-so,
   and only after the deep track is improved — not on my own initiative.

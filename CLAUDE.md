@@ -153,16 +153,26 @@ thread. A test that builds the app wants routes, not models.
 
 **The verification dataset is the primary evaluation** — `dataset/DATASET.md`
 is the full reference (3000 real utterances, subsets, metrics, the recursive
-loop). Run the engine on a subset, compare to the ground truth, read which
-component failed, fix that one, rerun; small subset for big deltas, upsize to
-avoid overfitting:
+loop). It is a supervised-ML loop: run the engine on a subset, score against
+the ground truth, read *which component* failed and *why*, improve that one
+component's **implementation** (never the design — big picture and contracts
+frozen), rerun.
 
-    python -m scripts.engine_dataset_compare --max-rank 150   # dev-fast (~22 min)
-    python -m scripts.engine_dataset_compare --max-rank 600   # dev-full
-    python -m scripts.engine_dataset_compare --min-rank 601   # held-out (sealed)
+**Start on the smallest rich-enough slice and upsize only as gains slow — never
+the full 3000 as the working loop:**
 
-The loop protocol is `DOCUMENTATION/experiments/ITERATION_PROTOCOL.md`; results
-go in `dataset/RESULTS.md`.
+    python -m scripts.engine_dataset_compare --limit 0 --max-rank 250   # dev-fast (~80 min)
+    python -m scripts.engine_dataset_compare --limit 0 --max-rank 600   # dev-full
+    python -m scripts.engine_dataset_compare --limit 0 --min-rank 601   # held-out (sealed)
+
+(`--limit 0` lifts the script's default 150-row cap — without it a rank slice
+silently returns only its first 150 rows.)
+
+**Each cycle is a hypothesis:** predict the component you'll change and the
+metric+slice you expect to move, then compare actual vs. expected — and note any
+novel effects — in `dataset/RESULTS.md`. A score is a pointer, not the point:
+read the breakdown and the failing rows to understand what it *means*, never
+just the number. Full protocol: `DOCUMENTATION/experiments/ITERATION_PROTOCOL.md`.
 
 **Always name the metric with the number.** "70→72" is meaningless in a vacuum;
 "count-correct 73.5%→75% on event+task" is a result. There are five metrics
