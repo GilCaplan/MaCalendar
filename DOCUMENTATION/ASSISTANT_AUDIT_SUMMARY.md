@@ -293,7 +293,7 @@ Conclusions live here because ASSISTANT_AUDIT.md is overwritten every run.
 
 ## Run 10 + the first real-utterance comparison — 2026-09-03 evening
 
-**Run 10 (94 cases, after round 3's stage fixes): 91% quick = 91% settled ·
+**Run 10 (the current corpus of 94 commands, after round 3's stage fixes): 91% quick = 91% settled ·
 recall 93% · precision 91% · first answer p50 5.3s (was 16.7s) · deep p50
 6.6s / p95 37.1s (was 22.7/75.8).** Three cycles of measure→name-the-stage→
 fix: 80% → 88% → 91%, first-answer latency down 6×. The event-chain
