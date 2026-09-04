@@ -141,7 +141,8 @@ def _run_locked(text, trace, source, current_view, trace_run,
         # start in the history teaches the model that junk is normal.
         logger.info("Ignoring a transcript with nothing in it: %r", text[:40])
         return {"message": "", "actions": [], "refresh": "", "parse": "ignored",
-                "corrections": [], "trace": trace.to_list(), "memory_id": None}
+                "corrections": [], "trace": trace.to_list(), "memory_id": None,
+                "brain": _brain_version()}
     if state.needs_edit:
         # The gate: the client shows an editor and resubmits; nothing executes
         # on a transcript the vocabulary doubts.
@@ -153,7 +154,7 @@ def _run_locked(text, trace, source, current_view, trace_run,
                 "needs_edit": state.needs_edit,
                 "transcript": state.text, "original_transcript": state.raw_text,
                 "corrections": state.corrections, "trace": trace.to_list(),
-                "uncertain_words": state.needs_edit}
+                "uncertain_words": state.needs_edit, "brain": _brain_version()}
 
     # -- fast track ---------------------------------------------------------
     try:
@@ -575,7 +576,8 @@ def _parse_error_response(state: EngineState, cfg, e: AssistantError) -> dict:
             "transcript": state.text, "original_transcript": state.raw_text,
             "corrections": state.corrections,
             "trace": state.trace.to_list() if state.trace else [],
-            "uncertain_words": _transcript.uncertain_words(state.text)}
+            "uncertain_words": _transcript.uncertain_words(state.text),
+            "brain": _brain_version()}
     if pending_id:
         resp["pending_id"] = pending_id
         state.pending_id = pending_id
