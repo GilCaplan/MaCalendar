@@ -195,7 +195,36 @@ def main() -> int:
               and lo <= (r.get("tier_rank") or 0) <= hi]
         return (round(sum(r["count_ok"] for r in rs) / len(rs), 3) if rs else None, len(rs))
 
+    def _slice_deltas(key):
+        groups = {}
+        for r in engine_scored["per_prompt"]:
+            g = r.get(key)
+            if g is None:
+                continue
+            groups.setdefault(g, [None, None])
+        old_by = {r["transcript"]: r for r in old_scored["per_prompt"]}
+        for r in engine_scored["per_prompt"]:
+            g, t = r.get(key), r["transcript"]
+            if g is None or t not in shared or r["count_ok"] is None:
+                continue
+            o = old_by.get(t)
+            if not o or o["count_ok"] is None:
+                continue
+            d = groups[g]
+            d[0] = (d[0] or [0, 0]); d[1] = (d[1] or [0, 0])
+            d[0][0] += o["count_ok"]; d[0][1] += 1
+            d[1][0] += r["count_ok"]; d[1][1] += 1
+        out = {}
+        for g, (o, n) in groups.items():
+            if not o or not n or not o[1]:
+                continue
+            out[g] = {"n": n[1], "old": round(o[0]/o[1], 3), "new": round(n[0]/n[1], 3),
+                      "delta": round(n[0]/n[1] - o[0]/o[1], 3)}
+        return out
+
     triage = {
+        "by_complexity": _slice_deltas("complexity"),
+        "by_compound_kind": _slice_deltas("compound_kind"),
         "split_policy": "DEV=ranks 1-600 (tunable); HELD-OUT=601-3000 (measure only, never mine)",
         "dev_rate_old_vs_new": [_slice_rate(old_scored, 1, 600), _slice_rate(engine_scored, 1, 600)],
         "heldout_rate_old_vs_new": [_slice_rate(old_scored, 601, 3000), _slice_rate(engine_scored, 601, 3000)],
