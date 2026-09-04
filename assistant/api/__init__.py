@@ -17,6 +17,10 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-8s  %(name)s — %(message)s",
 )
+# Colour the log by event kind when a human is watching a terminal (no-op into
+# a file or under NO_COLOR). See DOCUMENTATION/LOGGING.md for the legend.
+from assistant.api.log_color import install as _install_log_colour  # noqa: E402
+_install_log_colour()
 
 logger = logging.getLogger(__name__)
 
