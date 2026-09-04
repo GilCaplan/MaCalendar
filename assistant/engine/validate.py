@@ -425,9 +425,13 @@ def run_objects(state: EngineState, cfg) -> EngineState:
                 state.add_fix("validate", "observance_gate", getattr(intent, "title", ""), "",
                               note=reason)
         elif action == "create_todo":
+            _rule_create_from_remove_guard(state, item, intent)
+            if item.intent is None:
+                continue
             _rule_due_date_pin(state, intent, rel, recur, td_idx, n_todos)
             td_idx += 1
 
+    _rule_question_creates_nothing(state, pairs)
     _rule_cadence_round_and_announce(state, tl)
 
     applied = state.fixes[fixes_before:]
@@ -677,6 +681,60 @@ def _rule_move_time_fill(state, intent, transcript) -> None:
         intent.new_start_time = dst
         state.add_fix("validate", "move_time_fill", str(old or ""), dst,
                       note="“to X” is where it moves")
+
+
+_REMOVE_SHAPE = re.compile(
+    r"^(remove|delete|clear|take)\s+['\"]?(.+?)['\"]?\s+(?:from|off)\s+", re.I)
+
+
+def _rule_create_from_remove_guard(state, item, intent) -> None:
+    """Dataset triage: "remove 'table' from furniture" CREATED a task named
+    "remove table from furniture". A create whose own title is a remove
+    instruction is the parser echoing the words back — it becomes the delete
+    it says, never a new row."""
+    title = (getattr(intent, "title", None)
+             or (getattr(intent, "titles", None) or [""])[0] or "")
+    m = _REMOVE_SHAPE.match(title.strip())
+    if not m:
+        return
+    from assistant.actions.todo.intent import DeleteTodoIntent
+    target = m.group(2).strip()
+    try:
+        item.action = "delete_todo"
+        item.intent = DeleteTodoIntent(match_title=target)
+    except Exception:
+        item.intent = None      # cannot build the delete: drop the echo-create
+    state.add_fix("validate", "create_from_remove_guard", title, target,
+                  note="a remove instruction is a delete, not a new row")
+
+
+_QUESTION_START = re.compile(
+    r"^(does|do|did|is|are|was|were|will|can|could|would|what|when|where|who|how)\b", re.I)
+
+
+def _rule_question_creates_nothing(state, pairs) -> None:
+    """Dataset triage: "…does my daughter have a recital?" INVENTED a task
+    from the question's subordinate clause. An item whose own words are a
+    question feeds the query — it never creates. Scoped to the item's text,
+    so "book gym and what's on friday?" keeps its booking."""
+    for item, action, intent in pairs:
+        if item.intent is None or not action or not action.startswith("create_"):
+            continue
+        text = (item.text or "").strip()
+        if not text.endswith("?") and not _QUESTION_START.match(text):
+            continue
+        base = item.id.split("-")[0]
+        sibling_query = any(
+            other.id.split("-")[0] == base and other.action
+            and other.action.startswith("query")
+            for other, _a, _i in pairs if other is not item)
+        whole_question = text.endswith("?") and bool(_QUESTION_START.match(text))
+        if sibling_query or whole_question:
+            title = (getattr(intent, "title", None)
+                     or (getattr(intent, "titles", None) or [""])[0] or item.text[:30])
+            state.add_fix("validate", "question_creates_nothing", str(title), "",
+                          note="a question asks; it does not create")
+            item.intent = None
 
 
 def _rule_cadence_round_and_announce(state, tl) -> None:

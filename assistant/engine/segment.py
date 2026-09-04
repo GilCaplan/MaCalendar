@@ -141,6 +141,14 @@ An event chain ("another one at X", "then Y at Z", "one at A and one at B")
 is one event PER time-and-activity — and a date said once for the chain
 ("tomorrow") is repeated into each item, like a shared deadline.
 
+But do NOT split finer than the requests themselves:
+"i need to buy some groceries, i need rice and chicken"
+→ {"items": [{"kind": "task", "text": "buy some groceries"},
+             {"kind": "task", "text": "buy rice and chicken"}]}
+(two "i need" clauses = two items; "rice and chicken" stays together — the
+assistant splits shopping lists itself, and a list of THINGS is never split
+here.) Likewise "add tasks: A, B, pay C" is exactly three items, never more.
+
 Return JSON: {"items": [{"kind": ..., "text": ...}, ...]}"""
 
 

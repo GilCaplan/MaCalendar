@@ -290,3 +290,39 @@ def test_move_time_fill_sets_the_match_from_the_other_time(cfg):
     validate.run_objects(st, cfg)
     assert it.intent.match_start_time == "13:00"
     assert it.intent.new_start_time == "15:00"
+
+
+# --- guards from the real-utterance triage (2026-09-03) ----------------------
+
+def test_a_remove_instruction_becomes_the_delete_it_says(cfg):
+    it = _item("create_todo", SimpleNamespace(title="remove table from furniture",
+                                              due_date=None), kind="task")
+    st = _state("remove 'table' from furniture", [it])
+    validate.run_objects(st, cfg)
+    assert it.action == "delete_todo"
+    assert it.intent.match_title == "table"
+    assert "create_from_remove_guard" in [f.rule for f in st.fixes]
+
+
+def test_a_question_item_never_creates(cfg):
+    q = _item("query_schedule", SimpleNamespace(), id="item_1-1", kind="review",
+              text="On the day project one is due, does my daughter have a recital?")
+    junk = _item("create_todo", SimpleNamespace(title="project one", due_date=None),
+                 id="item_1-2", kind="task",
+                 text="On the day project one is due, does my daughter have a recital?")
+    st = _state("On the day project one is due, does my daughter have a recital?",
+                [q, junk])
+    validate.run_objects(st, cfg)
+    assert junk.intent is None
+    assert q.intent is not None
+
+
+def test_a_booking_next_to_a_question_survives(cfg):
+    ev = _item("create_event", _event_intent(title="gym", date="2026-09-08",
+                                             start_time="07:00"),
+               id="item_1", text="book gym tuesday at 7am")
+    q = _item("query_schedule", SimpleNamespace(), id="item_2", kind="review",
+              text="what do I have on friday?")
+    st = _state("book gym tuesday at 7am and what do I have on friday?", [ev, q])
+    validate.run_objects(st, cfg)
+    assert ev.intent is not None
