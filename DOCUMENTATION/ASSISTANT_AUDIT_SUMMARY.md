@@ -290,3 +290,40 @@ examples from run 8's failures) is what closed the false-alarm gap.
    designed lever; run 9's telemetry (findings on 4/94) begins to justify it.
 
 Conclusions live here because ASSISTANT_AUDIT.md is overwritten every run.
+
+## Run 10 + the first real-utterance comparison — 2026-09-03 evening
+
+**Run 10 (94 cases, after round 3's stage fixes): 91% quick = 91% settled ·
+recall 93% · precision 91% · first answer p50 5.3s (was 16.7s) · deep p50
+6.6s / p95 37.1s (was 22.7/75.8).** Three cycles of measure→name-the-stage→
+fix: 80% → 88% → 91%, first-answer latency down 6×. The event-chain
+segment examples and the calmer cross-check did most of it; the disfluent
+monsters that burned 95–208s in run 9 now settle in ~10–20s. Remaining 8
+failures: an over-splitting cluster (tasks precision stuck at 68% — the
+chain examples overcorrected on colon/task lists), the two move cases
+(root-caused AFTER the snapshot: the parser filed "from 9:30" as the
+DESTINATION; move_time_fill now reads the spoken from/to and overrides the
+model — lands in run 11), and one disfluent self-correction.
+
+**The pilot against the verification dataset** (150 real HWU-64 utterances,
+first slice of dummy_3000, scored by the dataset owner's own
+count-correctness metric; the old rows are BEHAVIOR, not ground truth):
+
+- shared-prompt count-correct: **old brain 70% · engine-v2 73%** —
+  13 prompts flipped better, 8 worse, 97/32 unchanged pass/fail.
+- by complexity (engine vs old-full-3000): simple 90% vs 92, medium 94% vs
+  88, **complex 38% vs 29** — and by compound kind: event+event **47% vs
+  20**, event+task **32% vs 17**, task+task 40%. The compound handling this
+  dataset was built to expose (83% of old failures drop the EVENT) is
+  where decompose-then-generate gains most. Cross-event date collapse: 0%.
+- the 8 worse-flips are the triage queue
+  (`DOCUMENTATION/experiments/engine_compare/triage.json`); several look
+  like odd rows where the old brain "passed" by doing nothing ("remove
+  'table' from furniture"). Triage verdicts (old right / new right / both
+  wrong) are a human's or an independent judge's call, not the harness's.
+
+Instruments now in place: the corpus audit (98% bar for merge) AND
+`scripts/engine_dataset_compare.py` on real utterances. The full-3000
+comparison remains a deliberate overnight run. Next tune: the
+over-splitting cluster, then re-audit (run 11 also picks up the
+from/to-aware move_time_fill).

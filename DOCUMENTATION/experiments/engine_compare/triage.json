@@ -1,0 +1,31 @@
+{
+  "shared_prompts": 150,
+  "count_ok_shared_old": 0.7,
+  "count_ok_shared_new": 0.7333333333333333,
+  "flipped_better (old fail \u2192 engine pass)": [
+    "Please repeat this event. Also, Set up recurring date on my calendar",
+    "Olly, please set dinner plans at 7pm for every Friday in April and pDA please set this event on repeat this date",
+    "Remind me at the 15th of every month and pUT MILK ON MY SHOPPING LIST",
+    "Add event with these people and also add bread to my grocery list",
+    "alexa set a meeting event reminder with mona on tuesday, and then Set a Thanks Giving event for Friday",
+    "Please set a reminder for church services on Sundays for 11am.",
+    "Add my co worker, Ann to submit project for work on Tuesday. Also, MAKE NEW SHCEDULE FOR TOMORROW MEETING",
+    "Repeat this event every Friday on my calendar, and then add wine to list",
+    "Remind me of the following event:",
+    "Remember to pick me up by 12 noon from the Airport, I have a 3 pm meeting \u2014 and pDA please make a list.",
+    "Set reminder for three o'clock",
+    "Please set recurring calendar event and set event in calandar.  repeat event every day",
+    "Set this before event and also add apples to shopping list"
+  ],
+  "flipped_worse (old pass \u2192 engine fail)": [
+    "remove 'table' from furniture",
+    "Will you send a calendar invite out to James and Alice for brunch at 11 am on Tuesday and also my new work schedule list",
+    "Add a party in NY city for this saturday \u2014 and on Monday, the 20th, I need to have a conversation with Greg about our weekend trip.",
+    "Mark reminder with these people, and then Pleas set a reminder for a meeting I have on Tuesday next week.",
+    "On the day project one is due, does my daughter have a recital?",
+    "add 'christmas' to calendar",
+    "set reminder for tomorrows meeting with {client name} and also add this one also.",
+    "new scenario, time or calendar to new list and also please create a list of Due payment those who not received more then 10 Months."
+  ],
+  "note": "old-system rows are behavior, not ground truth; each flip needs triage (old right / new right / both wrong) by a human or a judge model that is not the system under test"
+}
