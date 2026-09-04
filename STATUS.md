@@ -51,19 +51,20 @@ compare actual vs. expected in `RESULTS.md` → upsize only as gains slow.
     (ready-to-POST bodies); Mac `_RevertBar` + iOS banner re-create what was
     undone. Dormant until `self_check_apply` is on (removals are advisory by
     default). **HUD needs a restart to show it.**
-- **Deep-track improvement loop — RUNNING (started 2026-09-04 ~14:20).**
-  Cycle-1 measurement in flight: dev-fast (`--limit 0 --max-rank 250`),
-  scratch-isolated, background; outputs land in
-  `DOCUMENTATION/experiments/engine_compare/` (`triage.json`,
-  `engine_run.score.md`; the previous run is preserved in `pre_loop_last/`).
-  **If a session ends mid-loop, resume here:** read that output → interpret the
-  breakdown + the event+task failing rows → write the cycle-1 hypothesis in
-  `dataset/RESULTS.md` → fix ONE stage → rerun dev-fast. First lead: the
-  event-drop on event+task compounds (metric: count-correctness, slice:
-  event+task); suspect mechanisms: segment under-split + `_kind_of` labelling
-  the merged compound "task" (it starts with task phrasing) vs. generate
-  dropping a vague event half as unknown. Protocol:
-  `DOCUMENTATION/experiments/ITERATION_PROTOCOL.md`.
+- **Deep-track improvement loop — RUNNING (branch `loop-cycle-1`).**
+  Cycle 1 ✅ confirmed & graduated (2026-09-04): enforcing the pinned
+  remind+clock-time⇒event rule over segment's LLM labels took dev-fast(250)
+  count-correct **73.2→76.0%** (event+task 35→41, predicted ~40). Full record:
+  `dataset/RESULTS.md` (prose) + `dataset/loop_log.csv` (plottable, one row
+  per run — a protocol requirement now). Run outputs preserved per cycle in
+  `DOCUMENTATION/experiments/engine_compare/<label>/`.
+  **If a session ends mid-loop, resume here:** read the newest RESULTS.md entry
+  + loop_log.csv row, then continue the protocol
+  (`DOCUMENTATION/experiments/ITERATION_PROTOCOL.md`): next pile is
+  **task+task 35% (n=20)** — read its failing rows in the latest
+  `engine_compare/cycle1_fix/` outputs, write the cycle-2 hypothesis in
+  RESULTS.md, fix ONE stage, rerun dev-fast. A dev-full confirm is batched
+  with the next graduated win.
 - **Backlog — user-gated, do not start unprompted:** add fast-rule-parser rules
   mined from the user's real data + the dataset. Only on Gil's explicit say-so,
   and only after the deep track is improved — not on my own initiative.

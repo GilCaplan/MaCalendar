@@ -46,7 +46,19 @@ convention) — will let generate's event-retry engage for those items.
 dev-fast +1–2 pt; simple/medium and task+task flat (the override touches only
 remind+clock-time items). Modest by design: one narrow, attributable change.
 
-*(actual vs. expected: to be filled after the rerun)*
+**Actual (rerun @ e956763, 2265 s):** overall 73.2 → **76.0%** (+2.8 — above
+the predicted +1–2); event+task 35 → **41%** (predicted ~40 — on the nose);
+event+event 52 → **56%** (predicted ~58–60 — right direction, slightly under:
+two of its failures are the `update_todo`-misread and no-remind-word forms the
+narrow rule deliberately skips); task+task 35 → 35 flat ✓; simple 89 → 91 and
+medium 91 → 92 — a small **unexpected** gain: the rule also catches
+single-command timed reminders the LLM mislabels on the deep path, not only
+compound halves. complex 40 → 44. event-missing halves 20 → 18. Also novel:
+p50 latency 9.5 s → 5.7 s, p95 74 s → 31 s (plausibly less unknown/retry
+churn now the event-kind retry succeeds; possibly partly warmer caches — not
+claimed as a fix effect). **Verdict: confirmed → graduated; the dev-full
+confirm will be batched with the next cycle's win. Next pile: task+task 35%
+(n=20), untouched by this fix as predicted.**
 
 ## Baseline — old brain on the full 3000 (verified 2026-09-04 20:56)
 
