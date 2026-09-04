@@ -213,9 +213,17 @@ def _run_locked(text, trace, source, current_view, trace_run,
                 response_msg, state.refresh or "none", state.parse_path)
 
     _log_nlu(state, action_names)
-    trace.step(DONE, "Done",
-               f"{state.parse_path} path · {trace.total_ms / 1000:.1f} s total",
-               path=state.parse_path)
+    if state.parse_path == "fast":
+        # The fast path has ANSWERED, but a background review still runs — so
+        # this is not "Done", it is "answered, reviewing". Saying Done here read
+        # as finished when it was not.
+        trace.step(DONE, "Fast answer",
+                   f"rules answered in {trace.total_ms / 1000:.1f} s · reviewing in the background",
+                   path=state.parse_path)
+    else:
+        trace.step(DONE, "Done",
+                   f"deep path · {trace.total_ms / 1000:.1f} s total",
+                   path=state.parse_path)
     state.memory_id = _record_memory(state, cfg, response_msg)
     _mine_reformulations(state, cfg)
 

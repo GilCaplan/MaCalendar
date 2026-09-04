@@ -39,6 +39,9 @@ stage → rerun; small subset for big deltas, upsize to avoid overfitting.
 - Cutting the system over to the engine + retiring the old brain (this thread).
 - Next tuning target: the event-drop on event+task compounds (metric:
   count-correctness, slice: event+task).
+- **Backlog (after the deep track is improved, not before):** add fast-rule-parser
+  rules mined from the user's real data + the dataset; and fix the cross-check
+  matcher's false "not covered" findings (a deep-track tune — surfaced live).
 - Proposed, not yet built: an explicit precision/invention metric; each cycle
   stating its target metric+slice up front.
 

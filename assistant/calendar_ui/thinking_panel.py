@@ -95,8 +95,14 @@ class _Theme:
         self.orange = "#f0a35e" if dark else "#b84e0e"
 
     def stage_color(self, stage: str, ok: bool) -> str:
-        if not ok:
+        # Red is reserved for something FATAL — the error stage. A step that
+        # merely "didn't fully succeed" (the cross-check finding a gap, a
+        # held-back item, a loop-back) is the system reviewing itself, not a
+        # failure: that reads amber, not alarm-red.
+        if stage == "error":
             return self.destructive
+        if not ok:
+            return self.orange
         return {"rule": self.accent, "llm": self.purple,
                 "done": self.green, "verify": self.orange}.get(stage, self.text2)
 
@@ -279,10 +285,18 @@ class _StepRow(QWidget):
     def apply_theme(self, theme: _Theme) -> None:
         self._theme = theme
         ok = bool(self._step.get("ok", True))
+        stage = self._step.get("stage", "")
         self._title.setStyleSheet(f"color: {theme.text};")
         self._ms.setStyleSheet(f"color: {theme.text2};")
         if self._detail is not None:
-            color = theme.text if ok else theme.destructive
+            # Fatal (error stage) reads red; a review-stage note or soft
+            # not-ok reads amber, not alarm-red.
+            if stage == "error":
+                color = theme.destructive
+            elif not ok:
+                color = theme.orange
+            else:
+                color = theme.text
             self._detail.setStyleSheet(f"color: {color};")
         self.update()
 
