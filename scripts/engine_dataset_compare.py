@@ -24,6 +24,15 @@ Mechanics agreed with the dataset's owner (session macalendar-ee):
 Replay is ISOLATED per row (fresh calendar state each time), which matches
 the scorer's determinism caveat: sequence-dependent effects (context memory)
 are out of scope here.
+
+TRAIN/HELD-OUT DISCIPLINE (user decision 2026-09-04): tier ordering
+interleaves complexity, so contiguous rank slices are naturally stratified.
+DEV = ranks 1-600 — the only rows whose failures may be inspected, triaged,
+or mined for prompt examples (the 150-row pilot that already fed rounds 4-5
+sits inside it, which is what makes this honest). HELD-OUT = ranks 601-3000 —
+measured, never mined; its scores are the generalisation claim. Use
+--min-rank/--max-rank for cheap dev-cycle re-runs; quote the two slices
+separately, always.
 """
 
 from __future__ import annotations
@@ -72,11 +81,17 @@ def _load_scorer():
     return mod
 
 
-def _source_rows(source: pathlib.Path, limit: int) -> list[tuple[str, int]]:
+def _source_rows(source: pathlib.Path, limit: int,
+                 min_rank: int = 0, max_rank: int = 0) -> list[tuple[str, int]]:
+    where = "tier_rank IS NOT NULL"
+    if min_rank:
+        where += f" AND tier_rank >= {int(min_rank)}"
+    if max_rank:
+        where += f" AND tier_rank <= {int(max_rank)}"
     with sqlite3.connect(f"file:{source}?mode=ro", uri=True) as c:
         return c.execute(
-            f"SELECT {RAW_KEY}, tier_rank FROM examples "
-            "WHERE tier_rank IS NOT NULL ORDER BY tier_rank"
+            f"SELECT {RAW_KEY}, tier_rank FROM examples WHERE {where} "
+            "ORDER BY tier_rank"
             + (f" LIMIT {int(limit)}" if limit else "")
         ).fetchall()
 
@@ -116,13 +131,15 @@ def main() -> int:
                     default=EXP / "output" / "dummy_3000.db")
     ap.add_argument("--fixture", type=pathlib.Path, default=EXP / "hwu64_sample.json")
     ap.add_argument("--limit", type=int, default=150)
+    ap.add_argument("--min-rank", type=int, default=0)
+    ap.add_argument("--max-rank", type=int, default=0)
     ap.add_argument("--out-dir", type=pathlib.Path,
                     default=WORKTREE / "DOCUMENTATION" / "experiments" / "engine_compare")
     args = ap.parse_args()
 
     scorer = _load_scorer()
     prov = scorer.load_provenance(args.fixture)
-    rows = _source_rows(args.source, args.limit)
+    rows = _source_rows(args.source, args.limit, args.min_rank, args.max_rank)
     print(f"Replaying {len(rows)} rows from {args.source.name} through engine-v2 "
           f"(scratch: {_TMP})")
 
@@ -161,7 +178,16 @@ def main() -> int:
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     scorer.write_report(engine_scored, comparison, args.out_dir / "engine_run.score.md")
+    def _slice_rate(scored, lo, hi):
+        rs = [r for r in scored["per_prompt"]
+              if r["transcript"] in shared and r["count_ok"] is not None
+              and lo <= (r.get("tier_rank") or 0) <= hi]
+        return (round(sum(r["count_ok"] for r in rs) / len(rs), 3) if rs else None, len(rs))
+
     triage = {
+        "split_policy": "DEV=ranks 1-600 (tunable); HELD-OUT=601-3000 (measure only, never mine)",
+        "dev_rate_old_vs_new": [_slice_rate(old_scored, 1, 600), _slice_rate(engine_scored, 1, 600)],
+        "heldout_rate_old_vs_new": [_slice_rate(old_scored, 601, 3000), _slice_rate(engine_scored, 601, 3000)],
         "shared_prompts": len(shared),
         "count_ok_shared_old": old_rate, "count_ok_shared_new": new_rate,
         "flipped_better (old fail → engine pass)": comparison["flipped_better"],
