@@ -33,6 +33,17 @@ sits inside it, which is what makes this honest). HELD-OUT = ranks 601-3000 —
 measured, never mined; its scores are the generalisation claim. Use
 --min-rank/--max-rank for cheap dev-cycle re-runs; quote the two slices
 separately, always.
+
+SUBSET ≠ HISTORY (user caution, 2026-09-04): rank slices here select REPLAY
+INPUTS only — the engine runs each row against an EMPTY scratch memory, so
+timestamps play no role and no history-matching is needed for the agreement
+comparison. But a subset used AS a command-memory history (any k>0
+retrieval experiment) is a different animal: prompts and timestamps must
+come as a matched set, which is exactly what the verified tier exports
+(dummy_60/300/1000, each mirroring its history_N.json with its own ts
+values) exist for. For memory experiments use those tier dbs whole — never
+an ad-hoc rank slice of dummy_3000, whose ts/recency semantics belong to
+the full tier.
 """
 
 from __future__ import annotations
