@@ -80,7 +80,7 @@ Running list of user-reported issues and feature requests, with status. Update w
 | 73 | **Ran the memory comparison.** k=4 98% vs k=0 97% over 89 commands — but the LLM path, the only place examples enter the prompt, is 100% in both arms, so the corpus cannot detect an effect on it. No measurable difference, and the instrument is the limitation | done 2026-09-03 | `ASSISTANT_AUDIT_SUMMARY.md` run 7 |
 | 74 | Build a corpus from the real history's *failures* to measure the memory — the hand-written one is at ceiling on the path that matters, so it can only detect harm | in progress 2026-09-03 | `scripts/audit_assistant.py` corpus, see 75/76 |
 | 75 | **Found and fixed while mining row 74**: editing one event in a same-typed batch ("book gym, then a meeting, then dinner") applied that edit's fields to every same-typed action in the batch, corrupting the others' stored correction — `example_records` only tracked action *type*, not which specific action a record came from. Two real corpus cases added from the same mining pass (duration arithmetic, a dropped self-correction), both still reproduce live | done 2026-09-03 | `assistant/intent/memory.py` `feedback_for_record`, `tests/unit/test_vocab_memory_trace.py` |
-| 76 | **Memory scaling study, in progress overnight**: does retrieval pool *size* matter, and is any k>0 effect about personalisation specifically or just "having more examples"? Real history (74 commands, 65% from one day) can't grow, so built a second pool from HWU-64 (Liu et al. IWSDS 2019, CC BY 4.0) — 3000 real calendar/reminder utterances run through the actual parser against scratch DBs, nested tiers at 60/300/1000/3000. Comparing k-sweep on the real history, a held-out slice (dominant day + the row 75 bug's corrupted correction removed), and each external tier. Fixture and build script checked in, `.db` outputs regenerable and gitignored | in progress 2026-09-03 | `scripts/fetch_hwu64_sample.py`, `scripts/build_memory_scaling_pool.py`, `DOCUMENTATION/experiments/memory_scaling/` — results land in `ASSISTANT_AUDIT_SUMMARY.md` |
+| 76 | **Memory scaling study, in progress overnight**: does retrieval pool *size* matter, and is any k>0 effect about personalisation specifically or just "having more examples"? Real history (74 commands, 65% from one day) can't grow, so built a second pool from HWU-64 (Liu et al. IWSDS 2019, CC BY 4.0) — 3000 real calendar/reminder utterances run through the actual parser against scratch DBs, nested tiers at 60/300/1000/3000. Comparing k-sweep on the real history, a held-out slice (dominant day + the row 75 bug's corrupted correction removed), and each external tier. Fixture and build script checked in, `.db` outputs regenerable and gitignored. **Answered**: real history +3pts at k=4 (95% vs 92%), survives the held-out slice; external pool flat 91–93% at every size — personalisation, not volume. Keep k=4; don't grow the pool with non-personal data. Full write-up: `ASSISTANT_AUDIT_SUMMARY.md` § "The memory-scaling study" (unnumbered — the engine-v2 sessions took run numbers 8–13) | done 2026-09-04 | `scripts/fetch_hwu64_sample.py`, `scripts/build_memory_scaling_pool.py`, `DOCUMENTATION/experiments/memory_scaling/` — results land in `ASSISTANT_AUDIT_SUMMARY.md` |
 | 77 | **The audit's headline "N% accurate" collapsed two different failure modes**: missing something asked for vs. producing something extra. `_check()` now tracks each expected item individually and counts extra actions/task rows explicitly, so the report gets recall and precision — overall, by area, by parse path — plus a dedicated "produced more than expected" section. Confirmed it surfaces something real: tasks area is 95% recall but 79% precision, driven by the row 75/76-adjacent duplicate-task bug. Headline number also now labelled explicitly as case-level exact match against the hand-written corpus, not a real-usage or human-judged figure. `A_k0`/`A_k1` of the overnight run predate this and lack the breakdown — cheap to backfill (~15-20 min each) once the rest finishes | done 2026-09-03 | `scripts/audit_assistant.py` `_check`, `_recall_precision` |
 | 78 | **Linux/PC host migration checked, deferred.** Core (parser, Ollama, spaCy, API, DB, GUI via PyQt6, default STT) is already cross-platform — no work needed. One real blocker: TTS shells out to macOS `say` directly, on by default, in the live voice pipeline (not just dev tooling) — needs swapping for a cross-platform engine (`pyttsx3` / `espeak`) before a Linux host would actually speak replies. Minor, non-blocking degradations: the thinking HUD's "join all Spaces" polish is an AppKit best-effort layer with no Linux equivalent yet (falls back to a normal always-on-top window); optional macOS Calendar.app import wouldn't apply; launch script and weekly-review scheduling are trivially cron-able | todo | `assistant/tts/speaker.py` |
 | 79 | **Dataset redefined by actual spec, and a reusable scorer built.** "Complex" means genuine multi-action (event+event/task+task/event+task compounds, constructed by joining real utterances — HWU-64 is one action per utterance, so this doesn't occur naturally and had to be built), not just longer sentences. `scripts/score_dataset_run.py` scores a `dummy_<N>.db` with no hand-written ground truth — compound provenance gives free deterministic expectations (a task+task compound should yield ≥2 task rows) — and diffs two runs (which prompts flipped pass/fail). About half its metrics are dataset-specific (need `hwu64_sample.json`'s provenance); half are fully general and will run against real production traffic once there is any, unchanged. First real findings (1000/3000 partial build): complex 28% correct vs simple/medium 91%/89%; event+task failures are specifically a dropped *event* (68%), not a random mix; the earlier date-collapse fix accounts for only ~3% of event+event failures, so most of that failure mode is still unexplained; hybrid parse path underperforms both pure rule and pure LLM (57% vs 75%/77%) | in progress 2026-09-03 | `scripts/score_dataset_run.py`, `DOCUMENTATION/experiments/memory_scaling/METRICS.md` |
@@ -90,22 +90,19 @@ Running list of user-reported issues and feature requests, with status. Update w
 The 2026-09-02 order of play (internals artifact, install iOS, build the
 harness) is done — see rows 56, 61, 62. Current thread, as of 2026-09-03:
 
-**Row 76 is running unattended overnight.** If you're picking this up cold:
-`DOCUMENTATION/experiments/memory_scaling/build.log` has the pool-build
-progress; `scripts/build_memory_scaling_pool.py` is resumable, so if it died
-just re-run it. Once the pool exists, `--slice-tiers` exports the nested
-60/300/1000/3000 dbs, then each tier runs through
-`scripts/audit_assistant.py --memory --memory-source <tier db>` at k=4 (k=0
-only needs running once — pool size cannot affect it, nothing is retrieved).
-Conclusions go in `ASSISTANT_AUDIT_SUMMARY.md`, not the overwritten
-`ASSISTANT_AUDIT.md`. Also queued, same session: the k=0/1/2/4/8 sweep on the
-real history (dataset A) and the held-out-day check (dataset B) from before
-the scaling study was scoped up — see the run log in that summary once it
-lands.
+**Row 76 landed** (2026-09-04, overnight): the full A/B/C comparison is
+written up as run 8 in `ASSISTANT_AUDIT_SUMMARY.md`, and `k` is no longer an
+open question — k=4 stays, on evidence. The external dataset's own parser
+findings (compound commands 29%, dropped-event failure mode) are in
+`DOCUMENTATION/experiments/memory_scaling/METRICS.md` and feed whichever
+session works the compound-parsing problem next. Note for tooling: every join
+against the pool keys on `raw_transcript` (verbatim input), because the
+pipeline can rewrite a transcript before storing it.
 
-Decisions still waiting on a number, not yet worth arguing about: `k` itself,
-the eviction policy, the confidence weights (row 57, also waiting on a week
-of real use), whether labelling should move to the LLM.
+Decisions still waiting on a number: the eviction policy (row 60 — run 8 says
+protect real, reviewed examples; bulk data has no measured value), the
+confidence weights (row 57, waiting on a week of real use), whether labelling
+should move to the LLM.
 
 ## Working agreements
 - Everything on the phone is local: no third-party services; the only network peer is the Mac over Tailscale.

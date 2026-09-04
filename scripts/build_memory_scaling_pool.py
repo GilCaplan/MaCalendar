@@ -79,10 +79,16 @@ def _ensure_pool_schema() -> None:
 def _already_built() -> set[str]:
     if not POOL_DB.exists():
         return set()
+    # Keyed on the VERBATIM input (raw_transcript), not the stored transcript:
+    # the pipeline may rewrite the transcript before recording it ("Open
+    # calendar.  Set event." was stored as "Open calendar"), and a resume that
+    # compares history text against the rewritten form replays the same
+    # command forever without ever recognising it as done.
     with sqlite3.connect(POOL_DB) as c:
         try:
             rows = c.execute(
-                "SELECT transcript FROM examples WHERE tier_rank IS NOT NULL").fetchall()
+                "SELECT COALESCE(NULLIF(raw_transcript, ''), transcript) "
+                "FROM examples WHERE tier_rank IS NOT NULL").fetchall()
         except sqlite3.OperationalError:
             return set()
     return {t for (t,) in rows}
@@ -141,8 +147,9 @@ def build(limit: int | None) -> None:
         # whatever the last row happened to be.
         with sqlite3.connect(POOL_DB) as c:
             last = c.execute(
-                "SELECT id, transcript FROM examples ORDER BY id DESC LIMIT 1").fetchone()
-            if last and last[1] == row["text"]:
+                "SELECT id, transcript, raw_transcript FROM examples "
+                "ORDER BY id DESC LIMIT 1").fetchone()
+            if last and row["text"] in (last[1], last[2]):
                 c.execute("UPDATE examples SET ts=?, tier_rank=? WHERE id=?",
                           (row["ts"], row["seq"], last[0]))
             else:
@@ -186,7 +193,8 @@ def slice_tiers() -> None:
             c.execute("DELETE FROM examples WHERE tier_rank IS NULL OR tier_rank > ?", (n,))
             c.execute("DELETE FROM example_records WHERE example_id NOT IN (SELECT id FROM examples)")
             got = [r[0] for r in c.execute(
-                "SELECT transcript FROM examples ORDER BY tier_rank").fetchall()]
+                "SELECT COALESCE(NULLIF(raw_transcript, ''), transcript) "
+                "FROM examples ORDER BY tier_rank").fetchall()]
 
         want = [r["text"] for r in history["rows"]]
         if got != want:

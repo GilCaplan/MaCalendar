@@ -225,6 +225,66 @@ either way, and the reasonable thing is to leave it where it is.
   sending the same proportion each way as it did in run 6.
 - No parse errors in either arm.
 
+## The memory-scaling study — 2026-09-03/04 overnight — pool size vs personalisation
+
+(The A/B/C sweep on the OLD brain, answering row 76. The engine-v2 runs
+below number themselves 8–13; this study has no run number to avoid the
+collision — an earlier draft of this section called itself run 8, and
+TASKS.md row 76 points here.)
+
+Run 7 ended with "the corpus cannot detect an effect." Two things changed
+since: the corpus grew to 92 cases including commands mined from the real
+history's failures (rows 74/75), giving the affected path headroom, and the
+harness gained `--memory-source`, so the SAME corpus could be replayed
+against different retrieval pools. Three pools were compared overnight:
+
+- **A** — the real command history as it is (74 commands, k swept 0/1/2/4/8);
+- **B** — the real history with its dominant day and the row-75 corrupted
+  correction removed (the leakage suspects);
+- **C** — an external pool built from HWU-64 (real third-party calendar/
+  reminder utterances replayed through the actual parser — see
+  `DOCUMENTATION/experiments/memory_scaling/METRICS.md`), in nested tiers of
+  60/300/1000/3000 rows.
+
+| memory source | k=0 | k=1 | k=2 | k=4 | k=8 |
+|---|---:|---:|---:|---:|---:|
+| A: real history | 92% | 93% | 93% | **95%** | 93% |
+| B: real history, held out | 92% | | | **95%** | |
+| C: external, 60 rows | 92%* | | | 93% | |
+| C: external, 300 rows | * | | | 92% | |
+| C: external, 1000 rows | * | | | 91% | |
+| C: external, 3000 rows | * | | | 92% | |
+
+\* k=0 retrieves nothing, so it was run once and cannot differ by pool —
+that it matches A's and B's k=0 exactly is the negative control passing.
+
+**Conclusions:**
+
+- **The real history helps: +3 points at k=4** (95% vs 92%), and the effect
+  survives holding out the dominant day and the corrupted correction — it is
+  not one day's near-duplicates leaking into the corpus.
+- **It is personalisation, not example volume.** Three thousand real
+  calendar-domain examples from other speakers move nothing (91–93%, flat
+  from 60 to 3000). Growing the pool is not the lever; whose commands they
+  are is.
+- **k=4 remains the best point measured** (k=1/2 gain ~1 point, k=8 falls
+  back to 93%, consistent with noisy examples diluting the prompt), but each
+  step is 1–3 cases out of 92 — only the k=4-vs-k=0 gap is worth weight.
+  Keep `k=4` **for the old brain**; the engine measured the same A/B and
+  personalisation does NOT transfer to its per-item prompting — see runs
+  12–13 below.
+- **What this feeds:** eviction policy (row 60) should protect real, reviewed
+  examples — external or bulk data has no measured value; and there is no
+  case for seeding new users' pools with synthetic history.
+
+Caveats: 92 cases, so one case ≈ 1.1 points; A_k4 was re-run 23:23 after the
+overnight copy turned out to predate one corpus case (the 91-case original is
+kept as `A_k4_run8copy_91cases.md` — it read 96%). Raw runs:
+`DOCUMENTATION/experiments/memory_scaling/{A_*,B_*,C_*}.md`. The external
+dataset also produced its own findings about the parser (compound commands
+29% correct; failures drop the *event* 83% of the time) — those live in
+`METRICS.md` there, not here.
+
 ## Remaining gaps (ranked, from the 2026-08-26 run)
 
 1. ~~**Rule parser splits multi-event sentences into one**~~ — fixed, see above. ("lunch with Tal on monday at noon and coffee with Ezra on friday at 9" → only lunch). It is confident (0.90), so the LLM never sees it. Fix: lower confidence when a span contains two time expressions, forcing hybrid.
@@ -242,3 +302,155 @@ python -m scripts.audit_assistant --audio            # full, ~20 min
 python -m scripts.audit_assistant --area tasks       # one area
 python -m scripts.benchmark_models --history         # LLM models on your real history
 ```
+
+## Runs 8–9 — 2026-09-03 — the engine's first measurements (branch `engine-v2`)
+
+The brain was rebuilt as the 8-stage engine (TASKS row 79, `ENGINE.md`); these
+two runs are its acceptance measurements against run 7's baseline (98% exact
+match, tasks 95%/79% recall/precision, old brain, k=4).
+
+**Run 8 (92 cases): 85% quick / 80% settled · recall 83% · precision 88% ·
+first p50 33.3s.** The per-stage tables named every mechanism, which is the
+design working:
+
+- The cross-check cried wolf: 232 findings, loop-backs on 39 of 51 deep
+  commands (85s avg vs 36s unlooped). Three causes, all stage-internal: a
+  multi-title create_todo could satisfy only ONE extracted ask ("milk, eggs
+  and bread" → two false "missing" → the background patch added DUPLICATES,
+  breaking 4 commands that were right at the quick answer); observance-gate
+  refusals didn't count as covering their ask (every gated command
+  loop-stormed pointlessly); extraction kind-mislabels became false missings.
+- The observance gate itself worked exactly as specified — ~5 "failures" were
+  Friday-evening bookings it rightly refused; the corpus predated the policy.
+  Gate-colliding cases are now weekday-pinned and the gate has its own two
+  cases (Saturday gym → refusal; Friday-night Shabbat dinner → booked).
+- Two commands died whole on one item's validation error.
+
+**Run 9 (94 cases, after the revamp + extraction-prompt fine-tune): 88%
+quick = 88% settled · recall 90% · precision 90% · first p50 16.7s · settled
+p50 17.7s.** Loop-backs 39→3 commands, findings 39→4, broken-by-self-check
+4→0, extra task rows 8→3, deep p50 70s→22.7s. **The fast track is at
+parity with the old brain: 97% quick AND settled, recall 98%, precision
+100%, ~50ms.** The capacity-aware matcher plus a granularity contract in the
+extraction prompt (mirroring decompose's own splitting rules, with worked
+examples from run 8's failures) is what closed the false-alarm gap.
+
+**Remaining gap to the 98% bar (11 failures), ranked:**
+1. Multi-item deep segmentation quality (6): event chains ("one at 4,
+   another at 6:30") drop or duplicate an item; colon task-lists sometimes
+   over-split now. Next single-stage tune: event-chain examples in the
+   segment prompt, and an update/delete that ended NOT-FOUND should stop
+   counting as covering an ask (it hid a "night shift" create misread from
+   the checker).
+2. Action-layer quirks the corpus surfaces (2, predate the engine): an
+   update that reports success while changing nothing ("move my 1pm meeting
+   to 3pm"), and `_find_event` missing a seeded "Guri Karpas" on 'guri'.
+3. Worst-case deep latency: three disfluent monsters at 95–208s (bounded by
+   the loop budget, still ugly). `engine.reconcile: uncertain` is the
+   designed lever; run 9's telemetry (findings on 4/94) begins to justify it.
+
+Conclusions live here because ASSISTANT_AUDIT.md is overwritten every run.
+
+## Run 10 + the first real-utterance comparison — 2026-09-03 evening
+
+**Run 10 (the current corpus of 94 commands, after round 3's stage fixes): 91% quick = 91% settled ·
+recall 93% · precision 91% · first answer p50 5.3s (was 16.7s) · deep p50
+6.6s / p95 37.1s (was 22.7/75.8).** Three cycles of measure→name-the-stage→
+fix: 80% → 88% → 91%, first-answer latency down 6×. The event-chain
+segment examples and the calmer cross-check did most of it; the disfluent
+monsters that burned 95–208s in run 9 now settle in ~10–20s. Remaining 8
+failures: an over-splitting cluster (tasks precision stuck at 68% — the
+chain examples overcorrected on colon/task lists), the two move cases
+(root-caused AFTER the snapshot: the parser filed "from 9:30" as the
+DESTINATION; move_time_fill now reads the spoken from/to and overrides the
+model — lands in run 11), and one disfluent self-correction.
+
+**The pilot against the verification dataset** (150 real HWU-64 utterances,
+first slice of dummy_3000, scored by the dataset owner's own
+count-correctness metric; the old rows are BEHAVIOR, not ground truth):
+
+- shared-prompt count-correct: **old brain 70% · engine-v2 73%** —
+  13 prompts flipped better, 8 worse, 97/32 unchanged pass/fail.
+- by complexity (engine vs old-full-3000): simple 90% vs 92, medium 94% vs
+  88, **complex 38% vs 29** — and by compound kind: event+event **47% vs
+  20**, event+task **32% vs 17**, task+task 40%. The compound handling this
+  dataset was built to expose (83% of old failures drop the EVENT) is
+  where decompose-then-generate gains most. Cross-event date collapse: 0%.
+- the 8 worse-flips are the triage queue
+  (`DOCUMENTATION/experiments/engine_compare/triage.json`); several look
+  like odd rows where the old brain "passed" by doing nothing ("remove
+  'table' from furniture"). Triage verdicts (old right / new right / both
+  wrong) are a human's or an independent judge's call, not the harness's.
+
+Instruments now in place: the corpus audit (98% bar for merge) AND
+`scripts/engine_dataset_compare.py` on real utterances. The full-3000
+comparison remains a deliberate overnight run. Next tune: the
+over-splitting cluster, then re-audit (run 11 also picks up the
+from/to-aware move_time_fill).
+
+### The memory-scaling answer, and what it means for the engine (2026-09-03, late)
+
+The C-tier runs (owned by the dataset session; its collation is canonical)
+answered row 76: external-pool retrieval at k=4 is FLAT across 60/300/1000/
+3000 tiers (93/92/91/92% vs a 92% k=0 baseline) — no pool-size effect, no
+"just having examples" effect — while the real 74-command history at k=4
+reaches 95% on the held-out variant. **Personalisation does the work, not
+example count.** Engine-side implication: the engine ships with
+`nlu.memory_examples: 0` on run 7's "no measurable effect", but that was
+measured before recall/precision existed and on the old brain; the C-tier
+result says the REAL history specifically may be worth k=4. Queued: the
+same A/B on the engine (`--memory --memory-k {0,4}` corpus runs) before
+touching the default — the finding transfers only if the engine's LLM path
+benefits the way the old one did.
+
+### Runs 12–13 — the engine's memory A/B: personalisation does NOT transfer (2026-09-04)
+
+Run 12 (k=0, with round 4's header fix): **95%** — same five failures as
+run 11; the header fix's real mechanisms turned out to live elsewhere
+(an unknown-parse on a bare task fragment, and a schedule-only "due
+tomorrow" part), both fixed as round 5 and pinned by tests, to be
+measured in the next run.
+
+Run 13 (k=4 against a copy of the real history): **80%** — fixed 0,
+broke 14 (recall 96%→78%, p50 5.7s→8.6s). The old brain gains +3 from
+the same memory (its A-sweep, same day); the engine LOSES 15. The
+mechanism fits the architecture change: the engine prompts the LLM
+PER ITEM with short fragment texts, and whole-command multi-action
+examples retrieved for a fragment teach it the wrong output shape —
+retrieval noise the old whole-transcript prompting never saw. So
+`nlu.memory_examples: 0` is now EVIDENCE-BACKED for the engine, not
+inherited; if personalisation returns it must be per-item-shaped
+(retrieve by item text, reformat examples as single-item parses) — a
+designed experiment, not a default. This also retroactively explains
+run 9 (98%→run 7's number) vs run 12: the engine was never getting the
+old brain's +3, and doesn't need it to beat the old brain's live 92/95.
+
+## The full-3000 comparison — engine-v2 vs the old brain on real utterances (2026-09-04 morning)
+
+All 3000 rows replayed through the engine overnight (6.9h, isolated per
+row, empty memory), scored with the dataset owner's metrics, dev/held-out
+split per the user's design (DEV = ranks 1–600, the only tunable rows;
+HELD-OUT = 601–3000, measured never mined):
+
+- **Overall count-correct: old 70% → engine 74%** (252 flipped better,
+  135 worse, 1956 both-pass, 656 both-fail).
+- **HELD-OUT: old 69.5% → engine 73.5% (+4.0, n=2400)** — dev +3.4 ≈
+  held-out +4.0, i.e. the prompt tuning GENERALISES rather than
+  overfitting the rows it saw. At n=2400 the +4 is ~3× its standard
+  error: real.
+- By complexity (engine vs old): simple 92 vs 92 · medium 91 vs 88 ·
+  **complex 39 vs 29**. By compound kind: event+event **36 vs 20** ·
+  event+task **35 vs 17** · task+task 46 vs 40. Garbage titles ≤1%,
+  date collapse ≤2%.
+- The engine's own failure signature on event+task compounds: the EVENT
+  is still the half that goes missing (158 of 218 failures ≈ 72%, vs the
+  old brain's 83%) — improved, still the #1 target. Complex-tier latency
+  p50 10.3s, simple 3.5s.
+- Triage queue: 135 worse-flips, of which only the DEV-slice subset gets
+  inspected for tuning material (the held-out ones stay sealed).
+
+Verdict against the loop's objectives: engine ≥ old on every complexity
+tier and compound kind ✓ · invention metrics near zero ✓ · compounds
+2–3× better but at 35–46% still the frontier · corpus floor holds (95%
+vs the old brain's live 92% at k=0) ✓. The next cycles work the
+dev-slice event-drop failures on event+task and event+event compounds.

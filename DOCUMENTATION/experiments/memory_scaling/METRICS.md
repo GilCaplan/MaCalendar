@@ -38,19 +38,26 @@ general ones are the ones actually reusable once real usage exists to score.
 | **Determinism** (same prompt, replayed, same action sequence?) | Yes to compute, but confounded | No — general | Real result: 75% raw, ~85% once context-memory-dependent cases (2 of 5 diffs, isolated replay vs in-sequence) are set aside. Needs replaying at the *same sequence position* to measure cleanly, not in isolation. |
 | **Title/description "quality"** | No — no ground truth exists | — | Deliberately not built. Would need an LLM-judge model that isn't the system under test (avoids self-grading bias), and the same "prove it can fail before trusting it" discipline the self-check itself has never fully had. Noted as future work, not attempted here. |
 
-## Findings so far (1000-row partial build, in progress)
+## Findings (full 3000-row build, 2026-09-03)
 
-- Count-correct: simple 91%, medium 89%, **complex 28%**.
-- event+task compounds are the worst compound kind (15% correct) and the
-  failure mode is specific: dropping the event, not the task.
-- Cross-event date collapse is only ~3% of event+event failures — the
-  75% failure rate there is mostly something else, not the bug already
-  fixed.
-- Hybrid parse path is the weakest (57% vs rule 75%, llm 77%).
+Report: `output/dummy_3000.score.md`. The partial-build numbers held.
 
-These numbers are from a partial build and will move once the full
-3000-row run finishes — treat them as directional, not final. Re-run
-`python -m scripts.score_dataset_run <db>` for current numbers.
+- Count-correct: simple 92%, medium 88%, **complex 29%** — overall 70%.
+- event+task compounds are the worst compound kind (17% correct) and the
+  failure mode is specific: of 275 failures, 229 dropped the event, 20 the
+  task, 26 both — 83% are a dropped *event*.
+- event+event is barely better (20% correct), and cross-event date collapse
+  is only 4% of those rows — the failure mode is mostly something other
+  than the bug already fixed.
+- Hybrid parse path is the weakest (58% vs rule 74%, llm 78%) across
+  951/1372/677 rows respectively.
+
+One data note: every join in the build and scorer is keyed on
+`COALESCE(NULLIF(raw_transcript,''), transcript)` — the verbatim input —
+because the pipeline can rewrite a transcript before recording it ("Open
+calendar.  Set event." is stored as "Open calendar"), and a text join on
+the stored form leaves such rows permanently unmatchable (the build's
+resume replayed one forever before this was keyed right).
 
 ## Reusing this once something goes to production
 

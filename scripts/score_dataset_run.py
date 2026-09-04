@@ -142,8 +142,12 @@ def _score_row(transcript: str, actions_json: str, prov: dict | None) -> dict:
 
 def score_db(db_path: pathlib.Path, provenance: dict[str, dict]) -> dict:
     with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True) as c:
+        # Verbatim input, not the stored transcript: the pipeline may rewrite
+        # the transcript before recording it, and provenance is keyed on what
+        # the history file actually said.
         rows = c.execute(
-            "SELECT transcript, actions_json, parse_path, tier_rank, ts, llm_ms, total_ms "
+            "SELECT COALESCE(NULLIF(raw_transcript, ''), transcript), "
+            "actions_json, parse_path, tier_rank, ts, llm_ms, total_ms "
             "FROM examples WHERE tier_rank IS NOT NULL ORDER BY tier_rank"
         ).fetchall()
 
