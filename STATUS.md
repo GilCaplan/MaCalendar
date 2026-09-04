@@ -60,11 +60,10 @@ compare actual vs. expected in `RESULTS.md` → upsize only as gains slow.
   `DOCUMENTATION/experiments/engine_compare/<label>/`.
   **If a session ends mid-loop, resume here:** read the newest RESULTS.md entry
   + loop_log.csv row, then continue the protocol
-  (`DOCUMENTATION/experiments/ITERATION_PROTOCOL.md`): next pile is
-  **task+task 35% (n=20)** — read its failing rows in the latest
-  `engine_compare/cycle1_fix/` outputs, write the cycle-2 hypothesis in
-  RESULTS.md, fix ONE stage, rerun dev-fast. A dev-full confirm is batched
-  with the next graduated win.
+  (`DOCUMENTATION/experiments/ITERATION_PROTOCOL.md`): take the top unblocked
+  entry of **`dataset/HYPOTHESES.md`** (the ranked experiment queue), write its
+  prediction in RESULTS.md, fix ONE stage, rerun dev-fast, re-rank the queue.
+  A dev-full confirm is batched with the next graduated win.
 - **Backlog — user-gated, do not start unprompted:** add fast-rule-parser rules
   mined from the user's real data + the dataset. Only on Gil's explicit say-so,
   and only after the deep track is improved — not on my own initiative.

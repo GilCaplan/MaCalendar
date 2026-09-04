@@ -19,6 +19,7 @@ on — no human labelling needed.
     METRICS.md                                the metric definitions (canonical)
     RESULTS.md                                per-implementation results log (prose: hypotheses, actual-vs-expected)
     loop_log.csv                              one row per measurement run — timestamps, duration, commit, metrics; the plottable trajectory
+    HYPOTHESES.md                             the ranked experiment queue — take the top, re-rank after every rerun
     snapshots/                                code snapshots of meaningful iterations, to revert/compare
 
 **Frozen vs regenerable.** Only `inputs/*.json` are frozen, checked-in ground

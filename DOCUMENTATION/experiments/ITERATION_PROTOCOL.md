@@ -64,6 +64,10 @@ what teaches the next step.
    roughly how much — e.g. *"loosening segment's under-split on 'X and Y at T'
    should raise count-correct on event+task; I expect +3–5 pt there, flat
    elsewhere."* Write it into `RESULTS.md` as the cycle's prediction.
+   **`dataset/HYPOTHESES.md` is the ranked queue these come from** — take the
+   top unblocked entry, and after every verification rerun feed the fresh
+   failures back into it and re-rank (prune every ~3 cycles). A
+   product-convention question in an entry is Gil's call, never assumed.
 3. **Change only that stage's internals** (contracts frozen). No bundling: two
    fixes in one cycle make the delta — and the hypothesis test — unattributable.
 4. **Measure dev-fast.** Read the delta on the TARGETED slice
