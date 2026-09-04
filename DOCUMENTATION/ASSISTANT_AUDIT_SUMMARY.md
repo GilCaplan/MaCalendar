@@ -327,3 +327,18 @@ Instruments now in place: the corpus audit (98% bar for merge) AND
 comparison remains a deliberate overnight run. Next tune: the
 over-splitting cluster, then re-audit (run 11 also picks up the
 from/to-aware move_time_fill).
+
+### The memory-scaling answer, and what it means for the engine (2026-09-03, late)
+
+The C-tier runs (owned by the dataset session; its collation is canonical)
+answered row 76: external-pool retrieval at k=4 is FLAT across 60/300/1000/
+3000 tiers (93/92/91/92% vs a 92% k=0 baseline) — no pool-size effect, no
+"just having examples" effect — while the real 74-command history at k=4
+reaches 95% on the held-out variant. **Personalisation does the work, not
+example count.** Engine-side implication: the engine ships with
+`nlu.memory_examples: 0` on run 7's "no measurable effect", but that was
+measured before recall/precision existed and on the old brain; the C-tier
+result says the REAL history specifically may be worth k=4. Queued: the
+same A/B on the engine (`--memory --memory-k {0,4}` corpus runs) before
+touching the default — the finding transfers only if the engine's LLM path
+benefits the way the old one did.
