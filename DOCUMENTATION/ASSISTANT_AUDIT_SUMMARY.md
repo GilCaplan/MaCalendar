@@ -364,3 +364,33 @@ inherited; if personalisation returns it must be per-item-shaped
 designed experiment, not a default. This also retroactively explains
 run 9 (98%→run 7's number) vs run 12: the engine was never getting the
 old brain's +3, and doesn't need it to beat the old brain's live 92/95.
+
+## The full-3000 comparison — engine-v2 vs the old brain on real utterances (2026-09-04 morning)
+
+All 3000 rows replayed through the engine overnight (6.9h, isolated per
+row, empty memory), scored with the dataset owner's metrics, dev/held-out
+split per the user's design (DEV = ranks 1–600, the only tunable rows;
+HELD-OUT = 601–3000, measured never mined):
+
+- **Overall count-correct: old 70% → engine 74%** (252 flipped better,
+  135 worse, 1956 both-pass, 656 both-fail).
+- **HELD-OUT: old 69.5% → engine 73.5% (+4.0, n=2400)** — dev +3.4 ≈
+  held-out +4.0, i.e. the prompt tuning GENERALISES rather than
+  overfitting the rows it saw. At n=2400 the +4 is ~3× its standard
+  error: real.
+- By complexity (engine vs old): simple 92 vs 92 · medium 91 vs 88 ·
+  **complex 39 vs 29**. By compound kind: event+event **36 vs 20** ·
+  event+task **35 vs 17** · task+task 46 vs 40. Garbage titles ≤1%,
+  date collapse ≤2%.
+- The engine's own failure signature on event+task compounds: the EVENT
+  is still the half that goes missing (158 of 218 failures ≈ 72%, vs the
+  old brain's 83%) — improved, still the #1 target. Complex-tier latency
+  p50 10.3s, simple 3.5s.
+- Triage queue: 135 worse-flips, of which only the DEV-slice subset gets
+  inspected for tuning material (the held-out ones stay sealed).
+
+Verdict against the loop's objectives: engine ≥ old on every complexity
+tier and compound kind ✓ · invention metrics near zero ✓ · compounds
+2–3× better but at 35–46% still the frontier · corpus floor holds (95%
+vs the old brain's live 92% at k=0) ✓. The next cycles work the
+dev-slice event-drop failures on event+task and event+event compounds.
