@@ -685,6 +685,11 @@ def _rule_move_time_fill(state, intent, transcript) -> None:
 
 _REMOVE_SHAPE = re.compile(
     r"^(remove|delete|clear|take)\s+['\"]?(.+?)['\"]?\s+(?:from|off)\s+", re.I)
+# The from-less forms: "get rid of this list", "erase/earse the next birthday
+# event", "throw away X". Group 2 is the target.
+_REMOVE_LOOSE = re.compile(
+    r"^(?:please\s+)?(get rid of|erase|earse|era[sz]e|trash|throw away|discard|"
+    r"remove|delete|clear|cancel)\s+['\"]?(.+?)['\"]?\s*$", re.I)
 
 
 def _rule_create_from_remove_guard(state, item, intent) -> None:
@@ -694,7 +699,7 @@ def _rule_create_from_remove_guard(state, item, intent) -> None:
     it says, never a new row."""
     title = (getattr(intent, "title", None)
              or (getattr(intent, "titles", None) or [""])[0] or "")
-    m = _REMOVE_SHAPE.match(title.strip())
+    m = _REMOVE_SHAPE.match(title.strip()) or _REMOVE_LOOSE.match(title.strip())
     if not m:
         return
     from assistant.actions.todo.intent import DeleteTodoIntent
@@ -710,6 +715,9 @@ def _rule_create_from_remove_guard(state, item, intent) -> None:
 
 _QUESTION_START = re.compile(
     r"^(does|do|did|is|are|was|were|will|can|could|would|what|when|where|who|how)\b", re.I)
+_QUERY_OPENER = re.compile(
+    r"^(?:please\s+)?(give me|show me|show|list|read( me)?|tell me|check)\b", re.I)
+_CREATE_VERB = re.compile(r"\b(add|create|make|set|book|schedule|new|start|open)\b", re.I)
 
 
 def _rule_question_creates_nothing(state, pairs) -> None:
@@ -721,7 +729,16 @@ def _rule_question_creates_nothing(state, pairs) -> None:
         if item.intent is None or not action or not action.startswith("create_"):
             continue
         text = (item.text or "").strip()
-        if not text.endswith("?") and not _QUESTION_START.match(text):
+        imperative_query = bool(_QUERY_OPENER.match(text)) and not _CREATE_VERB.search(text)
+        if not text.endswith("?") and not _QUESTION_START.match(text) \
+                and not imperative_query:
+            continue
+        if imperative_query:
+            title = (getattr(intent, "title", None)
+                     or (getattr(intent, "titles", None) or [""])[0] or item.text[:30])
+            state.add_fix("validate", "question_creates_nothing", str(title), "",
+                          note="an ask-to-see request creates nothing")
+            item.intent = None
             continue
         base = item.id.split("-")[0]
         sibling_query = any(

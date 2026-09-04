@@ -326,3 +326,34 @@ def test_a_booking_next_to_a_question_survives(cfg):
     st = _state("book gym tuesday at 7am and what do I have on friday?", [ev, q])
     validate.run_objects(st, cfg)
     assert ev.intent is not None
+
+
+def test_from_less_removes_become_deletes(cfg):
+    it = _item("create_todo", SimpleNamespace(title="get rid of this list",
+                                              due_date=None), kind="task")
+    st = _state("get rid of this list", [it])
+    validate.run_objects(st, cfg)
+    assert it.action == "delete_todo"
+
+
+def test_a_misheard_erase_still_guards(cfg):
+    it = _item("create_event", _event_intent(title="earse the next birthday event"))
+    st = _state("Please earse the next birthday event", [it])
+    validate.run_objects(st, cfg)
+    assert it.action == "delete_todo" or it.intent is None
+
+
+def test_an_imperative_query_creates_nothing(cfg):
+    it = _item("create_event", _event_intent(title="Reminder: meeting"),
+               text="give me the reminders")
+    st = _state("give me the reminders", [it])
+    validate.run_objects(st, cfg)
+    assert it.intent is None
+
+
+def test_open_a_new_list_is_not_a_query(cfg):
+    it = _item("create_todo", SimpleNamespace(title="new list", due_date=None),
+               kind="task", text="Open up a new list")
+    st = _state("Open up a new list", [it])
+    validate.run_objects(st, cfg)
+    assert it.intent is not None
