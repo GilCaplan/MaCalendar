@@ -357,3 +357,11 @@ def test_open_a_new_list_is_not_a_query(cfg):
     st = _state("Open up a new list", [it])
     validate.run_objects(st, cfg)
     assert it.intent is not None
+
+
+def test_stray_quotes_are_shed_before_parsing(cfg, monkeypatch):
+    monkeypatch.setattr(engine_llm, "call_json",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("no LLM")))
+    st = _state("x", [Item(id="item_1", kind="event", text="add 'christmas' to calendar")])
+    validate.run(st, cfg)
+    assert st.items[0].text == "add christmas to calendar"

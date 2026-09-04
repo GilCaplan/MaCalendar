@@ -368,6 +368,10 @@ def run(state: EngineState, cfg) -> EngineState:
         cleaned = item.text.strip().strip("[]").strip()
         # Collapse doubled whitespace Whisper leaves around cut words.
         cleaned = re.sub(r"\s{2,}", " ", cleaned)
+        # Stray quotes around a single word break intent validation ("add
+        # 'christmas' to calendar" died on every attempt) — dictation quotes
+        # carry no meaning the words don't.
+        cleaned = re.sub(r"['\"](\w[\w ]{0,40}?)['\"]", r"\1", cleaned)
         if cleaned != item.text:
             state.add_fix("validate", "text_tidy", item.text, cleaned)
             item.text = cleaned
