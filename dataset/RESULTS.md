@@ -19,7 +19,22 @@ fast. **Expected:** overall +1–2 pt (→ ~78–79%); e+t +2–5, e+e +2–4, t
 and those commands go instant → 10–30 s (accepted correctness trade). Watch:
 any legit fast command slowed, and the fast/deep mix in the report.
 
-*(actual vs. expected: to be filled after the rerun)*
+**Actual (rerun @ ce0c9b3, 2365 s):** overall 76.8 → **77.6%** (+0.8, just
+under the +1–2 band). The slices tell the real story: **task+task 35 → 55%
+(+20 — far above the tempered +0–5)**: the gated ", and then" task compounds
+went deep and split properly. event+event 59 → **63%** (top of band ✓).
+complex 46 → **51**. Fast share 115 → 103 (−12, a little more than predicted);
+fast-path correctness *rose* to 79% (the mangles left it). event+task 43 → 41
+and simple 92 → 90 read as **regressions but diff as noise**: the flipped rows
+("Remind me at the 15th of every month and pUT MILK…") involve no gate marker —
+pure replay nondeterminism (the LLM is ~75% deterministic run-to-run).
+**Noise floor made explicit:** on dev-fast a handful of rows flip between
+identical-code runs, so overall deltas under ~1.5 pt are not signal; targeted
+slice moves like +20 are. One real loss: "Open me a new list — and please add
+milk…" was *accidentally passing* fast and now lands on the create-list
+capability gap (queue #6 [Gil] gains a data point). **Verdict: graduated** —
+targeted slices clearly up, the dips are noise-class, and the mangle class is
+gone from the fast path. Next: queue #2, grounded default-title events.
 
 ## Dev-full confirm of C1+C2 (2026-09-04, @ 8a3e127)
 
