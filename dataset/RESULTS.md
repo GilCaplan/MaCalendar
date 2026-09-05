@@ -4,6 +4,23 @@ Every meaningful run, newest first. **Always: metric + slice + the commit that
 produced it.** Baselines are replayed, not frozen — cite the score report and
 md5, not "the dataset".
 
+## Cycle 3 — the fast-path compound gate (2026-09-04, base @ 8a3e127)
+
+**Hypothesis (queue #1):** the fast path confidently swallows compounds — every
+observed mangle ("…at noon. **Also,** Please remind…", "…at 9am, **and then**
+Remind me…" → a todo literally titled "then") is a **single-intent** parse of
+text carrying a **strong joiner**. Gate `fast_propose`: when the text has a
+strong compound joiner (". Also,", ", and then", " — and", "and also", a
+sentence break + joiner) AND the confident parse read only ONE request, refuse
+the instant commit and take the deep track (deep 81% vs fast 71% on dev-fast).
+Weak joiners (a plain "and") never gate — "meeting with Tal and Ravid" stays
+fast. **Expected:** overall +1–2 pt (→ ~78–79%); e+t +2–5, e+e +2–4, t+t +0–5
+(tempered: deep still misreads some garbly halves); fast share drops ~5–8 rows
+and those commands go instant → 10–30 s (accepted correctness trade). Watch:
+any legit fast command slowed, and the fast/deep mix in the report.
+
+*(actual vs. expected: to be filled after the rerun)*
+
 ## Dev-full confirm of C1+C2 (2026-09-04, @ 8a3e127)
 
 Count-correctness, dev-full ranks 1–600 (5405 s): **76.0%** vs the pre-loop

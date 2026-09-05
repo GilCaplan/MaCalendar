@@ -344,3 +344,46 @@ def test_the_diagram_chain_labels_exist_for_this_version():
     stages = {s for s, _label in CHAINS[BRAIN_VERSION]}
     from assistant.trace import VOCAB, RULE, VALIDATE, LLM, EXECUTE, VERIFY, DONE
     assert stages <= {VOCAB, RULE, VALIDATE, LLM, EXECUTE, VERIFY, DONE}
+
+
+# --- cycle 3: the fast-path compound gate ----------------------------------
+
+def _rp(intents, confidence=0.99):
+    rr = SimpleNamespace(confidence=confidence, missing_slots=[], intents=intents)
+    rp = MagicMock()
+    rp.analyze.return_value = rr
+    return rp
+
+
+def test_a_strong_joiner_with_one_intent_refuses_the_fast_commit(monkeypatch, cfg):
+    """Cycle 3 of the dataset loop: '…at 9am, and then Remind me…' was
+    confidently committed as todos, one literally titled "then". A
+    single-intent parse of two-request wording takes the deep track,
+    whatever its confidence."""
+    from assistant.engine.state import EngineState
+    monkeypatch.setattr(generate, "_get_rule_parser",
+                        lambda: _rp([("create_todo", SimpleNamespace())]))
+    st = EngineState(raw_text="", text="remind me to meet James at work tomorrow "
+                                       "at 9am, and then remind me of my meeting")
+    assert generate.fast_propose(st, cfg) is False
+
+
+def test_a_plain_and_still_commits_fast(monkeypatch, cfg):
+    from assistant.engine.state import EngineState
+    monkeypatch.setattr(generate, "_get_rule_parser",
+                        lambda: _rp([("create_event", SimpleNamespace())]))
+    st = EngineState(raw_text="", text="meeting with Tal and Ravid at Kems "
+                                       "tomorrow at 7")
+    assert generate.fast_propose(st, cfg) is True
+    assert st.parse_path == "fast"
+
+
+def test_a_two_intent_parse_keeps_fast_despite_a_joiner(monkeypatch, cfg):
+    """When the rule parser itself read TWO requests, it did not swallow the
+    compound — the gate must not slow it."""
+    from assistant.engine.state import EngineState
+    monkeypatch.setattr(generate, "_get_rule_parser",
+                        lambda: _rp([("create_event", SimpleNamespace()),
+                                     ("create_todo", SimpleNamespace())]))
+    st = EngineState(raw_text="", text="book gym at 7. Also, add milk to my list")
+    assert generate.fast_propose(st, cfg) is True

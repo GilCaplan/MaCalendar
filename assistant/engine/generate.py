@@ -24,6 +24,7 @@ item's own words — never another item's.
 from __future__ import annotations
 
 import logging
+import re
 
 from assistant.engine.state import EngineState, Item
 
@@ -76,6 +77,21 @@ def reset_parsers() -> None:
     _rule_parser = None
 
 
+# A joiner that all but announces a second request. Deliberately much narrower
+# than segment's _COMPOUND_HINT: a plain "and" joins guests and groceries far
+# more often than requests, but ". Also," / ", and then" / " — and" almost
+# never appear inside ONE ask. Cycle 3 of the dataset loop: every observed
+# fast-path mangle ("…at 9am, and then Remind me…" committing a todo literally
+# titled "then") was a confident SINGLE-intent parse of text carrying one of
+# these.
+_STRONG_COMPOUND_RE = re.compile(
+    r"\band\s+(?:then|also)\b"          # "and then", "and also"
+    r"|[.;!?]\s+(?:also|then|plus|and)\b"   # a sentence break, then a joiner
+    r"|\s[—–]\s*and\b"                  # " — and"
+    r"|,\s*then\b",                     # ", then"
+    re.I)
+
+
 def fast_propose(state: EngineState, cfg) -> bool:
     from assistant.intent.rule_parser import RULE_THRESHOLD, RuleParserSkip
     from assistant.trace import RULE
@@ -96,6 +112,14 @@ def fast_propose(state: EngineState, cfg) -> bool:
         return False
 
     state.rule_confidence = float(rr.confidence)
+    if (len(rr.intents) <= 1 and _STRONG_COMPOUND_RE.search(state.text)):
+        # A one-request reading of two-request wording: however confident the
+        # score, the parse swallowed a compound. The deep track splits first.
+        if state.trace:
+            state.trace.step(RULE, "Rule parser",
+                             "Confident but the words announce a second request "
+                             "— deep track", ok=True)
+        return False
     if rr.confidence >= RULE_THRESHOLD and not rr.missing_slots:
         state.items = [
             Item(id=f"item_{i + 1}", kind=_kind_for(name), text=state.text,
