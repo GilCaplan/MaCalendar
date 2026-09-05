@@ -4,6 +4,17 @@ Every meaningful run, newest first. **Always: metric + slice + the commit that
 produced it.** Baselines are replayed, not frozen — cite the score report and
 md5, not "the dataset".
 
+## Dev-full confirm of C3+C4 — the day's milestone (2026-09-04, @ f1c8d9d)
+
+Count-correctness, dev-full 600 (6049 s): **78.0%** — +2.0 from C3+C4 off the
+tuning slice, **+3.8 total for the day** vs the 74.2 pre-loop reference; old
+brain 71% on the same rows. task+task generalises at +10 (47 → 57), complex
+45 → 51, garbage titles 0%. All four cycles hold off-slice. Two rows took an
+'error' parse path — to be glanced at next session. **Loop paused at this
+milestone**: after midnight the replay clock is *Saturday* (a new variant of
+the observance clash), so further measurement waits on the date-pinning
+decision (queue #0).
+
 ## Cycle 4 — data-driven cue iteration (2026-09-04, base @ ce0c9b3)
 
 **Hypothesis (queue #3):** three additions to segment's kind enforcement, each
