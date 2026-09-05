@@ -4,6 +4,16 @@ Every meaningful run, newest first. **Always: metric + slice + the commit that
 produced it.** Baselines are replayed, not frozen — cite the score report and
 md5, not "the dataset".
 
+## Dev-full confirm of C1+C2 (2026-09-04, @ 8a3e127)
+
+Count-correctness, dev-full ranks 1–600 (5405 s): **76.0%** vs the pre-loop
+dev-full reference 74.2% — **+1.8 pt on rows the loop never tuned against** —
+and vs the old brain's 71% on the same slice. Slices: simple 90 / medium 89 /
+complex 45; e+e 53, t+t 47, e+t 38; garbage titles 0%. Caveat: the pre-loop
+reference ran on a different weekday, and the Friday/Shabbat replay clash
+(cycle-2 finding) makes cross-day deltas approximate. **C1+C2 fully
+graduated.** Next per the queue: the fast-path compound gate.
+
 ## Cycle 2 — the date-only occasion reminder (2026-09-04, base @ e956763)
 
 **Reading (from cycle-1-fix failures):** 6 of 8 listed event+event failures and
