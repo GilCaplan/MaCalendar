@@ -17,7 +17,17 @@ stated noise floor, so the verdict will be read on the targeted rows
 themselves (do those two rows now pass?), not the headline. Everything else
 flat. Watch: "notify" over-firing on non-calendar notifications.
 
-*(actual vs. expected: to be filled after the rerun)*
+**Actual (rerun @ f1c8d9d, 2373 s):** judged on the targets per the noise-floor
+rule — **event+task 41 → 46%** (top of the predicted band ✓; the
+calendar-invite row now creates *'Brunch with James and Alice', Tue 11 AM* —
+exactly right), **event+event 63 → 67%** (+4 bonus: the cues catch e+e halves
+too), complex 51 → **54**. Headline flat at 77.6 (task+task returned one
+noise-class row, 55 → 50). The festival row's residual is a **semantic
+boundary**, not a bug: the kind flip works, but generate reads "notify me
+about any festival occurring next month" as a *schedule query* — a
+standing-alert concept the product doesn't have — and the event-kind retry
+rightly accepts queries as calendar-consistent. Accepted as a convention loss.
+**Verdict: graduated.** Next measurement: dev-full confirm of C3+C4.
 
 ## Cycle 3 — the fast-path compound gate (2026-09-04, base @ 8a3e127)
 
