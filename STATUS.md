@@ -52,9 +52,10 @@ compare actual vs. expected in `RESULTS.md` → upsize only as gains slow.
     undone. Dormant until `self_check_apply` is on (removals are advisory by
     default). **HUD needs a restart to show it.**
 - **Deep-track improvement loop — RUNNING (branch `loop-cycle-1`).**
-  Cycle 1 ✅ confirmed & graduated (2026-09-04): enforcing the pinned
-  remind+clock-time⇒event rule over segment's LLM labels took dev-fast(250)
-  count-correct **73.2→76.0%** (event+task 35→41, predicted ~40). Full record:
+  Four graduated cycles on 2026-09-04 took dev-fast(250) count-correct
+  **73.2 → 77.6%** (complex 40→54, e+e 52→67, e+t 35→46, t+t 35→50/55);
+  dev-full confirmed C1+C2 at +1.8 off-slice, C3+C4 confirm in flight.
+  Full record:
   `dataset/RESULTS.md` (prose) + `dataset/loop_log.csv` (plottable, one row
   per run — a protocol requirement now). Run outputs preserved per cycle in
   `DOCUMENTATION/experiments/engine_compare/<label>/`.

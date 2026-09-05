@@ -55,15 +55,11 @@ needing one is marked **[Gil]** and is blocked until asked.
    *Risk:* invention-adjacent — the title default must be grounded ("event"
    is in the words); never invent a time that isn't there.
 
-3. **C2 rule iteration** — stage: segment (extend `_OCCASION_RE`/`_DATED_RE`).
-   *Evidence:* forms C2 knowingly misses: "Remind me at the 15th that we are
-   going to comic con" (no occasion-noun match), "I need to have a
-   conversation with Greg on Monday the 20th" ("conversation" not in the
-   noun list; "i need to" form).
-   *Hypothesis:* after C2's rerun, add the misses its failures actually show
-   (data-driven nouns/date forms, never speculative ones).
-   *Expected:* +0.5–1 pt, cheap increments. *Effort:* trivial. *Risk:* noun
-   list creep — each addition needs a failing row as its justification.
+3. ✅ **C4 — cue iteration** (segment, @ f1c8d9d). notify + festival +
+   "calendar invite". Actual: e+t 41 → 46 (top of band; the calendar-invite
+   row creates a real brunch event), e+e 63 → 67, complex 51 → 54; headline
+   flat (one t+t noise give-back). Festival residual accepted as a semantic
+   boundary (standing-alert reads as a query). Graduated.
 
 4. **List-op misreads** — stage: generate (or rule-parser mapping).
    *Evidence:* "update work out list with new items" → `update_todo` (found
