@@ -4,6 +4,21 @@ Every meaningful run, newest first. **Always: metric + slice + the commit that
 produced it.** Baselines are replayed, not frozen — cite the score report and
 md5, not "the dataset".
 
+## Cycle 4 — data-driven cue iteration (2026-09-04, base @ ce0c9b3)
+
+**Hypothesis (queue #3):** three additions to segment's kind enforcement, each
+justified by a live failing row, none speculative: (a) `notify` joins the
+remind-cues — "notify me about any festival occurring next month" (0 events);
+(b) `festival` joins the occasion-nouns (same row); (c) the unambiguous phrase
+"calendar invite" ⇒ event on its own — "Will you send a calendar invite …
+for brunch at 11 am on Tuesday" (0 events; no remind-word, so C1/C2 never
+fire). **Expected:** event+task +2 rows (41 → ~46%); overall +~1 pt — at the
+stated noise floor, so the verdict will be read on the targeted rows
+themselves (do those two rows now pass?), not the headline. Everything else
+flat. Watch: "notify" over-firing on non-calendar notifications.
+
+*(actual vs. expected: to be filled after the rerun)*
+
 ## Cycle 3 — the fast-path compound gate (2026-09-04, base @ 8a3e127)
 
 **Hypothesis (queue #1):** the fast path confidently swallows compounds — every

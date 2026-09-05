@@ -34,18 +34,11 @@ needing one is marked **[Gil]** and is blocked until asked.
    re-baseline dev-fast once after. Measurement correctness, zero engine risk —
    but it resets comparability, so it is Gil's call when.
 
-1. **Fast-path compound gate** — stage: generate (`fast_propose`).
-   *Evidence:* the fast path mangles compounds it confidently commits:
-   "Remind me to read book next week — and can you add Gloria…" → three
-   garbage todos; "…at noon. **Also**, Please remind to get donuts…" swallowed
-   into one title; cycle 2 added a todo titled literally **"then"** from
-   "…at 9am, and then Remind me of my meeting tomorrow". Fast 71% vs deep 81%.
-   *Hypothesis:* when the rule parse is single-intent but the text carries a
-   strong compound marker (" — and ", ". Also, ", "and then", ; with clauses),
-   refuse the fast commit and take the deep track.
-   *Expected:* +1.5–2.5 pt overall (several e+t/e+e/t+t rows move to the
-   deeper, better path); garbage titles down. *Effort:* low. *Risk:* latency —
-   more commands go deep (~10–30 s); watch the fast/deep mix.
+1. ✅ **C3 — fast-path compound gate** (generate `fast_propose`, @ ce0c9b3).
+   Actual: task+task 35 → 55 (+20), e+e 59 → 63, overall +0.8; fast-path
+   correctness rose to 79% with the mangles gone. Graduated. Learning for the
+   queue: dips elsewhere diffed as replay nondeterminism — overall deltas
+   under ~1.5 pt on dev-fast are noise; judge cycles by their targeted slice.
 
 2. **Grounded default-title events** — stage: generate (event twin of the
    existing `task_fallback`).

@@ -52,7 +52,7 @@ _CLOCKISH_RE = re.compile(
 
 # Any remind-flavoured wording — the verb or the noun ("a birthday wish
 # reminder for tomorrow at 10 AM" carries no "remind me to").
-_REMINDISH_RE = re.compile(r"\bremind(?:er)?s?\b", re.I)
+_REMINDISH_RE = re.compile(r"\b(?:remind(?:er)?s?|notify)\b", re.I)   # notify: cycle 4
 
 # The "remind me to <verb> …" errand form — stays a task unless clock-timed.
 _REMIND_TO_VERB_RE = re.compile(r"\bremind\s+\w+\s+to\b", re.I)
@@ -61,7 +61,7 @@ _REMIND_TO_VERB_RE = re.compile(r"\bremind\s+\w+\s+to\b", re.I)
 _OCCASION_RE = re.compile(
     r"\b(meeting|appointment|party|get-?together|dinner|lunch|brunch|breakfast|"
     r"birthday|anniversary|wedding|funeral|concert|recital|interview|class|"
-    r"lesson|shiur|conference|ceremony|event)\b", re.I)
+    r"lesson|shiur|conference|ceremony|festival|event)\b", re.I)   # festival: cycle 4
 
 # … said with a date reference (a weekday, a relative day, an ordinal, a month).
 _DATED_RE = re.compile(
@@ -87,7 +87,14 @@ def _enforce_pinned_kinds(kind: str, text: str) -> str:
     reminder for my meeting today", "remind me of my meeting tomorrow" — while
     the errand form "remind me to <verb> …" stays a task unless clock-timed
     (cycle 1's rule)."""
-    if kind != "task" or not _REMINDISH_RE.search(text):
+    if kind != "task":
+        return kind
+    # "send a calendar invite …" names the calendar outright — no remind-word
+    # needed (cycle 4: "…calendar invite out to James and Alice for brunch at
+    # 11 am" was labelled task and produced no event).
+    if re.search(r"\bcalendar\s+invite\b", text, re.I):
+        return "event"
+    if not _REMINDISH_RE.search(text):
         return kind
     if _CLOCKISH_RE.search(text):
         return "event"

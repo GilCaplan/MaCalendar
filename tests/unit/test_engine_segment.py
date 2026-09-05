@@ -211,3 +211,14 @@ def test_the_errand_form_keeps_the_clock_gate():
     assert f("task", "reminder for a meeting I have on Tuesday") == "event"
     assert f("task", "set a reminder for my meeting") == "task"              # occasion, no date
     assert f("task", "remind me about the thing tomorrow") == "task"         # date, no occasion-noun
+
+
+def test_cycle4_cues_each_earned_by_a_failing_row():
+    """Cycle 4: additions justified by live dev-fast failures, never speculation."""
+    f = segment._enforce_pinned_kinds
+    # "notify me about any festival occurring next month" — 0 events before
+    assert f("task", "notify me about any festival occurring next month") == "event"
+    # "send a calendar invite … for brunch at 11 am on Tuesday" — no remind-word
+    assert f("task", "send a calendar invite out to James and Alice for brunch") == "event"
+    # notify without an occasion stays a task — the cue must not over-fire
+    assert f("task", "notify me when the package arrives tomorrow") == "task"
