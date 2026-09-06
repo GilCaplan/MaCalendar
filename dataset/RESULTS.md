@@ -19,6 +19,19 @@ share shrank). Repeatable: `python -m scripts.deep_rescue <mixed.db>
 <alldeep.db>` — if the rescue rate ever climbs off zero, the routing has a
 new harvestable gap.
 
+**Dataset conventions audit (2026-09-06):** 140/3000 rows (4.7%) encode
+conventions our product deliberately rejects (bare list creation, standing
+alerts, remind-to-as-event, placeholders). New overrides layer
+(`dataset/inputs/convention_overrides.json`, rules mined from dev only,
+applied mechanically) gives a product-adjusted count-correct next to raw:
+**epoch baseline 78.4 raw → 81.2 adjusted**, and every overridden row on the
+slice passes adjusted — the convention gap is fully accounted for. The new
+query-no-mutation check caught a real bug (a query emitting `update_event`
+on the dentist appointment). **Correction:** row 8's logged 79.2 had 10
+unscored rows; same-scorer it is 75.6 — all-deep was 2.8pt *worse* raw than
+mixed (crippled-recognizer caveat), retracting the earlier "+1pt" note.
+Full report: `dataset/DATASET_AUDIT.md`.
+
 Every meaningful run, newest first. **Always: metric + slice + the commit that
 produced it.** Baselines are replayed, not frozen — cite the score report and
 md5, not "the dataset".
