@@ -213,6 +213,22 @@ def main() -> int:
     app.config["TESTING"] = True
     client = app.test_client()
 
+    # Warm every lazy import OUTSIDE the frozen contexts. freezegun's
+    # FakeDatetime breaks class definitions that subclass datetime (metaclass
+    # conflict), and the engine builds its rule parser on the FIRST request —
+    # which used to happen inside the first row's freeze, so every fast_propose
+    # raised and all 250 rows silently took the deep track (caught on the
+    # 2026-09-05 re-baseline: parse paths {'deep': 250}).
+    from assistant.engine import generate as _gen
+    _rp = _gen._get_rule_parser()
+    if _rp is not None:
+        try:
+            # The conflict arises on the FIRST analyze (lazy class definitions
+            # inside the date machinery), so the warm-up must actually parse.
+            _rp.analyze("book gym tomorrow at 7am", current_view="month")
+        except Exception:
+            pass
+
     # Each row replays AT ITS RECORDED MOMENT (Gil, 2026-09-05): the dataset
     # is a history with timestamps, so "tomorrow" must resolve against the ts
     # the utterance carries — not against whatever weekday the run happens on.
