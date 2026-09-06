@@ -179,7 +179,31 @@ def resolve_tags(names: Iterable[str], palette: Optional[Iterable[str]] = None) 
     known = {n.lower(): n for n in palette if n}
     out: list[str] = []
     for n in names or []:
-        real = known.get(str(n).strip().lower())
+        raw = str(n).strip().lower()
+        real = known.get(raw)
+        # Closest-match healing (Gil, 2026-09-05): tags are a finite class
+        # set, and the LLM hallucinates near-misses of real classes —
+        # "grocery" for "Groceries". Snap to the closest textually-similar
+        # class before giving up: singular/plural stems first, then a tight
+        # fuzzy match. Anything still unmatched is dropped as before (the
+        # title inference downstream is the safety net) — snapping a far-off
+        # word to a wrong class would be worse than dropping it.
+        if not real and raw:
+            stems = {raw + "s", raw + "es"}
+            if raw.endswith("y"):
+                stems.add(raw[:-1] + "ies")     # grocery → groceries
+            if raw.endswith("ies"):
+                stems.add(raw[:-3] + "y")
+            if raw.endswith("es"):
+                stems.add(raw[:-2])
+            if raw.endswith("s"):
+                stems.add(raw[:-1])
+            real = next((known[s] for s in stems if s in known), None)
+        if not real and len(raw) >= 4:
+            import difflib
+            close = difflib.get_close_matches(raw, list(known), n=1, cutoff=0.8)
+            if close:
+                real = known[close[0]]
         if real and real not in out:
             out.append(real)
     return out

@@ -102,24 +102,40 @@ def test_clock_digits_are_not_quantities():
     assert s["parts"]["qty"] == 1.0           # the 5 is a time, default 1 is right
 
 
-def test_tags_are_closed_set_classification():
-    """Gil: a finite number of classes — validity + agreement with the
-    product's own classifier, never fuzzy word overlap."""
+def test_tags_are_closed_set_classification_scored_on_the_outcome():
+    """Gil: a finite number of classes; hallucinated near-misses snap to the
+    closest class, and the metric scores the OUTCOME the product stores
+    (resolve → else infer-from-title), never the raw LLM emission."""
+    from assistant.actions.todo.tagging import resolve_tags
     classes = ["Groceries", "Work"]
     ref = lambda title: ["Groceries"] if "milk" in title else []
-    kw = dict(tag_classes=classes, tag_reference=ref)
+    kw = dict(tag_classes=classes, tag_reference=ref,
+              tag_resolver=lambda names: resolve_tags(names, classes))
     ok = fq.score_item(_todo(["milk"], [1], tags=["Groceries"]),
                        "add milk to my grocery list", TS, **kw)
+    healed = fq.score_item(_todo(["milk"], [1], tags=["grocery"]),
+                           "add milk to my grocery list", TS, **kw)
     wrong = fq.score_item(_todo(["milk"], [1], tags=["Work"]),
                           "add milk to my grocery list", TS, **kw)
-    invented = fq.score_item(_todo(["milk"], [1], tags=["Sportsball"]),
-                             "add milk to my grocery list", TS, **kw)
+    rescued = fq.score_item(_todo(["milk"], [1], tags=["Sportsball"]),
+                            "add milk to my grocery list", TS, **kw)
     assert ok["parts"]["tag"] == 1.0
-    assert wrong["parts"]["tag"] == 0.0        # wrong class
-    assert invented["parts"]["tag"] == 0.0     # out-of-set = invented class
+    assert healed["parts"]["tag"] == 1.0    # "grocery" snaps to Groceries
+    assert wrong["parts"]["tag"] == 0.0     # a real class, the wrong one
+    assert rescued["parts"]["tag"] == 1.0   # far-off name dropped → inference heals
     unref = fq.score_item(_todo(["socks"], [1], tags=["Work"]),
                           "buy socks", TS, **kw)
-    assert "tag" not in unref["parts"]         # reference silent → uncovered
+    assert "tag" not in unref["parts"]      # reference silent → uncovered
+
+
+def test_resolver_snaps_near_misses_only():
+    from assistant.actions.todo.tagging import resolve_tags
+    classes = ["Groceries", "Work", "Coursework"]
+    assert resolve_tags(["grocery"], classes) == ["Groceries"]      # stem
+    assert resolve_tags(["GROCERIES"], classes) == ["Groceries"]    # case
+    assert resolve_tags(["grocerys"], classes) == ["Groceries"]     # fuzzy
+    assert resolve_tags(["coursework hw"], classes) == ["Coursework"]  # contains the class — snap
+    assert resolve_tags(["sportsball"], classes) == []              # hallucination — drop
 
 
 # --- aggregation -----------------------------------------------------------

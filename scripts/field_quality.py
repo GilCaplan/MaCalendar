@@ -136,7 +136,7 @@ def _qty_ok(quantity: int, text: str) -> "bool | None":
     return quantity in nums
 
 
-def _tag_ok(tags: list, title: str, classes, reference) -> "bool | None":
+def _tag_ok(tags: list, title: str, classes, reference, resolver=None) -> "bool | None":
     """Tags are CLASSIFICATION over a finite class set (Gil, 2026-09-05) —
     the registry's tag names, not fuzzy words. Two objective checks:
     (a) every assigned tag must BE one of the classes (an out-of-set tag is an
@@ -149,17 +149,26 @@ def _tag_ok(tags: list, title: str, classes, reference) -> "bool | None":
     classifier's own quality."""
     if classes is None:
         return None
-    assigned = [str(x) for x in (tags or [])]
-    if any(a not in classes for a in assigned):
-        return False
+    raw = [str(x) for x in (tags or [])]
+    # Score the OUTCOME the product stores, not the raw LLM emission: emitted
+    # names pass through the product's own resolver (exact → stem → tight
+    # fuzzy snap; far-off names dropped), and when nothing survives the
+    # product falls back to inferring from the title — which is exactly the
+    # reference classifier. `reference` doubles as the resolver injection:
+    # reference(("__resolve__", names)) is avoided — the harness passes a
+    # resolver via the classes tuple instead when available.
+    resolved = resolver(raw) if (resolver and raw) else [a for a in raw if a in classes]
     expected = list(reference(title)) if reference else []
+    final = resolved or expected            # product precedence: said > inferred
+    if any(a not in classes for a in final):
+        return False                        # an invented class survived — engine bug
     if expected:
-        return bool(set(assigned) & set(expected))
+        return bool(set(final) & set(expected))
     return None
 
 
 def score_item(action: dict, text: str, ts: float,
-               tag_classes=None, tag_reference=None) -> "dict | None":
+               tag_classes=None, tag_reference=None, tag_resolver=None) -> "dict | None":
     """One created item → {'score': 0..1, 'parts': {...}} or None (not a create)."""
     name = action.get("action", "")
     p = action.get("parameters", {}) or {}
@@ -186,7 +195,7 @@ def score_item(action: dict, text: str, ts: float,
             weights = {"title": 0.5, "qty": 0.3, "tag": 0.2}
             comps["qty"] = _qty_ok(qtys[i] if i < len(qtys) else 1, text)
             comps["tag"] = _tag_ok(p.get("tags") or [], str(title),
-                                   tag_classes, tag_reference)
+                                   tag_classes, tag_reference, tag_resolver)
             scores.append(_weigh(comps, weights, kind="task"))
         if not scores:
             return None
@@ -216,7 +225,7 @@ def _weigh(comps: dict, weights: dict, kind: str) -> dict:
 _TIER_WEIGHT = {"simple": 1.0, "medium": 1.5, "complex": 2.0}
 
 
-def score_run(rows, prov, tag_classes=None, tag_reference=None) -> dict:
+def score_run(rows, prov, tag_classes=None, tag_reference=None, tag_resolver=None) -> dict:
     """rows: iterable of (transcript, actions_json, ts). Returns overall +
     per-tier field quality, the paramount when-component alone, coverage, and
     the difficulty-weighted headline (complex counts double a simple)."""
@@ -231,7 +240,7 @@ def score_run(rows, prov, tag_classes=None, tag_reference=None) -> dict:
         tier = (prov.get(text) or {}).get("complexity", "unknown")
         for a in actions:
             s = score_item(a, text, ts or _dt.datetime.now().timestamp(),
-                           tag_classes, tag_reference)
+                           tag_classes, tag_reference, tag_resolver)
             if s is None:
                 continue
             t = per_tier.setdefault(tier, [0.0, 0])

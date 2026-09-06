@@ -291,11 +291,13 @@ def main() -> int:
     from scripts import field_quality as _fq
     with sqlite3.connect(ENGINE_DB) as _c:
         _fq_rows = _c.execute(f"SELECT {RAW_KEY}, actions_json, ts FROM examples").fetchall()
+    from assistant.actions.todo.tagging import resolve_tags as _resolve
     from assistant.actions.todo.tagging import suggest_tags as _suggest
     from assistant.db import get_db as _gdb
     _classes = [r["name"] for r in _gdb().get_tags()]
     fieldq = _fq.score_run(_fq_rows, prov, tag_classes=_classes,
-                           tag_reference=lambda title: _suggest(title, _classes))
+                           tag_reference=lambda title: _suggest(title, _classes),
+                           tag_resolver=lambda names: _resolve(names, _classes))
 
     prf = {"overall": _prf(engine_scored, prov)}
     for cx in ("simple", "medium", "complex"):
