@@ -39,6 +39,18 @@ logged 79.2; the original "all-deep ≈ +0.8pt raw over mixed" note stood all
 along.
 Full report: `dataset/DATASET_AUDIT.md`.
 
+**Model-comparison cycle — closed on partial data (2026-09-06, Gil's
+call):** swapping the deep track's LLM for Claude Sonnet/Haiku via a worker
+bridge, same engine, same frozen slice. On identical cleanly-served rows the
+tuned local llama WON, consistently across both models — deep-track rows:
+llama 80% vs Sonnet 60% (n=25), llama 74% vs Haiku 53% (n=19). The engine's
+llama tuning + Ollama's mechanical schema constraint outweigh raw model
+strength; the remaining losses are convention rows, not model-competence
+rows. Full table, caveats and the three-failure attempt log:
+`dataset/MODEL_COMPARISON.md` (worktree). Partial dbs archived as
+`dataset/runs/x_sim-{sonnet,haiku}-partial-a`. Cycle slot closes; the queue
+resumes at hypothesis #2 (grounded default-title events).
+
 Every meaningful run, newest first. **Always: metric + slice + the commit that
 produced it.** Baselines are replayed, not frozen — cite the score report and
 md5, not "the dataset".
