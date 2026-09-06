@@ -28,6 +28,14 @@ so p50 roughly flat. Risk: vetoing legitimate generic-anaphora edits
 ("delete the event" meaning the last one) — deep handles anaphora too, so
 the cost is latency, not correctness.
 
+**ACTUAL (run 11, 2026-09-06 10:05):** the causal chain worked end-to-end —
+"set reminder at 3 pm" routed deep and event_fallback booked Reminder@15:00
+(**+1, the designed flip; zero veto-caused regressions; fast slice held at
+79% with 5 rows migrated fast→deep**). Headline raw 78.4 (−0.8) / adj 81.2:
+the give-back is 3 deep-path garble rows that were ALREADY deep in run 10
+("new scenario…", quoted-placeholder schedule, Hindi garble) — LLM replay
+flicker, the documented noise. **GRADUATED on the targeted slice.**
+
 
 **Deep-rescue analysis (2026-09-06, corrected same night):** first
 published as 0/21 — WRONG, computed against a misidentified scratch db (run
