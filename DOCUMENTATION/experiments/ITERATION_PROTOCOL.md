@@ -213,3 +213,21 @@ NOTHING counts on the main board until a full joint run confirms (a better
 parser shifts which rows reach deep). Baseline 2026-09-07 @ dev-fast:
 39% commit, 78.4% correct-on-committed (query 97 / remove 94 / createoradd
 90 / set 80; compounds t+t 33, e+t 14, e+e 0 — the C3 gate's residue).
+
+## The personalization guard (Gil, 2026-09-07)
+
+The adaptive layers (vocab auto-correct, command memory + 24h feedback
+hooks, tag discovery, category learning) are UNSUPERVISED — the dataset
+cannot validate them, only protect them:
+
+- Machine-generated records (fallback default titles, guard-dropped items,
+  test/probe traffic) must never feed mining, few-shot selection, or the
+  review queue as if the user said them. (Review-feed filter shipped
+  2026-09-06; fallback-record marking queued for the next engine window.)
+- **`weekly_review.py`'s flag rate on real usage is the guard metric**:
+  after any merge to production, the next weekly review's flag rate is read
+  like a test — a rise is investigated against that merge before new loop
+  work starts.
+- Personal rule mining (fast-lane rules from the user's own vocab/history)
+  ships SHADOW-MODE first: would-have-fired logged, never fired, promoted
+  only after a quiet week on the weekly instrument.
