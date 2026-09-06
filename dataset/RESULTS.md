@@ -10,6 +10,15 @@ session: simple-tier field quality (75) is LOWER than complex (86). Row 8
 (all-deep bug run) stays as the pure-deep A/B: deep-only buys ~+1 pt count
 and cleaner e+t at ~1.8× the latency.
 
+**Deep-rescue analysis (2026-09-06, rows 8×9):** of the epoch baseline's 21
+fast-path failures, the all-deep A/B rescues **0** — and breaks 0 of its 82
+passes. Cycle 3's gate already routed every deep-rescuable fast failure into
+the deep track; what still fails on fast is convention/capability loss no
+track fixes (fast-path correctness rose 71→80% across the cycles while its
+share shrank). Repeatable: `python -m scripts.deep_rescue <mixed.db>
+<alldeep.db>` — if the rescue rate ever climbs off zero, the routing has a
+new harvestable gap.
+
 Every meaningful run, newest first. **Always: metric + slice + the commit that
 produced it.** Baselines are replayed, not frozen — cite the score report and
 md5, not "the dataset".
