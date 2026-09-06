@@ -185,11 +185,21 @@ def score_db(db_path: pathlib.Path, provenance: dict[str, dict]) -> dict:
         # Verbatim input, not the stored transcript: the pipeline may rewrite
         # the transcript before recording it, and provenance is keyed on what
         # the history file actually said.
-        rows = c.execute(
-            "SELECT COALESCE(NULLIF(raw_transcript, ''), transcript), "
-            "actions_json, parse_path, tier_rank, ts, llm_ms, total_ms "
-            "FROM examples WHERE tier_rank IS NOT NULL ORDER BY tier_rank"
-        ).fetchall()
+        cols = {r[1] for r in c.execute("PRAGMA table_info(examples)")}
+        if "tier_rank" in cols:
+            rows = c.execute(
+                "SELECT COALESCE(NULLIF(raw_transcript, ''), transcript), "
+                "actions_json, parse_path, tier_rank, ts, llm_ms, total_ms "
+                "FROM examples WHERE tier_rank IS NOT NULL ORDER BY tier_rank"
+            ).fetchall()
+        else:
+            # archives from before the harness stamped tier_rank (the Sep 3-4
+            # pre-loop runs); scoreable all the same, just unranked
+            rows = c.execute(
+                "SELECT COALESCE(NULLIF(raw_transcript, ''), transcript), "
+                "actions_json, parse_path, NULL, ts, llm_ms, total_ms "
+                "FROM examples ORDER BY id"
+            ).fetchall()
 
     overrides = load_overrides()
     per_prompt = []

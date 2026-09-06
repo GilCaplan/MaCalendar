@@ -49,23 +49,26 @@ Against the empty scratch store that no-ops; against a real calendar it
 | run | raw | adjusted | up-flips | down-flips |
 |---|---|---|---|---|
 | row 9 epoch baseline (mixed) | 78.4% | **81.2%** | 8 (5 remind_half, 2 placeholder, 1 list_bare) | 1 (dentist query-mutation) |
-| row 8 all-deep A/B | 75.6%* | 78.8% | 9 | 1 (same row) |
+| row 8 all-deep A/B | 79.2% | 81.2% | 8 | 2 (dentist + one more query-mutation) |
 
 Every overridden row in the mixed slice passes adjusted — i.e. on this slice
 the convention gap is now **fully accounted for**, and the adjusted number
 measures only what the engine actually gets wrong.
 
-\* **Correction:** row 8's logged 79.2 had 10 unscored rows (190/240);
-rescored under today's scorer it is 75.6 (189/250). Same-scorer comparison:
-**all-deep was 2.8pt *worse* raw than mixed**, not +1pt better as previously
-noted — with the caveat that row 8 ran with the metaclass-poisoned date
-recognizer, so it understates a healthy all-deep run.
+The first published version of this table scored a misidentified db as
+"row 8" (actually run 2's — caught within the hour by the archive salvage's
+parse_path fingerprints). The true row-8 db rescores at exactly its logged
+79.2 raw. Archive manifests (`dataset/runs/*/manifest.json`) now record
+identity at archive time so no analysis ever again infers which db is
+which.
 
 ## Follow-ups
 
 - `_prf` and `field_quality` don't yet read the overrides — an overridden
   row's precision/recall still assumes the raw expectation. Small, do next.
-- `loop_log.csv` gained an `adj_pct` column (backfilled for rows 8–9; blank
-  for the Friday epoch, whose dbs are gone).
+- `loop_log.csv` gained an `adj_pct` column, backfilled for ALL runs 1–9:
+  the whole Friday epoch's scratch dbs were salvaged from tmp into
+  `dataset/runs/` during the archive build (`scripts/rescore_runs.py --write`
+  redoes the backfill whenever a metric changes).
 - The dentist bug (queries emitting mutations) — deterministic guard in the
   engine, next cycle.

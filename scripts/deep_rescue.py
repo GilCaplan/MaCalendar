@@ -6,10 +6,12 @@ Joins a mixed fast/deep run against an all-deep companion run of the same
 slice (same frozen-clock harness) by verbatim transcript. Reports the rescue
 rate (fast failures the deep track passes) and the breakage rate (fast passes
 deep would lose). First measured 2026-09-06 on the epoch baseline vs the
-row-8 all-deep A/B: 0/21 rescued, 0/82 broken — cycle 3's compound gate had
-already routed every deep-rescuable fast failure to the deep track, and the
-fast path's remaining failures are convention/capability losses no track
-fixes. Rerun whenever a fresh all-deep companion exists; if the rescue rate
+row-8 all-deep A/B: deep rescues 7/21 fast failures (weak-joiner compounds
+the fast gate misses) and breaks 6/82 fast passes — net +1 row. (An earlier
+same-night 0/21 figure came from a misidentified scratch db — run 2's, not
+row 8's. Verify identity against dataset/runs/*/manifest.json before
+joining; parse_paths is the fingerprint.)
+Rerun whenever a fresh all-deep companion exists; if the rescue rate
 ever rises above ~0 again, the fast/deep routing has a new harvestable gap.
 """
 from __future__ import annotations

@@ -1,0 +1,29 @@
+{
+ "loop_run": 8,
+ "label": "rebaseline-alldeep-bug",
+ "source": "/var/folders/0f/nk3dnvrd54jbjz_qn40_ynwh0000gn/T/engine_compare_ux34zvy5",
+ "source_mtime": "2026-09-05T21:58:48",
+ "archived_at": "2026-09-06T05:46:16+00:00",
+ "n_rows": 250,
+ "parse_paths": {
+  "deep": 250
+ },
+ "row_ts_range": [
+  1772903605.684508,
+  1774198015.16763
+ ],
+ "files": {
+  "engine_run.db": {
+   "md5": "42f11885bbf486292eef25e7bcf33a5c",
+   "bytes": 163840
+  },
+  "calendar.db": {
+   "md5": "e0f3a292526e246ddc0a472cfa9dbb28",
+   "bytes": 344064
+  },
+  "trace_bus.jsonl": {
+   "md5": "4df3770dfe5618fba026857bb686fb02",
+   "bytes": 683954
+  }
+ }
+}

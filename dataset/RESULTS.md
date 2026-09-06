@@ -10,14 +10,18 @@ session: simple-tier field quality (75) is LOWER than complex (86). Row 8
 (all-deep bug run) stays as the pure-deep A/B: deep-only buys ~+1 pt count
 and cleaner e+t at ~1.8× the latency.
 
-**Deep-rescue analysis (2026-09-06, rows 8×9):** of the epoch baseline's 21
-fast-path failures, the all-deep A/B rescues **0** — and breaks 0 of its 82
-passes. Cycle 3's gate already routed every deep-rescuable fast failure into
-the deep track; what still fails on fast is convention/capability loss no
-track fixes (fast-path correctness rose 71→80% across the cycles while its
-share shrank). Repeatable: `python -m scripts.deep_rescue <mixed.db>
-<alldeep.db>` — if the rescue rate ever climbs off zero, the routing has a
-new harvestable gap.
+**Deep-rescue analysis (2026-09-06, corrected same night):** first
+published as 0/21 — WRONG, computed against a misidentified scratch db (run
+2's, not row 8's; caught during the archive salvage via parse_path
+fingerprints: the real all-deep db is 250/250 deep). True numbers, row 9
+mixed × row 8 all-deep: **deep rescues 7/21 fast failures** (weak-joiner
+compounds C3's gate misses — "Give an entry to this list", remind+remind —
+plus "mark 13 october as my birthday") **and breaks 6/82 fast passes** — net
++1 row (+0.4pt, under noise). Routing more traffic deep is not free win;
+the opportunity is extending C3's gate cues to the 7 rescuable shapes
+without paying the 6 breaks. Repeatable: `python -m scripts.deep_rescue
+<mixed.db> <alldeep.db>` — verify db identity via the archive manifest
+first.
 
 **Dataset conventions audit (2026-09-06):** 140/3000 rows (4.7%) encode
 conventions our product deliberately rejects (bare list creation, standing
@@ -27,9 +31,12 @@ applied mechanically) gives a product-adjusted count-correct next to raw:
 **epoch baseline 78.4 raw → 81.2 adjusted**, and every overridden row on the
 slice passes adjusted — the convention gap is fully accounted for. The new
 query-no-mutation check caught a real bug (a query emitting `update_event`
-on the dentist appointment). **Correction:** row 8's logged 79.2 had 10
-unscored rows; same-scorer it is 75.6 — all-deep was 2.8pt *worse* raw than
-mixed (crippled-recognizer caveat), retracting the earlier "+1pt" note.
+on the dentist appointment). **Correction of the correction:** the "row 8 =
+75.6" retraction earlier tonight was computed against the WRONG surviving
+scratch db (actually run 2's — identified during the archive salvage by
+mtime and parse_path fingerprint). The true row-8 db rescores at exactly its
+logged 79.2; the original "all-deep ≈ +0.8pt raw over mixed" note stood all
+along.
 Full report: `dataset/DATASET_AUDIT.md`.
 
 Every meaningful run, newest first. **Always: metric + slice + the commit that

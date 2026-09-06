@@ -370,6 +370,19 @@ def main() -> int:
         print(f"  sub-slices: ranks 1-250 count-ok {r250[0]:.1%} (n={r250[1]}) · "
               f"ranks 251-600 {r600[0]:.1%} (n={r600[1]}) — the 251-600 half is the untuned read")
     print(f"Reports: {args.out_dir}/engine_run.score.md · triage.json")
+
+    # Every run auto-archives its scratch so any metric added or fixed later
+    # can be recomputed over it (scripts/rescore_runs.py). Identity is
+    # recorded at archive time — a surviving-but-unlabeled scratch already
+    # caused one analysis to be computed against the wrong run's db.
+    try:
+        from scripts.archive_run import archive as _archive
+        stamp = _dt.datetime.now().strftime("%Y%m%dT%H%M")
+        dest = _archive(pathlib.Path(_TMP), None, f"auto-{stamp}-{len(rows)}rows")
+        print(f"Archived scratch -> {dest}  (rename with the loop run number "
+              f"when logging this run in loop_log.csv)")
+    except Exception as e:                                  # never fail a run over archiving
+        print(f"WARNING: scratch archive failed ({e}) — copy {_TMP} by hand")
     return 0
 
 
