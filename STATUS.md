@@ -71,6 +71,25 @@ hand-written audit corpus is now only a regression floor.
   beat Claude Sonnet/Haiku drop-ins on identical rows (worktree
   `dataset/MODEL_COMPARISON.md`) — do not respawn the sims.
 
+## Forward roadmap (2026-09-07)
+
+1. **INTEGRATE** the stacked fast-lane work into the loop tree — F1+F2+F3
+   vetoes + tuned RULE_THRESHOLD 0.80 + SUBITEM 0.60 + cycle-9 sub-item
+   trust — and run ONE joint full-engine cycle (the remerge gate: nothing
+   from the sandbox counts on the main board until this confirms).
+2. **HARD CHECKPOINT (Gil, 2026-09-07): describe the updated algorithm
+   structure and get Gil's read BEFORE running the next cycle.** No cycle 10
+   until then.
+3. **Cycle 10** — full rules-first-per-fragment (green-lit by cycle 9's
+   latency win), LLM = end-judge only, at the 0.60 sub-item bar.
+4. **F4+ sandbox** — parse-quality batches (task+task soft spot, safe
+   low-conf recoverables) in parallel.
+5. **Path B** — crosscheck-precision metric → improve crosscheck.py → flip
+   self_check_apply (verify auto-updates fast commits).
+6. **Per-instance/context threshold fine-tuning** (Gil's forward idea) —
+   once integrated, thresholds per FastRule instance/command class.
+7. Queued hypotheses (dentist bug, list-op, fieldq anomaly) reopen last.
+
 ## Plan of record (Gil, 2026-09-07) — this order, before ANY new hypotheses
 
 1. **Track 1 — improve the rule system in its sandbox** (fast-lane worktree,
