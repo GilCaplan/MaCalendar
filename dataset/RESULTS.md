@@ -26,7 +26,8 @@ exempt): courtesy-prefix cleanup after the reminder strip; fallback path
 now applies slots. *Predicted:* deep-path p50 drops (fewer LLM calls):
 7.5s → **6.0–7.0s**; deep-slice count-correct −1 to +2; overall
 78.5–80.5 raw; fieldq holds ≥84.5. Judge: deep latency + deep count.
-This run is ALSO the joint confirmation for sandbox F1+F2 (merged aboard).
+(Correction: the fast-lane merge conflicted, so F1+F2 are NOT aboard
+this run — cycle 9 measures C9 alone; F1+F2 get their own joint run next.)
 
 ## Sandbox batch F2 — verb-map gap + pronoun targets (fast lane) — PREDICTION (registered before the change)
 
