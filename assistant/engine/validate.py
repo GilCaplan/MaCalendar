@@ -258,9 +258,12 @@ def _observance_verdict(intent, cfg) -> "str | None":
     try:
         from assistant.db import _is_meal
         from assistant.observance import (
-            candle_lighting, is_fast_day, is_shabbat, is_yom_tov, tzeit,
+            candle_lighting, is_enabled, is_fast_day, is_shabbat, is_yom_tov,
+            tzeit,
         )
 
+        if not is_enabled():
+            return None                      # gating switched off in settings
         if getattr(intent, "recurrence", None):
             return None                      # series: db-level skipping owns it
         d = getattr(intent, "date", None)

@@ -44,6 +44,15 @@ the last cycle's, not confounded by a different sample.
 `--limit 0` disables the script's default 150-row cap so the rank slice is taken
 whole — without it, `--max-rank 600` still returns only the first 150 rows.
 
+**The harness replays history, not "now"** (Gil, 2026-09-05): each row runs
+frozen at its recorded `ts` (freezegun), and observance gating stands down via
+`MACALENDAR_OBSERVANCE=0` — the dataset has no concept of Shabbat, and a
+Friday replay penalised the engine for correctly refusing (cycle 2). This
+reset the measurement epoch on 2026-09-05: loop_log.csv rows before/after that
+boundary are not comparable. Standing policies: **merge the loop branch into
+`main` every few graduated cycles**, and **product questions go to DEVQA.md**
+(root) for Gil's inline answers — never blocking prompts.
+
 `triage.json` now reports `by_complexity` and `by_compound_kind` old-vs-new
 deltas, so a cycle that targets one component sees THAT component move, not
 just the overall blur.

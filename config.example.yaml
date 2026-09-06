@@ -121,6 +121,10 @@ api:
 # Workout scheduling around Shabbat and the chagim (assistant/observance.py).
 # Sundown is computed locally with `astral` — no network calls.
 observance:
+  enabled: true                  # Shabbat/yom tov/fast gating (engine gate +
+                                 # recurring-series skip). false switches all
+                                 # of it off; MACALENDAR_OBSERVANCE=0 overrides
+                                 # (the dataset replay harness sets that).
   latitude: 31.7683              # Jerusalem
   longitude: 35.2137
   timezone: "Asia/Jerusalem"

@@ -196,6 +196,26 @@ def clear_location() -> "ObservanceSettings":
     return reload_settings()
 
 
+def is_enabled() -> bool:
+    """Whether Shabbat / yom tov / fast-day gating applies at all.
+
+    Off ⇒ the engine's observance gate and the recurring-series skip both stand
+    down. A user setting (`observance.enabled` in config.yaml, default on) with
+    an env override the dataset replay harness uses — MACALENDAR_OBSERVANCE=0 —
+    because the dataset's ground truth has no concept of Shabbat, and a replay
+    run on a Friday was penalising the engine for correctly refusing to book
+    "tomorrow" (loop cycle 2, 2026-09-04; flag decided by Gil 2026-09-05).
+    """
+    env = os.environ.get("MACALENDAR_OBSERVANCE")
+    if env is not None:
+        return env.strip().lower() not in ("0", "false", "off", "no")
+    try:
+        from assistant.config import load_config
+        return bool(getattr(load_config().observance, "enabled", True))
+    except Exception:
+        return True
+
+
 def settings_from_config(cfg=None) -> ObservanceSettings:
     """Build settings from config.yaml's `observance:` block.
 

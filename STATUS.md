@@ -64,7 +64,11 @@ compare actual vs. expected in `RESULTS.md` → upsize only as gains slow.
   (`DOCUMENTATION/experiments/ITERATION_PROTOCOL.md`): take the top unblocked
   entry of **`dataset/HYPOTHESES.md`** (the ranked experiment queue), write its
   prediction in RESULTS.md, fix ONE stage, rerun dev-fast, re-rank the queue.
-  A dev-full confirm is batched with the next graduated win.
+  A dev-full confirm is batched with the next graduated win. Since
+  2026-09-05 the harness replays each row frozen at its recorded ts with
+  observance gating off (measurement epoch reset — re-baseline first);
+  questions for Gil live in `DEVQA.md`; the loop branch merges into `main`
+  every few graduated cycles.
 - **Backlog — user-gated, do not start unprompted:** add fast-rule-parser rules
   mined from the user's real data + the dataset. Only on Gil's explicit say-so,
   and only after the deep track is improved — not on my own initiative.

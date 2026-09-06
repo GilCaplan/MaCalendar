@@ -49,6 +49,8 @@ the full tier.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import datetime as _dt
 import importlib.util
 import json
 import os
@@ -76,6 +78,11 @@ os.environ["MACALENDAR_DB"] = os.path.join(_TMP, "calendar.db")
 os.environ["MACALENDAR_MEMORY_DB"] = ENGINE_DB
 os.environ["MACALENDAR_TRACE_BUS"] = os.path.join(_TMP, "trace_bus.jsonl")
 os.environ["MACALENDAR_NO_WARMUP"] = "1"
+# The dataset's ground truth has no concept of Shabbat — a Friday replay was
+# penalising the engine for correctly refusing "tomorrow" (cycle 2). Gil's
+# call (2026-09-05): gating off for replays, via the observance.enabled flag's
+# env override.
+os.environ["MACALENDAR_OBSERVANCE"] = "0"
 import shutil as _sh
 for _var, _real, _name in (
         ("MACALENDAR_VOCAB", os.path.expanduser("~/.assistant_tools/vocab.json"), "vocab.json"),
@@ -108,7 +115,7 @@ def _source_rows(source: pathlib.Path, limit: int,
         where += f" AND tier_rank <= {int(max_rank)}"
     with sqlite3.connect(f"file:{source}?mode=ro", uri=True) as c:
         return c.execute(
-            f"SELECT {RAW_KEY}, tier_rank FROM examples WHERE {where} "
+            f"SELECT {RAW_KEY}, tier_rank, ts FROM examples WHERE {where} "
             "ORDER BY tier_rank"
             + (f" LIMIT {int(limit)}" if limit else "")
         ).fetchall()
@@ -135,7 +142,7 @@ def _stamp_ranks(pairs: list[tuple[str, int]]) -> int:
         except sqlite3.OperationalError:
             pass
         stamped = 0
-        for text, rank in pairs:
+        for text, rank, _ts in pairs:
             cur = c.execute(
                 f"UPDATE examples SET tier_rank = ? WHERE {RAW_KEY} = ?",
                 (rank, text))
@@ -166,11 +173,20 @@ def main() -> int:
     app.config["TESTING"] = True
     client = app.test_client()
 
+    # Each row replays AT ITS RECORDED MOMENT (Gil, 2026-09-05): the dataset
+    # is a history with timestamps, so "tomorrow" must resolve against the ts
+    # the utterance carries — not against whatever weekday the run happens on.
+    # freezegun patches datetime in-process; perf_counter (timings) is not
+    # touched.
+    from freezegun import freeze_time
+
     t0 = time.perf_counter()
-    for i, (text, rank) in enumerate(rows, 1):
+    for i, (text, rank, ts) in enumerate(rows, 1):
         _reset_calendar()
-        resp = client.post("/voice/text",
-                           json={"transcript": text, "source": "test"}).get_json()
+        frozen = freeze_time(_dt.datetime.fromtimestamp(ts)) if ts else contextlib.nullcontext()
+        with frozen:
+            resp = client.post("/voice/text",
+                               json={"transcript": text, "source": "test"}).get_json()
         mark = "·" if (resp.get("actions") or resp.get("parse") == "ignored") else "!"
         if i % 10 == 0 or mark == "!":
             print(f"  {mark} {i}/{len(rows)}  [{resp.get('parse', '?'):9}] {text[:64]}")

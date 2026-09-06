@@ -24,15 +24,13 @@ needing one is marked **[Gil]** and is blocked until asked.
 
 ## The queue
 
-0. **[Gil] Replay-date pinning** — harness (`engine_dataset_compare`), not the
-   engine. *Evidence (cycle 2):* replays use the real clock, so a Friday run
-   makes every "tomorrow" event land on Shabbat and the observance gate
-   correctly refuses it — the dataset doesn't model Shabbat, so the engine is
-   penalised for being right, gains are understated, and runs replayed on
-   different weekdays are not comparable. *Proposal:* pin the replay clock to
-   a fixed mid-week date (e.g. a Tuesday) inside the compare harness only;
-   re-baseline dev-fast once after. Measurement correctness, zero engine risk —
-   but it resets comparability, so it is Gil's call when.
+0. ✅ **Resolved (Gil, 2026-09-05) — frozen replay clock + observance flag.**
+   Better than pinning to an arbitrary Tuesday: each row now replays AT ITS
+   RECORDED TIMESTAMP (the dataset is a history), and Shabbat gating stands
+   down in tests via the user flag `observance.enabled` /
+   MACALENDAR_OBSERVANCE=0. **Measurement epoch reset**: results from
+   2026-09-05 onward are not comparable to earlier rows in loop_log.csv — the
+   re-baseline run marks the boundary.
 
 1. ✅ **C3 — fast-path compound gate** (generate `fast_propose`, @ ce0c9b3).
    Actual: task+task 35 → 55 (+20), e+e 59 → 63, overall +0.8; fast-path
@@ -82,20 +80,23 @@ needing one is marked **[Gil]** and is blocked until asked.
    (interacts with #2 — do #2 first, then this guard can key off its
    grounding rule).
 
-6. **[Gil] "create a new list X" as a voice action** — capability, not a bug.
-   *Evidence:* task+task 35% is mostly "Create a new list… Also, Start
-   creating a new list" forms; the product has no create-list action, so one
-   generic todo appears. Blocked on: should voice create task lists at all?
-   *Expected if yes:* +1–1.5 pt on task+task. Until asked: accepted losses.
+6. ✅ **Resolved (Gil, 2026-09-05): NO** — lists stay Today/General + tags,
+   no separate lists by voice. The "create a new list" dataset rows are
+   accepted convention losses, permanently. (Informs #4: "update the workout
+   list with new items" should read as create-todos-with-tag, not a new list.)
 
-7. **[Gil] dated "I need to <meet/talk>…" ⇒ event** — convention edge.
-   "on Monday, the 20th, I need to have a conversation with Greg" — dated
-   meeting-ish i-need-to. Today: task. Dataset: event. One row on this slice —
-   ask only if #3's rerun shows more of the form.
+7. **[DEVQA Q1] dated "I need to <meet/talk>…" ⇒ event** — convention edge,
+   parked in DEVQA.md for Gil's inline answer. One row on this slice.
 
 ## Standing process items (not hypotheses)
 
-- **Dev-full confirm** (`--limit 0 --max-rank 600`, ~1½–3¼ h): run after the
-  next graduated win to confirm C1+C2 together off the tuning slice.
+- **Dev-full confirm** (`--limit 0 --max-rank 600`): after every couple of
+  graduated wins, to confirm off the tuning slice.
+- **Merge the loop branch into `main` every few graduated cycles** (Gil,
+  2026-09-05). First merge done @ a425ca2.
+- **Questions go to DEVQA.md**, never blocking prompts (Gil, 2026-09-05).
+- **Diminishing returns → upsize** (Gil): when dev-fast cycles stop moving
+  their targeted slices (two cycles < ~2 rows), the working slice becomes
+  dev-full, with held-out for milestones.
 - **Held-out check** (sealed): only at a milestone, never mined.
 - **Re-rank this file** after every verification rerun; prune on every third.
