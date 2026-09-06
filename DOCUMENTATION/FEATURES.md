@@ -24,7 +24,7 @@ purely backend (no client code beyond displaying the effects).
 | UI | [Tasks power features](#tasks-power-features) | rich notes, sorts, reorder, cal→tasks sync | `todo_view.py` |
 | UI | [Search & jump-to-date](#search--jump-to-date) | toolbar search over events/tasks; type a date to jump | `window.py`, `SearchView.swift` |
 | UI | [Small conveniences](#small-conveniences) | duplicate event, week numbers, Timer CSV export | `event_dialog.py`, `month_view.py`, `timer_view.py` |
-| hybrid | [Calendar views](#calendar-views-month--week--day) | month/week/day browsing + event CRUD, drag, undo | `calendar_ui/`, iOS views, `db.py` |
+| hybrid | [Calendar views](#calendar-views-month--week--day) | month/week/day/agenda browsing + event CRUD, drag, undo | `calendar_ui/`, iOS views, `db.py` |
 | hybrid | [Tasks](#tasks--to-dos) | Today/General lists, priorities, quantities | `db.py`, `TasksView` |
 | hybrid | [Tag discovery](#tag-discovery--the-class-set-grows-with-consent) | consent-based new classes + history | `actions/todo/tag_discovery.py` |
 | hybrid | [Share event as .ics](#share-event-as-ics) | one event → RFC 5545 file, both platforms | `ics_export.py`, `event_dialog.py` |
@@ -112,13 +112,19 @@ modes.
 
 ### Calendar views (month / week / day)
 **What:** The Outlook-style calendar — browse, create, edit, drag-reschedule
-events; undo/redo.
+events; undo/redo. A fourth Agenda mode (Mac only) lists the next 30 days'
+events chronologically, grouped by day, with day headers skipping empty days.
 **Where:** Mac `assistant/calendar_ui/` (`window.py`, `month_view` / week / day
-views, `styles.py`); iOS `Views/MonthGridView.swift`, `WeekView.swift`,
-`DayView.swift`, `EventDetailView.swift`; data `assistant/db.py` (`events`).
+/ `agenda_view.py` views, `styles.py`); iOS `Views/MonthGridView.swift`,
+`WeekView.swift`, `DayView.swift`, `EventDetailView.swift`; data
+`assistant/db.py` (`events`).
 **How:** PyQt6 on Mac, SwiftUI on iOS; both are thin clients over the same
 SQLite file via the API. Optimistic concurrency via `updated_at` stamps;
 drag-reschedule PATCHes and records implicit feedback on voice-created rows.
+Agenda anchors on a `set_start_date` date (Today resets it, nav arrows step a
+week), clicking a row opens the same edit dialog as the other views, and day
+headers append the Hebrew date when `hebrew_calendar.display_mode` isn't
+`english` — same rule as the Week header cells.
 
 ### Tasks / to-dos
 **What:** Two lists (Today, General) with priorities, due dates, notes,
