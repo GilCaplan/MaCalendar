@@ -135,7 +135,15 @@ attachments, quantities ("pasta ×5") and subtasks.
 **How:** Quantities parse from speech or typed titles
 (`assistant/intent/quantity.py`, `split_quantity`); list is a column, not a
 table — the two-list design is deliberate (see tag classes for the axis that
-does grow).
+does grow). **Creating a task is idempotent:** a client mints one
+`client_token` per task the user asked for and repeats it on every attempt —
+the live `POST /todos` and each replay of the same queued create — and the
+server returns the row it already stored (200, `{"id": …, "duplicate": true}`)
+instead of inserting a second one. `todos.client_token` carries the key with a
+unique index over non-empty values; in-process creators (voice, calendar sync,
+the Mac tasks pane) leave it empty because they never cross the wire. Added
+2026-09-06 after 32 copies of one task accumulated in Today, one per repeated
+`POST /todos`.
 
 ### Tag discovery — the class set grows with consent
 **What:** When ≥5 distinct untagged tasks share a theme no existing class

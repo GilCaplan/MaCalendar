@@ -1097,11 +1097,30 @@ def create_app() -> Flask:
 
     @app.post("/todos")
     def todo_create():
+        # todo-create fingerprint: an unidentified localhost client has been
+        # duplicating creates (34x "buy groceries"); tokened clients are now
+        # idempotent, but a token-less caller still gets through - log enough
+        # to name it on its next appearance.
+        logger.info("POST /todos from %s ua=%r token=%r",
+                    request.remote_addr, request.headers.get("User-Agent", ""),
+                    (request.get_json(silent=True) or {}).get("client_token"))
+        """Create a task. Idempotent on `client_token` — a repeat returns 200 + the existing id."""
         data = request.get_json(silent=True) or {}
         title = data.get("title", "").strip()
         if not title:
             return jsonify({"error": "Missing 'title' field", "code": 400}), 400
         db = get_db()
+        # Creation is idempotent on `client_token`: the client mints one token
+        # per task the user asked for and sends it on the live POST and on every
+        # replay of the same queued create. Without this a create that reached
+        # the Mac but whose reply was lost — or one flushed twice by overlapping
+        # sync passes — landed as another copy of the task; that is how 32
+        # "buy groceries" rows accumulated in the Today list (2026-09-04..06).
+        token = str(data.get("client_token") or "").strip()
+        if token:
+            already = db.get_todo_by_client_token(token)
+            if already is not None:
+                return jsonify({"id": already["id"], "duplicate": True}), 200
         # A count typed into the title works the same as one spoken: "pasta x5"
         # is one task for five, not a task literally called "pasta x5".
         from assistant.intent.quantity import split_quantity
@@ -1128,6 +1147,7 @@ def create_app() -> Flask:
             notes=data.get("notes", ""),
             tags=tags,
             quantity=quantity,
+            client_token=token,
         )
         return jsonify({"id": todo_id}), 201
 

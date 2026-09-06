@@ -38,6 +38,11 @@ class APIClient: ObservableObject {
     /// While things are changing (a voice command just ran, an edit was saved) the
     /// background poll drops to 1 s; it returns to 30 s once this window passes.
     private var isFlushingVoice = false
+    /// Same reason as `isFlushingVoice`, for the write queue. Four things ask
+    /// for a flush — the reconnect hook in `request()`, the `.active` scene
+    /// change, the poll loop, and a manual retry — and two overlapping passes
+    /// both read `allPending().first`, so both replay the same queued create.
+    private var isFlushingPending = false
     @Published var burstUntil = Date.distantPast
     func burstRefresh(seconds: TimeInterval = 45) { burstUntil = max(burstUntil, Date().addingTimeInterval(seconds)) }
     var pollInterval: TimeInterval { Date() < burstUntil ? 1 : 30 }
@@ -125,7 +130,10 @@ class APIClient: ObservableObject {
     /// Returns true if anything was synced (caller should refresh UI).
     @discardableResult
     func syncPending() async -> Bool {
+        guard !isFlushingPending else { return false }
         guard !LocalStore.shared.allPending().isEmpty else { return false }
+        isFlushingPending = true
+        defer { isFlushingPending = false }
         var synced = 0
         // Re-read the queue each pass: replaying a create rewrites the paths of
         // later entries that still point at its temporary offline id.
@@ -390,7 +398,13 @@ class APIClient: ObservableObject {
     /// Tags are always sent explicitly (possibly empty) so the server's own
     /// "tag mode" (config.todo.auto_tag) never overrides what the phone chose.
     func createTodo(title: String, list: String = "today", tags: [String] = []) async throws -> Int {
-        let body: [String: Any] = ["title": title, "list_name": list, "tags": tags]
+        // One idempotency token per task the user asked for, minted before the
+        // first attempt and carried by every later one. The Mac returns the row
+        // it already stored for a token it has seen, so a create that arrived
+        // but whose reply was lost — and a queued create replayed twice — can no
+        // longer land as a second copy of the task.
+        let body: [String: Any] = ["title": title, "list_name": list, "tags": tags,
+                                   "client_token": UUID().uuidString]
         do {
             let data = try await request("/todos", method: "POST", body: body)
             let obj  = try JSONSerialization.jsonObject(with: data) as? [String: Any]

@@ -273,6 +273,89 @@ def test_todo_create_missing_title_returns_400(app_client):
 
 
 # ---------------------------------------------------------------------------
+# Creation is idempotent — the duplicate-task bug
+#
+# Gil, 2026-09-06: "a lot of duplicates of 'buy groceries' in the Today todo
+# list" — 32 rows, all source='manual', every one of them a separate POST
+# /todos in ~/.assistant_tools/launch.log. The endpoint inserted on every
+# request, so a create that reached the Mac but whose reply was lost, and a
+# queued create flushed twice by overlapping sync passes, each landed as
+# another copy. `client_token` is the fix: one token per task the user asked
+# for, replayed with every attempt.
+# ---------------------------------------------------------------------------
+
+def test_replayed_create_with_same_token_makes_no_duplicate(app_client):
+    """The whole bug in one test: POST the identical create twice."""
+    client, db = app_client
+    body = {"title": "buy groceries", "list_name": "today",
+            "tags": ["Groceries"], "client_token": "queued-create-1"}
+
+    first = client.post("/todos", json=body)
+    assert first.status_code == 201
+    todo_id = first.get_json()["id"]
+
+    replay = client.post("/todos", json=body)
+    assert replay.status_code == 200                     # not 201: nothing created
+    assert replay.get_json() == {"id": todo_id, "duplicate": True}
+
+    rows = [t for t in db.get_todos(include_completed=True)
+            if t["title"] == "buy groceries"]
+    assert len(rows) == 1, f"a replayed create duplicated the task: {rows}"
+
+
+def test_many_replays_of_one_queued_create_stay_one_task(app_client):
+    """The shape the real data had: the same create replayed over and over."""
+    client, db = app_client
+    body = {"title": "buy groceries", "client_token": "queued-create-2"}
+    ids = {client.post("/todos", json=body).get_json()["id"] for _ in range(10)}
+    assert len(ids) == 1
+    assert len([t for t in db.get_todos(include_completed=True)
+                if t["title"] == "buy groceries"]) == 1
+
+
+def test_two_real_asks_are_two_tasks(app_client):
+    """Idempotency must not swallow a task the user genuinely asked for twice:
+    a different token is a different task, however identical the words."""
+    client, db = app_client
+    client.post("/todos", json={"title": "buy groceries", "client_token": "ask-a"})
+    client.post("/todos", json={"title": "buy groceries", "client_token": "ask-b"})
+    # and a client that sends no token at all keeps the old behaviour
+    client.post("/todos", json={"title": "buy groceries"})
+    assert len([t for t in db.get_todos(include_completed=True)
+                if t["title"] == "buy groceries"]) == 3
+
+
+def test_todo_client_token_is_idempotent_at_the_db_layer(tmp_path):
+    """db.create_todo is the seam every surface shares, so it holds the rule
+    too — not just the HTTP route above it."""
+    db = CalendarDB(path=str(tmp_path / "token_calendar.db"))
+    first = db.create_todo("buy groceries", client_token="tok-1")
+    again = db.create_todo("buy groceries", client_token="tok-1")
+    assert first == again
+    assert len(db.get_todos(include_completed=True)) == 1
+
+    # An empty token is "no key given" — never a shared one.
+    db.create_todo("buy milk", client_token="")
+    db.create_todo("buy milk", client_token="")
+    assert len([t for t in db.get_todos(include_completed=True)
+                if t["title"] == "buy milk"]) == 2
+
+
+def test_calendar_sync_stays_idempotent_across_runs(tmp_path):
+    """The other suspect, kept honest: re-running the calendar→todos sync must
+    still update in place rather than create a second row per event."""
+    import datetime
+
+    db = CalendarDB(path=str(tmp_path / "sync_calendar.db"))
+    today = datetime.date.today().isoformat()
+    db.create_event_from_dict({"title": "Standup", "date": today,
+                               "start_time": "09:00", "end_time": "09:30"})
+    assert db.sync_calendar_to_todos(list_name="today") == 1
+    assert db.sync_calendar_to_todos(list_name="today") == 1
+    assert len(db.get_todos_by_source("calendar_sync")) == 1
+
+
+# ---------------------------------------------------------------------------
 # API-key auth
 # ---------------------------------------------------------------------------
 
