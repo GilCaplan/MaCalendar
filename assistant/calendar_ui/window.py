@@ -299,6 +299,11 @@ class CalendarWindow(QMainWindow):
     A QTimer drains the queue on the main thread every 100ms.
     """
 
+    # A mined new-tag proposal arrived from the API (fetched on a worker
+    # thread; dialogs must run on the GUI thread, and a cross-thread signal
+    # is the safe hand-off).
+    _tag_suggestion_ready = pyqtSignal(dict)
+
     def __init__(self, pipeline=None, config=None, parent=None):
         super().__init__(parent)
         self._pipeline = pipeline
@@ -335,6 +340,14 @@ class CalendarWindow(QMainWindow):
             self._poll_timer.setInterval(100)
             self._poll_timer.timeout.connect(self._poll_status)
             self._poll_timer.start()
+
+        # Tag discovery (Gil, 2026-09-05): once per launch, a minute in — the
+        # user is demonstrably at the app by then — ask the API whether the
+        # history has earned a new tag class. All the politeness (evidence
+        # bar, weekly cooldown, refusals-forever) is server-side; this client
+        # only pulls and shows. See actions/todo/tag_discovery.py.
+        self._tag_suggestion_ready.connect(self._on_tag_suggestion)
+        QTimer.singleShot(60_000, self._fetch_tag_suggestion)
 
         # Changes made from the phone land in the same SQLite file via the API server;
         # pick them up without a manual refresh by watching the file's mtime.
@@ -947,6 +960,60 @@ class CalendarWindow(QMainWindow):
                 self._handle_status(status, message)
         except queue.Empty:
             pass
+
+    def _fetch_tag_suggestion(self) -> None:
+        import json as _json
+        import threading
+        import urllib.request
+
+        def _work() -> None:
+            try:
+                port = getattr(getattr(self._config, "api", None), "port", 8080)
+                req = urllib.request.Request(f"http://127.0.0.1:{port}/tags/suggestion")
+                key = getattr(getattr(self._config, "api", None), "key", None)
+                if key:
+                    req.add_header("X-API-Key", key)
+                with urllib.request.urlopen(req, timeout=5) as r:
+                    c = _json.loads(r.read().decode())
+                if c and c.get("name"):
+                    self._tag_suggestion_ready.emit(c)
+            except Exception:
+                pass                      # a quiet feature: never bother anyone
+
+        threading.Thread(target=_work, daemon=True, name="tag-suggest").start()
+
+    def _on_tag_suggestion(self, c: dict) -> None:
+        from PyQt6.QtWidgets import QMessageBox
+        samples = "\n  • ".join(c.get("samples") or [])
+        box = QMessageBox(self)
+        box.setWindowTitle("New tag idea")
+        box.setText(f"Add “{c['name']}” as a tag?")
+        box.setInformativeText(
+            f"{c.get('evidence', '?')} of your tasks share this theme and no "
+            f"existing tag covers them, e.g.:\n  • {samples}\n\n"
+            "You can review or reverse this later in the tag history.")
+        box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        accept = box.exec() == QMessageBox.StandardButton.Yes
+
+        import json as _json
+        import threading
+        import urllib.request
+
+        def _post() -> None:
+            try:
+                port = getattr(getattr(self._config, "api", None), "port", 8080)
+                req = urllib.request.Request(
+                    f"http://127.0.0.1:{port}/tags/suggestion/answer",
+                    data=_json.dumps({"name": c["name"], "accept": accept}).encode(),
+                    headers={"Content-Type": "application/json"}, method="POST")
+                key = getattr(getattr(self._config, "api", None), "key", None)
+                if key:
+                    req.add_header("X-API-Key", key)
+                urllib.request.urlopen(req, timeout=5).read()
+            except Exception:
+                pass
+
+        threading.Thread(target=_post, daemon=True, name="tag-suggest-answer").start()
 
     def _on_review_choice(self, choice: str) -> None:
         """Redo / Add more / Send / Cancel from the review bar."""

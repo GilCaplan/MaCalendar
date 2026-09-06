@@ -800,6 +800,22 @@ class APIClient: ObservableObject {
         _ = try await request("/observance/location", method: "DELETE")
     }
 
+    // MARK: - Tag discovery (consent-based new classes)
+
+    /// One polite ask per week at most — all rate-limiting is server-side;
+    /// call only from a foregrounded view.
+    func tagSuggestion() async -> TagSuggestion? {
+        guard let data = try? await request("/tags/suggestion"),
+              let s = try? JSONDecoder().decode(TagSuggestion.self, from: data),
+              let n = s.name, !n.isEmpty else { return nil }
+        return s
+    }
+
+    func answerTagSuggestion(name: String, accept: Bool) async {
+        _ = try? await request("/tags/suggestion/answer", method: "POST",
+                               body: ["name": name, "accept": accept])
+    }
+
     func vocab() async throws -> VocabState {
         try decode(VocabState.self, from: try await request("/vocab"))
     }

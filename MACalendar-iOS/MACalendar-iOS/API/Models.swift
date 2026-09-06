@@ -315,6 +315,14 @@ struct VerifyResult: Codable {
     let revert: [RevertItem]?   // destructive: rows removed, re-POST to undo
 }
 
+/// A mined new-tag proposal (GET /tags/suggestion) — consent-based growth of
+/// the finite tag class set. Empty name = nothing to ask this week.
+struct TagSuggestion: Codable {
+    let name: String?
+    let evidence: Int?
+    let samples: [String]?
+}
+
 /// One row a destructive background patch removed. `body` is exactly what
 /// POST /events / POST /todos accept, so reverting is a re-create (one tap).
 struct RevertItem: Codable, Identifiable {

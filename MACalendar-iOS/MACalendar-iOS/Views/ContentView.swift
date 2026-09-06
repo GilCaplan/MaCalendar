@@ -8,6 +8,9 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var selectedTab = 0
+    /// A mined new-tag proposal to confirm (server rate-limits to ~one/week).
+    @State private var tagSuggestion: TagSuggestion? = nil
+    @State private var showTagSuggestion = false
     @State private var selectedDate = Date()
     @State private var viewedDate = Date()
     @State private var calendarView: CalendarMode = .month
@@ -412,6 +415,30 @@ struct ContentView: View {
                 await loadMonth()
                 api.requestRefresh()
             }
+        }
+        // Tag discovery (Gil, 2026-09-05): the app may propose a NEW tag class
+        // mined from untagged history — at most ~one ask a week, enforced
+        // server-side; this only pulls while the app is actively open.
+        .task {
+            try? await Task.sleep(nanoseconds: 20_000_000_000)   // let the session settle
+            guard UIApplication.shared.applicationState == .active else { return }
+            if let s = await api.tagSuggestion() {
+                tagSuggestion = s
+                showTagSuggestion = true
+            }
+        }
+        .alert("Add “\(tagSuggestion?.name ?? "")” as a tag?",
+               isPresented: $showTagSuggestion, presenting: tagSuggestion) { s in
+            Button("Add tag") {
+                Task { await api.answerTagSuggestion(name: s.name ?? "", accept: true) }
+            }
+            Button("No thanks", role: .cancel) {
+                Task { await api.answerTagSuggestion(name: s.name ?? "", accept: false) }
+            }
+        } message: { s in
+            Text("\(s.evidence ?? 0) of your tasks share this theme, e.g. "
+                 + (s.samples ?? []).prefix(2).joined(separator: " · ")
+                 + ". You can review or reverse this later in the tag history.")
         }
     }
 

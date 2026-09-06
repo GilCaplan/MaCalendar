@@ -9,6 +9,12 @@ All endpoints are served by the Mac at `http://<tailscale-ip>:8080`; the iOS app
 |---|---|---|
 | `GET` | `/health` |  |
 
+## /heartbeat
+
+| Method | Path | What it does |
+|---|---|---|
+| `POST` | `/heartbeat` | A device (the phone, another client) reports it is alive and |
+
 ## /voice
 
 | Method | Path | What it does |
@@ -138,6 +144,10 @@ All endpoints are served by the Mac at `http://<tailscale-ip>:8080`; the iOS app
 | `GET` | `/tags` |  |
 | `POST` | `/tags` |  |
 | `DELETE` | `/tags/<path:name>` |  |
+| `GET` | `/tags/suggestion` | A new-tag proposal mined from the user's untagged history, or {}. |
+| `POST` | `/tags/suggestion/answer` | {"name": "...", "accept": true\|false} — yes adds the class to the |
+| `GET` | `/tags/suggestions/history` | Every past suggestion + verdict, newest first, incl. hidden flags — |
+| `POST` | `/tags/suggestions/revise` | {"name": ..., "accept": bool} changes a past verdict (un-accepting |
 
 ## /courses
 

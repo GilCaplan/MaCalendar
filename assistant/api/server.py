@@ -1183,6 +1183,60 @@ def create_app() -> Flask:
         get_db().delete_tag(name)
         return jsonify({"deleted": name})
 
+    @app.get("/tags/suggestion")
+    def tag_suggestion():
+        """A new-tag proposal mined from the user's untagged history, or {}.
+
+        {"name": "Pharmacy", "evidence": 6, "samples": [...]} when enough
+        distinct untagged tasks share a theme no existing class covers.
+        Server-side politeness: handing one out costs the week's cooldown even
+        if it goes unanswered, refused names never return, and clients call
+        this only while the app is actively in the foreground — the server
+        never pushes."""
+        from assistant.actions.todo.tag_discovery import candidate, record_ask
+        c = candidate()
+        if not c:
+            return jsonify({})
+        record_ask()
+        return jsonify(c)
+
+    @app.post("/tags/suggestion/answer")
+    def tag_suggestion_answer():
+        """{"name": "...", "accept": true|false} — yes adds the class to the
+        registry; no is remembered forever."""
+        from assistant.actions.todo.tag_discovery import answer
+        body = request.get_json(silent=True) or {}
+        name = str(body.get("name", "")).strip()
+        if not name:
+            return jsonify({"error": "Missing 'name'", "code": 400}), 400
+        created = answer(name, bool(body.get("accept")))
+        return jsonify({"name": name, "accepted": bool(body.get("accept")),
+                        "tag": created})
+
+    @app.get("/tags/suggestions/history")
+    def tag_suggestion_history():
+        """Every past suggestion + verdict, newest first, incl. hidden flags —
+        the reviewable record behind the app's history view."""
+        from assistant.actions.todo.tag_discovery import history
+        return jsonify(history())
+
+    @app.post("/tags/suggestions/revise")
+    def tag_suggestion_revise():
+        """{"name": ..., "accept": bool} changes a past verdict (un-accepting
+        removes the class from the registry again); {"name": ..., "hidden":
+        bool} folds an entry out of the visible history without deleting it."""
+        from assistant.actions.todo.tag_discovery import change_answer, set_hidden
+        body = request.get_json(silent=True) or {}
+        name = str(body.get("name", "")).strip()
+        if not name:
+            return jsonify({"error": "Missing 'name'", "code": 400}), 400
+        if "hidden" in body:
+            set_hidden(name, bool(body.get("hidden")))
+            return jsonify({"name": name, "hidden": bool(body.get("hidden"))})
+        created = change_answer(name, bool(body.get("accept")))
+        return jsonify({"name": name, "accepted": bool(body.get("accept")),
+                        "tag": created})
+
     # ------------------------------------------------------------------
     # Courses
     # ------------------------------------------------------------------
