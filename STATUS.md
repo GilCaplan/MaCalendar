@@ -6,7 +6,27 @@ Keep it current and short; details live in the files it points to.
 _Updated 2026-09-06 10:10 — cycles 1–6 closed (C6 graduated); notifications
 shipped (phases 1+2+4); branches merged at afc8c80._
 
-**Next session picks up here:** loop = hypothesis **#5 invention guard**
+**Next session picks up here (paused 2026-09-06 ~18:00 on Gil's token call):**
+1. **Cycle 8 run is IN FLIGHT** (spoken lead-times @ 48b9ac9, prediction in
+   RESULTS.md: full board flat, judged on stage tests + alert-before rows).
+   The local run survives the session: results in scratchpad
+   cycle8_devfast.log + auto-archived to dataset/runs/x_auto-*. Close it
+   with `python -m scripts.run_board` after renaming the archive to
+   run14_cycle8-fix (manifest loop_run=14).
+2. **Simple-tier fieldq anomaly SOLVED — fix not yet written**: two scorer
+   artifacts in scripts/field_quality.py: (a) `_content_words` regex
+   `[a-z0-9']+` keeps quote-apostrophes, so `'christmas'` ≠ `christmas`
+   (title scored 0 on verbatim quotes); (b) a title whose words are all
+   STOPWORDS ("Reminder", the fallbacks' honest default) hits
+   `if not words: return 0.0` in `_title_sim` — should score by verbatim
+   containment in the transcript instead. Fix in the WORKTREE copy, test
+   with run-12's worst-12 rows (analysis printout in this session's log),
+   merge, then manually recompute fieldq for runs 12–13 for comparability.
+3. Then cycle 9 = HYPOTHESES #4 ungated half ("update X with new items" ⇒
+   create) + the dentist query-mutation bug fix riding along.
+4. Unnamed localhost duplicate-maker: fingerprint log now on POST /todos —
+   check launch.log for `ua=` on its next appearance.
+ loop = hypothesis **#5 invention guard**
 (validate stage; fresh evidence: cycle 5's loose "in the future" groundings
 + the garble-row "New Event" fabrication; judge with the adjusted metric +
 precision, count-correct expected ~flat). Also open: notifications phase 3
