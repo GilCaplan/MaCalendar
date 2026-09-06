@@ -12,6 +12,39 @@ and cleaner e+t at ~1.8× the latency.
 
 Every meaningful run, newest first.
 
+## Sandbox batch F1 — abstention cues (fast lane) — PREDICTION (registered before the change)
+
+*Scope (gate-only, no parser internals — batch 2 takes those):* extend the
+fast gate's abstention: (a) weak-joiner compound cues the C3 regex misses
+("— and", "and also", ", and then" variants seen committing wrong in the
+sandbox baseline); (b) C6's generic-target set gains "list" ("get rid of
+this list" fast-commits a mutation at a generic noun). All changes make
+the fast track SAY NOT-MINE more often; none change what it parses.
+*Predicted (sandbox, dev-fast):* commit rate 39% → 33–36% (the ~8–12
+committed-wrong compound/convention rows abstain), correct-on-committed
+78.4% → **88–92%**; simple-ask slices (query/remove/createoradd) UNCHANGED.
+Gate on sandbox dev-full before graduating; joint confirmation rides cycle
+9's full run. Personalization note: static cues only — no personal-data
+mining, so the shadow-mode rule isn't in play for this batch.
+
+**SCOPE AMENDED before implementation (instrument first):** the assumed
+missing joiner cues already exist in the gate — baseline misses are
+TWO-intent wrong parses, and 4 of 21 were convention rows (sandbox now
+scores adjusted: 82.5% baseline, 17 true errors). F1 is now two gate
+rules: (a) **mixed-mode compound abstain** — a confident multi-intent fast
+parse mixing a create half with a mutation/query half on compound wording
+routes deep; (b) "list" joins C6's generic-target nouns. Revised
+prediction: commit 39% → ~35%, ADJUSTED-on-committed 82.5% → **90–93%**,
+simple-ask slices untouched.
+
+**ACTUAL (sandbox, 2026-09-07): GRADUATED at sandbox level.** dev-fast:
+commit 36% (band), adjusted-on-committed **89.9%** (edge of band), t+t on
+committed 33 → 80. Dev-full gate: **90.1%** on 600 (commit 37%) —
+consistent, no overfit signature. Residuals → F2: "get rid of this list"
+still commits (veto miss to diagnose), "sync my calendar with mark"
+(invention-shaped). Joint confirmation rides cycle 9's full run before
+anything lands on the main board.
+
 ## Cycle 8 — voice lead-times, inline shape (notifications phase 3) — PREDICTION (written before the change)
 
 *Stages:* decompose (clause strip → slot) + generate (`_apply_slots` →

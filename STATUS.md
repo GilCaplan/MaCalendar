@@ -71,6 +71,20 @@ hand-written audit corpus is now only a regression floor.
   beat Claude Sonnet/Haiku drop-ins on identical rows (worktree
   `dataset/MODEL_COMPARISON.md`) — do not respawn the sims.
 
+## The two improvement lanes
+
+**Deep lane** — the 55-min dev-fast cycles below, now pairable (one [fast]
++ one [deep] hypothesis per run; [routing] rides alone — protocol).
+**Fast-sandbox lane (live 2026-09-07)** — `python -m scripts.fast_sandbox`
+scores the rule system alone as a selective classifier in ~18s (commit
+rate × adjusted-on-committed; an abstain is deep's job). Batched
+predictions, dev-full gate, sealed held-out, and NOTHING lands on the main
+board until a joint full run confirms. Batch F1 graduated at sandbox level
+(89.9%/90.1% adjusted-on-committed, from 82.5 baseline). The
+personalization layers are guarded, not metricized — see the protocol's
+personalization-guard section (weekly flag rate = post-merge tripwire;
+personal rule mining ships shadow-mode).
+
 ## The loop
 
 `dataset/DATASET.md` + `DOCUMENTATION/experiments/ITERATION_PROTOCOL.md`:

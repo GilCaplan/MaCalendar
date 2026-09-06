@@ -53,10 +53,11 @@ def main() -> int:
     from assistant.config import load_config
     from assistant.engine import generate
     from assistant.engine.state import EngineState
-    from scripts.score_dataset_run import load_provenance
+    from scripts.score_dataset_run import load_overrides, load_provenance
 
     cfg = load_config()
     prov = load_provenance()
+    overrides = load_overrides()
 
     # Warm the recognizer's lazy first-analyze OUTSIDE any frozen clock —
     # the metaclass lesson from the main harness (epoch reset).
@@ -78,6 +79,7 @@ def main() -> int:
     n = len(rows)
     committed = correct = 0
     by_kind: Counter = Counter()
+    adj_correct = [0]
     by_kind_ok: Counter = Counter()
     misses: list[tuple[str, str]] = []
 
@@ -108,16 +110,32 @@ def main() -> int:
         else:
             committed -= 1        # unknown provenance — not scored
             continue
+        # adjusted verdict: the conventions-overrides layer, intent-count based
+        ov = (overrides.get(text) or {}).get("treatment")
+        total = n_ev + n_td
+        if ov == "noop_ok":
+            adj = total == 0 or total >= 1
+        elif ov == "half_flexible":
+            adj = total >= 1
+        elif ov == "split_flexible":
+            adj = total >= 2
+        else:
+            adj = ok
         by_kind[kind or intent] += 1
         if ok:
             correct += 1
             by_kind_ok[kind or intent] += 1
+        if adj:
+            adj_correct[0] += 1
         else:
             misses.append((kind or intent, text[:70]))
 
     print(f"rows {n} · committed {committed} ({committed/n:.0%}) · "
           f"correct-on-committed {correct}/{committed} "
-          f"({(correct/committed) if committed else 0:.1%})")
+          f"({(correct/committed) if committed else 0:.1%}) · "
+          f"ADJUSTED {adj_correct[0]}/{committed} "
+          f"({(adj_correct[0]/committed) if committed else 0:.1%})")
+    print("misses below are ADJUSTED misses — true fast errors, conventions forgiven")
     for k in sorted(by_kind):
         print(f"  {k:<14} {by_kind_ok[k]:>3}/{by_kind[k]:<3} "
               f"({by_kind_ok[k]/by_kind[k]:.0%})")
