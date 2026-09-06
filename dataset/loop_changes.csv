@@ -20,3 +20,4 @@ cycle,date,component,kind,description,commit
 -,2026-09-05,tagging,feature,"Suggestion history: review, reverse a past verdict (un-accept removes the class), hide-but-keep; endpoints /tags/suggestions/{history,revise}",24fbb7d
 -,2026-09-05,process,new,"FEATURES.md: the feature catalog (summary table + what/where/how per feature); convention in CLAUDE.md — a shipped feature adds its entry in the same change",ffdaa36
 -,2026-09-05,harness,bugfix,"freezegun metaclass conflict on the date recognizer's lazy first-analyze sent all 250 rows deep (parse paths {'deep':250}); the harness now warm-analyzes the rule parser before any frozen context",02c8dae
+-,2026-09-05,process,improvement,"Feature sweep (5 sonnet explorers, 294 features found): catalog extended — import/connected calendars, direct editing & undo, briefing, navigation chrome, design system, tasks power features, action set, engine named behaviours, HUD ergonomics, diagnostics logs",1d5fab4

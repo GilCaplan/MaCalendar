@@ -17,9 +17,11 @@ Format per entry: **What** (brief) · **Where** (all surfaces) · **How**
 | [Categories & stacking](#events-categories-colours--binder-stacking) | auto-colour/categorise; overlaps stack | `actions/calendar/categories.py` |
 | [Tasks](#tasks--to-dos) | Today/General lists, priorities, quantities | `db.py`, `TasksView` |
 | [Task tags](#task-tags--a-finite-classification) | closed-set classification w/ healing | `actions/todo/tagging.py` |
+| [Tasks power features](#tasks-power-features) | rich notes, sorts, reorder, cal→tasks sync | `todo_view.py` |
 | [Tag discovery](#tag-discovery--the-class-set-grows-with-consent) | consent-based new classes + history | `actions/todo/tag_discovery.py` |
 | [The engine](#the-engine-engine-v2--the-brain) | the AI brain: fast track + 7-step deep track | `assistant/engine/` |
-| [Voice I/O](#voice-in--voice-out) | local Whisper in, `say` out, streaming | `stt/`, `Voice/`, `tts/` |
+| [Voice I/O & capture controls](#voice-in--voice-out--capture-controls) | hotkey/stop-phrases/review-bar; engine-selectable STT; spoken replies | `stt/`, `Voice/`, `tts/` |
+| [The action set](#the-action-set) | the 15 things a command can do | `assistant/actions/` |
 | [Edit-transcription gate](#the-edit-transcription-round-trip-needs_edit) | doubted words → editor → learned | `engine/transcript.py` |
 | [Self-check & revert](#background-self-check--one-tap-revert) | background re-reasoning, one-tap undo | `engine/__init__.py`, panels |
 | [Review panel / HUD](#the-review-panel-thinking-hud--ios-timeline) | live chain-of-thought card + history | `thinking_hud.py`, `ThinkingView` |
@@ -27,6 +29,11 @@ Format per entry: **What** (brief) · **Where** (all surfaces) · **How**
 | [Command memory](#command-memory--feedback) | every command + verdicts, mined | `intent/memory.py` |
 | [Hebrew calendar & observance](#hebrew-calendar--observance) | sundown-bounded halachic windows + gate | `observance.py`, `hebrew_calendar.py` |
 | [Recurring events](#recurring-events) | daily/weekly/monthly, announced rounding | `db.py`, `engine/validate.py` |
+| [Import & connected calendars](#calendar-import--connected-calendars) | .ics/macOS import; ICS subscribe; Outlook 2-way | `window.py`, `calendar_sync/` |
+| [Direct editing & undo](#direct-manipulation-editing--undo) | drag-reschedule/resize, dbl-click create, ⌘Z | views, `window.py` |
+| [Morning briefing](#morning-briefing) | Brief Me: today summarised + spoken | `day_view.py` |
+| [Navigation chrome](#navigation-chrome) | sidebar, mini calendar, tabs, Today | `sidebar.py`, `window.py` |
+| [Design system & theming](#design-system--theming) | light/dark, live accent, fonts, toasts | `styles.py`, `Theme.swift` |
 | [Workout & training](#workout--training-scheduling) | templates, live sessions, observance-aware planning | `actions/workout*`, `Views/Workout/` |
 | [Timer](#timer-work-tracking) | per-project work + earnings | db `timers*`, `TimerView` |
 | [Counters](#counters) | tap counters + payouts | db `counters*` |
@@ -37,6 +44,7 @@ Format per entry: **What** (brief) · **Where** (all surfaces) · **How**
 | [Health CLI & heartbeats](#heartbeats--the-health-cli) | `assistant doctor`, 6 layers | `cli.py`, `heartbeat.py` |
 | [Self-improvement loop](#the-self-improvement-loop) | the AI measures & improves itself | `dataset/`, `scripts/` |
 | [Explainer pages](#published-explainer-pages) | public pages, build-enforced claims | `artifacts/*.html` |
+| [Diagnostics & logs](#diagnostics--self-observation-logs) | NLU tracking, LLM-judge bug log, audit, calibration | `scripts/` |
 | [Weekly review](#weekly-review) | real-usage flag-rate report | `scripts/weekly_review.py` |
 
 ---
@@ -112,17 +120,44 @@ frozen contracts); entered only via `assistant.api` (`/voice*` routes).
 **How:** `DOCUMENTATION/ENGINE.md` is the canonical stage-contract reference.
 Deterministic-first everywhere; every LLM call schema-constrained and grounded
 on the raw words; per-stage tests + `scripts/engine_stage_check.py`.
+**Notable behaviours (each a named, tested rule):** intake coalescing of
+queued commands; stop-word stripping; trivial/false-start filtering (ignored
+AND not remembered); anaphora ("the one I just made" → context memory);
+"another one at 7" title carry-over; not-found honesty on updates/deletes
+with one LLM second opinion — never a guess; am/pm correction; past-date
+bump; move-time fill ("from 9:30 to 9"); cadence rounding announced, never
+silent; question-creates-nothing and remove-echo guards; junk/placeholder
+event drop; quantity extraction ("5 apples" → one task ×5); shared-verb list
+splitting ("buy chicken and rice"); same-activity multi-time split ("walk
+the dog at 9 and 2:30" → two events); prompt-injection defense (refuses
+"ignore previous instructions" transcripts).
 
-### Voice in / voice out
-**What:** Push-to-talk (⌘J on Mac, mic button on iPhone) with stop-words,
-silence auto-stop and a review-before-send countdown; replies optionally
-spoken.
-**Where:** STT `assistant/stt/` (mlx-whisper, GPU, cached model); Mac capture
-in `pipeline.py`; iOS `Voice/VoiceRecorder.swift`, `SpeechPlayer.swift`; TTS
-`assistant/tts/speaker.py` (macOS `say`).
-**How:** Audio never leaves the machine; the phone streams to the Mac over
-Tailscale (`/voice/stream`, NDJSON step events). `test_offline.py` blocks any
-non-loopback socket in the build.
+### The action set
+**What:** What a voice command can *do* — 15 registered actions: create /
+update / delete event, query_schedule, clarify (ask instead of guess),
+create / update / complete / delete todo, add / complete / delete subtask,
+query_todos, generate_workout_routine, schedule_workout.
+**Where:** `assistant/actions/` — one package per domain, `@register`
+plugin classes.
+**How:** The registry auto-builds the LLM's system prompt from the action
+schemas, so adding an action is one class; fuzzy title+date matching for
+targets; deletes clear context memory.
+
+### Voice in / voice out — capture controls
+**What:** Push-to-talk (mic button, ⌘J, or a global hotkey — default
+⌘⇧Space) with configurable stop phrases, silence auto-stop (2–12 s), a
+review-before-send Redo/Add-more/Send bar with countdown, a configurable
+event-separator phrase ("next event"), instant placeholder-event keywords,
+and mic multi-tap gestures (second tap within 400 ms cancels). Replies
+optionally spoken (mute, voice picker, speaking rate, Test Audio preview).
+**Where:** STT `assistant/stt/` (engine-selectable: local Whisper CPU,
+Apple-GPU mlx-whisper, or opt-in Google cloud STT); Mac capture
+`pipeline.py` + settings in `calendar_ui/window.py`; iOS
+`Voice/VoiceRecorder.swift` (on-device stop-word recognition),
+`SpeechPlayer.swift`; TTS `assistant/tts/speaker.py` (macOS `say`).
+**How:** Audio never leaves the machine on the default engines; the phone
+streams over Tailscale (`/voice/stream`, NDJSON). `test_offline.py` blocks
+non-loopback sockets in the build.
 
 ### The edit-transcription round-trip (needs_edit)
 **What:** When the vocabulary doubts words in a transcript, nothing executes —
@@ -159,6 +194,72 @@ trace source `assistant/trace.py` + `trace_bus.py`
 brain version: `CHAINS[BRAIN_VERSION]` scaffold rail with per-step ⓘ
 (copy from `trace.STAGE_INFO`, mirrored in Swift, drift-pinned by
 `test_stage_info_parity`). Red is reserved for fatal; review reads amber.
+**Ergonomics:** menu-bar tray icon (show/hide/quit), sticky hide, corner
+parking, drag-to-reposition persisted across launches, idle translucency
+that solidifies on hover, minimise-to-header with live step count, joins
+every macOS Space including over full-screen apps, right-click menu; result
+cards carry click-to-fix word chips, uncertain-word candidate chips, Retry
+now, 👍/👎, and the Revert bar.
+
+### Calendar import & connected calendars
+**What:** Import events from an `.ics` file or scan macOS Calendar.app;
+subscribe read-only to any ICS/webcal link (Gmail, iCloud, Outlook.com…);
+optional Outlook **two-way** sync via device-code OAuth, with Sync Now and a
+15-minute background sync.
+**Where:** Mac toolbar Import + Connected Calendars dialogs
+(`calendar_ui/window.py`); `assistant/calendar_sync/outlook_sync.py`,
+`actions/calendar/graph_client.py`; `calendar_sources` table.
+**How:** Synced rows are marked by source; ICS rows render read-only with a
+banner; Outlook dirty-row preservation protects local edits while two-way is
+off.
+
+### Direct-manipulation editing & undo
+**What:** Drag an event to another day/slot (30-min snap), drag its edges to
+resize (15-min snap), double-click a cell/slot to create pre-filled; editing
+or deleting a repeating event asks "this instance or the series?"; ⌘Z /
+⇧⌘Z undo/redo with a toast naming what was reverted.
+**Where:** month/week/day views + `calendar_ui/window.py`
+(`_on_event_rescheduled`, `_on_undo/_on_redo`), `event_dialog.py`.
+**How:** An undo stack of inverse operations over db writes; drag PATCHes
+feed the same implicit-feedback hooks as any edit.
+
+### Morning briefing
+**What:** A "Brief Me" button on the Day view — the day's schedule
+summarised as a toast and spoken aloud.
+**Where:** `calendar_ui/day_view.py` + `window.py`
+(`_on_briefing_requested`); TTS.
+**How:** Reads the day's rows directly; honours the mute/voice settings.
+
+### Navigation chrome
+**What:** Sidebar with one-click New Event and a mini month calendar
+(wheel-scroll months, fade transitions); toolbar prev/next/Today, an eliding
+title with Hebrew-date suffix, and segmented view tabs (Month / Week / Day /
+Tasks / Timer / Coursework / Workout — the last three hideable in settings).
+**Where:** `calendar_ui/sidebar.py`, `calendar_ui/window.py`.
+**How:** Pure view-layer; tab visibility persists to config.
+
+### Design system & theming
+**What:** Light/dark theme (startup setting + one-click toolbar toggle with
+toast), accent colour presets + custom picker applied live app-wide,
+per-view font sizes, compact density, and centered auto-fading toasts;
+theme-aware SVG icon tinting.
+**Where:** `calendar_ui/styles.py` (`set_accent`, palettes),
+`calendar_ui/icons.py` (rasterised per name/colour/size), settings popup in
+`window.py`; iOS `Theme.swift` + `AppSettings.swift`.
+**How:** One accent hex derives hover/pressed states; the whole QSS sheet
+regenerates on toggle (cached per palette — the PyQt6 QSS-caching gotcha).
+
+### Tasks power features
+**What:** Rich task notes (bold/italic, insert-link) auto-saved while
+typing; Manual/Priority/Due-date sort modes; drag-to-reorder; Clear
+Completed per section; priority dots and due-date picker; a Manage-tags
+sheet on iOS (built-ins protected); calendar→tasks sync (pull today's or the
+week's events into Today/General, with an auto mode).
+**Where:** `calendar_ui/todo_view.py`; `db.sync_calendar_to_todos`; iOS
+`TasksView`/`TaskRowView` + manage-tags sheet.
+**How:** Synced rows carry `source='calendar_sync'` so they update rather
+than duplicate; manual order is a `position` column, disabled under sorted
+modes.
 
 ## Personalisation & learning
 
@@ -169,8 +270,9 @@ before the brain sees them.
 editors: Mac panel tap-a-word + QuickFix, iOS `VocabularyView` /
 `VocabImportView` / onboarding; API `/vocab*`.
 **How:** Aliases + phonetic keys; learns from tap-a-word, the needs_edit
-round-trip, and bulk import mining (contacts/messages candidates). Doubt
-whitelist counters live beside the store, never inside it.
+round-trip, and bulk import mining (contacts/messages candidates); iOS runs a
+first-launch onboarding interview once the Mac is reachable. Doubt whitelist
+counters live beside the store, never inside it.
 
 ### Command memory & feedback
 **What:** Every command, what it did, and the user's verdict — explicit 👍/👎
@@ -256,8 +358,12 @@ workout, timer — working offline and syncing when the Mac returns.
 **Where:** `MACalendar-iOS/`; queues in `LocalStore.swift`; polling via
 `GET /changes/token`.
 **How:** Three queues (CRUD ops with temp-id repointing, queued voice
-recordings, pending LLM commands); burst-refresh after actions; reaches the
-Mac over Tailscale only.
+recordings, pending LLM commands) plus a local event/todo/tag cache so views
+work offline; lost-stream recovery (checks whether the Mac finished the
+command anyway); a background assertion keeps a voice command alive when the
+app is backgrounded; burst-refresh after actions; vertical-swipe month
+change; guests via the system Contacts picker with per-guest
+Message/WhatsApp actions; reaches the Mac over Tailscale only.
 
 ### Hosted calendar sync
 **What:** Optional two-way Outlook sync and read-only ICS subscriptions —
@@ -298,6 +404,16 @@ guard `tests/unit/test_artifact_claims.py`;
 brief `DOCUMENTATION/ARTIFACT_BUILDER.md`.
 **How:** Any drifting number (endpoint counts, thresholds) turns the build
 red naming the page.
+
+### Diagnostics & self-observation logs
+**What:** The system writes evidence about itself: `NLU_TRACKING.md` (every
+parse with path + source), `SCENARIO_BUG.md` (an LLM-as-judge records cases
+where the rule parser and the model disagreed), the hand-written audit
+corpus (regression floor), and a routing-confidence calibration checker.
+**Where:** appended by the engine/server; `scripts/audit_assistant.py`,
+`scripts/calibration.py`.
+**How:** All read-only instruments — they observe the live system, never
+steer it.
 
 ### Weekly review
 **What:** A Wednesday 10:00 report over real usage — flag rate, honest
