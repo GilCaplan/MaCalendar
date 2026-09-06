@@ -14,7 +14,7 @@ Every meaningful run, newest first.
 
 ## Dev-full anchor, epoch 1 (run 13, 2026-09-06 17:11, 600 rows)
 
-The new epoch's first off-slice read, covering C5+C6+C7 together: **78.0
+The new epoch's first off-slice read, covering C5+C6+C7 together: **78.5
 raw / 81.0 adjusted**. The three verdicts it delivers: (1) **low overfit** —
 tuned half 79.6 vs untuned 77.7, a 1.9pt gap; (2) **the invention guard
 generalizes** — precision 85.9 off-slice, matching dev-fast's 85.8; (3)
