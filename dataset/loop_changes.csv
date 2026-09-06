@@ -22,3 +22,4 @@ cycle,date,component,kind,description,commit
 -,2026-09-05,harness,bugfix,freezegun metaclass conflict on the date recognizer's lazy first-analyze sent all 250 rows deep (parse paths {'deep':250}); the harness now warm-analyzes the rule parser before any frozen context,02c8dae
 -,2026-09-05,process,improvement,"Feature sweep (5 sonnet explorers, 294 features found): catalog extended — import/connected calendars, direct editing & undo, briefing, navigation chrome, design system, tasks power features, action set, engine named behaviours, HUD ergonomics, diagnostics logs",1d5fab4
 5,2026-09-06,engine/generate,improvement,event_fallback: default-titled event when words literally ask event/reminder + recognizer grounds a when (kept; +0.8 noise-floor),b3c6656
+6,2026-09-06,engine/generate,improvement,fast-gate veto: mutation targeting a bare ask-noun (reminder/event/...) routes deep,13edcce

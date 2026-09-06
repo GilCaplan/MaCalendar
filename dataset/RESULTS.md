@@ -12,6 +12,31 @@ and cleaner e+t at ~1.8× the latency.
 
 Every meaningful run, newest first.
 
+## Cycle 6 — fast-path generic-target veto (queue 2b) — PREDICTION (written before the change)
+
+*Stage:* generate `fast_propose` (a C3-style gate cue). Evidence (run 10):
+"set reminder at 3 pm" fast-commits `update_todo(match_title="reminder")` —
+"set" verb-mapped to update, the generic ask-noun became the target, the
+time dropped. Rule: a confident fast MUTATION whose match_title is a bare
+generic noun (reminder/alert/event/appointment/task/todo) has no real
+target — route deep, where event_fallback and the not-found ethos handle
+it. *Predicted:* the targeted row flips (fast→deep→Reminder@15:00); overall
++0.4–0.8 raw — BELOW the noise floor, so per cycle 5's lesson the verdict
+is judged on the targeted rows directly, not the headline. No fast-path
+regressions (fast-slice count-correct holds ≥79%); ≤2 rows migrate fast→deep
+so p50 roughly flat. Risk: vetoing legitimate generic-anaphora edits
+("delete the event" meaning the last one) — deep handles anaphora too, so
+the cost is latency, not correctness.
+
+**ACTUAL (run 11, 2026-09-06 10:05):** the causal chain worked end-to-end —
+"set reminder at 3 pm" routed deep and event_fallback booked Reminder@15:00
+(**+1, the designed flip; zero veto-caused regressions; fast slice held at
+79% with 5 rows migrated fast→deep**). Headline raw 78.4 (−0.8) / adj 81.2:
+the give-back is 3 deep-path garble rows that were ALREADY deep in run 10
+("new scenario…", quoted-placeholder schedule, Hindi garble) — LLM replay
+flicker, the documented noise. **GRADUATED on the targeted slice.**
+
+
 **Deep-rescue analysis (2026-09-06, corrected same night):** first
 published as 0/21 — WRONG, computed against a misidentified scratch db (run
 2's, not row 8's; caught during the archive salvage via parse_path

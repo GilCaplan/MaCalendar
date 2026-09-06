@@ -81,3 +81,49 @@ def test_task_kind_item_never_parses_to_nothing(dead_llm, cfg):
     it = _run("submit the Haxaga grades", "task", cfg)
     assert it.action == "create_todo"
     assert it.intent.titles == ["submit the Haxaga grades"]
+
+
+# --- fast-path generic-target veto (cycle 6) ------------------------------
+
+class _StubRR:
+    def __init__(self, intents):
+        self.confidence = 0.95
+        self.intents = intents
+        self.missing_slots = []
+
+
+class _StubParser:
+    def __init__(self, intents):
+        self._rr = _StubRR(intents)
+
+    def analyze(self, text, current_view=None):
+        return self._rr
+
+
+def _fast(monkeypatch, cfg, text, intents):
+    from types import SimpleNamespace
+    monkeypatch.setattr(generate, "_get_rule_parser",
+                        lambda: _StubParser(intents))
+    st = EngineState(raw_text=text, text=text)
+    return generate.fast_propose(st, cfg), st
+
+
+def test_mutation_on_a_bare_ask_noun_routes_deep(monkeypatch, cfg):
+    from types import SimpleNamespace
+    ok, st = _fast(monkeypatch, cfg, "set reminder at 3 pm",
+                   [("update_todo", SimpleNamespace(match_title="reminder"))])
+    assert ok is False          # the deep track (event_fallback) owns this
+
+
+def test_mutation_on_a_real_target_still_fast(monkeypatch, cfg):
+    from types import SimpleNamespace
+    ok, st = _fast(monkeypatch, cfg, "move the gym meeting",
+                   [("update_event", SimpleNamespace(match_title="gym meeting"))])
+    assert ok is True and st.parse_path == "fast"
+
+
+def test_creations_never_vetoed(monkeypatch, cfg):
+    from types import SimpleNamespace
+    ok, st = _fast(monkeypatch, cfg, "reminder tomorrow 9am take pills",
+                   [("create_event", SimpleNamespace(title="take pills"))])
+    assert ok is True

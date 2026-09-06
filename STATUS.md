@@ -3,7 +3,18 @@
 **One-screen reference. A fresh conversation reads this first, then CLAUDE.md.**
 Keep it current and short; details live in the files it points to.
 
-_Updated 2026-09-06 — cycles 1–5 closed; app queue + notifications shipped; branches merged._
+_Updated 2026-09-06 10:10 — cycles 1–6 closed (C6 graduated); notifications
+shipped (phases 1+2+4); branches merged at afc8c80._
+
+**Next session picks up here:** loop = hypothesis **#5 invention guard**
+(validate stage; fresh evidence: cycle 5's loose "in the future" groundings
++ the garble-row "New Event" fabrication; judge with the adjusted metric +
+precision, count-correct expected ~flat). Also open: notifications phase 3
+(voice lead-time phrase — engine files, now unblocked by the merge; per
+Gil's model-budget rule, weigh delegating vs. loop time), the dentist
+query-mutation bug (queued in HYPOTHESES.md), and DEVQA Q1/Q4–Q6 await Gil.
+Per Gil (2026-09-06): Fable works ONLY the self-improvement cycles; feature
+work goes to Sonnet/Opus subagents.
 
 ## The state
 

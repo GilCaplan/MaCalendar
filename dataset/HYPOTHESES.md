@@ -58,11 +58,10 @@ needing one is marked **[Gil]** and is blocked until asked.
    new entry below. Process lesson: re-verify evidence rows against the
    current epoch before taking an entry.
 
-2b. **Fast-path "set reminder at TIME"** — stage: rule parser (or the fast
-   gate). *Evidence:* "set reminder at 3 pm" fast-commits wrong (run 10)
-   while the deep fallback handles the same shape. *Expected:* +0.5 pt,
-   simple tier. *Effort:* low. *Risk:* low — either parse it or route it
-   deep.
+2b. ✅ **C6 — generic-target veto** (fast gate, @ 13edcce, run 11). A
+   confident fast MUTATION whose match_title is a bare ask-noun routes deep.
+   Targeted row flipped as designed, zero veto regressions, fast held 79%;
+   headline −0.8 = garble-row flicker (noise). Graduated.
 
 3. ✅ **C4 — cue iteration** (segment, @ f1c8d9d). notify + festival +
    "calendar invite". Actual: e+t 41 → 46 (top of band; the calendar-invite
