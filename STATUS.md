@@ -84,9 +84,12 @@ merge with `main` + the loop branch between cycles. Queue, in order:
    Known caveat for the reading: Claude models sometimes answer garble/query
    rows in helpful prose instead of JSON (scored as a parse failure — same
    treatment llama's `unknown` gets).
-2. **Notifications** — plan first (Gil wants the lock-screen/notification UX
-   thought through), then build: Mac local notifications + iOS
-   UNUserNotificationCenter scheduled from the offline cache.
+2. **Notifications** — PLANNED 2026-09-06: `DOCUMENTATION/NOTIFICATIONS_PLAN.md`
+   (5 phases; phone = reliable ringer from the offline cache, server computes
+   `notify_at`, Mac banners best-effort, observance quiet windows on the fire
+   time) + visual preview artifact linked there. Build blocked on Gil's three
+   answers (DEVQA Q4-Q6): Mac-with-calendar-closed?, default lead 0 or 30?,
+   in-Shabbat events suppress or pre-candle digest?
 3. **.ics export/share** (approved) — server `GET /events/<id>.ics`, Mac
    context menu, iOS ShareLink.
 4. **Search** (approved) — events/tasks search endpoint + Mac toolbar box;

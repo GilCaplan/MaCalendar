@@ -19,14 +19,23 @@ The on/off flag now exists (`observance.enabled` in config.yaml, default on).
 Want a checkbox for it in the Mac settings popup too, or is the config file
 enough?
 
-**Q3 — Anthropic API key for the model-comparison sims.**
-The Haiku/Sonnet simulation runs are fully plumbed and sandboxed but blocked
-on a key: put it in config.yaml under `claude: api_key: ...` (gitignored) or
-export `ANTHROPIC_API_KEY` before I launch. ~250 rows × 2 models of deep-track
-calls — expect real API cost.
+**Q4 — Notifications: do you want Mac reminders with the calendar CLOSED?**
+That means detaching `assistant.api` into a launchd LaunchAgent (launch-model
+change: --reload, HUD, shutdown ownership). If "no", the phone is officially
+the only always-on ringer and the plan's riskiest phase disappears.
+
+**Q5 — Notifications: default lead time — opt-in (0: only where you asked)
+or blanket (e.g. 30 min before everything)?** Plan ships 0; blanket changes
+the feature's noise level on a dense calendar.
+
+**Q6 — Reminders for events INSIDE Shabbat/yom tov (e.g. Shabbat lunch):
+suppress entirely (plan's default) or roll into one pre-candle-lighting
+digest banner?** Lifestyle call, not engineering.
 
 ## Answered (log)
 
+- 2026-09-06 — **Q3 withdrawn** (API key): the sims run through Claude Code
+  subagent workers now, no key or API billing involved.
 - 2026-09-05 — **Old-brain comparison**: Gil doesn't care about it; the
   questions that matter are "is the new system better, and can it get
   better?" → answered in chat (yes / yes); vs-old numbers stay incidental.
