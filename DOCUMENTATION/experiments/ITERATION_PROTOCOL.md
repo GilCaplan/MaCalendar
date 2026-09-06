@@ -172,3 +172,14 @@ md5s, loop run number. Rules:
 - Empirical noise floor (cycle 3 verdict): overall dev-fast deltas under
   **~1.5 pt are noise** — judge a cycle by its targeted slice, and measure
   twice when the predicted effect is under ~4 rows.
+
+## Report the FULL board, every run (Gil, 2026-09-06)
+
+A cycle close reports EVERY metric — count raw+adjusted, complexity tiers,
+compound kinds, missing-half, date-collapse, garbage titles, P/R/F1, field
+quality (+when-correct, +difficulty-weighted), parse-path correctness and
+counts, latency p50/p95, query-mutation violations — in chat and in
+RESULTS.md alike. Never a highlights-only summary: a metric that moved
+against you and went unreported is a broken instrument next cycle.
+`python -m scripts.run_board <run>` prints the full table from loop_log.csv
+(vs the epoch baseline and the previous same-slice run).
