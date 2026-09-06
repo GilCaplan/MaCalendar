@@ -24,6 +24,17 @@ needing one is marked **[Gil]** and is blocked until asked.
 
 ## The queue
 
+- **[deep] ✅ C8 — spoken lead-times, inline** (decompose+generate, run 14).
+  Board flat as predicted; fieldq 85.3 + when 86.1 best-ever (clause strip
+  cleans titles); behavioral goal delivered (reminder_minutes flows out
+  through notify_at). Two exempt bugs found+fixed (courtesy-prefix mangle,
+  fallback slot-apply).
+- **[deep] 🔄 C9 — sub-item rules-first trust, step 1** (generate
+  `_parse_item`, IN FLIGHT). Fragments accept rule parses at 0.60 vs the
+  whole-command 0.85; crosscheck stays the net. Prediction: deep p50
+  6.0-7.0s, deep count -1..+2. Step 2 (full rules-first-per-fragment, LLM as
+  end-judge) is cycle 10 IF this pays — the plan of record.
+
 *(Entries are tagged **[fast]** / **[deep]** / **[routing]** since 2026-09-07:
 a cycle may pair one [fast] + one [deep]; [routing] rides alone — see the
 protocol's Paired-track section.)*
