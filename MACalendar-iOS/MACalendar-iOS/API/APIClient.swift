@@ -248,6 +248,18 @@ class APIClient: ObservableObject {
         return try decode(HealthResponse.self, from: data)
     }
 
+    // MARK: - Heartbeat
+
+    /// Fire-and-forget "this phone is alive" ping. The Mac records the last
+    /// beat per source so `assistant doctor` can tell a connected surface
+    /// from a silent one. Failures are swallowed — being away from the Mac
+    /// is a phone's normal state, not an error worth surfacing.
+    func heartbeat() async {
+        _ = try? await request("/heartbeat", method: "POST",
+                               body: ["source": "ios",
+                                      "device": UIDevice.current.name])
+    }
+
     // MARK: - Events
 
     func eventsForDay(_ date: Date) async throws -> [CalendarEvent] {
@@ -283,6 +295,14 @@ class APIClient: ObservableObject {
         } catch APIError.offline, APIError.badURL {
             return LocalStore.shared.eventsForWeek(startStr: d)
         }
+    }
+
+    /// Raw bytes of GET /events/<id>.ics — the Mac renders one event as an
+    /// RFC 5545 file served as a text/calendar attachment. Only rows the Mac
+    /// has can be fetched, so callers must not ask for an offline temp id
+    /// (negative) — those haven't synced yet.
+    func fetchICS(eventId: Int) async throws -> Data {
+        try await request("/events/\(eventId).ics")
     }
 
     // MARK: - Holidays

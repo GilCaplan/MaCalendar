@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct EventDetailView: View {
     @EnvironmentObject var api: APIClient
@@ -16,6 +17,8 @@ struct EventDetailView: View {
     @State private var saving = false
     @State private var confirmDelete = false
     @State private var errorMessage: String?
+    @State private var sharing = false
+    @State private var shareFile: ShareFile?
     @Environment(\.dismiss) var dismiss
 
     /// ICS-subscribed events are always read-only (no write endpoint behind
@@ -104,6 +107,28 @@ struct EventDetailView: View {
                         .lineLimit(3...12)
                 }
                 GuestsSection(attendees: $attendees, title: title, date: date, startTime: startTime, endTime: endTime, location: location)
+                if !isNew {
+                    Section {
+                        Button {
+                            shareICS()
+                        } label: {
+                            HStack {
+                                Label("Share Event (.ics)", systemImage: "square.and.arrow.up")
+                                if sharing {
+                                    Spacer()
+                                    ProgressView()
+                                }
+                            }
+                        }
+                        // Offline temp rows (negative id) don't exist on the
+                        // Mac yet, so there is nothing to fetch.
+                        .disabled(sharing || event.id <= 0)
+                    } footer: {
+                        if event.id <= 0 {
+                            Text("Sharing becomes available once this event has synced to your Mac.")
+                        }
+                    }
+                }
                 if !isNew && !isReadOnly {
                     Section {
                         Button(role: .destructive) { confirmDelete = true } label: {
@@ -130,6 +155,9 @@ struct EventDetailView: View {
             .confirmationDialog("Delete this event?", isPresented: $confirmDelete, titleVisibility: .visible) {
                 Button("Delete", role: .destructive) { deleteEvent() }
                 Button("Cancel", role: .cancel) {}
+            }
+            .sheet(item: $shareFile) { file in
+                ShareSheet(items: [file.url])
             }
             .alert("Couldn't Save", isPresented: .constant(errorMessage != nil), presenting: errorMessage) { _ in
                 Button("OK") { errorMessage = nil }
@@ -199,4 +227,56 @@ struct EventDetailView: View {
             }
         }
     }
+
+    // MARK: - Share as .ics
+
+    /// A filesystem-safe slug of the title for the shared file's name.
+    private var titleSlug: String {
+        let safe = title
+            .replacingOccurrences(of: "[^A-Za-z0-9 _-]", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
+            .replacingOccurrences(of: " ", with: "-")
+        return safe.isEmpty ? "event" : safe
+    }
+
+    /// Download the Mac's rendering of this event (GET /events/<id>.ics),
+    /// park it in a temp file named after the title, and present the share
+    /// sheet for that file. The Mac is the source of truth for the .ics —
+    /// recurrence, categories and any Mac-side edits come out right without
+    /// the phone re-deriving them from possibly-unsaved form fields.
+    private func shareICS() {
+        guard !sharing, event.id > 0 else { return }
+        sharing = true
+        Task {
+            do {
+                let data = try await api.fetchICS(eventId: event.id)
+                let url = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("\(titleSlug).ics")
+                try data.write(to: url)
+                sharing = false
+                shareFile = ShareFile(url: url)
+            } catch {
+                sharing = false
+                errorMessage = "Couldn't fetch this event from your Mac — sharing needs the Mac reachable."
+            }
+        }
+    }
+}
+
+/// Identifiable wrapper so `.sheet(item:)` can present the share sheet the
+/// moment the .ics file lands on disk. ShareLink wants its item up front,
+/// which an async fetch can't provide — GuestsSection gets away with
+/// ShareLink because it composes its .ics synchronously on-device.
+private struct ShareFile: Identifiable {
+    let url: URL
+    var id: String { url.path }
+}
+
+/// The system share sheet (runs in-process; nothing here talks to a service).
+private struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    func updateUIViewController(_ vc: UIActivityViewController, context: Context) {}
 }

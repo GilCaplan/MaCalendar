@@ -28,6 +28,7 @@
 		AA0000A100000000000000A1 /* TimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000A100000000000000B1 /* TimerView.swift */; };
 		AA0000A200000000000000A1 /* GuestsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000A200000000000000B1 /* GuestsSection.swift */; };
 		AA0000A300000000000000A1 /* ThinkingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000A300000000000000B1 /* ThinkingView.swift */; };
+		AA0000A400000000000000A1 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000A400000000000000B1 /* SearchView.swift */; };
 		AA00009C00000000000000A1 /* AssistantIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00009C00000000000000B1 /* AssistantIcons.swift */; };
 		AA00000D000000000000001A /* WeekView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000D000000000000001B /* WeekView.swift */; };
 		AA00000E000000000000001A /* SpeechPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000E000000000000001B /* SpeechPlayer.swift */; };
@@ -70,6 +71,7 @@
 		AA0000A100000000000000B1 /* TimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerView.swift; sourceTree = "<group>"; };
 		AA0000A200000000000000B1 /* GuestsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestsSection.swift; sourceTree = "<group>"; };
 		AA0000A300000000000000B1 /* ThinkingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThinkingView.swift; sourceTree = "<group>"; };
+		AA0000A400000000000000B1 /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 		AA00009C00000000000000B1 /* AssistantIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantIcons.swift; sourceTree = "<group>"; };
 		AA00000D000000000000001B /* WeekView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekView.swift; sourceTree = "<group>"; };
 		AA00000E000000000000001B /* SpeechPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechPlayer.swift; sourceTree = "<group>"; };
@@ -148,6 +150,7 @@
 				AA000006000000000000001B /* DayView.swift */,
 				AA000007000000000000001B /* EventDetailView.swift */,
 				AA000008000000000000001B /* MonthGridView.swift */,
+				AA0000A400000000000000B1 /* SearchView.swift */,
 				AA000009000000000000001B /* SettingsView.swift */,
 				AA00000A000000000000001B /* TaskRowView.swift */,
 				AA00000B000000000000001B /* TasksView.swift */,
@@ -298,6 +301,7 @@
 				AA00000C000000000000001A /* VoiceButton.swift in Sources */,
 				AA00009A00000000000000A1 /* VocabularyView.swift in Sources */,
 				AA0000A300000000000000A1 /* ThinkingView.swift in Sources */,
+				AA0000A400000000000000A1 /* SearchView.swift in Sources */,
 				AA00009B00000000000000A1 /* VocabOnboardingView.swift in Sources */,
 				AA00009D00000000000000A1 /* VocabImportView.swift in Sources */,
 				AA00009E00000000000000A1 /* AssistantReviewView.swift in Sources */,

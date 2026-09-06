@@ -169,6 +169,45 @@ class LocalStore: ObservableObject {
 
     func removeEvent(_ id: Int) { events.removeAll { $0.id == id }; persist() }
 
+    // MARK: - Search (offline cache)
+
+    /// Case-insensitive substring search over every cached event — the same
+    /// cache the calendar reads when the Mac is unreachable, so search works
+    /// entirely offline. Upcoming events first (soonest on top), then past
+    /// ones (most recent first): a hit you can still make it to beats one
+    /// that's over.
+    func searchEvents(_ query: String) -> [CalendarEvent] {
+        let q = query.lowercased()
+        guard !q.isEmpty else { return [] }
+        let hits = events.filter {
+            $0.title.lowercased().contains(q)
+                || $0.location.lowercased().contains(q)
+                || $0.description.lowercased().contains(q)
+        }
+        let today = DateFormatter.isoDay.string(from: Date())
+        let upcoming = hits.filter { $0.date >= today }
+            .sorted { ($0.date, $0.startTime) < ($1.date, $1.startTime) }
+        let past = hits.filter { $0.date < today }
+            .sorted { ($0.date, $0.startTime) > ($1.date, $1.startTime) }
+        return upcoming + past
+    }
+
+    /// Case-insensitive substring search over cached tasks. The iOS Todo
+    /// model carries no notes field, so the title (plus tags) is what there
+    /// is to match. Open tasks come before completed ones.
+    func searchTodos(_ query: String) -> [Todo] {
+        let q = query.lowercased()
+        guard !q.isEmpty else { return [] }
+        return todos.filter { todo in
+            todo.title.lowercased().contains(q)
+                || todo.tags.contains { $0.lowercased().contains(q) }
+        }
+        .sorted { a, b in
+            if a.isDone != b.isDone { return !a.isDone }
+            return a.title.lowercased() < b.title.lowercased()
+        }
+    }
+
     // MARK: - Todos
 
     func cacheTodos(_ fresh: [Todo]) {

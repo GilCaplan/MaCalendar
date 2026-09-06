@@ -89,15 +89,17 @@ merge with `main` + the loop branch between cycles. Queue, in order:
    time) + visual preview artifact linked there. Build blocked on Gil's three
    answers (DEVQA Q4-Q6): Mac-with-calendar-closed?, default lead 0 or 30?,
    in-Shabbat events suppress or pre-candle digest?
-3. **.ics export/share** (approved) — server `GET /events/<id>.ics`, Mac
-   context menu, iOS ShareLink.
-4. **Search** (approved) — events/tasks search endpoint + Mac toolbar box;
-   jump-to-date.
-5. **Small wins** (approved): duplicate-event · agenda/list view · week
-   numbers · Timer CSV export · observance checkbox in settings (config_store
-   makes it a one-liner; closes DEVQA Q2) · iOS posts `/heartbeat`.
-6. **Convolution #1 (approved, not yet done):** move `ThinkingView` +
-   `EngineChain` out of `VocabularyView.swift` into `ThinkingView.swift`.
+3. ✅ **.ics export/share** — DONE @ 243d99f (ics_export.py, GET
+   /events/<id>.ics, Mac dialog button; iOS share sheet in flight).
+4. ✅ **Search** — DONE @ 243d99f (GET /search, Mac toolbar box +
+   jump-to-date; iOS offline SearchView in flight).
+5. **Small wins** — mostly DONE @ 243d99f: duplicate-event ✅ · week
+   numbers ✅ (`ui.show_week_numbers`) · Timer CSV ✅ · observance checkbox ✅
+   (found + fixed the pydantic-drops-`observance.enabled` bug, DEVQA Q2
+   closed). Remaining: agenda view (agent in flight) · iOS `/heartbeat`
+   (agent in flight — endpoint already existed server-side).
+6. ✅ **Convolution #1** — DONE @ 243d99f: ThinkingView + EngineChain live in
+   `Views/ThinkingView.swift` (byte-identical move, simulator build green).
 
 ## Working notes
 

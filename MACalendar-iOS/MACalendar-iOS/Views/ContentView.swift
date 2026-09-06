@@ -24,6 +24,7 @@ struct ContentView: View {
     @State private var sharedImportText: String? = nil
     @State private var unreviewed = 0
     @State private var showReview = false
+    @State private var showSearch = false
 
     enum CalendarMode { case month, week, day }
 
@@ -205,6 +206,12 @@ struct ContentView: View {
                     .navigationTitle("Calendar")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button { showSearch = true } label: {
+                                Image(systemName: "magnifyingglass")
+                            }
+                            .accessibilityLabel("Search")
+                        }
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button("Today") {
                                 selectedDate = Date()
@@ -297,8 +304,29 @@ struct ContentView: View {
         .onChange(of: settings.showWorkoutTab) { visible in
             if !visible && selectedTab == 4 { selectedTab = 0 }
         }
+        .sheet(isPresented: $showSearch) {
+            SearchView(
+                onOpenEvent: { event in
+                    // Navigate the calendar to the event's day, in whatever
+                    // month/week/day mode is already showing. selectedDate and
+                    // viewedDate are the same state every other navigation
+                    // (Today button, grid taps, swipes) drives.
+                    if let d = DateFormatter.isoDay.date(from: event.date) {
+                        selectedDate = d
+                        viewedDate = d
+                    }
+                    selectedTab = 0
+                    Task { await loadMonth() }
+                },
+                onOpenTodo: { _ in selectedTab = 1 }
+            )
+        }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
+                // Fire-and-forget presence ping, separate from the sync path
+                // so an unreachable Mac can't delay the local refresh below.
+                // heartbeat() swallows its own failures — offline is normal.
+                Task { await api.heartbeat() }
                 Task {
                     _ = await api.syncPending()
                     await api.syncPendingVoice()
