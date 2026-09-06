@@ -79,14 +79,13 @@ class _Tts:
     mute, voice, rate = False, "Samantha", 200
 
 
-class _Confirmer:
-    level = 0
-
-
 class _Pipeline:
+    """No `_confirmer` — the real Pipeline has not had one since e3ea4f6, and
+    a double that invents it is what let the dialog ship reading it (SIGABRT on
+    open). See test_settings_real_shapes.py."""
+
     def __init__(self):
         self._tts = _Tts()
-        self._confirmer = _Confirmer()
 
 
 class _Observance:
