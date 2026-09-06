@@ -84,6 +84,11 @@ def reset_parsers() -> None:
 # fast-path mangle ("…at 9am, and then Remind me…" committing a todo literally
 # titled "then") was a confident SINGLE-intent parse of text carrying one of
 # these.
+#: A mutation whose match_title is just the ask-noun targets nothing (cycle 6).
+_GENERIC_TARGET_RE = re.compile(
+    r"^(?:my |the |a |an )?(?:reminder|alert|event|appointment|task|todo)s?$",
+    re.I)
+
 _STRONG_COMPOUND_RE = re.compile(
     r"\band\s+(?:then|also)\b"          # "and then", "and also"
     r"|[.;!?]\s+(?:also|then|plus|and)\b"   # a sentence break, then a joiner
@@ -120,6 +125,20 @@ def fast_propose(state: EngineState, cfg) -> bool:
                              "Confident but the words announce a second request "
                              "— deep track", ok=True)
         return False
+    for name, intent in rr.intents:
+        # Cycle 6: "set reminder at 3 pm" fast-committed
+        # update_todo(match_title="reminder") — a mutation aimed at the bare
+        # ask-noun is no target at all (the same ethos as the delete
+        # not-found rule). Deep handles it: event_fallback for the set-shape,
+        # anaphora/not-found for real edits.
+        if name.startswith(("update_", "delete_", "complete_")):
+            target = str(getattr(intent, "match_title", "") or "").strip()
+            if _GENERIC_TARGET_RE.match(target):
+                if state.trace:
+                    state.trace.step(RULE, "Rule parser",
+                                     f"Confident but “{target}” is a generic noun, "
+                                     "not a target — deep track", ok=True)
+                return False
     if rr.confidence >= RULE_THRESHOLD and not rr.missing_slots:
         state.items = [
             Item(id=f"item_{i + 1}", kind=_kind_for(name), text=state.text,
