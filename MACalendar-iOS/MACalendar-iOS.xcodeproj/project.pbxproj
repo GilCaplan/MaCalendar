@@ -56,6 +56,10 @@
 		AA0000C500000000000000C1 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA0000B600000000000000C1 /* WidgetKit.framework */; };
 		AA0000C600000000000000C1 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA0000B700000000000000C1 /* SwiftUI.framework */; };
 		AA0000C700000000000000C1 /* MACalendarWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA0000B500000000000000C1 /* MACalendarWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		AA0000C800000000000000C1 /* WidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000B800000000000000C1 /* WidgetSnapshot.swift */; };
+		AA0000C900000000000000C1 /* WidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000B800000000000000C1 /* WidgetSnapshot.swift */; };
+		AA0000CA00000000000000C1 /* UpNextHomeWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000B900000000000000C1 /* UpNextHomeWidget.swift */; };
+		AA0000CB00000000000000C1 /* TagHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000BC00000000000000C1 /* TagHistoryView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -110,6 +114,11 @@
 		AA0000B500000000000000C1 /* MACalendarWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MACalendarWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000B600000000000000C1 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		AA0000B700000000000000C1 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		AA0000B800000000000000C1 /* WidgetSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshot.swift; sourceTree = "<group>"; };
+		AA0000B900000000000000C1 /* UpNextHomeWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpNextHomeWidget.swift; sourceTree = "<group>"; };
+		AA0000BA00000000000000C1 /* MACalendar-iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "MACalendar-iOS.entitlements"; sourceTree = "<group>"; };
+		AA0000BB00000000000000C1 /* MACalendarWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MACalendarWidgets.entitlements; sourceTree = "<group>"; };
+		AA0000BC00000000000000C1 /* TagHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagHistoryView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXContainerItemProxy section */
@@ -170,7 +179,9 @@
 			children = (
 				AA0000B200000000000000C1 /* MACalendarWidgetsBundle.swift */,
 				AA0000B300000000000000C1 /* UpNextLiveActivity.swift */,
+				AA0000B900000000000000C1 /* UpNextHomeWidget.swift */,
 				AA0000B400000000000000C1 /* Info.plist */,
+				AA0000BB00000000000000C1 /* MACalendarWidgets.entitlements */,
 			);
 			path = MACalendarWidgets;
 			sourceTree = "<group>";
@@ -188,6 +199,7 @@
 			isa = PBXGroup;
 			children = (
 				AA0000B000000000000000C1 /* UpNextActivityAttributes.swift */,
+				AA0000B800000000000000C1 /* WidgetSnapshot.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -211,6 +223,7 @@
 				AA000037000000000000001A /* Workout */,
 				AA000010000000000000001B /* Assets.xcassets */,
 				AA000012000000000000001B /* Info.plist */,
+				AA0000BA00000000000000C1 /* MACalendar-iOS.entitlements */,
 			);
 			path = "MACalendar-iOS";
 			sourceTree = "<group>";
@@ -234,6 +247,7 @@
 				AA000008000000000000001B /* MonthGridView.swift */,
 				AA0000A400000000000000B1 /* SearchView.swift */,
 				AA000009000000000000001B /* SettingsView.swift */,
+				AA0000BC00000000000000C1 /* TagHistoryView.swift */,
 				AA00000A000000000000001B /* TaskRowView.swift */,
 				AA00000B000000000000001B /* TasksView.swift */,
 				AA00000C000000000000001B /* VoiceButton.swift */,
@@ -431,6 +445,8 @@
 				AA0000A500000000000000A1 /* ReminderScheduler.swift in Sources */,
 				AA0000C100000000000000C1 /* LiveActivityManager.swift in Sources */,
 				AA0000C000000000000000C1 /* UpNextActivityAttributes.swift in Sources */,
+				AA0000C800000000000000C1 /* WidgetSnapshot.swift in Sources */,
+				AA0000CB00000000000000C1 /* TagHistoryView.swift in Sources */,
 				AA000014000000000000001A /* HebrewDate.swift in Sources */,
 				AA000015000000000000001A /* CourseworkView.swift in Sources */,
 				AA000016000000000000001A /* Theme.swift in Sources */,
@@ -450,8 +466,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA0000C400000000000000C1 /* UpNextLiveActivity.swift in Sources */,
+				AA0000CA00000000000000C1 /* UpNextHomeWidget.swift in Sources */,
 				AA0000C300000000000000C1 /* MACalendarWidgetsBundle.swift in Sources */,
 				AA0000C200000000000000C1 /* UpNextActivityAttributes.swift in Sources */,
+				AA0000C900000000000000C1 /* WidgetSnapshot.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -588,6 +606,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "MACalendar-iOS/MACalendar-iOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
@@ -610,6 +629,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "MACalendar-iOS/MACalendar-iOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
@@ -630,6 +650,7 @@
 		AA0000F200000000000000C1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = MACalendarWidgets/MACalendarWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = HPMNWWG455;
@@ -655,6 +676,7 @@
 		AA0000F300000000000000C1 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = MACalendarWidgets/MACalendarWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = HPMNWWG455;

@@ -1,4 +1,5 @@
 import Foundation
+import WidgetKit
 
 // A write operation that couldn't reach the server and needs to be replayed.
 struct PendingChange: Codable, Identifiable {
@@ -186,6 +187,84 @@ class LocalStore: ObservableObject {
         events.removeAll { $0.id == id }
         persist()
         ReminderScheduler.shared.reconcile()
+    }
+
+    // MARK: - Home-screen widget snapshot
+
+    /// Mirror the near future into the shared App Group container, where the
+    /// widget extension can read it.
+    ///
+    /// The widget runs in its own process and cannot see this store's
+    /// Documents directory; an App Group container is the only sanctioned
+    /// channel between the two. Everything here is deliberately defensive —
+    /// when the group is not available (`snapshotURL` nil, because the
+    /// entitlement has not reached a provisioning profile yet, or the build
+    /// was never signed with it) this is a silent no-op and the widget draws
+    /// its "no data yet" placeholder instead.
+    ///
+    /// Called from `LiveActivityManager.sync()`, so the snapshot is refreshed
+    /// on exactly the moments the lock-screen card is: foregrounding, the
+    /// `/changes` poll, the 30 s tick, and every write to the event cache.
+    func refreshWidgetSnapshot(now: Date = Date()) {
+        guard let url = WidgetBridge.snapshotURL else { return }
+
+        let accent = LiveActivityManager.accentHex
+        let snapshot = WidgetSnapshot(
+            generated: now,
+            accentHex: accent,
+            items: Self.widgetItems(now: now, events: events, accentHex: accent))
+
+        // Write — and reload — only when the content actually moved. `sync()`
+        // runs on every 30 s tick, and WidgetKit budgets timeline reloads:
+        // spending them redrawing an unchanged widget is how a widget ends up
+        // refusing to update at the moment it matters. Same discipline as
+        // `LiveActivityManager.sameCard`.
+        if let data = try? Data(contentsOf: url),
+           let old = try? WidgetBridge.decoder().decode(WidgetSnapshot.self, from: data),
+           old.items == snapshot.items, old.accentHex == snapshot.accentHex {
+            return
+        }
+        guard let data = try? WidgetBridge.encoder().encode(snapshot),
+              (try? data.write(to: url, options: .atomic)) != nil
+        else { return }
+
+        WidgetCenter.shared.reloadTimelines(ofKind: WidgetBridge.homeWidgetKind)
+    }
+
+    /// Today's and tomorrow's still-relevant timed events, soonest first.
+    ///
+    /// Pure and static so what the widget will show can be reasoned about (and
+    /// tested) without a container or a device — the same treatment
+    /// `LiveActivityManager.currentCard` gets, and the same parsing rules:
+    /// all-day rows have nothing to point at, a missing end time means an hour,
+    /// and "23:00 – 01:00" belongs to two days.
+    static func widgetItems(now: Date, events: [CalendarEvent],
+                            accentHex: String) -> [WidgetSnapshot.Item] {
+        let cal = Calendar.current
+        guard let horizon = cal.date(byAdding: .day, value: 2,
+                                     to: cal.startOfDay(for: now)) else { return [] }
+
+        let items: [WidgetSnapshot.Item] = events.compactMap { e in
+            guard !e.startTime.isEmpty,
+                  let start = ReminderScheduler.parseLocal("\(e.date)T\(e.startTime)")
+            else { return nil }
+            var end = (e.endTime.isEmpty ? nil : ReminderScheduler.parseLocal("\(e.date)T\(e.endTime)"))
+                ?? start.addingTimeInterval(LiveActivityManager.assumedDuration)
+            if end <= start { end = end.addingTimeInterval(86_400) }
+            // Already over, or further out than tomorrow: not this widget's job.
+            guard end > now, start < horizon else { return nil }
+            return WidgetSnapshot.Item(
+                id: e.id,
+                title: e.title.isEmpty ? "Untitled event" : e.title,
+                start: start,
+                end: end,
+                timeLabel: e.displayTime,
+                location: e.location,
+                colorHex: e.color.isEmpty ? accentHex : e.color)
+        }
+        .sorted { $0.start < $1.start }
+
+        return Array(items.prefix(WidgetSnapshot.maxItems))
     }
 
     // MARK: - Search (offline cache)

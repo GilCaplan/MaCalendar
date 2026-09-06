@@ -202,8 +202,12 @@ struct TasksView: View {
                 .padding(.bottom, 24)
             }
             .sheet(isPresented: $showManageTags) {
+                // A sheet does not inherit environment objects from its
+                // presenter, so both are handed over explicitly — `api` for
+                // the suggestion-history screen pushed from inside.
                 ManageTagsSheet(tags: $tags, onAdd: addTag, onDelete: deleteTag)
                     .environmentObject(settings)
+                    .environmentObject(api)
             }
         }
     }
@@ -562,6 +566,16 @@ struct ManageTagsSheet: View {
                             }
                         }
                     }
+                }
+                Section {
+                    NavigationLink {
+                        TagHistoryView()
+                    } label: {
+                        Label("Suggestion history", systemImage: "clock.arrow.circlepath")
+                    }
+                } footer: {
+                    Text("Every tag the assistant has offered to add, and what you answered — the only place to change an answer after the fact.")
+                        .font(.system(size: 12))
                 }
                 Section {
                     Text("Deleting a tag removes it from every task. Long-press a tag in the filter bar to switch on tag mode for it.")

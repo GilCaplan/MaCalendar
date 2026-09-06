@@ -58,6 +58,11 @@ final class LiveActivityManager {
     }
 
     private func performSync() async {
+        // The home-screen widget rides the same wake moments. It is not gated
+        // on 16.2 — a phone too old for a Live Activity still has widgets —
+        // and it is a no-op unless the snapshot actually changed.
+        LocalStore.shared.refreshWidgetSnapshot()
+
         // Everything below is 16.2 API (`ActivityContent`, `staleDate`, the
         // request/update overloads that take it). Older phones simply never
         // get a card; nothing else in the app notices.
@@ -210,7 +215,9 @@ final class LiveActivityManager {
     /// The accent the calendar itself falls back to for an event with no
     /// category colour. Read straight from UserDefaults, the same way
     /// `ReminderScheduler.isEnabled` does, so no AppSettings instance is needed.
-    private static var accentHex: String {
+    /// Shared with `LocalStore.refreshWidgetSnapshot`, which resolves colours
+    /// for the home-screen widget by exactly the same rule.
+    static var accentHex: String {
         UserDefaults.standard.string(forKey: "accentColorHex") ?? Theme.defaultAccentHex
     }
 }

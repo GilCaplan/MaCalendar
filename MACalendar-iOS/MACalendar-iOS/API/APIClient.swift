@@ -836,6 +836,32 @@ class APIClient: ObservableObject {
                                body: ["name": name, "accept": accept])
     }
 
+    /// Every past suggestion and its verdict, newest first — hidden rows
+    /// included, with their flag, because folding them away is the client's
+    /// decision. Throws so the history view can tell "the Mac is away" from
+    /// "you have never been asked anything".
+    func tagSuggestionHistory() async throws -> [TagSuggestionRecord] {
+        try decode([TagSuggestionRecord].self,
+                   from: try await request("/tags/suggestions/history"))
+    }
+
+    /// Change a past verdict. Un-accepting deletes the class from the registry
+    /// again — and, exactly as deleting a tag by hand does, strips it from
+    /// every task — so callers should refresh their tag list afterwards.
+    func reviseTagSuggestion(name: String, accept: Bool) async throws {
+        _ = try await request("/tags/suggestions/revise", method: "POST",
+                              body: ["name": name, "accept": accept])
+    }
+
+    /// Fold an entry out of the visible history, or back into it. The record
+    /// is kept either way; this only moves a display flag. Sent as its own
+    /// request because the Mac reads `hidden` in preference to `accept` when
+    /// both are present.
+    func setTagSuggestionHidden(name: String, hidden: Bool) async throws {
+        _ = try await request("/tags/suggestions/revise", method: "POST",
+                              body: ["name": name, "hidden": hidden])
+    }
+
     func vocab() async throws -> VocabState {
         try decode(VocabState.self, from: try await request("/vocab"))
     }

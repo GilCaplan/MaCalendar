@@ -339,6 +339,69 @@ struct TagSuggestion: Codable {
     let samples: [String]?
 }
 
+/// One row of the record behind the weekly "add 'Pharmacy' as a tag?" popup —
+/// `GET /tags/suggestions/history`, newest first.
+///
+/// The Mac keeps the verdict for every name it has ever proposed, so a "no"
+/// is never re-asked; this is the reviewable version of that record, and the
+/// only place an answer can be changed after the fact.
+struct TagSuggestionRecord: Codable, Identifiable, Equatable {
+    /// Capitalised by the server; also the key every write is addressed by,
+    /// which is why it can serve as the identity.
+    let name: String
+    /// "accepted" | "refused". Anything else is a name that was asked about
+    /// but never answered.
+    let status: String
+    /// The Mac's local ISO timestamp of the last change ("2026-09-05T12:34:56.789012").
+    /// No zone: the phone and the Mac share one.
+    let ts: String
+    /// Folded out of the visible history. Optional so a payload from a Mac
+    /// predating the flag still decodes.
+    let hidden: Bool?
+
+    var id: String { name }
+    var isHidden: Bool { hidden ?? false }
+
+    enum Verdict { case accepted, declined, pending }
+
+    var verdict: Verdict {
+        switch status {
+        case "accepted": return .accepted
+        case "refused":  return .declined
+        default:         return .pending
+        }
+    }
+
+    /// When the verdict was recorded. Nil rather than a wrong date if the
+    /// stamp is in a shape neither formatter knows — the view then falls back
+    /// to showing the raw string.
+    var answeredAt: Date? {
+        DateFormatter.macMicroseconds.date(from: ts)
+            ?? DateFormatter.macSeconds.date(from: ts)
+    }
+}
+
+extension DateFormatter {
+    /// Python's `datetime.isoformat()` — six fractional digits, no zone.
+    /// (`ReminderScheduler.parseLocal` reads the same family of stamps but is
+    /// main-actor isolated, and these are decoded off the main actor.)
+    static let macMicroseconds: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+        return f
+    }()
+
+    /// The same stamp when the microseconds happen to be zero — Python drops
+    /// the fractional part entirely in that case.
+    static let macSeconds: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        return f
+    }()
+}
+
 /// One row a destructive background patch removed. `body` is exactly what
 /// POST /events / POST /todos accept, so reverting is a re-create (one tap).
 struct RevertItem: Codable, Identifiable {
