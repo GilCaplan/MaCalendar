@@ -84,114 +84,37 @@ def reset_parsers() -> None:
 # fast-path mangle ("…at 9am, and then Remind me…" committing a todo literally
 # titled "then") was a confident SINGLE-intent parse of text carrying one of
 # these.
-#: A mutation whose match_title is just the ask-noun targets nothing (cycle 6).
-_GENERIC_TARGET_RE = re.compile(
-    r"^(?:my |the |a |an |this )?(?:reminder|alert|event|appointment|task|todo|list)s?$"
-    r"|^(?:you|it|me|this|that|them)$",
-    re.I)
-
-#: A question. A confident fast parse of an interrogative that nonetheless
-#: produces a CREATE is invention ("could you tell when we pay for car
-#: insurance?" -> create_todo); route deep (sandbox batch F3). A real query
-#: commits query_schedule/query_todos (no create) and is untouched.
-_INTERROGATIVE_RE = re.compile(
-    r"^\s*(?:hey\s+\w+,?\s*)?(?:who|what|when|where|which|whose|how|do|does|did|is|are|am|can|could|would|will|should)\b"
-    r"|\bcould you (?:tell|let me know|check)\b|\bdo i have\b|\?\s*$",
-    re.I)
-
-_STRONG_COMPOUND_RE = re.compile(
-    r"\band\s+(?:then|also)\b"          # "and then", "and also"
-    r"|[.;!?]\s+(?:also|then|plus|and)\b"   # a sentence break, then a joiner
-    r"|\s[—–]\s*and\b"                  # " — and"
-    r"|,\s*then\b",                     # ", then"
-    re.I)
-
-
 def fast_propose(state: EngineState, cfg) -> bool:
-    from assistant.intent.rule_parser import RULE_THRESHOLD, RuleParserSkip
+    """Whole-command fast track: FastRule at RULE_THRESHOLD (the conservative
+    front-door instance; the deep track is its net). A thin adapter now — the
+    parser + gates + threshold live in assistant/engine/fastrule.FastRule."""
+    from assistant.intent.rule_parser import RULE_THRESHOLD
+    from assistant.engine.fastrule import FastRule
     from assistant.trace import RULE
 
-    rule_parser = _get_rule_parser()
-    if rule_parser is None:
-        return False
-    try:
-        rr = rule_parser.analyze(state.text, current_view=state.current_view)
-    except RuleParserSkip as e:
-        if state.trace:
-            state.trace.step(RULE, "Rule parser", f"Skipped: {e}")
-        return False
-    except Exception as e:
-        # A fast-path bug is not a reason to lose the command.
-        if state.trace:
-            state.trace.step(RULE, "Rule parser", f"Failed, deep track instead: {e}", ok=False)
-        return False
+    res = FastRule(RULE_THRESHOLD).run(state.text, state.current_view)
+    state.rule_confidence = res.confidence
 
-    state.rule_confidence = float(rr.confidence)
-    if (len(rr.intents) <= 1 and _STRONG_COMPOUND_RE.search(state.text)):
-        # A one-request reading of two-request wording: however confident the
-        # score, the parse swallowed a compound. The deep track splits first.
-        if state.trace:
-            state.trace.step(RULE, "Rule parser",
-                             "Confident but the words announce a second request "
-                             "— deep track", ok=True)
-        return False
-    if (len(rr.intents) >= 2 and _STRONG_COMPOUND_RE.search(state.text)
-            and any(n.startswith(("create_",)) for n, _ in rr.intents)
-            and any(n.startswith(("update_", "delete_", "complete_", "query_"))
-                    for n, _ in rr.intents)):
-        # Sandbox batch F1: a compound read as create-PLUS-mutation/query is
-        # the fast track's worst signature ("Add milk…, and then update work
-        # out list" → create + update_todo that finds nothing). Mixed-mode
-        # compounds are deep's judgment call.
-        if state.trace:
-            state.trace.step(RULE, "Rule parser",
-                             "Confident but a compound mixing create with "
-                             "edit/query — deep track", ok=True)
-        return False
-    if (_INTERROGATIVE_RE.search(state.text)
-            and any(n.startswith("create_") for n, _ in rr.intents)):
-        # F3: a question that produces a create is invention — deep track.
-        if state.trace:
-            state.trace.step(RULE, "Rule parser",
-                             "Confident but a question producing a create — "
-                             "deep track", ok=True)
-        return False
-    for name, intent in rr.intents:
-        # Cycle 6: "set reminder at 3 pm" fast-committed
-        # update_todo(match_title="reminder") — a mutation aimed at the bare
-        # ask-noun is no target at all (the same ethos as the delete
-        # not-found rule). Deep handles it: event_fallback for the set-shape,
-        # anaphora/not-found for real edits.
-        if name.startswith(("update_", "delete_", "complete_")):
-            target = str(getattr(intent, "match_title", "") or "").strip()
-            if _GENERIC_TARGET_RE.match(target):
-                if state.trace:
-                    state.trace.step(RULE, "Rule parser",
-                                     f"Confident but “{target}” is a generic noun, "
-                                     "not a target — deep track", ok=True)
-                return False
-    if rr.confidence >= RULE_THRESHOLD and not rr.missing_slots:
+    if res.committed:
         state.items = [
             Item(id=f"item_{i + 1}", kind=_kind_for(name), text=state.text,
                  action=name, intent=intent)
-            for i, (name, intent) in enumerate(rr.intents)
+            for i, (name, intent) in enumerate(res.intents)
         ]
         state.parse_path = "fast"
         if state.trace:
             state.trace.step(RULE, "Rule parser",
-                             f"Confident ({rr.confidence:.2f}) — instant: "
-                             + ", ".join(n for n, _ in rr.intents),
-                             confidence=round(rr.confidence, 2),
-                             actions=[n for n, _ in rr.intents])
+                             f"Confident ({res.confidence:.2f}) — instant: "
+                             + ", ".join(n for n, _ in res.intents),
+                             confidence=round(res.confidence, 2),
+                             actions=[n for n, _ in res.intents])
         return True
 
     if state.trace:
         state.trace.step(RULE, "Rule parser",
-                         f"Partial ({rr.confidence:.2f})"
-                         + (f", missing {', '.join(rr.missing_slots)}" if rr.missing_slots else "")
-                         + " — deep track",
-                         confidence=round(rr.confidence, 2),
-                         missing=list(rr.missing_slots) or None)
+                         f"({res.confidence:.2f}) {res.reason} — deep track",
+                         confidence=round(res.confidence, 2),
+                         missing=res.missing_slots)
     return False
 
 
