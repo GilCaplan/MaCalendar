@@ -291,6 +291,11 @@ def create_app() -> Flask:
 
     if not _no_bg:
         start_pending_retry_loop(_run_transcript)
+        # Pre-event notifications: best-effort Mac banners while the calendar
+        # stack is up (the phone is the reliable ringer). NO_WARMUP-gated so
+        # tests building the app never start the thread.
+        from assistant.notifier import start_notifier_loop
+        start_notifier_loop()
 
     @app.post("/voice")
     def voice_audio():
