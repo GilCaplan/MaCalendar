@@ -52,6 +52,7 @@ generalisation claim.
 | **count-correctness** (right # of events/tasks) | yes — dataset-only | the core one; multi-item drops and duplicate-item invention |
 | **missing-half** (which side drops on event+task) | yes — dataset-only | *what* to fix, not just pass/fail |
 | **item-level P/R/F1** (Gil 2026-09-05: balance missing vs inventing) | yes — dataset-only | recall = asked items created; precision = created items asked-for (excess and creations on query/remove cost it); F1 balances the two. Defined in `engine_dataset_compare._prf` |
+| **field quality** (Gil 2026-09-05: the contents, not just the count) | no — transcript-grounded, transfers to real usage | per created item: the WHEN is paramount (weight .5, objective — clock/day expressions in the words must match the event); title = similarity, short-and-similar wins (.3, subjective); location/description/attendees only must not be invented (.2). Tasks: title .5 / quantity .3 / tag .2. Uncovered components are excluded and counted, never guessed. Reported by tier + a difficulty-weighted headline (simple 1 / medium 1.5 / complex 2). `scripts/field_quality.py` |
 | cross-event date collapse (2+ events, same date+time) | no — general | a compound flattened to one time |
 | garbage titles (a leaked "then"/"also" as a title) | no — general | title defects (proxy, not true quality) |
 | parse-path distribution + latency percentiles | no — general | operational; slice by anything |

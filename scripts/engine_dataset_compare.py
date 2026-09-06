@@ -288,6 +288,11 @@ def main() -> int:
                       "delta": round(n[0]/n[1] - o[0]/o[1], 3)}
         return out
 
+    from scripts import field_quality as _fq
+    with sqlite3.connect(ENGINE_DB) as _c:
+        _fq_rows = _c.execute(f"SELECT {RAW_KEY}, actions_json, ts FROM examples").fetchall()
+    fieldq = _fq.score_run(_fq_rows, prov)
+
     prf = {"overall": _prf(engine_scored, prov)}
     for cx in ("simple", "medium", "complex"):
         prf[cx] = _prf(engine_scored, prov, keep=lambda r, c=cx: r.get("complexity") == c)
@@ -302,6 +307,7 @@ def main() -> int:
 
     triage = {
         "prf": prf,
+        "field_quality": fieldq,
         "subslices": subslices,
         "by_complexity": _slice_deltas("complexity"),
         "by_compound_kind": _slice_deltas("compound_kind"),
@@ -331,6 +337,12 @@ def main() -> int:
         print(f"PRF (engine, item-level micro): precision {o['precision']:.1%} · "
               f"recall {o['recall']:.1%} · F1 {o['f1']:.1%}  "
               f"(matched {o['matched']} / expected {o['expected']} / created {o['created']})")
+    if fieldq["items"]:
+        wq = fieldq["difficulty_weighted"]
+        print(f"FIELD QUALITY (contents, transcript-grounded): {fieldq['field_quality']:.1%} "
+              f"· when-correct {fieldq['when_ok']:.1%} (n={fieldq['when_coverage']})"
+              + (f" · difficulty-weighted {wq:.1%}" if wq is not None else "")
+              + f" · by tier {fieldq['by_tier']}")
     r250, r600 = subslices["count_ok_ranks_1_250"], subslices["count_ok_ranks_251_600"]
     if r600[0] is not None:
         print(f"  sub-slices: ranks 1-250 count-ok {r250[0]:.1%} (n={r250[1]}) · "
