@@ -125,3 +125,43 @@ component per cycle, big-picture design and contracts frozen. Full protocol:
 `snapshots/<label>/` keeps a meaningful iteration's changed files, and every
 result in `RESULTS.md` cites the commit that produced it — so a component can
 be reverted or A/B'd against an earlier version.
+
+
+## The metrics, precisely (formulas as implemented)
+
+1. **Count-correctness** (`scripts/score_dataset_run.py`) — per command:
+   compounds pass iff `n_events ≥ E ∧ n_tasks ≥ T` with (E,T) = e+e (2,0),
+   t+t (0,2), e+t (1,1); simple creates pass iff `n_events+n_tasks ≥ 1`;
+   query/remove pass iff `= 0`. Rate over scored rows; sliced by tier, kind,
+   parse path.
+2. **Product-adjusted** (`count_ok_adj`) — same, then the overrides layer on
+   its 140 rows: `noop_ok` = (0 creations ∧ 0 mutations) ∨ (≥1 clean);
+   `half_flexible` = ≥1 clean; `split_flexible` = total ≥ 2 kinds-free — and
+   every query row additionally requires 0 mutation actions.
+3. **Missing-half** — failing e+t rows missing event half / task half / both
+   (counts, diagnostic).
+4. **Date-collapse** — rows where ≥2 created events each having date+time all
+   share one identical (date, start).
+5. **Garbage titles** — rows creating a title ∈ {then, and, also, and then,
+   so, please, now}.
+6. **P/R/F1** (item-level micro, harness `_prf`) — expected per row: compound
+   exact per kind, simple = 1, query/remove = 0; matched = per-kind
+   min(created, expected); `P = Σm/Σcreated`, `R = Σm/Σexpected`,
+   `F1 = 2PR/(P+R)`. Invention costs precision, shortfall costs recall.
+7. **Field quality** (`scripts/field_quality.py`, transcript-grounded,
+   coverage-honest): events `0.5·title + 0.3·when + 0.2·extras`; tasks
+   `0.5·title + 0.3·quantity + 0.2·tag` (tag = closed-set classification on
+   the product outcome, resolver healing included). Plus when-correct rate
+   (own n) and difficulty-weighted mean (×1 / ×1.5 / ×2).
+8. **Parse-path & latency** — fast/deep counts, count-correct per path,
+   p50/p95 total_ms.
+9. **Query-mutation violations** — query rows emitting
+   `delete_*/update_*/complete_*`.
+10. **Fast-gate AP** (diagnostic, not on the standard board) — confidence-
+    descending ranking of fast commits, `AP = (1/pos)·Σ Precision@k` at each
+    correct commit. Finding 2026-09-06: the rule confidence is near-binary
+    (AP 0.838 vs 78.6% base rate) — thresholds are not a dial here; semantic
+    vetoes are.
+
+`python -m scripts.run_board <run>` prints 1–9 for any run; all values live
+per-run in `loop_log.csv`.
