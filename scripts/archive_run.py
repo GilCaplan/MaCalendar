@@ -10,8 +10,8 @@ was 7/21. Identity must be recorded at archive time, never inferred later.
     python -m scripts.archive_run <scratch_dir> --run 9 --label epoch-baseline
     python -m scripts.archive_run <scratch_dir> --label full3000-sweep
 
-Copies engine_run.db, calendar.db and trace_bus.jsonl (gzipped — the
-repo's *.db ignore rule doesn't apply to .db.gz, so archives are committed)
+Copies engine_run.db, calendar.db and trace_bus.jsonl (gzipped; the data files are gitignored per Gil's call — local-only,
+while each manifest.json is committed as the durable identity record)
 into dataset/runs/<name>/ with a manifest.json recording provenance:
 row count, parse-path fingerprint, source path, mtimes, md5s, and the
 loop_log run number when given. scripts/rescore_runs.py replays the CURRENT

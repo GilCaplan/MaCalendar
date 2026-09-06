@@ -11,8 +11,9 @@ CURRENT scorer over every archive — when a metric is added or fixed, the
 whole history's readings refresh (it backfills loop_log's backfillable
 columns and reports drift against as-logged values). Never analyze an
 unlabeled scratch db: identity is verified at archive time precisely because
-inferring it later once put a wrong figure in RESULTS.md. Sixteen archives to date (runs 1–9, five pre-loop sweeps, two
-model-sim partials) cost ~2.4 MB.
+inferring it later once put a wrong figure in RESULTS.md. Archive DATA is local-only (gitignored, Gil's call); the manifests are
+committed as the identity record. Losing the local data loses rescoreability
+for those runs, so treat dataset/runs/ as part of the machine, not cache.
 
 ## The conventions overrides layer
 
