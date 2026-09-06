@@ -12,6 +12,17 @@ and cleaner e+t at ~1.8× the latency.
 
 Every meaningful run, newest first.
 
+## Threshold sweep (Gil's experiment, 2026-09-07) — two tuned operating points
+
+Whole-command RULE_THRESHOLD 0.85→**0.80** (full-3000 sweep: commit 38→40%,
+correct-on-committed flat 87%, false-accept flat 13%; degrades below 0.65).
+Sub-item SUBITEM_RULE_THRESHOLD **0.60** confirmed optimal (simple-tier
+sweep: commit 53→58%, flat 94%/6%; flatlines at 0.60 — near-binary
+confidence). Two numbers for two populations: whole command conservative
+(compounds, deep=net), fragment aggressive (simple, crosscheck=net). Both
+join F1-F3 in the pending joint-confirmation run before landing on the
+board.
+
 ## FastRule-native metrics + F4 diagnosis (2026-09-07)
 
 FastRule is a SELECTIVE CLASSIFIER; the deep metrics scored only its
