@@ -24,6 +24,16 @@ needing one is marked **[Gil]** and is blocked until asked.
 
 ## The queue
 
+- **[deep] Crosscheck-correction precision → then auto-apply** (Gil chose
+  path B, 2026-09-07). The LLM verify runs on every fast commit already;
+  auto-applying its fix is off because the old auto-applier fixed 0 / broke
+  1. Make correction precision (proposed-and-right / proposed) a measured
+  loop target on the dataset — improve crosscheck.py's extract + blame until
+  false-corrections are rare + the retracted-time regression is pinned, THEN
+  flip self_check_apply:true. First step: instrument the metric (needs
+  ground-truth 'what should the verify have changed' — likely a small
+  hand-labeled slice, since the dataset has no correction labels).
+
 - **[deep] ✅ C8 — spoken lead-times, inline** (decompose+generate, run 14).
   Board flat as predicted; fieldq 85.3 + when 86.1 best-ever (clause strip
   cleans titles); behavioral goal delivered (reminder_minutes flows out

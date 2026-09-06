@@ -86,7 +86,17 @@ hand-written audit corpus is now only a regression floor.
      after cycle 9's read: after decompose's separation, EACH fragment goes
      through the rule system; the LLM is the end-judge (crosscheck) only, not
      a per-item parser. Gil-authorized design change.
-3. Only after BOTH tracks plateau do queued hypotheses reopen (dentist
+3. **Verify-and-auto-update, safely (Gil chose B, 2026-09-07).** The LLM
+   crosscheck ALREADY verifies every FastRule commit (reconcile:"always",
+   incl. 100%-confident); what's gated is auto-APPLYING its corrections
+   (self_check_apply, default false — the old auto-applier fixed 0/broke 1
+   in the audit). Path B: make the crosscheck's correction PRECISION a loop
+   target (improve its extract-and-blame accuracy — a legit implementation
+   cycle on crosscheck.py) until false-corrections are measurably rare, THEN
+   flip self_check_apply:true. Needs a metric: crosscheck-correction
+   precision on the dataset (proposed-and-right / proposed) + a regression
+   floor (the retracted-time "2pm sorry 3pm" case must never re-break).
+4. Only after these tracks plateau do queued hypotheses reopen (dentist
    query-mutation bug, #4 list-op misreads, simple-tier fieldq anomaly).
 
 ## The two improvement lanes
