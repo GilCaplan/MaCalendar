@@ -98,3 +98,55 @@ def test_depth_is_bounded_to_one_split(cfg):
     """A sub-item is never split again: ids go one level deep."""
     st = _run([_task("buy chicken and rice and pasta")], cfg)
     assert all(it.id.count("-") <= 1 for it in st.items)
+
+
+# --- reminder-clause stripping (cycle 8, notifications phase 3) -----------
+
+def test_inline_reminder_clause_lands_in_slots():
+    from assistant.engine.decompose import _strip_reminder_clause
+    from assistant.engine.state import Item
+    it = Item(id="item_1", kind="event",
+              text="book gym tomorrow at 6:30 and give me a heads-up half an hour before")
+    _strip_reminder_clause(it)
+    assert it.slots["reminder_minutes"] == 30
+    assert it.text == "book gym tomorrow at 6:30"
+
+
+def test_with_a_reminder_noun_form():
+    from assistant.engine.decompose import _strip_reminder_clause
+    from assistant.engine.state import Item
+    it = Item(id="item_1", kind="event",
+              text="meeting with Dana Monday 9am with a 15 minute reminder")
+    _strip_reminder_clause(it)
+    assert it.slots["reminder_minutes"] == 15
+    assert it.text == "meeting with Dana Monday 9am"
+
+
+def test_leading_alert_me_hours_form():
+    from assistant.engine.decompose import _strip_reminder_clause
+    from assistant.engine.state import Item
+    it = Item(id="item_1", kind="event",
+              text="Alert me 2 hours before my meeting on Tuesday with client")
+    _strip_reminder_clause(it)
+    assert it.slots["reminder_minutes"] == 120
+
+
+def test_until_through_sentences_never_touched():
+    # The whole reason the strip lives in decompose: a bare surviving
+    # "before" would read as a recurrence-end marker in validate.
+    from assistant.engine.decompose import _strip_reminder_clause
+    from assistant.engine.state import Item
+    for txt in ("run daily until the end of September",
+                "shiur weekly through October 3rd",
+                "gym every monday until December"):
+        it = Item(id="item_1", kind="event", text=txt)
+        _strip_reminder_clause(it)
+        assert "reminder_minutes" not in it.slots and it.text == txt
+
+
+def test_bare_reminder_command_left_for_the_fallback():
+    from assistant.engine.decompose import _strip_reminder_clause
+    from assistant.engine.state import Item
+    it = Item(id="item_1", kind="event", text="remind me 30 minutes before")
+    _strip_reminder_clause(it)
+    assert "reminder_minutes" not in it.slots

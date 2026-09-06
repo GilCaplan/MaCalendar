@@ -12,6 +12,19 @@ and cleaner e+t at ~1.8× the latency.
 
 Every meaningful run, newest first.
 
+## Cycle 8 — voice lead-times, inline shape (notifications phase 3) — PREDICTION (written before the change)
+
+*Stages:* decompose (clause strip → slot) + generate (`_apply_slots` →
+`CalendarIntent.reminder_minutes`), TASKS row 80. The dataset's ground
+truth has NO reminder expectations, so this is judged on stage tests plus
+one row class: "Alert me 2 hours before my meeting on Tuesday…"-shaped
+commands, where stripping the clause leaves a clean event ask.
+*Predicted:* the full board FLAT within noise (count −0.4 to +0.4; the
+alert-before rows may add +1 row); the until/through recurrence tests must
+stay green (the strip exists precisely to protect `_EXCLUSIVE_END`);
+garbage flat; p50 flat. The real deliverable is behavioral: a spoken lead
+time lands on the event and flows out through `notify_at`.
+
 ## Dev-full anchor, epoch 1 (run 13, 2026-09-06 17:11, 600 rows)
 
 The new epoch's first off-slice read, covering C5+C6+C7 together: **78.5

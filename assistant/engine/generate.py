@@ -372,6 +372,10 @@ def _event_fallback(text: str):
 def _apply_slots(item: Item) -> None:
     """Structured hints from decomposition land on the intent, when it can
     carry them — a count the words stated beats one the model guessed."""
+    rm = item.slots.get("reminder_minutes")
+    if rm and item.action == "create_event" and hasattr(item.intent, "reminder_minutes"):
+        if getattr(item.intent, "reminder_minutes", None) is None:
+            item.intent.reminder_minutes = int(rm)
     q = item.slots.get("quantity")
     if q and item.action == "create_todo" and hasattr(item.intent, "quantity"):
         if getattr(item.intent, "quantity", None) in (None, 0, 1):

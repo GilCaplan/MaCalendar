@@ -3,7 +3,7 @@
 Contract (see DOCUMENTATION/ENGINE.md):
   reads   state.items
   writes  state.items (may replace an item with sub-items id "item_N-M",
-          may fill item.slots: quantity), trace steps (RULE)
+          may fill item.slots: quantity, reminder_minutes), trace steps (RULE)
 
 Bounded: one decomposition pass over the step-2 items — an item is split at
 most once (ids go one level deep, "item_1-2", never "item_1-2-3").
@@ -127,12 +127,64 @@ def _extract_quantity(item: Item) -> None:
         item.text = clean
 
 
+#: "…and give me a heads-up half an hour before" / "with a 15 minute
+#: reminder" / "remind me 2 hours before/ahead". Stripped HERE, before
+#: validate, because validate's _EXCLUSIVE_END regex would read the bare
+#: surviving "before" as a recurrence-end marker and corrupt until/through
+#: semantics. The minutes land in slots["reminder_minutes"]; generate maps
+#: them onto the intent.
+_REMINDER_CLAUSE = re.compile(
+    r"[,;]?\s*(?:and\s+)?(?:(?:please\s+)?(?:give me|send me|i want|i'd like)\s+"
+    r"(?:a\s+)?(?:heads[- ]?up|reminder|alert)\s+|remind me\s+|alert me\s+|"
+    r"with\s+(?:a\s+)?)"
+    r"(?:of it\s+|about it\s+)?"
+    r"(?P<n>\d+|a|an|one|two|five|ten|fifteen|twenty|thirty|half an?|quarter of an?)?\s*"
+    r"(?P<u>minutes?|mins?|hours?|hrs?)\s*"
+    r"(?:(?:reminder|heads[- ]?up|alert)"
+    r"(?:\s+(?:before|ahead(?:\s+of\s+(?:time|it))?|earlier|in advance))?"
+    r"|(?:before|ahead(?:\s+of\s+(?:time|it))?|earlier|in advance))\b\.?",
+    re.I)
+
+_NUM_WORDS = {"a": 1, "an": 1, "one": 1, "two": 2, "five": 5, "ten": 10,
+              "fifteen": 15, "twenty": 20, "thirty": 30,
+              "half a": 30, "half an": 30, "quarter of a": 15, "quarter of an": 15}
+
+
+def _strip_reminder_clause(item) -> None:
+    """Pull a spoken lead time out of the item text into slots (cycle 8)."""
+    m = _REMINDER_CLAUSE.search(item.text)
+    if not m:
+        return
+    n_raw = (m.group("n") or "one").lower().strip()
+    unit = (m.group("u") or "").lower()
+    if n_raw in _NUM_WORDS:
+        n = _NUM_WORDS[n_raw]
+        if n_raw.startswith(("half", "quarter")) and unit.startswith(("hour", "hr")):
+            pass                      # already expressed in minutes
+        elif unit.startswith(("hour", "hr")):
+            n *= 60
+    else:
+        try:
+            n = int(n_raw)
+        except ValueError:
+            return
+        if unit.startswith(("hour", "hr")):
+            n *= 60
+    remainder = (item.text[:m.start()] + " " + item.text[m.end():]).strip(" ,;")
+    if len(remainder.split()) < 2:
+        return                        # the clause WAS the command - not inline
+    item.slots["reminder_minutes"] = max(1, min(1440, n))
+    item.text = remainder
+
+
 def run(state: EngineState, cfg) -> EngineState:
     from assistant.trace import RULE
 
     out: list = []
     split_notes: list[str] = []
     for item in state.items:
+        if item.kind == "event":
+            _strip_reminder_clause(item)
         subs = None
         if item.kind == "event":
             subs = _split_times(item) or _llm_split_times(item, state, cfg)

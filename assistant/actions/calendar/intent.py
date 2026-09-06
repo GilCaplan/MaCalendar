@@ -17,6 +17,9 @@ class CalendarIntent(BaseIntent):
     description: Optional[str] = None
     recurrence: Optional[str] = None      # 'daily', 'weekly', 'monthly'
     recur_until: Optional[str] = None     # ISO 8601 date, e.g. "2026-12-31"
+    # Spoken lead time ("…and give me a heads-up half an hour before"):
+    # minutes before start_time; None = inherit category/global default.
+    reminder_minutes: Optional[int] = None
 
     @field_validator("title", mode="before")
     @classmethod
