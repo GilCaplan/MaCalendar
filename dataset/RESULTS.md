@@ -12,6 +12,20 @@ and cleaner e+t at ~1.8× the latency.
 
 Every meaningful run, newest first.
 
+## Sandbox batch F3 — interrogative-create veto (fast lane) — PREDICTION (registered before the change)
+
+*Diagnosis (fast-lane, dev):* interrogatives commit CREATES — "COULD YOU
+PLEASE TELL WHEN WE HAVE TO PAY FOR CAR INSURANCE?" → create_todo(["car
+insurance"]); a question that creates is invention. Also "mark 13 october …
+as my birthday" → complete_todo("this year") (a create-shaped 'mark X as Y'
+misrouted). *Change [gate]:* a confident fast parse whose text is
+interrogative (leading question word / "could you tell" / trailing "?") AND
+whose intents include a create action routes deep — a real query commits
+query_schedule (no create) and is unaffected. *Predicted (sandbox
+dev-fast):* the 1–2 interrogative-create rows abstain; commit 35% → ~34%,
+adjusted-on-committed 92.0% → **93–95%**; query slice (already 97) and real
+query_schedule commits UNCHANGED; held-out aggregate ticks up.
+
 ## Cycle 9 — sub-item rules-first trust (Gil's architecture call) — PREDICTION (registered before the change)
 
 *Stage:* generate `_parse_item` (internal; no contract change). Gil's
