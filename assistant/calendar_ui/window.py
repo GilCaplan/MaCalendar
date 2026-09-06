@@ -559,6 +559,15 @@ class CalendarWindow(QMainWindow):
         connected_btn.clicked.connect(self._on_connected_calendars)
         layout.addWidget(connected_btn, alignment=v_center)
 
+        tag_history_btn = QPushButton("🏷")
+        tag_history_btn.setObjectName("icon_btn")
+        tag_history_btn.setFixedSize(30, 30)
+        tag_history_btn.setToolTip("Tag Suggestion History — review, reverse or hide "
+                                   "past tag suggestions")
+        tag_history_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        tag_history_btn.clicked.connect(self._on_tag_history)
+        layout.addWidget(tag_history_btn, alignment=v_center)
+
         self._settings_btn = QPushButton("⚙")
         self._settings_btn.setObjectName("icon_btn")
         self._settings_btn.setFixedSize(30, 30)
@@ -1331,6 +1340,10 @@ class CalendarWindow(QMainWindow):
     def _on_settings_popup(self) -> None:
         from assistant.calendar_ui.settings_dialog import open_settings
         open_settings(self)
+
+    def _on_tag_history(self) -> None:
+        from assistant.calendar_ui.tag_history_dialog import open_tag_history
+        open_tag_history(self)
 
     def _on_import(self) -> None:
         """Show an import dialog: choose .ics file OR scan macOS Calendar."""
