@@ -183,3 +183,20 @@ RESULTS.md alike. Never a highlights-only summary: a metric that moved
 against you and went unreported is a broken instrument next cycle.
 `python -m scripts.run_board <run>` prints the full table from loop_log.csv
 (vs the epoch baseline and the previous same-slice run).
+
+## Paired-track cycles (Gil, 2026-09-07)
+
+The fast (rule) and deep (7-stage) tracks are parallel systems; a cycle MAY
+carry TWO hypotheses — one per track — since a run costs the same and every
+row is scored with its parse path. Rules that keep attribution honest:
+
+- Pairable: a rule-parser INTERNAL change (parse better, stay fast) + a
+  deep-stage INTERNAL change. Each verdict is read off its own parse-path
+  slice, with its own prediction registered up front.
+- NEVER pairable: routing changes (fast gates, thresholds, track selection)
+  — they move rows between populations and confound both verdicts; routing
+  rides alone (C6 moved 5 rows fast→deep).
+- Rows that CHANGED parse path between the runs are excluded from both
+  verdicts and reported as their own count.
+- If both hypotheses miss their predicted bands, rerun each alone.
+- Bugs remain exempt and ride any cycle.

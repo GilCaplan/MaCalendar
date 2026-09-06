@@ -24,6 +24,17 @@ needing one is marked **[Gil]** and is blocked until asked.
 
 ## The queue
 
+*(Entries are tagged **[fast]** / **[deep]** / **[routing]** since 2026-09-07:
+a cycle may pair one [fast] + one [deep]; [routing] rides alone — see the
+protocol's Paired-track section.)*
+
+- **[fast] Quoted/misspelled targets on the rule path** — evidence (runs
+  11–12 tails): "remove 'father's day' from calender" and "mark 13 october
+  of this year as my birthday" fail ON the fast path — quoted titles and
+  misspellings inside otherwise-confident parses. Rule-parser internal.
+  *Expected:* +0.5–1 pt on the fast slice. *Effort:* low-medium.
+
+
 - **BUG (open; found 2026-09-06 by the query-no-mutation check): queries can
   emit mutations.** "Is my appointment to the dentist still on for tomorrow
   morning?" → deep produced `update_event(match_title="dentist")` — a
