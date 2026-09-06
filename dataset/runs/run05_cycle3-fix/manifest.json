@@ -1,0 +1,30 @@
+{
+ "loop_run": 5,
+ "label": "cycle3-fix",
+ "source": "/var/folders/0f/nk3dnvrd54jbjz_qn40_ynwh0000gn/T/engine_compare_t3y16t4b",
+ "source_mtime": "2026-09-04T21:28:42",
+ "archived_at": "2026-09-06T05:46:16+00:00",
+ "n_rows": 250,
+ "parse_paths": {
+  "fast": 103,
+  "deep": 147
+ },
+ "row_ts_range": [
+  1788569359.062387,
+  1788571722.4794161
+ ],
+ "files": {
+  "engine_run.db": {
+   "md5": "7cc9410d586d83fd33cc6c901904844a",
+   "bytes": 147456
+  },
+  "calendar.db": {
+   "md5": "0a6f314c54d366355aa6f792a2735e8b",
+   "bytes": 315392
+  },
+  "trace_bus.jsonl": {
+   "md5": "82295c36f95793fd1c75ed6aab1056aa",
+   "bytes": 516582
+  }
+ }
+}

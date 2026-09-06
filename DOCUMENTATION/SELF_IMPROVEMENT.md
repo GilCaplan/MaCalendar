@@ -15,8 +15,10 @@ This page is the map. The working files it describes:
 | [`DOCUMENTATION/experiments/ITERATION_PROTOCOL.md`](experiments/ITERATION_PROTOCOL.md) | the loop's rules — the canonical protocol |
 | [`dataset/HYPOTHESES.md`](../dataset/HYPOTHESES.md) | the ranked experiment queue (the future) |
 | [`dataset/RESULTS.md`](../dataset/RESULTS.md) | every cycle's prediction vs. actual, and the interpretation (the why) |
-| [`dataset/loop_log.csv`](../dataset/loop_log.csv) | one row per measurement run — timestamps, duration, commit, every metric — the plottable trajectory |
+| [`dataset/loop_log.csv`](../dataset/loop_log.csv) | one row per measurement run — timestamps, duration, commit, every metric incl. `adj_pct` (product-adjusted count-correct) — the plottable trajectory |
 | [`dataset/loop_changes.csv`](../dataset/loop_changes.csv) | every change shipped, per component: bugfix / improvement / convention / metric |
+| [`dataset/runs/`](../dataset/runs/) | every run's scratch, archived with an identity manifest — `scripts/rescore_runs.py --write` recomputes the whole history when a metric changes |
+| [`convention_overrides.json`](../dataset/inputs/convention_overrides.json) | the product-conventions layer behind the adjusted score (raw never changes) — see [`DATASET_AUDIT.md`](../dataset/DATASET_AUDIT.md) |
 | [`DEVQA.md`](../DEVQA.md) | async product questions for Gil, and the log of his rulings |
 
 ## The framing: a classic ML problem, with a twist

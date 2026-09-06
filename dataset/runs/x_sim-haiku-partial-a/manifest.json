@@ -1,0 +1,31 @@
+{
+ "loop_run": null,
+ "label": "sim-haiku-partial-a",
+ "source": "/var/folders/0f/nk3dnvrd54jbjz_qn40_ynwh0000gn/T/engine_compare_gwa_b423",
+ "source_mtime": "2026-09-06T07:45:19",
+ "archived_at": "2026-09-06T12:03:59+00:00",
+ "n_rows": 54,
+ "parse_paths": {
+  "fast": 20,
+  "deep": 19,
+  "error": 15
+ },
+ "row_ts_range": [
+  1772903595.042841,
+  1773181946.969606
+ ],
+ "files": {
+  "engine_run.db": {
+   "md5": "9d690d9f7c1c39432e81c415d23eec62",
+   "bytes": 53248
+  },
+  "calendar.db": {
+   "md5": "2d9510ba0d4e8890ebdb13dd3987bbea",
+   "bytes": 225280
+  },
+  "trace_bus.jsonl": {
+   "md5": "6130d6ca641b52cbde19093e9c033a64",
+   "bytes": 83078
+  }
+ }
+}

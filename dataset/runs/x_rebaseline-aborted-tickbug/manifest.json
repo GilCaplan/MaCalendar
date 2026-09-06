@@ -1,0 +1,29 @@
+{
+ "loop_run": null,
+ "label": "rebaseline-aborted-tickbug",
+ "source": "/var/folders/0f/nk3dnvrd54jbjz_qn40_ynwh0000gn/T/engine_compare_5lxg1mbm",
+ "source_mtime": "2026-09-05T20:43:58",
+ "archived_at": "2026-09-06T05:46:17+00:00",
+ "n_rows": 84,
+ "parse_paths": {
+  "deep": 84
+ },
+ "row_ts_range": [
+  1772903594.940581,
+  1773337466.940581
+ ],
+ "files": {
+  "engine_run.db": {
+   "md5": "eeec7b0046adc81e577abd7afd467ccb",
+   "bytes": 69632
+  },
+  "calendar.db": {
+   "md5": "346ee0a4b9425fac8344956ac94beffd",
+   "bytes": 233472
+  },
+  "trace_bus.jsonl": {
+   "md5": "b9dd147b47cf375729e43bd8704e8e65",
+   "bytes": 230990
+  }
+ }
+}

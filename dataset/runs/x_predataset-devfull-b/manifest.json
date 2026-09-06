@@ -1,0 +1,30 @@
+{
+ "loop_run": null,
+ "label": "predataset-devfull-b",
+ "source": "/var/folders/0f/nk3dnvrd54jbjz_qn40_ynwh0000gn/T/engine_compare_ddy0aiyv",
+ "source_mtime": "2026-09-04T10:58:53",
+ "archived_at": "2026-09-06T05:46:17+00:00",
+ "n_rows": 600,
+ "parse_paths": {
+  "fast": 271,
+  "deep": 329
+ },
+ "row_ts_range": [
+  1788528076.546731,
+  1788533933.162347
+ ],
+ "files": {
+  "engine_run.db": {
+   "md5": "e96d5f59f0e9d63fd6bf4e3b75dbc9c0",
+   "bytes": 335872
+  },
+  "calendar.db": {
+   "md5": "49929d78470e6f0fc00c721bc608a914",
+   "bytes": 315392
+  },
+  "trace_bus.jsonl": {
+   "md5": "9c9cf3fac4101c2996d718513694e150",
+   "bytes": 770965
+  }
+ }
+}

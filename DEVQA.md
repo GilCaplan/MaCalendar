@@ -18,24 +18,27 @@ remind-word at all). ~1 row on dev-fast, so low stakes — whenever convenient.
 That means detaching `assistant.api` into a launchd LaunchAgent (launch-model
 change: --reload, HUD, shutdown ownership). If "no", the phone is officially
 the only always-on ringer and the plan's riskiest phase disappears.
+*(The build shipped with the phone-only default — this stays reversible.)*
 
 **Q5 — Notifications: default lead time — opt-in (0: only where you asked)
-or blanket (e.g. 30 min before everything)?** Plan ships 0; blanket changes
-the feature's noise level on a dense calendar.
+or blanket (e.g. 30 min before everything)?** Shipped as 0 (opt-in);
+blanket changes the feature's noise level on a dense calendar.
 
 **Q6 — Reminders for events INSIDE Shabbat/yom tov (e.g. Shabbat lunch):
-suppress entirely (plan's default) or roll into one pre-candle-lighting
+suppress entirely (shipped default) or roll into one pre-candle-lighting
 digest banner?** Lifestyle call, not engineering.
 
 ## Answered (log)
 
-- 2026-09-06 — **Q2 built directly** (checkbox in the settings dialog,
-  243d99f) — and building it exposed that pydantic silently discarded
-  `observance.enabled` (field never declared on ObservanceConfig); fixed +
-  pinned by test.
-
-- 2026-09-06 — **Q3 withdrawn** (API key): the sims run through Claude Code
-  subagent workers now, no key or API billing involved.
+- 2026-09-06 — **Q2 shipped without needing an answer**: the observance
+  checkbox is in the Mac settings dialog (243d99f), persisted via
+  config_store — and building it exposed that `observance.enabled` was
+  silently DROPPED by pydantic (`ObservanceConfig` never declared the
+  field), so the yaml flag never reached `is_enabled()`; only the env
+  override worked. Field declared + pinned by test.
+- 2026-09-06 — **Q3 withdrawn** (API key): the model sims ran through Claude
+  Code subagent workers, no key needed; the experiment is closed on partial
+  data (llama beat both drop-ins — `dataset/MODEL_COMPARISON.md`).
 - 2026-09-05 — **Old-brain comparison**: Gil doesn't care about it; the
   questions that matter are "is the new system better, and can it get
   better?" → answered in chat (yes / yes); vs-old numbers stay incidental.

@@ -1,0 +1,567 @@
+{
+ "version": 1,
+ "generated": "2026-09-06",
+ "note": "Mechanical rules mined from dev region (tier_rank<=600) only, applied dataset-wide. Raw count_ok is never changed; the scorer reports these as count_ok_adj.",
+ "rows": {
+  "Set a event for the evening, and then get xxx on the list": {
+   "class": "placeholder",
+   "treatment": "half_flexible"
+  },
+  "Remind me to read book next week — and can you add Gloria to my list of clients?": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Open up a new list.": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "please set event on Tuesday — and alexa remind me to go to my doctors at 4pm on tuesday": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Please remind to get donuts for the meeting, and then new scenario, time or calendar to new list": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "set reminder for tomorrows meeting with {client name} and also add this one also.": {
+   "class": "placeholder",
+   "treatment": "half_flexible"
+  },
+  "Create a new list called Grocery Store, please.": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "create a new list of . Also, get xxx on the list": {
+   "class": "placeholder",
+   "treatment": "half_flexible"
+  },
+  "Set reminder on calendar for": {
+   "class": "truncated",
+   "treatment": "noop_ok"
+  },
+  "Remind me to meet James at work tomorrow at 9am, and then Remind me of my meeting tomorrow at 3:00PM": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Every Wednesday night at 5pm remind me to meet Phil and also make a new list for me, please.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "I need to make a list.": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "Remind me to meet Sarah at Safeway in Mckinleyville California at noon. Also, Please remind to get donuts for the meeting": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to send the presentation today at 1:00pm. Also, Go to Stripes at 5pm on 3 April.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Notify me when my rent due?": {
+   "class": "standing_alert",
+   "treatment": "noop_ok"
+  },
+  "remind me to brush my teeth at three thirty, and then pls add list of friends to invite for the party": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "I need new list to be created, Do it now and add xxx on the list": {
+   "class": "placeholder",
+   "treatment": "half_flexible"
+  },
+  "Let me know when the meeting is gonna happen. Also, Remind me to buy jeans on my shopping list": {
+   "class": "standing_alert",
+   "treatment": "half_flexible"
+  },
+  "Cortana, let me know when a next event if occurring from my calendar and send me a notification.": {
+   "class": "standing_alert",
+   "treatment": "noop_ok"
+  },
+  "Please put meeting with <insert name> at <insert time> on <insert date> on my calendar": {
+   "class": "placeholder",
+   "treatment": "noop_ok"
+  },
+  "tell me when the event starts": {
+   "class": "standing_alert",
+   "treatment": "noop_ok"
+  },
+  "add a new list": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "Remind me to pick up John from the airport tonight at 8, and then add this to the list": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "reopen groceries and add milk. Also, put xxx on the list": {
+   "class": "placeholder",
+   "treatment": "half_flexible"
+  },
+  "Remind me about my Monday meeting with Peter Francis fifteen minutes before the meeting — and remind me to wash the windows.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Tell me when I have an event": {
+   "class": "standing_alert",
+   "treatment": "noop_ok"
+  },
+  "Make a new shopping list": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "can you add to my calendar an event for next friday and put xxx on the list": {
+   "class": "placeholder",
+   "treatment": "half_flexible"
+  },
+  "Make a things to do list": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "set on 2nd jan about soccer match of Manchester. Also, Remind me to contact old friends that I have not talked with in 6 months before they pass": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to go to the store every friday and also mUJHE 8 PM YAAD DILANA MUJHE KAHIN BAHAR JANA HAI.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "get xxx on the list": {
+   "class": "placeholder",
+   "treatment": "noop_ok"
+  },
+  "REMIND TO AT 8 P.M. TO TAKE MY MEDICINE — and add juice to my grocery list": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "PLZ REMIND TO SLEEP AT 9 P.M. Also, add to calendar and repeat": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Save event for 5pm to 6pm on March 18th — and remind me to take my medicine at 9am": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "remind me to check the oven in 15 minutes and also i need to add bananas to my grocery list.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "For Every Odd Numbered Sunday, set a reminder for": {
+   "class": "truncated",
+   "treatment": "noop_ok"
+  },
+  "Remind me to meet Dad for coffee at 10 am and help me start my kitchen list.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Notify me when I have a meeting, and then Add practice to calendar on Feb 4 at King's Park at 2 p.m..": {
+   "class": "standing_alert",
+   "treatment": "half_flexible"
+  },
+  "Make sure to remind me to pay my bills tomorrow morning — and please Find all name start with alphabetic of 'A' and create a list.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Please open grocery list and add bananas to list.": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "Alert me when registration opens — and i need to something every monday set a reminder for it": {
+   "class": "standing_alert",
+   "treatment": "half_flexible"
+  },
+  "Create a blank list.": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "add xxx on the list": {
+   "class": "placeholder",
+   "treatment": "noop_ok"
+  },
+  "Remind me the meeting with Allen on 15th match — and remind me to get the mail in 10 minutes.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to meet Joe for lunch tomorrow. Also, create repeating event 'john's birthday' on calendar": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to contact old friends that I have not talked with in 6 months before they pass. Also, Alexa, i would like to set the event repetitive": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Notify me when the event is going to take place": {
+   "class": "standing_alert",
+   "treatment": "noop_ok"
+  },
+  "Schedule a reminder on 15th march and input name as meeting. Also, will you remind me to go to hockey class every Sunday afternoon?": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me that I have a meeting at 3pm tomorrow — and please remind me to call mom in half an hour": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to go to my meeting tomorrow. Also, Add event: Baseball practice, 5pm tonight": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "My calender is to be updated with all RCCG March event — and can you let me know when it's 2:00?": {
+   "class": "standing_alert",
+   "treatment": "half_flexible"
+  },
+  "Let me know when my phone is due and also new scenario, time or calendar to new list": {
+   "class": "standing_alert",
+   "treatment": "half_flexible"
+  },
+  "I would like it to make doctor appointments, etc. for me, and then get xxx on the list": {
+   "class": "placeholder",
+   "treatment": "half_flexible"
+  },
+  "Notify me when this meeting is close, and then Put hamburger on my grocery list.": {
+   "class": "standing_alert",
+   "treatment": "half_flexible"
+  },
+  "I need to add bananas to my grocery list — and get xxx on the list": {
+   "class": "placeholder",
+   "treatment": "half_flexible"
+  },
+  "Remind me to go grocery shopping today and please add oranges to my grocery list.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "manage a meeting for today morning. Also, Please remind me to go to the post office.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to tweet at this company, and then create a list that is available": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Set this before event. Also, Tell me when I have an event": {
+   "class": "standing_alert",
+   "treatment": "half_flexible"
+  },
+  "Set my calendar to remind me to buy groceries every Friday — and refresh the list with new one.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "tell me when the event is happening": {
+   "class": "standing_alert",
+   "treatment": "noop_ok"
+  },
+  "Make a new list": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "make appointment for next friday — and remind me to fill college's application form every two days from now": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me every year/week/month on this date of": {
+   "class": "truncated",
+   "treatment": "noop_ok"
+  },
+  "Remind me to pay my bills at the start of every month. Also, Please Find all name start with alphabetic of 'G' and create a list.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to send the presentation today at 1:00pm and also make a calendar entry for brunch on saturday morning with Chris, Kimberly, and Aaronson": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to meet Dad for coffee at 10 am and also remind me in the morning to call my mother.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "tell me when my moms birthday is": {
+   "class": "standing_alert",
+   "treatment": "noop_ok"
+  },
+  "alert me when my anniversary is": {
+   "class": "standing_alert",
+   "treatment": "noop_ok"
+  },
+  "Create a new grocery list": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "Remind me to pay the electricity bill on this weekend at 9:00 a.m and also i would need to be notified of church services on Sundays at 11 am.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Every other Wednesday, remind me to go grocery shopping — and remind me to take my medicine every day at 7PM for the next two weeks.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to ask an important question to my boss and generate a new inventory": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Please remind me to call mom in half an hour and add coffee to the grocery list": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to have the presentation ready by 10 on Wednesday and meeting at 8am to 12pm": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to take my medicine at 9am. Also, Please make a list of thing I have to shop tomorrow": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Set and event for the 15th of every month to remind me to pay my internet bill. Also, add business contacts to contact list": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to pick up the laundry next Monday — and i would like to start a new list": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to check the stew at 6 o'clock, and then Add butter to the list": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to start the crock pot at 2:00 PM and add apples to shopping list": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Let me know when my meetings are on Monday and also remind me about the meeting tomorrow at 6": {
+   "class": "standing_alert",
+   "treatment": "half_flexible"
+  },
+  "Remind me to contact old friends that I have not talked with in 6 months before they pass and remember to fix a meeting between me and the players tomorrow evening by 7.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to go shopping every week. Also, what are the events coming up soon?": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Can you add Name/Location to calendar, and then remind me to buy ham when I am in the shop next time": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Set a timer for 5 minutes for cookies and set and event for the 15th of every month to remind me to pay my internet bill.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Start a grocery list": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "Please add deodorant to my shopping list — and add xxx on the list": {
+   "class": "placeholder",
+   "treatment": "half_flexible"
+  },
+  "Every Wednesday night at 5pm remind me to meet Phil and put meeting with Pawel for tomorrow 10am": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to do something then, and then Add milk to my grocery list.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "put xxx on the list, and then PDA, I want to make a list and this should be automatically saved as a text file with the title, list.": {
+   "class": "placeholder",
+   "treatment": "half_flexible"
+  },
+  "Create a new reminder at 3pm — and remind me to make a pizza tomorrow morning": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Mark the event monthly and also remind me to buy jeans on my shopping list": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to look at the pasta in 30 mins and please update my grocery list with1 gallon of 2% milk.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Please remind me to pickup John at school today at 1 pm — and create a list for today's tasks": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Notify me when I am supposed to attend the dance recital on March 5th.": {
+   "class": "standing_alert",
+   "treatment": "noop_ok"
+  },
+  "PDA can you remind me to check my clothes in a hour. Also, Set a meeting on Wednesday at 3pm in room G30.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Set reminder for 7 am for the City Team Meeting. Also, PLZ REMIND TO SLEEP AT 9 P.M.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "set the event name to ____ and rEMIND TO AT 8 P.M. TO TAKE MY MEDICINE.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Add a party in NY city for this saturday, and then Remind me to meet James at work tomorrow at 9am": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Set calendar reminder for noon titled lunch meeting, and then Notify me when the event is going to take place": {
+   "class": "standing_alert",
+   "treatment": "half_flexible"
+  },
+  "I need to add pasta and milk to the grocery list — and add xxx on the list": {
+   "class": "placeholder",
+   "treatment": "half_flexible"
+  },
+  "Make sure to remind me to pay my bills tomorrow morning, and then PDA can you create a list for me.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Start me a new list.": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "notification of meeting on Wednesday — and alert me when my anniversary is": {
+   "class": "standing_alert",
+   "treatment": "half_flexible"
+  },
+  "Notify me when I have a meeting.": {
+   "class": "standing_alert",
+   "treatment": "noop_ok"
+  },
+  "Olly, I need to create a list of grocery items which are generally required for an outing for two days when you travel out of the city and get xxx on the list": {
+   "class": "placeholder",
+   "treatment": "half_flexible"
+  },
+  "alert me when my anniversary is and pDA please mark my calendar for a holiday in Cuba on April 2.": {
+   "class": "standing_alert",
+   "treatment": "half_flexible"
+  },
+  "Can you let me know when it's 2:00?": {
+   "class": "standing_alert",
+   "treatment": "noop_ok"
+  },
+  "Please remind me to go to the post office. Also, create a new list of my pending bills": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Can you create a new list?": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "remind me to buy ham when I am in the shop next time, and then This item should be added to the list": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "make a list of management staff for the 20th oct meeting, and then Make sure to remind me to pay my bills tomorrow morning.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to meet Joe for lunch tomorrow, and then set repeating event 'gym day' on calendar": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Thirteen minutes from now, remind me to drive to the park — and set a reminder to pick up food this Friday.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Send me notice of meeting Wednesday 9 am and also remind me to meet Joe for lunch tomorrow.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Remind me to pick up the laundry next Monday and i want to meet with sara tomorrow alexa": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Notify me when this happens": {
+   "class": "standing_alert",
+   "treatment": "noop_ok"
+  },
+  "I want to start a new list.": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "Repeat reminder for Christmas, and then Notify me when the event is going to take place": {
+   "class": "standing_alert",
+   "treatment": "half_flexible"
+  },
+  "Remind me to do something then — and set a reminder about tomorrows meeting at 9am": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Alert me when registration opens": {
+   "class": "standing_alert",
+   "treatment": "noop_ok"
+  },
+  "Please give me an update on the election every 30 minutes. Also, Please put meeting with <insert name> at <insert time> on <insert date> on my calendar": {
+   "class": "placeholder",
+   "treatment": "half_flexible"
+  },
+  "Alexa create a new shopping list.": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "PDA can you remind me to check my clothes in a hour and nOTE DOWN IMPORTANT EVENT IN THIS WEEK.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "start a new list": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "Please remind me to call Duker at 1:00 pm on Thursday and also please add this item to the list": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "Set my calendar to remind me to buy groceries every Friday — and add Jane's birthday party at 123 Main St for 2PM tomorrow on my calendar": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "please create new list": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "Please create a new list": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "Let me know when the meeting is gonna happen.": {
+   "class": "standing_alert",
+   "treatment": "noop_ok"
+  },
+  "Open me a new list.": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "Tell me when I need to leave the airport": {
+   "class": "standing_alert",
+   "treatment": "noop_ok"
+  },
+  "set reminder for tomorrows meeting with {client name}. Also, I need a list of my clients today, make one": {
+   "class": "placeholder",
+   "treatment": "half_flexible"
+  },
+  "Tell me when this meeting is coming up.": {
+   "class": "standing_alert",
+   "treatment": "noop_ok"
+  },
+  "Start creating a new list": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "Tell me when my next meeting is.": {
+   "class": "standing_alert",
+   "treatment": "noop_ok"
+  },
+  "Every other Wednesday, remind me to go grocery shopping. Also, Set a reminder to pick up food this Friday.": {
+   "class": "remind_half",
+   "treatment": "split_flexible"
+  },
+  "make a note of this on the list": {
+   "class": "list_create_bare",
+   "treatment": "noop_ok"
+  },
+  "Set reminder for tomorrow for this item. Also, Notify me when this happens": {
+   "class": "standing_alert",
+   "treatment": "half_flexible"
+  }
+ }
+}

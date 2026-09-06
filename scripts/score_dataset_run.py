@@ -61,7 +61,24 @@ def _expected(intent: str) -> dict:
     }[intent]
 
 
-def _score_row(transcript: str, actions_json: str, prov: dict | None) -> dict:
+OVERRIDES = ROOT / "dataset" / "inputs" / "convention_overrides.json"
+
+
+def load_overrides(path: pathlib.Path = OVERRIDES) -> dict[str, dict]:
+    """transcript -> {class, treatment} from the convention-overrides layer.
+
+    Produced by scripts/audit_dataset_conventions.py: rows whose HWU-derived
+    expectation disagrees with the product's own conventions (no list
+    objects, no standing alerts, remind-to may be a task). Raw count_ok is
+    never touched by these — they feed count_ok_adj only, so logged runs
+    stay comparable."""
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text())["rows"]
+
+
+def _score_row(transcript: str, actions_json: str, prov: dict | None,
+               override: dict | None = None) -> dict:
     try:
         actions = json.loads(actions_json or "[]")
     except json.JSONDecodeError:
@@ -137,6 +154,29 @@ def _score_row(transcript: str, actions_json: str, prov: dict | None) -> dict:
         row["expected_min_tasks"] = None
         row["count_ok"] = None  # unknown provenance — not scored either way
 
+    # --- product-adjusted verdict (count_ok_adj); raw count_ok above is
+    # frozen for comparability with every logged run ---------------------
+    n_mut = sum(1 for a in actions if a.get("action", "").startswith(
+        ("delete_", "update_", "complete_")))
+    row["n_mutations"] = n_mut
+    adj = row["count_ok"]
+    if intent == "query" and adj:
+        # a query must not just avoid creating — it must not CHANGE anything
+        adj = n_mut == 0
+    total, clean = n_events + n_tasks, not garbage
+    treatment = (override or {}).get("treatment")
+    if treatment == "noop_ok":
+        # an honest nothing is as correct as a sensible creation
+        adj = (total == 0 and n_mut == 0) or (total >= 1 and clean)
+    elif treatment == "half_flexible":
+        # one half is something the product legitimately declines
+        adj = total >= 1 and clean
+    elif treatment == "split_flexible":
+        # per-kind split came from source intents our conventions re-file
+        adj = total >= 2
+    row["count_ok_adj"] = adj
+    row["override_class"] = (override or {}).get("class")
+
     return row
 
 
@@ -145,15 +185,27 @@ def score_db(db_path: pathlib.Path, provenance: dict[str, dict]) -> dict:
         # Verbatim input, not the stored transcript: the pipeline may rewrite
         # the transcript before recording it, and provenance is keyed on what
         # the history file actually said.
-        rows = c.execute(
-            "SELECT COALESCE(NULLIF(raw_transcript, ''), transcript), "
-            "actions_json, parse_path, tier_rank, ts, llm_ms, total_ms "
-            "FROM examples WHERE tier_rank IS NOT NULL ORDER BY tier_rank"
-        ).fetchall()
+        cols = {r[1] for r in c.execute("PRAGMA table_info(examples)")}
+        if "tier_rank" in cols:
+            rows = c.execute(
+                "SELECT COALESCE(NULLIF(raw_transcript, ''), transcript), "
+                "actions_json, parse_path, tier_rank, ts, llm_ms, total_ms "
+                "FROM examples WHERE tier_rank IS NOT NULL ORDER BY tier_rank"
+            ).fetchall()
+        else:
+            # archives from before the harness stamped tier_rank (the Sep 3-4
+            # pre-loop runs); scoreable all the same, just unranked
+            rows = c.execute(
+                "SELECT COALESCE(NULLIF(raw_transcript, ''), transcript), "
+                "actions_json, parse_path, NULL, ts, llm_ms, total_ms "
+                "FROM examples ORDER BY id"
+            ).fetchall()
 
+    overrides = load_overrides()
     per_prompt = []
     for transcript, actions_json, parse_path, tier_rank, ts, llm_ms, total_ms in rows:
-        r = _score_row(transcript, actions_json, provenance.get(transcript))
+        r = _score_row(transcript, actions_json, provenance.get(transcript),
+                       overrides.get(transcript))
         r.update({"tier_rank": tier_rank, "ts": ts, "parse_path": parse_path,
                   "llm_ms": llm_ms, "total_ms": total_ms})
         per_prompt.append(r)
@@ -163,9 +215,15 @@ def score_db(db_path: pathlib.Path, provenance: dict[str, dict]) -> dict:
         if not n:
             return {"n": 0}
         scored = [r for r in rows_ if r["count_ok"] is not None]
+        adj = [r for r in rows_ if r.get("count_ok_adj") is not None]
         return {
             "n": n,
             "count_ok_rate": (sum(r["count_ok"] for r in scored) / len(scored)) if scored else None,
+            "count_ok_adj_rate": (sum(r["count_ok_adj"] for r in adj) / len(adj)) if adj else None,
+            "n_overridden": sum(1 for r in rows_ if r.get("override_class")),
+            "query_mutation_violations": sum(
+                1 for r in rows_ if r.get("n_mutations") and r["count_ok"] and
+                r.get("count_ok_adj") is False and not r.get("override_class")),
             "garbage_title_rate": sum(1 for r in rows_ if r["garbage_titles"]) / n,
             "total_ms_p50": statistics.median(r["total_ms"] for r in rows_),
             "total_ms_p95": (sorted(r["total_ms"] for r in rows_)[int(n * .95)] if n > 1
@@ -234,6 +292,8 @@ def _fmt_pct(x) -> str:
 def write_report(result: dict, comparison: dict | None, out_path: pathlib.Path) -> None:
     lines = [f"# Dataset run score — `{result['db']}`", ""]
     ov = result["aggregate"]["overall"]
+    lines += [f"- product-adjusted count-correct **{_fmt_pct(ov.get('count_ok_adj_rate'))}** "
+              f"({ov.get('n_overridden', 0)} overridden rows; raw below is the comparable number)"]
     lines += [f"- **{ov['n']} prompts** scored · count-correct **{_fmt_pct(ov.get('count_ok_rate'))}** · "
               f"garbage-title rate **{_fmt_pct(ov.get('garbage_title_rate'))}**",
               f"- total_ms p50 {ov.get('total_ms_p50', 0):.0f} · p95 {ov.get('total_ms_p95', 0):.0f}",

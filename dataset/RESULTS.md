@@ -1,6 +1,94 @@
 # Results log
 
-Every meaningful run, newest first. **Always: metric + slice + the commit that
+## Epoch baseline (2026-09-05, code @ 76cfd4f, banked @ d343a7c) — the anchor all cycles now compare to
+
+Frozen row-timestamps + observance off + fast path alive (103/250 fast).
+Count-correct **78.4%** (old brain 67.2) · **F1 82.1** (P 85.1 / R 79.3) ·
+**field quality 84.6** (when-correct 85%, coverage 70 items) · complex 52 ·
+e+e 63 / t+t 50 / e+t 46 · p50 7.2 s · garbage 1%. Curiosity for next
+session: simple-tier field quality (75) is LOWER than complex (86). Row 8
+(all-deep bug run) stays as the pure-deep A/B: deep-only buys ~+1 pt count
+and cleaner e+t at ~1.8× the latency.
+
+Every meaningful run, newest first.
+
+**Deep-rescue analysis (2026-09-06, corrected same night):** first
+published as 0/21 — WRONG, computed against a misidentified scratch db (run
+2's, not row 8's; caught during the archive salvage via parse_path
+fingerprints: the real all-deep db is 250/250 deep). True numbers, row 9
+mixed × row 8 all-deep: **deep rescues 7/21 fast failures** (weak-joiner
+compounds C3's gate misses — "Give an entry to this list", remind+remind —
+plus "mark 13 october as my birthday") **and breaks 6/82 fast passes** — net
++1 row (+0.4pt, under noise). Routing more traffic deep is not free win;
+the opportunity is extending C3's gate cues to the 7 rescuable shapes
+without paying the 6 breaks. Repeatable: `python -m scripts.deep_rescue
+<mixed.db> <alldeep.db>` — verify db identity via the archive manifest
+first.
+
+**Dataset conventions audit (2026-09-06):** 140/3000 rows (4.7%) encode
+conventions our product deliberately rejects (bare list creation, standing
+alerts, remind-to-as-event, placeholders). New overrides layer
+(`dataset/inputs/convention_overrides.json`, rules mined from dev only,
+applied mechanically) gives a product-adjusted count-correct next to raw:
+**epoch baseline 78.4 raw → 81.2 adjusted**, and every overridden row on the
+slice passes adjusted — the convention gap is fully accounted for. The new
+query-no-mutation check caught a real bug (a query emitting `update_event`
+on the dentist appointment). **Correction of the correction:** the "row 8 =
+75.6" retraction earlier tonight was computed against the WRONG surviving
+scratch db (actually run 2's — identified during the archive salvage by
+mtime and parse_path fingerprint). The true row-8 db rescores at exactly its
+logged 79.2; the original "all-deep ≈ +0.8pt raw over mixed" note stood all
+along.
+Full report: `dataset/DATASET_AUDIT.md`.
+
+**Model-comparison cycle — closed on partial data (2026-09-06, Gil's
+call):** swapping the deep track's LLM for Claude Sonnet/Haiku via a worker
+bridge, same engine, same frozen slice. On identical cleanly-served rows the
+tuned local llama WON, consistently across both models — deep-track rows:
+llama 80% vs Sonnet 60% (n=25), llama 74% vs Haiku 53% (n=19). The engine's
+llama tuning + Ollama's mechanical schema constraint outweigh raw model
+strength; the remaining losses are convention rows, not model-competence
+rows. Full table, caveats and the three-failure attempt log:
+`dataset/MODEL_COMPARISON.md` (worktree). Partial dbs archived as
+`dataset/runs/x_sim-{sonnet,haiku}-partial-a`. Cycle slot closes; the queue
+resumes at hypothesis #2 (grounded default-title events). Do NOT respawn
+the sim bridge — the experiment is closed by Gil's call.
+
+
+## Cycle 5 — grounded default-title events (hypothesis #2) — PREDICTION (written before the change)
+
+*Stage:* generate — the event twin of `task_fallback`, firing only after the
+event-kind retry also comes back empty/unknown. Gate: the text literally
+asks to set an event/reminder/appointment (the noun is the grounded default
+title) AND the datetime recognizer finds a date or clock time in the words.
+Never invents a time; no gate match ⇒ stays unknown (honest).
+*Predicted:* overall count-correct 78.4 → **79.4–79.9** on dev-fast
+(+1–1.5pt = 3–4 rows: "Set a event for the evening", "please set event on
+Tuesday", "Set reminder for three o'clock" class — simple tier and the e+e/
+e+t halves they sit in). Simple tier should move most; garbage-title rate
+must NOT rise (the title is a literal word from the ask). Adjusted metric
+expected to move in step (+1–1.5). Risk watched: invention-adjacent — any
+new event on a garble row is a regression even if count says otherwise.
+
+**ACTUAL (run 10, 2026-09-06 09:06):** raw **79.2** (+0.8, predicted
++1.0–1.5 — under band and UNDER the ~1.5pt noise floor), adjusted 82.0
+(+0.8). Targeted-slice read (the honest judge): the fallback fired on
+exactly 4 rows, but the hypothesis's evidence was partly STALE — "Set
+reminder for three o'clock" and "please set event on Tuesday" already pass
+under the new epoch (they were old-epoch failures), so the predicted 3–4
+flip rows mostly weren't there to win. Where it fired: 2 sensible defaults
++ 2 loose groundings ("Remind me in the future of this", "Remind me of the
+following event:" — the recognizer grounds vague futurity; both rows passed
+anyway, but these are invention-adjacent and become evidence for the #5
+guard). "Set a event for the evening" still fails honestly (the recognizer
+can't ground "the evening" — by design, no invented time). **Verdict:
+inconclusive on count — kept** (deterministic, honest, pinned by
+test_engine_generate.py, documented in ENGINE.md), but not claimed as a
+win. Novel finds: "set reminder at 3 pm" fails on the FAST path (rule
+parser, not the deep track — new queue evidence), and complex +3 (52→55)
+was the only slice that moved. Lesson for the queue: re-verify an entry's
+evidence rows against the CURRENT epoch before spending a cycle on it.
+ **Always: metric + slice + the commit that
 produced it.** Baselines are replayed, not frozen — cite the score report and
 md5, not "the dataset".
 
