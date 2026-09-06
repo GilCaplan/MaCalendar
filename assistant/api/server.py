@@ -664,7 +664,12 @@ def create_app() -> Flask:
         from assistant.intent.memory import get_memory
         limit = int(request.args.get("limit", 30))
         mem = get_memory(); db = get_db()
-        rows = [r for r in mem.recent(200) if r["feedback"] == "none" and r["success"] and r["actions"]][:limit]
+        # Health probes and harness traffic record with source "test"; they
+        # are machine noise, not the user's asks - 43 of them once flooded
+        # the phone's review queue with identical "what do I have today"s.
+        rows = [r for r in mem.recent(200)
+                if r["feedback"] == "none" and r["success"] and r["actions"]
+                and r.get("source") != "test"][:limit]
         # Attach what actually landed in the calendar (date/time/title) so the
         # review screen can show the real date even when the stored example
         # parameters carry none.
