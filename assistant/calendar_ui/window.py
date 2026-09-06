@@ -1592,100 +1592,41 @@ class CalendarWindow(QMainWindow):
             self._config.hebrew_calendar.display_mode = hebrew_mode_combo.currentData()
             self._config.hebrew_calendar.show_holidays = hebrew_holidays_cb.isChecked()
             self._config.hebrew_calendar.israel_holidays = hebrew_israel_cb.isChecked()
-            # Try to write to config.yaml safely
+            # Persist — one section-scoped, comment-preserving write
+            # (assistant/config_store). Each setting names its section, so a
+            # `rate:` under tts can never clobber a rate elsewhere, and keys
+            # missing from an older config are inserted instead of dropped.
             try:
-                import os, re, yaml as _yaml
-                c_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "config.yaml")
-                if os.path.exists(c_path):
-                    with open(c_path, "r") as f:
-                        txt = f.read()
-                    txt = re.sub(r"mute:\s*(true|false)", f"mute: {'true' if mute_cb.isChecked() else 'false'}", txt, count=1, flags=re.IGNORECASE)
-                    txt = re.sub(r"voice:\s*\"[^\"]+\"", f'voice: "{voice_combo.currentText()}"', txt, count=1)
-                    txt = re.sub(r"rate:\s*\d+", f"rate: {speed_spin.value()}", txt, count=1)
-                    txt = re.sub(r"confirmation_level:\s*\d+", f"confirmation_level: {0 if auto_cb.isChecked() else 1}", txt, count=1)
-                    txt = re.sub(r"theme:\s*\"[^\"]+\"", f'theme: "{theme_combo.currentText().lower()}"', txt, count=1)
-                    # Update UI Font Sizes
-                    txt = re.sub(r"font_month:\s*\d+", f"font_month: {month_spin.value()}", txt, count=1)
-                    txt = re.sub(r"font_week:\s*\d+", f"font_week: {week_spin.value()}", txt, count=1)
-                    txt = re.sub(r"font_day:\s*\d+", f"font_day: {day_spin.value()}", txt, count=1)
-                    txt = re.sub(r"font_tasks:\s*\d+", f"font_tasks: {tasks_spin.value()}", txt, count=1)
-                    txt = re.sub(r"font_coursework:\s*\d+", f"font_coursework: {coursework_spin.value()}", txt, count=1)
-                    txt = re.sub(r"compact_ui:\s*(true|false)", f"compact_ui: {'true' if compact_cb.isChecked() else 'false'}", txt, count=1)
-                    if re.search(r'accent_color:\s*"[^"]*"', txt):
-                        txt = re.sub(r'accent_color:\s*"[^"]*"', f'accent_color: "{accent_state["hex"]}"', txt, count=1)
-                    else:
-                        txt = re.sub(r"(compact_ui:\s*(?:true|false))", rf'\1\n  accent_color: "{accent_state["hex"]}"', txt, count=1)
-                    def _put(key: str, value, after: str) -> None:
-                        """Rewrite `key: value` in place, or add it under `after`.
-
-                        Keys added by later versions are missing from configs
-                        written by earlier ones, so every setting needs a place
-                        to land rather than being silently dropped.
-                        """
-                        nonlocal txt
-                        literal = ("true" if value else "false") if isinstance(value, bool) else (
-                            f'"{value}"' if isinstance(value, str) else str(value))
-                        pattern = rf"{key}:\s*(?:true|false|\d+|\"[^\"]*\")"
-                        if re.search(pattern, txt):
-                            txt = re.sub(pattern, f"{key}: {literal}", txt, count=1)
-                        else:
-                            txt = re.sub(rf"({after})", rf"\1\n  {key}: {literal}", txt, count=1)
-
-                    _ui_anchor = r'accent_color:\s*"[^"]*"'
-                    _put("show_coursework", coursework_tab_cb.isChecked(), _ui_anchor)
-                    _put("show_workout", workout_tab_cb.isChecked(), _ui_anchor)
-                    _put("show_timer", timer_tab_cb.isChecked(), _ui_anchor)
-                    _put("show_thinking", thinking_cb.isChecked(), _ui_anchor)
-                    _put("thinking_corner", thinking_corner_combo.currentData(), _ui_anchor)
-
-                    _audio_anchor = r"max_recording_sec:\s*\d+"
-                    _put("review_before_send", review_cb.isChecked(), _audio_anchor)
-                    _put("review_seconds", review_spin.value(), _audio_anchor)
-                    # Event keywords — write as YAML flow list
-                    kw_yaml = _yaml.dump(raw_keywords, default_flow_style=True).strip()
-                    txt = re.sub(r"event_keywords:\s*\[.*?\]", f"event_keywords: {kw_yaml}", txt, count=1)
-                    # Stop phrases — write as YAML list
-                    phrases_yaml = _yaml.dump(raw_phrases, default_flow_style=True).strip()
-                    txt = re.sub(r"stop_phrases:\s*\[.*?\]", f"stop_phrases: {phrases_yaml}", txt, count=1)
-                    # Event separator
-                    sep_val = sep_edit.text().strip()
-                    txt = re.sub(r'event_separator:\s*"[^"]*"', f'event_separator: "{sep_val}"', txt, count=1)
-                    # Engine gate — append the block if config.yaml predates it
-                    _confirm = "true" if confirm_cb.isChecked() else "false"
-                    if re.search(r"^engine:", txt, flags=re.M):
-                        if re.search(r"confirm_transcript:\s*(?:true|false)", txt):
-                            txt = re.sub(r"confirm_transcript:\s*(?:true|false)",
-                                         f"confirm_transcript: {_confirm}", txt, count=1)
-                        else:
-                            txt = re.sub(r"(^engine:)", rf"\1\n  confirm_transcript: {_confirm}",
-                                         txt, count=1, flags=re.M)
-                    else:
-                        txt += f"\nengine:\n  confirm_transcript: {_confirm}\n"
-                    # Hebrew calendar — append the block if config.yaml predates this feature
-                    if "hebrew_calendar:" in txt:
-                        txt = re.sub(
-                            r'display_mode:\s*"[^"]*"',
-                            f'display_mode: "{hebrew_mode_combo.currentData()}"', txt, count=1,
-                        )
-                        txt = re.sub(
-                            r"show_holidays:\s*(true|false)",
-                            f"show_holidays: {'true' if hebrew_holidays_cb.isChecked() else 'false'}",
-                            txt, count=1,
-                        )
-                        txt = re.sub(
-                            r"israel_holidays:\s*(true|false)",
-                            f"israel_holidays: {'true' if hebrew_israel_cb.isChecked() else 'false'}",
-                            txt, count=1,
-                        )
-                    else:
-                        txt += (
-                            "\nhebrew_calendar:\n"
-                            f'  display_mode: "{hebrew_mode_combo.currentData()}"\n'
-                            f"  show_holidays: {'true' if hebrew_holidays_cb.isChecked() else 'false'}\n"
-                            f"  israel_holidays: {'true' if hebrew_israel_cb.isChecked() else 'false'}\n"
-                        )
-                    with open(c_path, "w") as f:
-                        f.write(txt)
+                from assistant.config_store import set_values
+                ok = set_values({
+                    "": {"confirmation_level": 0 if auto_cb.isChecked() else 1,
+                         "theme": theme_combo.currentText().lower()},
+                    "tts": {"mute": mute_cb.isChecked(),
+                            "voice": voice_combo.currentText(),
+                            "rate": speed_spin.value()},
+                    "ui": {"font_month": month_spin.value(),
+                           "font_week": week_spin.value(),
+                           "font_day": day_spin.value(),
+                           "font_tasks": tasks_spin.value(),
+                           "font_coursework": coursework_spin.value(),
+                           "compact_ui": compact_cb.isChecked(),
+                           "accent_color": accent_state["hex"],
+                           "show_coursework": coursework_tab_cb.isChecked(),
+                           "show_workout": workout_tab_cb.isChecked(),
+                           "show_timer": timer_tab_cb.isChecked(),
+                           "show_thinking": thinking_cb.isChecked(),
+                           "thinking_corner": thinking_corner_combo.currentData()},
+                    "audio": {"review_before_send": review_cb.isChecked(),
+                              "review_seconds": review_spin.value(),
+                              "stop_phrases": raw_phrases,
+                              "event_separator": sep_edit.text().strip()},
+                    "nlu": {"event_keywords": raw_keywords},
+                    "engine": {"confirm_transcript": confirm_cb.isChecked()},
+                    "hebrew_calendar": {"display_mode": hebrew_mode_combo.currentData(),
+                                        "show_holidays": hebrew_holidays_cb.isChecked(),
+                                        "israel_holidays": hebrew_israel_cb.isChecked()},
+                })
+                if ok:
 
                     # Apply changes immediately
                     self._config.ui.font_month = month_spin.value()
