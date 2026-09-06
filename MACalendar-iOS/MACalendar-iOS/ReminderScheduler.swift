@@ -58,6 +58,14 @@ final class ReminderScheduler {
     }
 
     private func performReconcile() async {
+        // The "Up Next" lock-screen card is derived from the same cache and
+        // the same enable flag, so every path that re-derives the reminders
+        // should re-derive it too. Placed before the isEnabled guard on
+        // purpose: turning reminders off has to END the card, not just stop
+        // scheduling. The manager decides for itself whether to start, roll or
+        // end, and debounces exactly like this method.
+        LiveActivityManager.shared.sync()
+
         let center = UNUserNotificationCenter.current()
 
         // Remove everything of ours first (and ONLY ours — the prefix filter

@@ -102,7 +102,49 @@ Current misparse (all three designs agree, verified line refs): `_TASK_RE` (segm
 | **2 — iOS lock screen (the headline)** | `ReminderScheduler.swift` (new + pbxproj entries), `Models.swift`/`LocalStore.swift` fields, `UNUserNotificationCenterDelegate` + deep-link route (`MACalendarApp.swift`), shared permission helper, reconcile hooks (`ContentView.swift` + `/changes` poll), `EventDetailView` picker, `SettingsView` section, 55-cap budget | MACalendar-app worktree | ~1.5–2 sessions |
 | **3 — Voice** | TASKS.md design row → decompose stripping (`engine/decompose.py`), rule-parser patterns (`intent/rule_parser.py`), intent/schema fields + contract-pin updates, update-path matching, announced-suppression replies, stage tests + audit rows, dev-fast run | main repo | ~1.5 sessions |
 | **4 — Mac banners** | `assistant/notifier.py` thread (NO_WARMUP-gated), osascript delivery, catch-up policy, trace-bus steps, Mac settings section (worktree `settings_dialog.py`), FEATURES.md entries for shipped phases | both | ~1 session |
-| **5 — Hardening (each behind an owner decision)** | LaunchAgent detachment of `assistant.api` (weekly-review-agent precedent); `BGAppRefreshTask` + `UIBackgroundModes: fetch` (Info.plist verified clean today); snooze action; pre-Shabbat digest mode | both | ~1–2 sessions |
+| **5 — Hardening (each behind an owner decision)** | ~~Live Activity "Up Next" card~~ **(done, see below)**; LaunchAgent detachment of `assistant.api` (weekly-review-agent precedent); `BGAppRefreshTask` + `UIBackgroundModes: fetch` (Info.plist verified clean today); snooze action; pre-Shabbat digest mode | both | ~1–2 sessions |
+
+### Phase 5 — partially done: the "Up Next" Live Activity (2026-09-06)
+
+Gil saw the pre-event banner fire on his lock screen and asked for the
+Google-Maps / Starbucks experience: a persistent, self-updating card. Shipped
+in the `MACalendar-app` worktree, **additive — the notification scheduling was
+not touched.**
+
+- **New target `MACalendarWidgets`** (app extension, `com.macalendar.app.widgets`,
+  deployment target 16.2, embedded through an "Embed Foundation Extensions"
+  copy phase). Sources: `MACalendarWidgetsBundle.swift`,
+  `UpNextLiveActivity.swift`, plus the shared
+  `MACalendar-iOS/Shared/UpNextActivityAttributes.swift` compiled into **both**
+  targets. No asset catalog, no app-only imports — the extension links nothing
+  of the app's.
+- **The local-only trick.** Live Activities are normally kept alive by APNs,
+  which this project will never use. It does not need to: the countdown is
+  drawn by the *system* (`Text(timerInterval:)`, `ProgressView(timerInterval:)`)
+  and ticks on the lock screen with the app not running. The app only pushes
+  content when the *event* changes — a handful of updates a day.
+- **The cost of no push**, stated honestly: those updates only happen when iOS
+  gives the app execution time. `LiveActivityManager.sync()` is called from
+  `ReminderScheduler.reconcile()` (so every cache write), ContentView's
+  foreground handler, its `/changes` token branch, and its 30 s tick. Every
+  card carries a `staleDate` at the exact moment it stops being true, so a
+  transition missed while the phone is locked is **dimmed by iOS**, not shown
+  as a stale countdown.
+- **Policy:** starts only when reminders are enabled *and* something is running
+  or starts within 8 h (the ActivityKit cap); ends when neither holds; an
+  in-progress event wins over an upcoming one.
+
+**Still open in phase 5:** `BGAppRefreshTask` would let the card roll between
+events while the phone is locked, and is the natural next increment — it is
+also the one that makes the `staleDate` fallback rare rather than routine.
+
+**Not verified on device.** Simulator proof is complete (start / flip to NOW /
+roll to next / end, plus the Dynamic Island rendering the live countdown), but
+the extension's bundle id has never been provisioned: only
+`com.macalendar.app` has a profile on this Mac, and a headless `xcodebuild`
+cannot mint a new one ("No Accounts"). **One Run from Xcode.app with the phone
+reachable creates it**; after that `xcrun devicectl device install app` works
+as usual.
 
 Each shipped phase adds its `DOCUMENTATION/FEATURES.md` entry in the same change; branch, never commit to main.
 

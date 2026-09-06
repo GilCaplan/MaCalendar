@@ -339,6 +339,10 @@ struct ContentView: View {
                     // and idempotent (cacheEvents also triggers it; this
                     // covers the offline foreground where nothing was fetched).
                     ReminderScheduler.shared.reconcile()
+                    // Foregrounding is the main moment iOS gives us execution
+                    // time, and therefore the main chance to roll the lock
+                    // screen card onto the event that has since started.
+                    LiveActivityManager.shared.sync()
                 }
             }
         }
@@ -424,6 +428,9 @@ struct ContentView: View {
                             // reconciles too, but only when the month view's
                             // fetch actually succeeds).
                             ReminderScheduler.shared.reconcile()
+                            // …and the card may now be pointing at an event
+                            // that was moved or deleted on the Mac.
+                            LiveActivityManager.shared.sync()
                             continue
                         }
                         lastToken = token
@@ -454,6 +461,14 @@ struct ContentView: View {
                 // whole loop, so nothing changed on the Mac ever reached the phone
                 // until the app was backgrounded and reopened.
                 guard UIApplication.shared.applicationState == .active else { continue }
+
+                // Clock-driven, not data-driven: nothing about the calendar has
+                // to change for the card to go wrong — the event simply starts.
+                // This tick is the only thing that flips "in 0:02" to "Now:"
+                // while the app sits open, so it runs before the early-outs
+                // below and regardless of whether the Mac has anything new.
+                LiveActivityManager.shared.sync()
+
                 if !api.isOnline { _ = try? await api.health() }   // flips isOnline (+refresh) when the Mac is back
                 _ = await api.syncPending()
                 await api.syncPendingVoice()
