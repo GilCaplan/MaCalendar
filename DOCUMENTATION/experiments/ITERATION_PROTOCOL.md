@@ -200,3 +200,16 @@ row is scored with its parse path. Rules that keep attribution honest:
   verdicts and reported as their own count.
 - If both hypotheses miss their predicted bands, rerun each alone.
 - Bugs remain exempt and ride any cycle.
+
+## The fast-sandbox lane (Gil, 2026-09-07)
+
+`python -m scripts.fast_sandbox --max-rank 250` replays the FAST track
+alone — rule parser + gates, no LLM, no execution — in ~18s (vs ~55min),
+scored as a SELECTIVE classifier: commit rate x correct-on-committed (an
+abstain is deep's job, never a failure). Rules: tweak batches carry ONE
+registered prediction (micro-iterations overfit in seconds); every batch
+gates on dev-full (--max-rank 600, also seconds); held-out stays sealed;
+NOTHING counts on the main board until a full joint run confirms (a better
+parser shifts which rows reach deep). Baseline 2026-09-07 @ dev-fast:
+39% commit, 78.4% correct-on-committed (query 97 / remove 94 / createoradd
+90 / set 80; compounds t+t 33, e+t 14, e+e 0 — the C3 gate's residue).
