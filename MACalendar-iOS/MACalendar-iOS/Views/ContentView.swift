@@ -21,6 +21,7 @@ struct ContentView: View {
     @State private var showVocabOnboarding = false
     @State private var showVoiceQueue = false
     @ObservedObject private var importInbox = ImportInbox.shared
+    @ObservedObject private var notifRouter = NotificationRouter.shared
     @State private var sharedImportText: String? = nil
     @State private var unreviewed = 0
     @State private var showReview = false
@@ -334,6 +335,10 @@ struct ContentView: View {
                     await loadMonth()
                     await refreshWorkoutIfNeeded()
                     api.requestRefresh()
+                    // Re-mirror reminders after the foreground sync — cheap
+                    // and idempotent (cacheEvents also triggers it; this
+                    // covers the offline foreground where nothing was fetched).
+                    ReminderScheduler.shared.reconcile()
                 }
             }
         }
@@ -348,6 +353,21 @@ struct ContentView: View {
         }
         .onReceive(importInbox.$pendingText) { t in
             if let t { sharedImportText = t; importInbox.pendingText = nil }
+        }
+        // A tapped "evt-*" reminder lands here (NotificationRouter is the
+        // UNUserNotificationCenter delegate). Navigate to the event's date —
+        // the same selectedDate/viewedDate/selectedTab route SearchView's
+        // onOpenEvent drives.
+        .onReceive(notifRouter.$pendingEventId) { id in
+            guard let id else { return }
+            notifRouter.pendingEventId = nil
+            if let e = LocalStore.shared.event(id),
+               let d = DateFormatter.isoDay.date(from: e.date) {
+                selectedDate = d
+                viewedDate = d
+            }
+            selectedTab = 0
+            Task { await loadMonth() }
         }
         .sheet(isPresented: Binding(get: { sharedImportText != nil }, set: { if !$0 { sharedImportText = nil } })) {
             VocabImportView(initialText: sharedImportText, initialName: importInbox.pendingName)
@@ -399,6 +419,11 @@ struct ContentView: View {
                             slept = 0
                             await loadMonth()
                             api.requestRefresh()
+                            // Something changed on the Mac — a reminder may
+                            // have moved with it (loadMonth → cacheEvents
+                            // reconciles too, but only when the month view's
+                            // fetch actually succeeds).
+                            ReminderScheduler.shared.reconcile()
                             continue
                         }
                         lastToken = token

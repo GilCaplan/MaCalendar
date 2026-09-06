@@ -112,7 +112,15 @@ class LocalStore: ObservableObject {
         }
         events = local + fresh
         persist()
+        // Fresh payloads carry fresh notify_at verdicts — re-mirror them into
+        // the pending local notifications. Debounced and idempotent, so the
+        // frequent refresh paths (month loads, the 2 s token poll) are fine.
+        ReminderScheduler.shared.reconcile()
     }
+
+    /// Every cached event — what ReminderScheduler mirrors into scheduled
+    /// local notifications.
+    func allEvents() -> [CalendarEvent] { events }
 
     func eventsForDate(_ str: String) -> [CalendarEvent] {
         events.filter { $0.date == str }
@@ -150,6 +158,7 @@ class LocalStore: ObservableObject {
         nextTemp -= 1
         events.append(e)
         persist()
+        ReminderScheduler.shared.reconcile()
         return e
     }
 
@@ -164,10 +173,20 @@ class LocalStore: ObservableObject {
         if let v = fields["end_time"]   as? String { events[i].endTime   = v }
         if let v = fields["location"]   as? String { events[i].location  = v }
         if let v = fields["attendees"]  as? String { events[i].attendees = v }
+        // Present-but-null (NSNull) clears the override back to "inherit" —
+        // `as? Int` yields nil for NSNull, which is exactly the clear.
+        if fields.keys.contains("reminder_minutes") {
+            events[i].reminderMinutes = fields["reminder_minutes"] as? Int
+        }
         persist()
+        ReminderScheduler.shared.reconcile()
     }
 
-    func removeEvent(_ id: Int) { events.removeAll { $0.id == id }; persist() }
+    func removeEvent(_ id: Int) {
+        events.removeAll { $0.id == id }
+        persist()
+        ReminderScheduler.shared.reconcile()
+    }
 
     // MARK: - Search (offline cache)
 

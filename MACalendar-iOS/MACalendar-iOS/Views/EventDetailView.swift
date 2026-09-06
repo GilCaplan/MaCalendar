@@ -14,6 +14,10 @@ struct EventDetailView: View {
     @State private var location: String
     @State private var attendees: String
     @State private var notes: String
+    /// Reminder override: -1 = Inherit (no stored override), 0 = None,
+    /// N = minutes before start. Mirrors reminder_minutes, where "inherit"
+    /// is the column being NULL.
+    @State private var reminderChoice: Int
     @State private var saving = false
     @State private var confirmDelete = false
     @State private var errorMessage: String?
@@ -39,9 +43,26 @@ struct EventDetailView: View {
         _location  = State(initialValue: event.location)
         _attendees = State(initialValue: event.attendees)
         _notes     = State(initialValue: event.description)
+        _reminderChoice = State(initialValue: event.reminderMinutes ?? -1)
     }
 
     // MARK: - Computed helpers
+
+    /// Human reading of the server's notify_suppressed_reason — the effective
+    /// state when a lead time exists but no reminder will fire. The server is
+    /// the policy brain; this only translates its verdict.
+    private var suppressionNote: String? {
+        guard let r = event.notifySuppressedReason, !r.isEmpty else { return nil }
+        if r == "shabbat" { return "Held for Shabbat" }
+        if r.hasPrefix("yom_tov:") {
+            let name = String(r.dropFirst("yom_tov:".count))
+            return name.isEmpty ? "Held for yom tov" : "Held for \(name)"
+        }
+        if r == "clamped_past_start" {
+            return "Skipped — the reminder would have landed during Shabbat or chag"
+        }
+        return "Reminder held (\(r))"
+    }
 
     /// Returns e.g. "Monday, Apr 14, 2026" or nil if the date string is invalid.
     private var parsedDayLabel: String? {
@@ -98,6 +119,26 @@ struct EventDetailView: View {
                         .onSubmit { if !saving && !title.isEmpty { save() } }
                     TextField("Attendees", text: $attendees)
                         .onSubmit { if !saving && !title.isEmpty { save() } }
+                }
+                Section {
+                    Picker("Reminder", selection: $reminderChoice) {
+                        Text("Inherit").tag(-1)
+                        Text("None").tag(0)
+                        ForEach([5, 10, 15, 30, 60], id: \.self) { m in
+                            Text("\(m) min before").tag(m)
+                        }
+                    }
+                    .onChange(of: reminderChoice) { choice in
+                        // First actual use of reminders on this device — the
+                        // moment to ask, not app launch.
+                        if choice != -1 { NotificationPermission.requestIfNeeded() }
+                    }
+                } footer: {
+                    if let note = suppressionNote {
+                        Label(note, systemImage: "moon.stars")
+                    } else if reminderChoice == -1 {
+                        Text("Inherit uses the category's lead time, or the default from Settings › Reminders.")
+                    }
                 }
                 // The event body. This is where a planned session keeps the
                 // part that matters — "2 × 10 min @ 4:40 — 2 min jog between" —
@@ -186,20 +227,23 @@ struct EventDetailView: View {
         saving = true
         Task {
             do {
+                var fields: [String: Any] = [
+                    "title": title, "date": date,
+                    "start_time": startTime, "end_time": endTime,
+                    "location": location, "attendees": attendees,
+                    "description": notes
+                ]
                 if isNew {
-                    _ = try await api.createEvent([
-                        "title": title, "date": date,
-                        "start_time": startTime, "end_time": endTime,
-                        "location": location, "attendees": attendees,
-                        "description": notes
-                    ])
+                    // Only send an override that exists — a fresh event with
+                    // "Inherit" simply has no reminder_minutes.
+                    if reminderChoice != -1 { fields["reminder_minutes"] = reminderChoice }
+                    _ = try await api.createEvent(fields)
                 } else {
-                    try await api.updateEvent(id: event.id, fields: [
-                        "title": title, "date": date,
-                        "start_time": startTime, "end_time": endTime,
-                        "location": location, "attendees": attendees,
-                        "description": notes
-                    ])
+                    // NSNull → JSON null → the Mac clears the override back
+                    // to Inherit. The offline patchEvent path reads the same
+                    // convention.
+                    fields["reminder_minutes"] = reminderChoice == -1 ? NSNull() : reminderChoice
+                    try await api.updateEvent(id: event.id, fields: fields)
                 }
                 saving = false
                 dismiss()

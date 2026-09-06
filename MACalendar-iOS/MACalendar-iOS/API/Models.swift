@@ -25,6 +25,19 @@ struct CalendarEvent: Identifiable, Codable, Equatable {
     /// change made from a copy that has since been edited there.
     var updatedAt: String? = nil
 
+    // Pre-event reminders. The server computes the policy (assistant/notify.py)
+    // and embeds the verdict in every event payload; the phone only schedules
+    // what it is told. All optional so caches written before the feature
+    // existed decode unchanged.
+    /// Stored per-event override: nil = inherit category/default, 0 = never.
+    var reminderMinutes: Int? = nil
+    /// When the reminder should fire — ISO local datetime ("2026-09-06T18:30",
+    /// no zone; the Mac and phone share one), or nil for no reminder.
+    var notifyAt: String? = nil
+    /// Why there is no reminder despite a lead being set:
+    /// "shabbat" | "yom_tov:<name>" | "clamped_past_start".
+    var notifySuppressedReason: String? = nil
+
     enum CodingKeys: String, CodingKey {
         case id, title, date, color, recurrence, attendees, location, description, source
         case startTime      = "start_time"
@@ -33,6 +46,9 @@ struct CalendarEvent: Identifiable, Codable, Equatable {
         case externalSource = "external_source"
         case externalId     = "external_id"
         case updatedAt      = "updated_at"
+        case reminderMinutes        = "reminder_minutes"
+        case notifyAt               = "notify_at"
+        case notifySuppressedReason = "notify_suppressed_reason"
     }
 
     var displayTime: String {
@@ -360,6 +376,41 @@ struct HealthResponse: Codable {
     let status: String
     let llm: String
     let db: String
+}
+
+/// The `notifications` section of the Mac's config (GET /config). The server
+/// is the policy brain — this is only read to render the Settings controls
+/// and written back whole-field via PATCH /config.
+struct NotificationsConfig: Codable, Equatable {
+    var enabled: Bool
+    var defaultLeadMinutes: Int
+    /// Category name → lead minutes; 0 mutes the whole category.
+    var categoryLeads: [String: Int]
+    var respectObservance: Bool
+    var catchUpMinutes: Int
+    var sound: Bool
+    var speak: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case enabled, sound, speak
+        case defaultLeadMinutes = "default_lead_minutes"
+        case categoryLeads      = "category_leads"
+        case respectObservance  = "respect_observance"
+        case catchUpMinutes     = "catch_up_minutes"
+    }
+
+    // Tolerant decode so an older server (no notifications section yet, or a
+    // partial one) still yields a usable default instead of a decode failure.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        enabled            = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        defaultLeadMinutes = try c.decodeIfPresent(Int.self,  forKey: .defaultLeadMinutes) ?? 0
+        categoryLeads      = try c.decodeIfPresent([String: Int].self, forKey: .categoryLeads) ?? [:]
+        respectObservance  = try c.decodeIfPresent(Bool.self, forKey: .respectObservance) ?? true
+        catchUpMinutes     = try c.decodeIfPresent(Int.self,  forKey: .catchUpMinutes) ?? 10
+        sound              = try c.decodeIfPresent(Bool.self, forKey: .sound) ?? true
+        speak              = try c.decodeIfPresent(Bool.self, forKey: .speak) ?? false
+    }
 }
 
 struct Course: Identifiable, Codable, Equatable {

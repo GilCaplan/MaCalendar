@@ -508,11 +508,9 @@ class WorkoutStore: ObservableObject {
     // MARK: - Rest-end notifications
 
     private func requestNotificationPermissionIfNeeded() {
-        let center = UNUserNotificationCenter.current()
-        center.getNotificationSettings { settings in
-            guard settings.authorizationStatus == .notDetermined else { return }
-            center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
-        }
+        // Shared with the pre-event reminders — one ask for the whole app
+        // (see NotificationPermission in ReminderScheduler.swift).
+        NotificationPermission.requestIfNeeded()
     }
 
     private func scheduleRestNotification(deadline: Date) {

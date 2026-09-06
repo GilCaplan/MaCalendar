@@ -124,6 +124,15 @@ class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(vocabOnboardingDone, forKey: "vocabOnboardingDone") }
     }
 
+    /// Device-local master switch for pre-event reminder rings on THIS phone.
+    /// The lead-time policy (what fires when) lives on the Mac and is edited
+    /// via PATCH /config; this only decides whether this device schedules the
+    /// local notifications it is told about. ReminderScheduler reads the same
+    /// UserDefaults key directly.
+    @Published var remindersEnabled: Bool {
+        didSet { UserDefaults.standard.set(remindersEnabled, forKey: "remindersEnabled") }
+    }
+
     init() {
         self.followMyLocation = UserDefaults.standard.bool(forKey: "followMyLocation")
         self.speakReplies = UserDefaults.standard.object(forKey: "speakReplies") == nil
@@ -137,6 +146,8 @@ class AppSettings: ObservableObject {
         let sil = UserDefaults.standard.double(forKey: "silenceStopSeconds")
         self.silenceStopSeconds = sil == 0 ? 6 : sil
         self.vocabOnboardingDone = UserDefaults.standard.bool(forKey: "vocabOnboardingDone")
+        self.remindersEnabled = UserDefaults.standard.object(forKey: "remindersEnabled") == nil
+            ? true : UserDefaults.standard.bool(forKey: "remindersEnabled")
         self.showThinking = UserDefaults.standard.object(forKey: "showThinking") == nil
             ? true : UserDefaults.standard.bool(forKey: "showThinking")
         self.serverURL = UserDefaults.standard.string(forKey: "serverURL") ?? ""

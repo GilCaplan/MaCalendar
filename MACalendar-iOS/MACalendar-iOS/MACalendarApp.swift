@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 @main
 struct MACalendarApp: App {
@@ -9,6 +10,10 @@ struct MACalendarApp: App {
         let s = AppSettings()
         _settings = StateObject(wrappedValue: s)
         _api = StateObject(wrappedValue: APIClient(settings: s))
+        // Must be set before launch finishes so a tap on a reminder that
+        // cold-starts the app still reaches didReceive. The router presents
+        // foreground banners and routes "evt-*" taps to the calendar.
+        UNUserNotificationCenter.current().delegate = NotificationRouter.shared
     }
 
     var body: some Scene {

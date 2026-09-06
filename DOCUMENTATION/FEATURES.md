@@ -28,6 +28,7 @@ purely backend (no client code beyond displaying the effects).
 | hybrid | [Tasks](#tasks--to-dos) | Today/General lists, priorities, quantities | `db.py`, `TasksView` |
 | hybrid | [Tag discovery](#tag-discovery--the-class-set-grows-with-consent) | consent-based new classes + history | `actions/todo/tag_discovery.py` |
 | hybrid | [Share event as .ics](#share-event-as-ics) | one event → RFC 5545 file, both platforms | `ics_export.py`, `event_dialog.py` |
+| hybrid | [Pre-event notifications](#pre-event-notifications) | phone rings from its cache; server computes policy; per-category mute | `notify.py`, `ReminderScheduler.swift` |
 | hybrid | [Voice I/O & capture controls](#voice-in--voice-out--capture-controls) | hotkey/stop-phrases/review-bar; engine-selectable STT; spoken replies | `stt/`, `Voice/`, `tts/` |
 | hybrid | [Edit-transcription gate](#the-edit-transcription-round-trip-needs_edit) | doubted words → editor → learned | `engine/transcript.py` |
 | hybrid | [Self-check & revert](#background-self-check--one-tap-revert) | background re-reasoning, one-tap undo | `engine/__init__.py`, panels |
@@ -331,6 +332,30 @@ row straddles two), `timer_view.py` (`_on_export_csv`).
 **How:** duplicate strips series identity (a copied instance is a one-off,
 same boundary as undo-restore); CSV derives rows from the panel's own
 aggregation helper so file and tiles can't disagree.
+
+### Pre-event notifications
+
+**What:** "remind me before it starts." The server computes each event's
+`notify_at` (lead resolution: event override → category lead **or mute — a
+category can opt out entirely** → global default, shipped opt-in) and embeds
+it in every event payload; the phone schedules local notifications from its
+offline cache (fires with the app closed and the Mac asleep); the Mac shows
+best-effort banners (+ optional spoken heads-up) while the calendar stack
+runs. Quiet windows: evaluated on the FIRE time — an event inside
+Shabbat/yom tov gets no reminder (reason in the payload), a motzei lead is
+clamped past havdala, fasts don't suppress, fail-open like the series skip.
+**Where:** policy `assistant/notify.py`; store `events.reminder_minutes` +
+`reminder_log` (`db.py`); Mac thread `assistant/notifier.py` (osascript);
+settings `settings_dialog.py` + iOS `SettingsView`; phone
+`ReminderScheduler.swift` + `NotificationRouter` (tap deep-links to the
+event); per-event picker in both edit surfaces; config `notifications:`
+section (PATCH /config).
+**How:** no new sync surface — the event payload is the contract; the phone
+reconciles ≤55 `UNCalendarNotificationTrigger`s (headroom under the 64 cap
+for workout rest timers); `reminder_log` dedupes across `--reload`
+restarts; late fires obey `catch_up_minutes`. Voice phrase → lead time
+(phase 3) lands after the next branch merge. Plan:
+`NOTIFICATIONS_PLAN.md`.
 
 ### The engine (engine-v2) — the brain
 **What:** Speech/text → events, tasks, answers. A fast track (confident rule

@@ -1010,6 +1010,29 @@ class APIClient: ObservableObject {
         return n
     }
 
+    // MARK: - Notifications config (server-side reminder policy)
+
+    /// The `notifications` section of GET /config. The Mac computes every
+    /// event's notify_at from this; the phone only edits it.
+    func notificationsConfig() async throws -> NotificationsConfig {
+        struct ConfigEnvelope: Codable { let notifications: NotificationsConfig? }
+        let data = try await request("/config")
+        guard let n = (try decode(ConfigEnvelope.self, from: data)).notifications else {
+            throw APIError.serverError("This Mac doesn't serve a notifications config yet.")
+        }
+        return n
+    }
+
+    /// PATCH /config with a partial `notifications` section, e.g.
+    /// ["default_lead_minutes": 15] or ["category_leads": fullUpdatedMap]
+    /// (the server merges at the section level, so category_leads must be
+    /// sent whole). Returns whether the Mac accepted it.
+    @discardableResult
+    func patchNotifications(_ fields: [String: Any]) async -> Bool {
+        (try? await request("/config", method: "PATCH",
+                            body: ["notifications": fields])) != nil
+    }
+
     // MARK: - Event categories
 
     func categories() async throws -> [EventCategory] {
