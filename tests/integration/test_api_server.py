@@ -395,6 +395,6 @@ def test_review_feed_excludes_probe_traffic(app_client):
     b = mem.record(transcript="gym tomorrow 7am", source="mac",
                    actions=[("create_event", {"title": "Gym"})], result="ok", success=True)
     client, _ = app_client
-    rows = client.get("/memory/unreviewed").get_json()["unreviewed"]
+    rows = client.get("/memory/unreviewed").get_json()["examples"]
     ids = {r["id"] for r in rows}
     assert b in ids and a not in ids
