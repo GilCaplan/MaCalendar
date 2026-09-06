@@ -73,6 +73,30 @@ compare actual vs. expected in `RESULTS.md` → upsize only as gains slow.
   mined from the user's real data + the dataset. Only on Gil's explicit say-so,
   and only after the deep track is improved — not on my own initiative.
 
+## App stream — next session picks up here (Gil, 2026-09-06)
+
+Work happens in THIS worktree (`../MACalendar-app`, branch `app-features`);
+merge with `main` + the loop branch between cycles. Queue, in order:
+
+1. **Model-comparison results** — if the haiku/sonnet CLI-bridge sims (and the
+   llama true baseline) finished unprocessed, fill `dataset/MODEL_COMPARISON.md`
+   from `engine_compare/model_{haiku,sonnet}/` + the baseline, and report.
+   Known caveat for the reading: Claude models sometimes answer garble/query
+   rows in helpful prose instead of JSON (scored as a parse failure — same
+   treatment llama's `unknown` gets).
+2. **Notifications** — plan first (Gil wants the lock-screen/notification UX
+   thought through), then build: Mac local notifications + iOS
+   UNUserNotificationCenter scheduled from the offline cache.
+3. **.ics export/share** (approved) — server `GET /events/<id>.ics`, Mac
+   context menu, iOS ShareLink.
+4. **Search** (approved) — events/tasks search endpoint + Mac toolbar box;
+   jump-to-date.
+5. **Small wins** (approved): duplicate-event · agenda/list view · week
+   numbers · Timer CSV export · observance checkbox in settings (config_store
+   makes it a one-liner; closes DEVQA Q2) · iOS posts `/heartbeat`.
+6. **Convolution #1 (approved, not yet done):** move `ThinkingView` +
+   `EngineChain` out of `VocabularyView.swift` into `ThinkingView.swift`.
+
 ## Working notes
 
 - Two Claude sessions share this project's checkouts; re-read a `main`-checkout
