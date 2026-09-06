@@ -3,13 +3,13 @@
 **One-screen reference. A fresh conversation reads this first, then CLAUDE.md.**
 Keep it current and short; details live in the files it points to.
 
-_Updated 2026-09-04 — engine live in production._
+_Updated 2026-09-06 — cycle 5 in flight; app batch shipped in the worktree._
 
 ## The state
 
-- **The brain is being rebuilt** as `assistant/engine/` (8 stages, frozen
-  contracts) on branch `engine-v2`. `DOCUMENTATION/ENGINE.md` is the contract
-  reference.
+- **The brain was rebuilt** as `assistant/engine/` (8 stages, frozen
+  contracts; branch `engine-v2`, now merged). `DOCUMENTATION/ENGINE.md` is
+  the contract reference.
 - **LIVE in production (cut over 2026-09-04, merge bce502e).** The engine is
   the brain on `main`; smoke-verified (parse=fast, brain=engine-v2).
 - The old brain is archived at `retired/old-brain-v1/` (+ tag `pre-engine-v2`).
@@ -22,11 +22,23 @@ The verification dataset (`dataset/`, see `dataset/DATASET.md`) — 3000 real
 utterances, count-correctness + 4 other metrics, dev/held-out subsets. The
 hand-written audit corpus is now only a regression floor.
 
-- **Latest numbers (count-correctness, metric #1):** engine **73.5%** vs old
-  **70%** on the 2400 sealed held-out prompts; compounds 2–3× the old brain.
-  Full table: `dataset/RESULTS.md`.
-- Frontier: complex compounds (35–39%); the event half drops in 72% of
-  event+task failures.
+- **Current anchor (epoch baseline, run 9, 2026-09-05):** count-correct
+  **78.4% raw / 81.2% product-adjusted** on dev-fast-250, F1 82.1, field
+  quality 84.6 (frozen row-timestamps, observance off — the epoch reset;
+  pre-2026-09-05 rows in loop_log.csv are not comparable). Full record:
+  `dataset/RESULTS.md`.
+- **Two standing instruments (2026-09-06):** every run auto-archives its
+  scratch to `dataset/runs/` (manifest = identity; `scripts/rescore_runs.py
+  --write` recomputes the whole history when a metric changes), and the
+  conventions-overrides layer (`dataset/inputs/convention_overrides.json`)
+  reports product-adjusted `count_ok_adj` beside raw — its query-no-mutation
+  check found an OPEN engine bug (a query emitting `update_event`; queue row
+  in HYPOTHESES.md).
+- Frontier: fast/deep rescue is largely harvested (deep rescues 7/21 fast
+  failures but breaks 6/82 passes — net +1 row); remaining losses are
+  convention/capability rows. Model-comparison closed: the tuned local llama
+  beat Claude Sonnet/Haiku drop-ins on identical rows (worktree
+  `dataset/MODEL_COMPARISON.md`) — do not respawn the sims.
 
 ## The loop
 
@@ -40,6 +52,17 @@ compare actual vs. expected in `RESULTS.md` → upsize only as gains slow.
 
 ## In flight / next
 
+- **App stream (worktree `../MACalendar-app`, branch `app-features`) — the
+  whole approved queue SHIPPED 2026-09-06** (243d99f → 3b89809): .ics share
+  (server+Mac+iOS), search + jump-to-date (server+Mac toolbar+iOS offline
+  sheet), duplicate event, ISO week numbers, Timer CSV, agenda view,
+  observance settings checkbox, iOS /heartbeat, ThinkingView file move.
+  Two bugs found+fixed on the way: the extracted settings dialog dropped
+  imports (NameError on open) and pydantic silently discarded
+  `observance.enabled` (field never declared). **Notifications is planned
+  only** (`DOCUMENTATION/NOTIFICATIONS_PLAN.md` + preview artifact), blocked
+  on Gil's DEVQA Q4–Q6. Merge app-features + loop-cycle-1 + main at the next
+  cycle boundary.
 - **Client/UI** (endorsed 2026-09-04) — all three done:
   - ✅ iOS edit-transcription sheet — server threads `supports_edit` through the
     audio routes; iOS shows the editor on `needs_edit` and resubmits.
@@ -51,10 +74,12 @@ compare actual vs. expected in `RESULTS.md` → upsize only as gains slow.
     (ready-to-POST bodies); Mac `_RevertBar` + iOS banner re-create what was
     undone. Dormant until `self_check_apply` is on (removals are advisory by
     default). **HUD needs a restart to show it.**
-- **Deep-track improvement loop — RUNNING (branch `loop-cycle-1`).**
-  Four graduated cycles on 2026-09-04 took dev-fast(250) count-correct
-  **73.2 → 77.6%** (complex 40→54, e+e 52→67, e+t 35→46, t+t 35→50/55);
-  dev-full confirmed C1+C2 at +1.8 off-slice, C3+C4 confirm in flight.
+- **Deep-track improvement loop — RUNNING (branch `loop-cycle-1`), cycle 5
+  in flight** (hypothesis #2, grounded default-title events —
+  `event_fallback` @ b3c6656; prediction 78.4 → 79.4–79.9 recorded first).
+  History: cycles 1–4 took the old-epoch dev-fast 73.2 → 77.6 (dev-full
+  74.2 → 78.0, all four graduated); then the epoch reset re-baselined at
+  78.4/81.2-adj.
   Full record:
   `dataset/RESULTS.md` (prose) + `dataset/loop_log.csv` (plottable, one row
   per run — a protocol requirement now). Run outputs preserved per cycle in

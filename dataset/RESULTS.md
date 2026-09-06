@@ -1,6 +1,6 @@
 # Results log
 
-## Epoch baseline (2026-09-05, @ f1c8d9d) — the anchor all cycles now compare to
+## Epoch baseline (2026-09-05, code @ 76cfd4f, banked @ d343a7c) — the anchor all cycles now compare to
 
 Frozen row-timestamps + observance off + fast path alive (103/250 fast).
 Count-correct **78.4%** (old brain 67.2) · **F1 82.1** (P 85.1 / R 79.3) ·
@@ -9,6 +9,8 @@ e+e 63 / t+t 50 / e+t 46 · p50 7.2 s · garbage 1%. Curiosity for next
 session: simple-tier field quality (75) is LOWER than complex (86). Row 8
 (all-deep bug run) stays as the pure-deep A/B: deep-only buys ~+1 pt count
 and cleaner e+t at ~1.8× the latency.
+
+Every meaningful run, newest first.
 
 **Deep-rescue analysis (2026-09-06, corrected same night):** first
 published as 0/21 — WRONG, computed against a misidentified scratch db (run
@@ -49,9 +51,9 @@ strength; the remaining losses are convention rows, not model-competence
 rows. Full table, caveats and the three-failure attempt log:
 `dataset/MODEL_COMPARISON.md` (worktree). Partial dbs archived as
 `dataset/runs/x_sim-{sonnet,haiku}-partial-a`. Cycle slot closes; the queue
-resumes at hypothesis #2 (grounded default-title events).
+resumes at hypothesis #2 (grounded default-title events). Do NOT respawn
+the sim bridge — the experiment is closed by Gil's call.
 
-Every meaningful run, newest first.
 
 ## Cycle 5 — grounded default-title events (hypothesis #2) — PREDICTION (written before the change)
 

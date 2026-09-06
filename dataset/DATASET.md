@@ -11,8 +11,8 @@ CURRENT scorer over every archive — when a metric is added or fixed, the
 whole history's readings refresh (it backfills loop_log's backfillable
 columns and reports drift against as-logged values). Never analyze an
 unlabeled scratch db: identity is verified at archive time precisely because
-inferring it later once put a wrong figure in RESULTS.md. Total archive cost
-for the first nine runs plus five pre-loop sweeps: 2.1 MB.
+inferring it later once put a wrong figure in RESULTS.md. Sixteen archives to date (runs 1–9, five pre-loop sweeps, two
+model-sim partials) cost ~2.4 MB.
 
 ## The conventions overrides layer
 
@@ -44,7 +44,7 @@ on — no human labelling needed.
     experiments/                              run outputs (gitignored)
     METRICS.md                                the metric definitions (canonical)
     RESULTS.md                                per-implementation results log (prose: hypotheses, actual-vs-expected)
-    loop_log.csv                              one row per measurement run — timestamps, duration, commit, metrics; the plottable trajectory
+    loop_log.csv (now incl. an `adj_pct` column — the product-adjusted count-correct, backfilled for all runs)                              one row per measurement run — timestamps, duration, commit, metrics; the plottable trajectory
     HYPOTHESES.md                             the ranked experiment queue — take the top, re-rank after every rerun
     snapshots/                                code snapshots of meaningful iterations, to revert/compare
 

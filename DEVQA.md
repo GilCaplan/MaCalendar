@@ -14,12 +14,20 @@ becomes a task; the dataset's ground truth calls it a calendar event. Same
 family as the occasion-reminder rule you approved, one step further (no
 remind-word at all). ~1 row on dev-fast, so low stakes — whenever convenient.
 
-**Q2 — Observance toggle in the Mac settings window?**
-The on/off flag now exists (`observance.enabled` in config.yaml, default on).
-Want a checkbox for it in the Mac settings popup too, or is the config file
-enough?
+*(Q4–Q6, the notifications-plan questions, live in the worktree's DEVQA.md —
+one set of open questions per stream, merged at cycle boundaries.)*
 
 ## Answered (log)
+
+- 2026-09-06 — **Q2 shipped without needing an answer**: the observance
+  checkbox is in the Mac settings dialog (worktree commit 243d99f), persisted
+  via config_store — and building it exposed that `observance.enabled` was
+  silently DROPPED by pydantic (`ObservanceConfig` never declared the field),
+  so the yaml flag never reached `is_enabled()`; only the env override
+  worked. Field declared + pinned by test in the worktree.
+- 2026-09-06 — **Q3 withdrawn** (API key): the model sims ran through Claude
+  Code subagent workers, no key needed; the experiment is closed on partial
+  data (llama beat both drop-ins — `dataset/MODEL_COMPARISON.md`, worktree).
 
 - 2026-09-05 — **Old-brain comparison**: Gil doesn't care about it; the
   questions that matter are "is the new system better, and can it get

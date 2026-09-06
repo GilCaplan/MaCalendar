@@ -149,6 +149,16 @@ on separate threads segfault the interpreter — the same collision the BLAS pin
 guards against. The engine reads the same flag before starting any daemon
 thread. A test that builds the app wants routes, not models.
 
+## Two work streams, two checkouts
+
+While the improvement loop has a measurement run in flight, its checkout is
+**read-only in practice**: a running replay lazily imports some modules at
+scoring time, so editing files under it can change a run mid-flight. App
+features and cleanups happen in the `../MACalendar-app` worktree (branch
+`app-features`), merged with the loop branch and `main` **between cycles**,
+never during a run. (Gil, 2026-09-06 — after two suites racing through a
+shared personal store surfaced exactly this class of accident.)
+
 ## Measuring a change to the assistant
 
 **The verification dataset is the primary evaluation** — `dataset/DATASET.md`

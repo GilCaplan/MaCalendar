@@ -85,16 +85,29 @@ Running list of user-reported issues and feature requests, with status. Update w
 | 78 | **Linux/PC host migration checked, deferred.** Core (parser, Ollama, spaCy, API, DB, GUI via PyQt6, default STT) is already cross-platform — no work needed. One real blocker: TTS shells out to macOS `say` directly, on by default, in the live voice pipeline (not just dev tooling) — needs swapping for a cross-platform engine (`pyttsx3` / `espeak`) before a Linux host would actually speak replies. Minor, non-blocking degradations: the thinking HUD's "join all Spaces" polish is an AppKit best-effort layer with no Linux equivalent yet (falls back to a normal always-on-top window); optional macOS Calendar.app import wouldn't apply; launch script and weekly-review scheduling are trivially cron-able | todo | `assistant/tts/speaker.py` |
 | 79 | **Dataset redefined by actual spec, and a reusable scorer built.** "Complex" means genuine multi-action (event+event/task+task/event+task compounds, constructed by joining real utterances — HWU-64 is one action per utterance, so this doesn't occur naturally and had to be built), not just longer sentences. `scripts/score_dataset_run.py` scores a `dummy_<N>.db` with no hand-written ground truth — compound provenance gives free deterministic expectations (a task+task compound should yield ≥2 task rows) — and diffs two runs (which prompts flipped pass/fail). About half its metrics are dataset-specific (need `hwu64_sample.json`'s provenance); half are fully general and will run against real production traffic once there is any, unchanged. First real findings (1000/3000 partial build): complex 28% correct vs simple/medium 91%/89%; event+task failures are specifically a dropped *event* (68%), not a random mix; the earlier date-collapse fix accounts for only ~3% of event+event failures, so most of that failure mode is still unexplained; hybrid parse path underperforms both pure rule and pure LLM (57% vs 75%/77%) | in progress 2026-09-03 | `scripts/score_dataset_run.py`, `DOCUMENTATION/experiments/memory_scaling/METRICS.md` |
 
-| 79 | **Engine v2 — the brain rebuilt as the 7-step deep track** (branch `engine-v2`). The old `_run_transcript` (~800 lines of interleaved heuristics, plus four background bolt-ons) retired and replaced by `assistant/engine/`: frozen per-stage contracts (`state.py`, `ENGINE.md`, `test_engine_contracts.py`), fast track (instant rule-parser commit) + deep track (segment → decompose → validate → generate → commit → label → crosscheck), every old named rule ported into `validate.py` with its regression tests, observance gate for AI-created events (leyning/meals/davening on holy days, fasts exclude meals), `needs_edit` transcript-confirmation round-trip gated on `supports_edit`. All eight stages live and stage-gated (LLM gates for segment/decompose/crosscheck passed against real Ollama); step-1 gate + learning loop + Mac dialog/settings done; intake lock + coalescing done (pending-retry loop batches its backlog); per-stage audit lines added. **Primary instrument now the verification dataset (user decision 2026-09-04): improve against its metrics (count-correct by complexity/compound-kind, missing-half, garbage titles, date collapse); the hand corpus is the regression floor.** Pilot: engine 73% vs old 70% (compounds 2-3x better); full-3000 comparison running overnight → its per-metric report becomes the improvement backlog. Remaining: dataset-driven tune cycles, k=4 memory verdict (run 13), iOS edit sheet, one-tap revert, live Mac+phone check, explainer artifacts (update at merge), merge | in progress 2026-09-03 | `assistant/engine/`, `DOCUMENTATION/ENGINE.md` |
+| 79 | **Engine v2 — the brain rebuilt as the 7-step deep track** (branch `engine-v2`). The old `_run_transcript` (~800 lines of interleaved heuristics, plus four background bolt-ons) retired and replaced by `assistant/engine/`: frozen per-stage contracts (`state.py`, `ENGINE.md`, `test_engine_contracts.py`), fast track (instant rule-parser commit) + deep track (segment → decompose → validate → generate → commit → label → crosscheck), every old named rule ported into `validate.py` with its regression tests, observance gate for AI-created events (leyning/meals/davening on holy days, fasts exclude meals), `needs_edit` transcript-confirmation round-trip gated on `supports_edit`. All eight stages live and stage-gated (LLM gates for segment/decompose/crosscheck passed against real Ollama); step-1 gate + learning loop + Mac dialog/settings done; intake lock + coalescing done (pending-retry loop batches its backlog); per-stage audit lines added. **Primary instrument now the verification dataset (user decision 2026-09-04): improve against its metrics (count-correct by complexity/compound-kind, missing-half, garbage titles, date collapse); the hand corpus is the regression floor.** Pilot: engine 73% vs old 70% (compounds 2-3x better); full-3000 comparison running overnight → its per-metric report becomes the improvement backlog. Merged to `main` 2026-09-04 (bce502e); iOS edit sheet, one-tap revert, versioned panel all shipped; dataset-driven tune cycles continue as the improvement loop (see below) | done 2026-09-04 | `assistant/engine/`, `DOCUMENTATION/ENGINE.md` |
 
 ## How we are working right now
 
-**Row 79 (engine v2) is the current thread on branch `engine-v2`** — the plan
-lives in the row; contracts are frozen, remaining work is stage-gated
-(build → independent test vs real Ollama → revamp → next stage), and the
-merge gate is the full audit beating the recorded run-7 baseline in
-`ASSISTANT_AUDIT_SUMMARY.md`. No audits until the row-76 overnight jobs
-finish — two model-loading jobs side by side segfault.
+**The current thread is the deep-track improvement loop** (branch
+`loop-cycle-1`; protocol in `DOCUMENTATION/experiments/ITERATION_PROTOCOL.md`,
+queue in `dataset/HYPOTHESES.md`, record in `dataset/RESULTS.md` +
+`dataset/loop_log.csv`). Cycles 1–4 graduated 2026-09-04; the measurement
+epoch reset 2026-09-05 (frozen row clocks + observance flag; baseline
+78.4 raw / 81.2 adjusted); **cycle 5 in flight 2026-09-06** (grounded
+default-title events). Standing instruments: the runs archive
+(`dataset/runs/` + `scripts/rescore_runs.py`) and the conventions-overrides
+layer (`count_ok_adj`). Open engine bug queued in HYPOTHESES.md: queries can
+emit mutations (the dentist `update_event`).
+
+**The app stream** runs in the `../MACalendar-app` worktree (branch
+`app-features`, CLAUDE.md "Two work streams"): the whole Gil-approved queue
+shipped 2026-09-06 (243d99f → 3b89809) — .ics share, search + jump-to-date,
+duplicate event, week numbers, Timer CSV, agenda view, observance checkbox,
+iOS heartbeat/share/search, ThinkingView file move; two bugs found+fixed
+(settings-dialog imports; pydantic dropping `observance.enabled`).
+Notifications is planned only (`DOCUMENTATION/NOTIFICATIONS_PLAN.md`),
+blocked on DEVQA Q4–Q6. Merge all three branches at the next cycle boundary.
 
 Previous thread, as of 2026-09-03 (still relevant on `main`):
 

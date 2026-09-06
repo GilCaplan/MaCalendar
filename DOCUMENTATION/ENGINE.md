@@ -119,7 +119,7 @@ Two passes, both contract:
   `db._skip_for_observance`. Allowed on any computation failure.
 Every applied rule lands in `state.fixes` under its name and in the trace.
 
-### 5 · generate (`generate.py` · trace `rule`/`llm` · tests `test_engine_flow.py` + integration)
+### 5 · generate (`generate.py` · trace `rule`/`llm` · tests `test_engine_generate.py` + integration)
 Owns ALL text→intent conversion. `fast_propose` (whole input) is the fast
 track; `run` works per item: rule parser first (~50ms, free), LLM fills gaps
 from the rule parser's partial analysis, or parses from scratch — grounded on
@@ -127,6 +127,15 @@ the item's own words, never another item's. An item parsing into several
 intents is expanded into sub-items, one intent each (per-item attribution is
 the row-75 fix). Slots from decomposition land on the intent (`quantity`).
 `AssistantError` propagates: the orchestrator owns offline queueing.
+
+Two deterministic fallbacks close the honest-failure ladder (both pinned in
+`test_engine_generate.py`): **task_fallback** (run 12) — a task-kind item
+never parses to nothing; the item text IS the task. **event_fallback**
+(cycle 5) — an event-kind item that still parses to unknown after the
+event-kind retry becomes a default-titled event ONLY when the words
+literally contain event/reminder/appointment (that noun is the title) AND
+the date recognizer grounds a date or clock time in them; nothing is ever
+invented, no match stays unknown.
 
 ### commit (orchestrator)
 The only place the engine touches the database, via the existing action

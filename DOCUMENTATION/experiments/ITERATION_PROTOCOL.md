@@ -147,3 +147,28 @@ If a machine with more RAM is available later, two `ollama serve` on separate
 ports would allow either sharding one run to ~halve wall-clock, or a true
 concurrent A/B of two variants — coordinate first with any session running
 tier audits so the two do not contend.
+
+
+## The runs archive (added 2026-09-06 — after two misidentified-db retractions)
+
+Every measurement run auto-archives its scratch (engine_run.db + calendar.db
++ trace_bus, gzipped) to `dataset/runs/<name>/` with a `manifest.json`
+recording identity: row count, **parse-path fingerprint**, source path,
+md5s, loop run number. Rules:
+
+- **Never analyze an unlabeled scratch db.** Verify identity against the
+  manifest (parse_paths) before any cross-run join — inferring it later
+  published a wrong deep-rescue figure (0/21; truth 7/21) and a wrong
+  "row 8 = 75.6" retraction in a single night.
+- When a metric is added or fixed, `python -m scripts.rescore_runs --write`
+  replays the CURRENT scorer over every archive, backfills loop_log's
+  backfillable columns (today: `adj_pct`), and prints drift against
+  as-logged values. As-logged numbers are never rewritten.
+- Scoring reports **raw and product-adjusted** count-correct together: the
+  conventions-overrides layer (`dataset/inputs/convention_overrides.json`,
+  see `dataset/DATASET_AUDIT.md`) feeds `count_ok_adj`; queries additionally
+  must mutate nothing to pass adjusted. Raw stays the cross-run comparable
+  number; adjusted is the product-true one.
+- Empirical noise floor (cycle 3 verdict): overall dev-fast deltas under
+  **~1.5 pt are noise** — judge a cycle by its targeted slice, and measure
+  twice when the predicted effect is under ~4 rows.

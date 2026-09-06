@@ -24,6 +24,16 @@ needing one is marked **[Gil]** and is blocked until asked.
 
 ## The queue
 
+- **BUG (open; found 2026-09-06 by the query-no-mutation check): queries can
+  emit mutations.** "Is my appointment to the dentist still on for tomorrow
+  morning?" → deep produced `update_event(match_title="dentist")` — a
+  question that MOVES the appointment on a real calendar. Present in every
+  archived run (14 hits on the full-3000 sweep). Deterministic guard: an
+  interrogative with no imperative verb must not generate
+  delete_*/update_*/complete_* actions. Bugs are exempt from
+  one-change-per-cycle; fix when the engine tree is next idle.
+
+
 0. ✅ **Resolved (Gil, 2026-09-05) — frozen replay clock + observance flag.**
    Better than pinning to an arbitrary Tuesday: each row now replays AT ITS
    RECORDED TIMESTAMP (the dataset is a history), and Shabbat gating stands
@@ -38,8 +48,10 @@ needing one is marked **[Gil]** and is blocked until asked.
    queue: dips elsewhere diffed as replay nondeterminism — overall deltas
    under ~1.5 pt on dev-fast are noise; judge cycles by their targeted slice.
 
-2. **Grounded default-title events** — stage: generate (event twin of the
-   existing `task_fallback`).
+2. **🔄 IN FLIGHT (cycle 5, 2026-09-06)** — grounded default-title events —
+   stage: generate (event twin of the existing `task_fallback`). Implemented
+   as `event_fallback` @ b3c6656; dev-fast replay running; prediction
+   78.4 → 79.4–79.9 recorded in RESULTS.md.
    *Evidence:* explicit asks that name no title die as unknown: "Set a event
    for the evening" (0 created), "please set event on Tuesday", "Set reminder
    for three o'clock" (simple row, 0/0). The event-kind retry fires and still
