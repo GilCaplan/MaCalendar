@@ -8,10 +8,12 @@ function still takes the window as `self` so every `self._config` /
 """
 from __future__ import annotations
 
+import os
+import re
 import subprocess
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QPainter, QPixmap
 from PyQt6.QtWidgets import (
     QCheckBox, QColorDialog, QComboBox, QDialog, QFormLayout, QFrame, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QScrollArea, QSpinBox, QVBoxLayout, QWidget,
 )
@@ -205,6 +207,91 @@ def open_settings(self) -> None:
     observance_cb.setChecked(bool(getattr(getattr(self._config, "observance", None),
                                           "enabled", True)))
     hebrew.addWidget(observance_cb)
+
+    # ── Notifications ─────────────────────────────────────────────
+    notif = section("Notifications")
+    notif_cfg = getattr(self._config, "notifications", None)
+
+    notif_enabled_cb = QCheckBox("Pre-event notifications")
+    notif_enabled_cb.setObjectName("notif_enabled_cb")
+    notif_enabled_cb.setToolTip(
+        "A heads-up before an event starts. The lead time below is the\n"
+        "default; each category can override it or opt out entirely.")
+    notif_enabled_cb.setChecked(bool(getattr(notif_cfg, "enabled", True)))
+    notif.addWidget(notif_enabled_cb)
+
+    notif_form = QFormLayout()
+    notif_form.setSpacing(8)
+    notif_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+    notif_lead_combo = QComboBox()
+    notif_lead_combo.setObjectName("notif_default_lead_combo")
+    notif_lead_combo.addItem("Off", 0)
+    for _mins in (5, 10, 15, 30, 60):
+        notif_lead_combo.addItem(f"{_mins} minutes", _mins)
+    _lead = int(getattr(notif_cfg, "default_lead_minutes", 0) or 0)
+    _lead_idx = notif_lead_combo.findData(_lead)
+    if _lead_idx < 0:
+        # A hand-edited value keeps itself rather than snapping to Off.
+        notif_lead_combo.addItem(f"{_lead} minutes", _lead)
+        _lead_idx = notif_lead_combo.count() - 1
+    notif_lead_combo.setCurrentIndex(_lead_idx)
+    notif_lead_combo.setMaximumWidth(160)
+    notif_form.addRow("Default lead time:", notif_lead_combo)
+    notif.addLayout(notif_form)
+
+    notif_speak_cb = QCheckBox("Spoken heads-up (uses the assistant voice)")
+    notif_speak_cb.setObjectName("notif_speak_cb")
+    notif_speak_cb.setChecked(bool(getattr(notif_cfg, "speak", False)))
+    notif.addWidget(notif_speak_cb)
+
+    notif_observance_cb = QCheckBox("Hold on Shabbat && yom tov")
+    notif_observance_cb.setObjectName("notif_observance_cb")
+    notif_observance_cb.setToolTip(
+        "No banners or speech inside Shabbat / yom tov; anything missed\n"
+        "waits and is delivered after it goes out.")
+    notif_observance_cb.setChecked(bool(getattr(notif_cfg, "respect_observance", True)))
+    notif.addWidget(notif_observance_cb)
+
+    notif.addWidget(hint("Per category — Muted silences it outright; Default "
+                         "follows the lead time above."))
+    from assistant.actions.calendar.categories import all_categories
+    cat_grid = QGridLayout()
+    cat_grid.setVerticalSpacing(4)
+    cat_grid.setHorizontalSpacing(10)
+    cat_lead_combos: dict[str, QComboBox] = {}
+    _cat_leads_now = dict(getattr(notif_cfg, "category_leads", {}) or {})
+    for _row, _cat in enumerate(all_categories()):
+        _cname = _cat["name"]
+        _dot = QLabel()
+        _pm = QPixmap(12, 12)
+        _pm.fill(Qt.GlobalColor.transparent)
+        _painter = QPainter(_pm)
+        _painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        _painter.setPen(Qt.PenStyle.NoPen)
+        _painter.setBrush(QColor(_cat.get("color", "#64748b")))
+        _painter.drawEllipse(0, 0, 12, 12)
+        _painter.end()
+        _dot.setPixmap(_pm)
+        cat_grid.addWidget(_dot, _row, 0)
+        cat_grid.addWidget(QLabel(_cname), _row, 1)
+        _cc = QComboBox()
+        _cc.setObjectName(f"notif_cat_lead_{_cname}")
+        _cc.addItem("Default", None)     # absent from category_leads
+        _cc.addItem("Muted", 0)          # 0 = category muted (Gil's rule)
+        for _mins in (5, 10, 15, 30, 60):
+            _cc.addItem(f"{_mins} minutes", _mins)
+        if _cname in _cat_leads_now:
+            _v = int(_cat_leads_now[_cname])
+            _j = _cc.findData(_v)
+            if _j < 0:
+                _cc.addItem(f"{_v} minutes", _v)
+                _j = _cc.count() - 1
+            _cc.setCurrentIndex(_j)
+        _cc.setMaximumWidth(130)
+        cat_grid.addWidget(_cc, _row, 2)
+        cat_lead_combos[_cname] = _cc
+    cat_grid.setColumnStretch(3, 1)
+    notif.addLayout(cat_grid)
 
     # ── Voice ─────────────────────────────────────────────────────
     voice = section("Voice")
@@ -408,6 +495,10 @@ def open_settings(self) -> None:
         # (assistant/config_store). Each setting names its section, so a
         # `rate:` under tts can never clobber a rate elsewhere, and keys
         # missing from an older config are inserted instead of dropped.
+        # Default = absent from the map; Muted / a lead land in it as 0 / n.
+        cat_leads = {name: int(combo.currentData())
+                     for name, combo in cat_lead_combos.items()
+                     if combo.currentData() is not None}
         try:
             from assistant.config_store import set_values
             ok = set_values({
@@ -440,8 +531,27 @@ def open_settings(self) -> None:
                 # Read by observance.is_enabled() in the API process, which
                 # loads config.yaml itself — nothing to apply in-memory here.
                 "observance": {"enabled": observance_cb.isChecked()},
+                # Scalars only — category_leads is a mapping, which
+                # config_store._literal cannot render (it would come out as a
+                # quoted Python repr); _persist_category_leads below rewrites
+                # that one key in the same comment-preserving spirit.
+                "notifications": {
+                    "enabled": notif_enabled_cb.isChecked(),
+                    "default_lead_minutes": int(notif_lead_combo.currentData() or 0),
+                    "respect_observance": notif_observance_cb.isChecked(),
+                    "speak": notif_speak_cb.isChecked(),
+                    # No widget for sound yet — round-trip the config value.
+                    "sound": bool(getattr(notif_cfg, "sound", True)),
+                },
             })
             if ok:
+                _persist_category_leads(cat_leads)
+                if notif_cfg is not None:
+                    notif_cfg.enabled = notif_enabled_cb.isChecked()
+                    notif_cfg.default_lead_minutes = int(notif_lead_combo.currentData() or 0)
+                    notif_cfg.respect_observance = notif_observance_cb.isChecked()
+                    notif_cfg.speak = notif_speak_cb.isChecked()
+                    notif_cfg.category_leads = cat_leads
 
                 # Apply changes immediately
                 self._config.ui.font_month = month_spin.value()
@@ -482,6 +592,77 @@ def open_settings(self) -> None:
     outer.addLayout(btn_layout)
 
     dialog.exec()
+
+
+# ------------------------------------------------------------------
+# category_leads persistence
+# ------------------------------------------------------------------
+
+def _yaml_flow_key(name: str) -> str:
+    """A category name as a YAML flow-mapping key: plain where safe, quoted
+    where the name would otherwise change the document's structure."""
+    if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 _.'’-]*", name):
+        return name
+    return '"' + name.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _persist_category_leads(leads: "dict[str, int]", path: "str | None" = None) -> bool:
+    """Rewrite just the `category_leads:` entry inside config.yaml's
+    `notifications:` section — section-scoped and comment-preserving, in the
+    same spirit as assistant/config_store (whose set_values handles the
+    section's scalar keys and runs first, so the section always exists).
+
+    TODO(config_store-dict-values): set_values cannot carry this mapping —
+    config_store._literal renders bool / number / list / str, and a dict
+    falls through to the string case as a quoted Python repr (verified:
+    {"Work": 15} → `"{'Work': 15}"`, which YAML reads back as a *string*).
+    Teach _literal a dict case (flow mapping) in a config_store change with
+    its own tests, then fold category_leads into the ordinary set_values
+    call above and delete this helper.
+
+    The value is written as a one-line flow mapping — `{Work: 15, Meal: 0}` —
+    and an existing block-style mapping's child lines are collapsed into it.
+    0 mutes the category outright; an absent name follows the default lead.
+    """
+    from assistant import config_store
+    if path is None:
+        path = config_store.CONFIG_PATH
+    if not os.path.exists(path):
+        return False
+    with open(path, "r") as f:
+        lines = f.read().splitlines()
+    span = config_store._section_span(lines, "notifications")
+    if span is None:
+        return False
+    start, end = span
+    flow = "{" + ", ".join(f"{_yaml_flow_key(n)}: {int(v)}"
+                           for n, v in sorted(leads.items())) + "}"
+    pat = re.compile(r"^(\s+category_leads\s*:\s*)([^#]*?)(\s*#.*)?$")
+    for i in range(start, end):
+        m = pat.match(lines[i])
+        if m is None:
+            continue
+        indent = len(lines[i]) - len(lines[i].lstrip())
+        j = i + 1                # a block-style mapping's children, if any
+        while (j < end and lines[j].strip()
+               and len(lines[j]) - len(lines[j].lstrip()) > indent):
+            j += 1
+        # A block-style header is bare `category_leads:` — group(1) then ends
+        # on the colon, and gluing the flow mapping straight on would emit the
+        # invalid `category_leads:{…}`. A scalar line's group(1) already
+        # carries the separating space.
+        prefix = m.group(1) if m.group(1).endswith(" ") else m.group(1) + " "
+        lines[i:j] = [prefix + flow + (m.group(3) or "")]
+        break
+    else:
+        at = end                 # insert before the section's trailing blanks
+        while at > start and not lines[at - 1].strip():
+            at -= 1
+        lines.insert(at, f"  category_leads: {flow}")
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    return True
+
 
 # ------------------------------------------------------------------
 # ICS / macOS Calendar import
