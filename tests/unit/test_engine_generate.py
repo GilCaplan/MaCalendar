@@ -127,3 +127,39 @@ def test_creations_never_vetoed(monkeypatch, cfg):
     ok, st = _fast(monkeypatch, cfg, "reminder tomorrow 9am take pills",
                    [("create_event", SimpleNamespace(title="take pills"))])
     assert ok is True
+
+
+# --- invention guard (cycle 7) --------------------------------------------
+
+def test_fabricated_title_is_dropped():
+    from types import SimpleNamespace
+    st = EngineState(raw_text="x", text="x")
+    item = Item(id="item_1", kind="event",
+                text="new scenario, time or calendar to new list")
+    got = [("create_event", SimpleNamespace(title="New Event"))]
+    assert generate._guard_inventions(got, item, st) == []
+    assert any("invention_guard" in str(f) for f in st.fixes)
+
+
+def test_paraphrased_title_survives_via_stems():
+    from types import SimpleNamespace
+    st = EngineState(raw_text="x", text="x")
+    item = Item(id="item_1", kind="event", text="meet Dana tomorrow at noon")
+    got = [("create_event", SimpleNamespace(title="Meeting with Dana"))]
+    assert generate._guard_inventions(got, item, st) == got
+
+
+def test_grounded_title_untouched():
+    from types import SimpleNamespace
+    st = EngineState(raw_text="x", text="x")
+    item = Item(id="item_1", kind="event", text="dentist on Wednesday at noon")
+    got = [("create_event", SimpleNamespace(title="Dentist"))]
+    assert generate._guard_inventions(got, item, st) == got
+
+
+def test_non_event_actions_never_guarded():
+    from types import SimpleNamespace
+    st = EngineState(raw_text="x", text="x")
+    item = Item(id="item_1", kind="task", text="whatever garble")
+    got = [("create_todo", SimpleNamespace(titles=["Unrelated Words"]))]
+    assert generate._guard_inventions(got, item, st) == got

@@ -208,7 +208,7 @@ def _parse_item(item: Item, state: EngineState, cfg) -> "list | None":
             try:
                 got = parser.parse_with_context(item.text, rr)
                 _llm_trace(state, parser, cfg, f"Read {_friendly(item.id)}")
-                return got
+                return _guard_inventions(got, item, state)
             except Exception:
                 pass
         except RuleParserSkip:
@@ -217,7 +217,46 @@ def _parse_item(item: Item, state: EngineState, cfg) -> "list | None":
             pass
     got = parser.parse(item.text)
     _llm_trace(state, parser, cfg, f"Read {_friendly(item.id)}")
-    return got
+    return _guard_inventions(got, item, state)
+
+
+#: Words too generic to ground a title on their own (cycle 7).
+_TITLE_STOP = {"the", "a", "an", "and", "with", "for", "new", "my", "our"}
+
+
+def _grounded_title(title: str, text: str) -> bool:
+    """Every content word of an LLM event title must be spoken in the item's
+    own words, prefix-stemmed so "Meeting" grounds on "meet". A title the
+    words never said is a fabrication (hypothesis #5: garble input produced
+    "New Event", conference room, 10:00-11:00 — none of it in the words)."""
+    words = [w for w in re.findall(r"[a-z']+", title.casefold())
+             if len(w) > 2 and w not in _TITLE_STOP]
+    if not words:
+        return True                       # bare/stopword titles judged elsewhere
+    toks = set(re.findall(r"[a-z']+", text.casefold()))
+    def ok(w: str) -> bool:
+        stem = w[:4]
+        return any(tk.startswith(stem) or w.startswith(tk[:4])
+                   for tk in toks if len(tk) > 2)
+    return all(ok(w) for w in words)
+
+
+def _guard_inventions(got, item: Item, state: EngineState):
+    """Drop LLM-fabricated events (cycle 7); rule-parser output never routes
+    through here — rules are grounded by construction. An emptied list falls
+    through to the event-kind retry / event_fallback / honest unknown."""
+    if not got:
+        return got
+    kept = []
+    for name, intent in got:
+        if name == "create_event" and item.kind != "task":
+            title = str(getattr(intent, "title", "") or "")
+            if not _grounded_title(title, item.text):
+                state.add_fix("generate", "invention_guard", title[:40], "",
+                              note="LLM title not grounded in the item's words")
+                continue
+        kept.append((name, intent))
+    return kept
 
 
 def run(state: EngineState, cfg) -> EngineState:

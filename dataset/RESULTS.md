@@ -12,6 +12,24 @@ and cleaner e+t at ~1.8× the latency.
 
 Every meaningful run, newest first.
 
+## Cycle 7 — invention guard (queue #5) — PREDICTION (written before the change)
+
+*Stage:* generate — after the LLM parses an event-kind item, every content
+word of the returned event TITLE must be grounded in the item's own words
+(prefix-stem match, so "meeting" grounds on "meet"); an ungrounded title is
+dropped, letting the item fall through to event_fallback or honest unknown.
+Evidence: the garble row "new scenario, time or calendar to new list…"
+produced a fabricated "New Event" in a conference room at 10:00–11:00 —
+fields not in the words (cycle-5 byproduct list; hypothesis #5's original
+row). *Predicted:* count-correct roughly FLAT (−0.4 to +0.4 — the guard
+removes lucky garble passes and cannot add count wins; judged NOT by count
+but by precision and the adjusted metric): precision 84.7 → **85.3–86.0**,
+garbage-titles stays 0, adjusted flat-to-up (held garble rows pass
+`noop_ok`-class overrides). Risk: over-blocking legitimate LLM titles that
+paraphrase ("Lunch" from "eat with Dana at noon") — the stem match and
+event_fallback net limit the damage; watched via down-flips on non-garble
+rows, which must be ZERO.
+
 ## Cycle 6 — fast-path generic-target veto (queue 2b) — PREDICTION (written before the change)
 
 *Stage:* generate `fast_propose` (a C3-style gate cue). Evidence (run 10):
