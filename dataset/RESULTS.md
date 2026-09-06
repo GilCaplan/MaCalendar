@@ -64,6 +64,14 @@ exempt): courtesy-prefix cleanup after the reminder strip; fallback path
 now applies slots. *Predicted:* deep-path p50 drops (fewer LLM calls):
 7.5s → **6.0–7.0s**; deep-slice count-correct −1 to +2; overall
 78.5–80.5 raw; fieldq holds ≥84.5. Judge: deep latency + deep count.
+
+**ACTUAL (run 15): GOAL MET — GREEN LIGHT for cycle 10.** Deep-only p50
+**15255 → 14118ms**, deep-only p95 **67213 → 57714ms** (~10s faster on the
+hard compound rows — fewer per-fragment LLM calls, the mechanism); count
+flat as predicted (78.0 raw / 80.8 adj); fieldq 85.3, when 86.6 (best-ever
+band held). The direction pays: trusting FastRule more on fragments cuts
+deep latency with no accuracy cost. Gil re-confirmed cycle 10 = the FULL
+version (rules-first per fragment, LLM as end-judge only).
 (Correction: the fast-lane merge conflicted, so F1+F2 are NOT aboard
 this run — cycle 9 measures C9 alone; F1+F2 get their own joint run next.)
 
