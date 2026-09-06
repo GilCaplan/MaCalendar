@@ -1,7 +1,15 @@
 # Notifications — the plan
 
-_2026-09-06. Status: **designed, awaiting Gil's three answers below — nothing
-built yet.** Produced by a design panel (4 read-only code sweeps → 3
+_2026-09-06. Status: **BUILDING — Gil greenlit ("implement when ready",
+same day) with one addition: per-category MUTE — `category_leads` value 0
+turns a whole category's notifications off, mirroring the event-level 0.
+Q4–Q6 stand unanswered, so the build uses this plan's safe defaults (no
+launch-model change — the phone is the only always-on ringer; global
+default 0 = opt-in; in-Shabbat events suppressed with the reason announced)
+— all three reversible in config whenever Gil rules. Phase 1 (policy core,
+notify.py + data model + payload fields) landed @ 7ec34a6; phases 2 (iOS)
+and 4 (Mac notifier + settings) in flight; phase 3 (voice) waits for the
+cycle-boundary merge since it touches engine files the loop owns.** Produced by a design panel (4 read-only code sweeps → 3
 independent designs: iOS-first / server-first / UX-first → adversarial judge
 + synthesis). The winning skeleton is the UX-first design (thinnest client
 data flow — `notify_at` embedded in event payloads, no second sync surface),
