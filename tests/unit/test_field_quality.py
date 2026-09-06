@@ -102,12 +102,24 @@ def test_clock_digits_are_not_quantities():
     assert s["parts"]["qty"] == 1.0           # the 5 is a time, default 1 is right
 
 
-def test_grocery_wording_wants_a_grocery_tag():
-    ok = fq.score_item(_todo(["milk"], [1], tags=["grocery"]),
-                       "add milk to my grocery list", TS)
-    bad = fq.score_item(_todo(["milk"], [1], tags=["work"]),
-                        "add milk to my grocery list", TS)
-    assert ok["parts"]["tag"] == 1.0 and bad["parts"]["tag"] == 0.0
+def test_tags_are_closed_set_classification():
+    """Gil: a finite number of classes — validity + agreement with the
+    product's own classifier, never fuzzy word overlap."""
+    classes = ["Groceries", "Work"]
+    ref = lambda title: ["Groceries"] if "milk" in title else []
+    kw = dict(tag_classes=classes, tag_reference=ref)
+    ok = fq.score_item(_todo(["milk"], [1], tags=["Groceries"]),
+                       "add milk to my grocery list", TS, **kw)
+    wrong = fq.score_item(_todo(["milk"], [1], tags=["Work"]),
+                          "add milk to my grocery list", TS, **kw)
+    invented = fq.score_item(_todo(["milk"], [1], tags=["Sportsball"]),
+                             "add milk to my grocery list", TS, **kw)
+    assert ok["parts"]["tag"] == 1.0
+    assert wrong["parts"]["tag"] == 0.0        # wrong class
+    assert invented["parts"]["tag"] == 0.0     # out-of-set = invented class
+    unref = fq.score_item(_todo(["socks"], [1], tags=["Work"]),
+                          "buy socks", TS, **kw)
+    assert "tag" not in unref["parts"]         # reference silent → uncovered
 
 
 # --- aggregation -----------------------------------------------------------

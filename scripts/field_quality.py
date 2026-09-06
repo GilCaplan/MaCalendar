@@ -136,17 +136,30 @@ def _qty_ok(quantity: int, text: str) -> "bool | None":
     return quantity in nums
 
 
-def _tag_ok(tags: list, text: str) -> "bool | None":
-    low = _content_words(text)
-    hinted = {t for t in ("grocery", "groceries", "shopping", "work", "workout")
-              if t in low}
-    if not hinted:
+def _tag_ok(tags: list, title: str, classes, reference) -> "bool | None":
+    """Tags are CLASSIFICATION over a finite class set (Gil, 2026-09-05) —
+    the registry's tag names, not fuzzy words. Two objective checks:
+    (a) every assigned tag must BE one of the classes (an out-of-set tag is an
+    invented class → fail outright); (b) when the product's own deterministic
+    classifier (`tagging.suggest_tags`, injected as `reference`) names an
+    expected class for this title, the assignment must include it. A valid
+    assignment the reference can't adjudicate is uncovered. Note the honest
+    limit: the reference is the product's classifier, so this catches
+    class-set violations and divergence (e.g. LLM-assigned tags), not the
+    classifier's own quality."""
+    if classes is None:
         return None
-    tag_words = {w for t in (tags or []) for w in _content_words(str(t))}
-    return bool(tag_words & {h.rstrip("s") for h in hinted} | (tag_words & hinted))
+    assigned = [str(x) for x in (tags or [])]
+    if any(a not in classes for a in assigned):
+        return False
+    expected = list(reference(title)) if reference else []
+    if expected:
+        return bool(set(assigned) & set(expected))
+    return None
 
 
-def score_item(action: dict, text: str, ts: float) -> "dict | None":
+def score_item(action: dict, text: str, ts: float,
+               tag_classes=None, tag_reference=None) -> "dict | None":
     """One created item → {'score': 0..1, 'parts': {...}} or None (not a create)."""
     name = action.get("action", "")
     p = action.get("parameters", {}) or {}
@@ -172,7 +185,8 @@ def score_item(action: dict, text: str, ts: float) -> "dict | None":
             comps = {"title": _title_sim(str(title), text)}
             weights = {"title": 0.5, "qty": 0.3, "tag": 0.2}
             comps["qty"] = _qty_ok(qtys[i] if i < len(qtys) else 1, text)
-            comps["tag"] = _tag_ok(p.get("tags") or [], text)
+            comps["tag"] = _tag_ok(p.get("tags") or [], str(title),
+                                   tag_classes, tag_reference)
             scores.append(_weigh(comps, weights, kind="task"))
         if not scores:
             return None
@@ -202,7 +216,7 @@ def _weigh(comps: dict, weights: dict, kind: str) -> dict:
 _TIER_WEIGHT = {"simple": 1.0, "medium": 1.5, "complex": 2.0}
 
 
-def score_run(rows, prov) -> dict:
+def score_run(rows, prov, tag_classes=None, tag_reference=None) -> dict:
     """rows: iterable of (transcript, actions_json, ts). Returns overall +
     per-tier field quality, the paramount when-component alone, coverage, and
     the difficulty-weighted headline (complex counts double a simple)."""
@@ -216,7 +230,8 @@ def score_run(rows, prov) -> dict:
             actions = []
         tier = (prov.get(text) or {}).get("complexity", "unknown")
         for a in actions:
-            s = score_item(a, text, ts or _dt.datetime.now().timestamp())
+            s = score_item(a, text, ts or _dt.datetime.now().timestamp(),
+                           tag_classes, tag_reference)
             if s is None:
                 continue
             t = per_tier.setdefault(tier, [0.0, 0])
