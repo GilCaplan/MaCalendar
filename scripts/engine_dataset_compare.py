@@ -208,6 +208,34 @@ def main() -> int:
                          "(Gil, 2026-09-06).")
     args = ap.parse_args()
 
+    if args.llm.startswith("cli:"):
+        # Claude-Code-CLI bridge (Gil, 2026-09-06): each engine LLM call shells
+        # out to `claude -p --model <alias>` — runs on the Claude Code plan,
+        # no API key, no separate billing. ~5s/call overhead; JSON arrives
+        # fenced, which _extract_json already strips. The product is untouched:
+        # this only exists behind the harness flag.
+        _cli_model = args.llm.split(":", 1)[1]
+        import subprocess as _sp
+        import assistant.intent.parser as _pmod
+        from assistant.exceptions import LLMTimeoutError, LLMUnavailableError
+        _empty_cwd = tempfile.mkdtemp(prefix="cli_bridge_")
+
+        def _cli_call(self, sys_prompt, user):
+            try:
+                r = _sp.run(["claude", "-p", "--model", _cli_model,
+                             "--setting-sources", "",
+                             "--system-prompt", sys_prompt, user],
+                            capture_output=True, text=True, timeout=240,
+                            cwd=_empty_cwd)
+            except _sp.TimeoutExpired as e:
+                raise LLMTimeoutError("claude CLI timed out") from e
+            if r.returncode != 0:
+                raise LLMUnavailableError(f"claude CLI failed: {r.stderr[:200]}")
+            return r.stdout
+
+        _pmod.IntentParser._call_claude = _cli_call
+        args.llm = f"claude:cli-{_cli_model}"
+
     if args.llm:
         _engine, _, _model = args.llm.partition(":")
         import assistant.config as _cmod
@@ -219,6 +247,8 @@ def main() -> int:
                 cfg.llm_engine = _engine
                 if _model:
                     getattr(cfg, _engine).model = _model
+                if _engine == "claude" and not cfg.claude.api_key:
+                    cfg.claude.api_key = "claude-code-cli-bridge"
                 _key = os.environ.get("ANTHROPIC_API_KEY")
                 if _engine == "claude" and _key and not cfg.claude.api_key:
                     cfg.claude.api_key = _key
