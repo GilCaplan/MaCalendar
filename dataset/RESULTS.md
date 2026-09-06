@@ -12,6 +12,30 @@ and cleaner e+t at ~1.8× the latency.
 
 Every meaningful run, newest first.
 
+## FastRule-native metrics + F4 diagnosis (2026-09-07)
+
+FastRule is a SELECTIVE CLASSIFIER; the deep metrics scored only its
+false-accepts. Added **recoverable-abstain** (of abstained rows, how many
+the raw parse would nail — headroom + wasted latency): dev 19.8%, full-3000
+17.4%, cause-split low-conf (threshold) vs gate-overblock (my own vetoes).
+
+FastRule standalone full board (committed rows, full-3000): commit 38% ·
+correct-on-committed 87.4% · simple 94 / medium 92 / complex 55 · garbage
+0.4% · date-collapse 0.0% · **field quality 96.1% · when-correct 100%** —
+a near-perfect specialist on what it commits (deterministic dates = perfect
+when), honestly abstaining on compounds (e+e 8, e+t 23).
+
+**F4 diagnosis (NOT a blind threshold drop):** the 6 dev gate-overblocks
+("get rid of this list", "Please delete this event", "Do I need to be
+reminded…") are query/remove/delete rows where committing scores correct
+ONLY because query/remove pass by creating nothing — the vetoes send them
+deep for anaphora resolution, which is defensible (latency, not
+correctness). The real headroom is the ~20 dev low-conf recoverables, but
+lowering the 0.85 bar trades against false-accepts (the AP finding: the
+confidence signal is near-binary, so a blanket drop is unsafe). F4 must
+find a SAFE sub-pattern (a specific confident-enough shape), not move the
+threshold — teed up, next fast-lane batch.
+
 ## Sandbox batch F3 — interrogative-create veto (fast lane) — PREDICTION (registered before the change)
 
 *Diagnosis (fast-lane, dev):* interrogatives commit CREATES — "COULD YOU
