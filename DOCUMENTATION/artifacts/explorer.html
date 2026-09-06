@@ -550,9 +550,74 @@ const P = {
   parse: {
     tag:"step 3 of 9", name:"parse", title:"Rules first",
     z:[352,211,2.9],
-    sum:`<p>Keyword rules read the sentence first and score how well they understood it. This step is arithmetic on words, and takes about a tenth of a second.</p>
+    sum:`<p>A fixed pipeline reads the sentence first: normalize its shorthand, route the verb to an action, fill its slots, score how well it understood it. All arithmetic on words, about a tenth of a second.</p>
     <p class="figs">76 verbs &#183; 9 of the 15 actions reachable this way</p>`,
-    more:`<p>The score starts at the fraction of required slots filled, then pays for its
+    more:`<p>Four things happen before any score exists, in a fixed order, and every one of them
+    is arithmetic on the words themselves &mdash; nothing here calls the model:</p>
+    <svg viewBox="0 0 390 48" role="img" aria-label="The rule parser's four phases in order: normalize the transcript against a shorthand table, route the verb and domain to an action, score the filled slots against their doubts, then gate the result at fast_propose &mdash; the step covered next.">
+      <defs><marker id="pf" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
+      <g font-size="8">
+        <rect x="0" y="4" width="84" height="40" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+        <text x="42" y="21" text-anchor="middle" font-weight="600">NORMALIZE</text>
+        <text x="42" y="35" text-anchor="middle" font-size="7" fill="var(--muted)">shorthand table</text>
+
+        <path d="M 88 24 L 100 24" stroke="var(--line)" stroke-width="1.2" marker-end="url(#pf)" color="var(--line)"/>
+
+        <rect x="104" y="4" width="84" height="40" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+        <text x="146" y="21" text-anchor="middle" font-weight="600">ROUTE</text>
+        <text x="146" y="35" text-anchor="middle" font-size="7" fill="var(--muted)">verb + domain</text>
+
+        <path d="M 192 24 L 204 24" stroke="var(--line)" stroke-width="1.2" marker-end="url(#pf)" color="var(--line)"/>
+
+        <rect x="208" y="4" width="84" height="40" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+        <text x="250" y="21" text-anchor="middle" font-weight="600">SCORE</text>
+        <text x="250" y="35" text-anchor="middle" font-size="7" fill="var(--muted)">slots, then doubts</text>
+
+        <path d="M 296 24 L 308 24" stroke="var(--line)" stroke-width="1.2" marker-end="url(#pf)" color="var(--line)"/>
+
+        <rect x="312" y="4" width="78" height="40" rx="4" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.3"/>
+        <text x="351" y="21" text-anchor="middle" font-weight="600" fill="var(--amber)">GATE</text>
+        <text x="351" y="35" text-anchor="middle" font-size="7" fill="var(--amber)">step 4, next</text>
+      </g>
+    </svg>
+    <figcaption>The first three boxes are this step, all inside <code>rule_parser.py</code>; the
+    fourth is <code>generate.py</code>'s <code>fast_propose</code> deciding whether to trust the
+    score &mdash; covered next.</figcaption>
+    <pre><code>"add meeting w/ sam tmrw at 3"
+  normalize &#8594; "add meeting with sam tomorrow at 3"
+  route     &#8594; ("add", "calendar") &#8594; create_event   ("meeting" names the domain)
+  slots     &#8594; title / date / start_time all filled &#8594; score 1.00
+  gate      &#8594; &ge; 0.85, nothing missing, no compound cue &#8594; commit now
+</code></pre>
+
+    <p><strong>Normalize.</strong> A short table of regex aliases expands dictation shorthand
+    before anything else runs: <code>mtg</code> becomes meeting, <code>w/</code> becomes with,
+    <code>tmrw</code> becomes tomorrow, a bare weekday abbreviation becomes the full day name. It
+    runs on the transcript itself, before spaCy ever tags it, so a mishearing fixed here is fixed
+    for every phase after it.</p>
+
+    <p><strong>Route.</strong> A 76-entry table keyed on <code>(verb, domain)</code> pairs picks
+    the action &mdash; a domain-specific entry wins when one exists, otherwise the verb falls back
+    to what it means everywhere:</p>
+    <pre><code>("remove", "calendar")  &#8594; delete_event
+("add",    "todo")      &#8594; create_todo
+("show",   "calendar")  &#8594; query_schedule
+("buy",    None)        &#8594; create_todo   # no domain entry: buying is always a task
+</code></pre>
+    <p>The domain itself &mdash; calendar or todo &mdash; comes from keywords already in the
+    sentence ("meeting", "task", "list"); only when neither side speaks up does it fall back to
+    whichever screen happens to be open, which is exactly the &times;0.85 doubt below.</p>
+
+    <p><strong>Fill slots.</strong> Dates and times go through a dedicated recognizer, with regex
+    fallbacks for what it misses ("noon", a bare "at 3"); a title is picked from the sentence's own
+    noun chunks &mdash; the direct object first, then the object of a preposition, then simply the
+    chunk closest to the verb &mdash; with every temporal word carved out first, so a time is never
+    mistaken for part of a title. Which slots count as "filled" depends on the action: creating an
+    event needs a title, a date and a start time, while updating or deleting one is satisfied by
+    naming the event <em>or</em> giving the time that pins it down &mdash; either is enough.</p>
+
+    <p>The score starts at the fraction of required slots filled, then pays for its
     doubts:</p>
     <div class="tblwrap"><table>
       <tr><th class="num">factor</th><th>doubt</th></tr>
@@ -564,14 +629,42 @@ const P = {
     </table></div>
     <p>These multipliers are hand-picked and have never been calibrated against outcomes. Worth
     saying plainly: the threshold works in practice — the next step has the measurements — but
-    nobody has verified that 0.80 is the right price for a pronoun.</p>`
+    nobody has verified that 0.80 is the right price for a pronoun.</p>
+
+    <p>What comes out is more than one number. A clause the verb table couldn't route at all is
+    counted as a <strong>dropped span</strong> and discounts the whole result by another &times;0.7
+    on top of its own doubts; any required field still empty is named outright as a
+    <strong>missing slot</strong> ("date", "match_title") rather than folded silently into a lower
+    score. Step 4 reads both of those, not just the score itself &mdash; what it is confident about,
+    and exactly what, if anything, it is still unsure of.</p>`
   },
   route: {
     tag:"step 4 of 9", name:"route", title:"The fast lane — parallel, not instead",
     z:[310,239,2.4],
     sum:`<p>Two lanes in parallel. A confident rule parse (&ge; 0.85, nothing missing) answers <em>instantly</em>, and the deep pipeline runs behind that answer as its verifier. Anything uncertain takes the deep pipeline in front of you instead.</p>
     <p class="figs">fast: instant &#183; deep: seconds &mdash; every command gets the deep look either way</p>`,
-    more:`<p>Measured on the 94-command corpus (ASSISTANT_AUDIT_SUMMARY.md, runs 10&ndash;12):</p>
+    more:`<p>A perfect score is necessary but not sufficient. Three narrow checks run right after
+    it and can still send a confident, complete parse to the deep track instead &mdash; the fast
+    lane refuses rather than guesses, the same instinct that governs deleting anywhere in this
+    system:</p>
+    <div class="tblwrap"><table>
+      <tr><th>the check</th><th>what it catches</th></tr>
+      <tr><td>a strong-compound cue</td><td>wording that all but announces a second request
+      &mdash; "&#8230;at 9am, and then remind me&#8230;" &mdash; even when the rules themselves
+      read it as one</td></tr>
+      <tr><td>a generic-target veto</td><td>a mutation aimed at a bare noun: "delete the
+      reminder", "update this list" &mdash; neither names an actual event or task to act on</td></tr>
+      <tr><td>a mixed-mode compound</td><td>a confident multi-intent read that pairs a create
+      with an edit, delete or query on compound wording &mdash; "add milk, and then update the
+      workout list" reads as create_todo plus update_todo, and which half is really meant is a
+      judgment call, not a table lookup</td></tr>
+    </table></div>
+    <p>Each of the three is a regex or a name check against words already in hand, not a second
+    model call &mdash; the fast lane can only refuse in the same arithmetic register it committed
+    in. Fail any one and the command takes the deep track exactly as if the score itself had come
+    back low.</p>
+
+    <p>Measured on the 94-command corpus (ASSISTANT_AUDIT_SUMMARY.md, runs 10&ndash;12):</p>
     <div class="tblwrap"><table>
       <tr><th>track</th><th class="num">commands</th><th class="num">correct</th><th class="num">median</th></tr>
       <tr><td>fast &mdash; rules answer, pipeline checks behind</td><td class="num">39</td><td class="num">97%</td><td class="num">~0.1 s</td></tr>
@@ -582,7 +675,14 @@ const P = {
     days when an always-on checker proposed much and fixed nothing.</p>
     <p>The score is stored with every command. Keeping it is what makes the line itself checkable:
     group judged commands by the score they were given and see how often each group turned out
-    right &mdash; the only way to know whether 0.85 sits in the right place.</p>`
+    right &mdash; the only way to know whether 0.85 sits in the right place.</p>
+
+    <p>Put together, the fast lane is not the deep pipeline's rough draft running faster on easy
+    inputs &mdash; it is a narrow specialist that only ever answers on shapes it is sure of (a
+    single query, a single remove, a single clean create) and hands over anything carrying a
+    second request or an unresolved target rather than take a guess at it. The 97% above is what
+    that selectivity buys: nothing here is graded on partial credit for a compound it chose to
+    walk away from instead of touching.</p>`
   },
   split: {
     tag:"step 5 of 9", name:"split", title:"One sentence, several asks",
