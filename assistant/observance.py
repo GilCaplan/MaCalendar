@@ -227,13 +227,27 @@ def settings_from_config(cfg=None) -> ObservanceSettings:
     have moved the workout planner and left the calendar computing sundown
     for wherever the defaults were written.
     """
+    # The device's reported position must win even when config.yaml is
+    # missing or unreadable — the except path used to return bare defaults and
+    # silently ignore it (caught 2026-09-06: a checkout without config.yaml
+    # computed sundown for the default city while the phone said London).
+    here = get_location() or {}
     try:
         if cfg is None:
             from assistant.config import load_config
             cfg = load_config()
         ob = cfg.observance
     except Exception:
-        return DEFAULT_SETTINGS
+        d = DEFAULT_SETTINGS
+        if not here:
+            return d
+        return dataclasses.replace(
+            d,
+            latitude=here.get("latitude") or d.latitude,
+            longitude=here.get("longitude") or d.longitude,
+            timezone=here.get("timezone") or d.timezone,
+            city=here.get("city") or d.city,
+        )
 
     def _time(value, fallback):
         if isinstance(value, datetime.time):
@@ -249,7 +263,6 @@ def settings_from_config(cfg=None) -> ObservanceSettings:
     # the config says where you usually are, the device says where you are.
     # Only the position is taken from it — how long before candle lighting a
     # session must end is a preference, not a fact about the sky.
-    here = get_location() or {}
     return ObservanceSettings(
         latitude=here.get("latitude") or getattr(ob, "latitude", d.latitude),
         longitude=here.get("longitude") or getattr(ob, "longitude", d.longitude),

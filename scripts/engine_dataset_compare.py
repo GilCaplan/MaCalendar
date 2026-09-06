@@ -200,7 +200,35 @@ def main() -> int:
     ap.add_argument("--max-rank", type=int, default=0)
     ap.add_argument("--out-dir", type=pathlib.Path,
                     default=WORKTREE / "DOCUMENTATION" / "experiments" / "engine_compare")
+    ap.add_argument("--llm", default="",
+                    help="engine[:model] override for model-comparison sims, e.g. "
+                         "claude:claude-haiku-4-5-20251001. The Claude key comes "
+                         "from config.yaml or ANTHROPIC_API_KEY. The product "
+                         "stays offline; this is a harness-only simulation "
+                         "(Gil, 2026-09-06).")
     args = ap.parse_args()
+
+    if args.llm:
+        _engine, _, _model = args.llm.partition(":")
+        import assistant.config as _cmod
+        _orig_load = _cmod.load_config
+
+        def _patched(*a, **k):
+            cfg = _orig_load(*a, **k)
+            try:
+                cfg.llm_engine = _engine
+                if _model:
+                    getattr(cfg, _engine).model = _model
+                _key = os.environ.get("ANTHROPIC_API_KEY")
+                if _engine == "claude" and _key and not cfg.claude.api_key:
+                    cfg.claude.api_key = _key
+            except Exception as e:
+                print(f"--llm override failed: {e}")
+                raise
+            return cfg
+
+        _cmod.load_config = _patched
+        print(f"LLM override: {_engine}" + (f" · {_model}" if _model else ""))
 
     scorer = _load_scorer()
     prov = scorer.load_provenance(args.fixture)

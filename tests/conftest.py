@@ -44,7 +44,13 @@ _SCRATCH = _tempfile.mkdtemp(prefix="macalendar-tests-")
 for _var, _name in (("MACALENDAR_DB", "calendar.db"),
                     ("MACALENDAR_MEMORY_DB", "nlu_memory.db"),
                     ("MACALENDAR_VOCAB", "vocab.json"),
-                    ("MACALENDAR_CATEGORIES", "categories.json")):
+                    ("MACALENDAR_CATEGORIES", "categories.json"),
+                    # the device-location store was missed for a long time —
+                    # its tests were writing the REAL ~/.assistant_tools/
+                    # location.json (caught 2026-09-06 when two checkouts'
+                    # suites raced through the shared file)
+                    ("MACALENDAR_LOCATION", "location.json"),
+                    ("MACALENDAR_TRACE_BUS", "trace_bus.jsonl")):
     _os.environ.setdefault(_var, _os.path.join(_SCRATCH, _name))
 
 import json

@@ -19,6 +19,12 @@ The on/off flag now exists (`observance.enabled` in config.yaml, default on).
 Want a checkbox for it in the Mac settings popup too, or is the config file
 enough?
 
+**Q3 — Anthropic API key for the model-comparison sims.**
+The Haiku/Sonnet simulation runs are fully plumbed and sandboxed but blocked
+on a key: put it in config.yaml under `claude: api_key: ...` (gitignored) or
+export `ANTHROPIC_API_KEY` before I launch. ~250 rows × 2 models of deep-track
+calls — expect real API cost.
+
 ## Answered (log)
 
 - 2026-09-05 — **Old-brain comparison**: Gil doesn't care about it; the
