@@ -138,6 +138,15 @@ observance:
   minor_fast_is_rest_day: true   # Tzom Gedalia etc. = full rest, not a late run
   allow_motzei_fallback: true    # Saturday night only to save a lost session
 
+notifications:
+  enabled: true                # pre-event notifications (assistant/notify.py)
+  default_lead_minutes: 0      # 0 = opt-in only; N = N min before everything
+  category_leads: {}           # e.g. {Work: 15, Sports: 30, Errands: 0} - 0 MUTES that category
+  respect_observance: true     # hold/clamp reminders around Shabbat & yom tov
+  catch_up_minutes: 10         # Mac: fire late if missed by <= this and event not started
+  sound: true
+  speak: false                 # Mac only: also read the heads-up aloud
+
 hebrew_calendar:
   display_mode: "both"      # "english" | "hebrew" | "both" — Hebrew dates use gematria letters, never numerals
   show_holidays: true        # overlay Jewish/Israeli holidays on Month/Week/Day views

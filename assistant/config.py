@@ -199,6 +199,22 @@ class ObservanceConfig(BaseModel):
     allow_motzei_fallback: bool = True
 
 
+class NotificationsConfig(BaseModel):
+    """Pre-event notifications (see assistant/notify.py for the policy).
+
+    category_leads maps a category name to its lead in minutes; 0 MUTES the
+    whole category (Gil's rule), mirroring the event-level 0 = "explicitly
+    none". default_lead_minutes 0 means opt-in only: reminders fire only
+    where an event or category asked for one."""
+    enabled: bool = True
+    default_lead_minutes: int = 0
+    category_leads: dict[str, int] = {}
+    respect_observance: bool = True
+    catch_up_minutes: int = 10          # Mac: fire late if missed by <= this
+    sound: bool = True
+    speak: bool = False                 # Mac only: read aloud via tts
+
+
 class NLUConfig(BaseModel):
     # Words that trigger instant fast-path create + background LLM title fix.
     # When a voice command's extracted title matches one of these, the event is
@@ -265,6 +281,7 @@ class AppConfig(BaseModel):
     ui: UIConfig = UIConfig()
     hebrew_calendar: HebrewCalendarConfig = HebrewCalendarConfig()
     observance: ObservanceConfig = ObservanceConfig()
+    notifications: NotificationsConfig = NotificationsConfig()
 
     @field_validator("confirmation_level")
     @classmethod

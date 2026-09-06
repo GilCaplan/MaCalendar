@@ -990,7 +990,8 @@ def create_app() -> Flask:
         except ValueError as e:
             return jsonify({"error": str(e), "code": 400}), 400
 
-        return jsonify(rows)
+        from assistant.notify import annotate
+        return jsonify(annotate(rows))
 
     @app.get("/events/<int:event_id>")
     def event_get(event_id: int):
@@ -998,7 +999,8 @@ def create_app() -> Flask:
         row = db.get_event(event_id)
         if row is None:
             return jsonify({"error": "Event not found", "code": 404}), 404
-        return jsonify(row)
+        from assistant.notify import annotate
+        return jsonify(annotate([row])[0])
 
     @app.get("/events/<int:event_id>.ics")
     def event_ics(event_id: int):
@@ -1608,7 +1610,7 @@ def create_app() -> Flask:
     # ------------------------------------------------------------------
 
     _CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config.yaml")
-    _ALLOWED_PATCH_KEYS = {"llm_engine", "tts", "confirmation_level"}
+    _ALLOWED_PATCH_KEYS = {"llm_engine", "tts", "confirmation_level", "notifications"}
 
     @app.get("/config")
     def config_get():
@@ -1618,6 +1620,7 @@ def create_app() -> Flask:
             "tts": cfg.tts.model_dump(),
             "confirmation_level": cfg.confirmation_level,
             "todo": cfg.todo.model_dump(),
+            "notifications": cfg.notifications.model_dump(),
         })
 
     @app.patch("/config")

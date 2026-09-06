@@ -114,6 +114,9 @@ _MIGRATIONS = [
     "ALTER TABLE events ADD COLUMN external_source TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE events ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE events ADD COLUMN sync_dirty INTEGER NOT NULL DEFAULT 0",
+    # Pre-event notifications: NULL = inherit (category default, then global),
+    # 0 = explicitly none, N>0 = fire N minutes before start_time.
+    "ALTER TABLE events ADD COLUMN reminder_minutes INTEGER",
 ]
 
 _CREATE_CALENDAR_SOURCES_TABLE = """
@@ -232,6 +235,19 @@ CREATE TABLE IF NOT EXISTS courses (
     created_at TEXT    NOT NULL
 )
 """
+
+_CREATE_REMINDER_LOG_TABLE = """
+CREATE TABLE IF NOT EXISTS reminder_log (
+    event_id INTEGER NOT NULL,
+    fires_at TEXT    NOT NULL,               -- ISO local datetime it was due
+    fired_at TEXT    NOT NULL DEFAULT '',    -- when it actually delivered
+    outcome  TEXT    NOT NULL DEFAULT '',    -- fired | suppressed | missed
+    UNIQUE (event_id, fires_at)
+)
+"""
+# DB-backed (not in-memory) because the API runs with --reload: every source
+# edit restarts the process, and an in-memory fired-set would re-fire
+# constantly during development.
 
 _CREATE_ASSIGNMENTS_TABLE = """
 CREATE TABLE IF NOT EXISTS assignments (
@@ -638,6 +654,7 @@ class CalendarDB:
             conn.execute(_CREATE_COUNTER_PAYOUTS_TABLE)
             conn.execute(_CREATE_COURSES_TABLE)
             conn.execute(_CREATE_ASSIGNMENTS_TABLE)
+            conn.execute(_CREATE_REMINDER_LOG_TABLE)
             conn.execute(_CREATE_CALENDAR_SOURCES_TABLE)
             conn.execute(_CREATE_SYNC_DELETES_TABLE)
             conn.execute(_CREATE_WORKOUT_EXERCISES_TABLE)
@@ -792,8 +809,9 @@ class CalendarDB:
                 """
                 INSERT INTO events
                     (title, date, start_time, end_time, attendees, location, description,
-                     color, created_at, updated_at, series_id, recurrence, recurrence_end, category)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     color, created_at, updated_at, series_id, recurrence, recurrence_end,
+                     category, reminder_minutes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     intent.title,
@@ -812,6 +830,7 @@ class CalendarDB:
                     recurrence,
                     recur_until,
                     category,
+                    getattr(intent, "reminder_minutes", None),
                 ),
             )
             first_id = cur.lastrowid
@@ -911,8 +930,9 @@ class CalendarDB:
                 """
                 INSERT INTO events
                     (title, date, start_time, end_time, attendees, location, description,
-                     color, created_at, updated_at, series_id, recurrence, recurrence_end, category)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     color, created_at, updated_at, series_id, recurrence, recurrence_end,
+                     category, reminder_minutes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     data["title"],
@@ -929,6 +949,7 @@ class CalendarDB:
                     recurrence,
                     recur_until,
                     category,
+                    data.get("reminder_minutes"),
                 ),
             )
             first_id = cur.lastrowid
@@ -1008,6 +1029,27 @@ class CalendarDB:
                 (like, like, limit)).fetchall()
         return [dict(r) for r in rows]
 
+    def log_reminder(self, event_id: int, fires_at: str, outcome: str) -> bool:
+        """Record a reminder outcome; False if this (event, fire time) is
+        already logged — the notifier's re-fire guard across --reload
+        restarts."""
+        with self._conn() as conn:
+            try:
+                conn.execute(
+                    "INSERT INTO reminder_log (event_id, fires_at, fired_at, outcome) "
+                    "VALUES (?, ?, ?, ?)",
+                    (event_id, fires_at, datetime.datetime.now().isoformat(), outcome))
+                return True
+            except sqlite3.IntegrityError:
+                return False
+
+    def reminder_logged(self, event_id: int, fires_at: str) -> bool:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM reminder_log WHERE event_id = ? AND fires_at = ?",
+                (event_id, fires_at)).fetchone()
+        return row is not None
+
     def get_series_events(self, series_id: int) -> List[dict]:
         """Return all events belonging to a recurring series."""
         with self._conn() as conn:
@@ -1060,7 +1102,8 @@ class CalendarDB:
 
     def update_event(self, event_id: int, **fields) -> None:
         allowed = {"title", "date", "start_time", "end_time", "attendees",
-                   "location", "description", "color", "recurrence", "recurrence_end", "category"}
+                   "location", "description", "color", "recurrence",
+                   "recurrence_end", "category", "reminder_minutes"}
         updates = {k: v for k, v in fields.items() if k in allowed}
         if not updates:
             return
