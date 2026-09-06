@@ -139,6 +139,7 @@ class UIConfig(BaseModel):
     compact_ui: bool = False
     accent_color: str = "#f5a524"  # hex; brand accent used app-wide (Settings → Accent Color)
     show_coursework: bool = True  # toggled off from Settings to hide the Coursework tab entirely
+    show_week_numbers: bool = True  # ISO week number column in the month grid
     # Same per-tab switches the phone has (iOS Settings › Tabs)
     show_workout: bool = True
     show_timer: bool = True
@@ -173,6 +174,11 @@ class ObservanceConfig(BaseModel):
     deliberately separate: one answers "what is today called?", this one
     answers "may I train, and when?".
     """
+    # The master gate observance.is_enabled() reads. This field existing here
+    # is what makes the yaml key real: pydantic silently discards unknown
+    # keys, so before it was declared, `enabled: false` in config.yaml was
+    # dropped on load and only the MACALENDAR_OBSERVANCE env override worked.
+    enabled: bool = True
     latitude: float = 31.7683            # Jerusalem
     longitude: float = 35.2137
     timezone: str = "Asia/Jerusalem"

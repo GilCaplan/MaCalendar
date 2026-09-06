@@ -123,6 +123,13 @@ All endpoints are served by the Mac at `http://<tailscale-ip>:8080`; the iOS app
 | `DELETE` | `/events/<int:event_id>` |  |
 | `GET` | `/events/<int:event_id>` |  |
 | `PATCH` | `/events/<int:event_id>` |  |
+| `GET` | `/events/<int:event_id>.ics` | Share/export one event as an .ics file (import's symmetric half). |
+
+## /search
+
+| Method | Path | What it does |
+|---|---|---|
+| `GET` | `/search` | Substring search over events and tasks for the toolbar/search UIs. |
 
 ## /todos
 

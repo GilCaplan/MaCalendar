@@ -152,6 +152,7 @@ ui:
   font_tasks: 13
   font_coursework: 13
   compact_ui: false
+  show_week_numbers: true   # ISO week number column in the month grid
   accent_color: "#f5a524"   # hex; brand accent used app-wide (also editable from Settings → Accent Color)
   show_thinking: true       # show the assistant's stage-by-stage thinking HUD while a command runs.
                             # The HUD is a separate always-on-top app (assistant.thinking_hud),

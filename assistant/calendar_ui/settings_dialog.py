@@ -16,8 +16,10 @@ from PyQt6.QtWidgets import (
     QCheckBox, QColorDialog, QComboBox, QDialog, QFormLayout, QFrame, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QScrollArea, QSpinBox, QVBoxLayout, QWidget,
 )
 
+from assistant.calendar_ui import icons
 from assistant.calendar_ui import styles as _styles
 from assistant.calendar_ui.dialog_utils import install_enter_confirms
+from assistant.calendar_ui.styles import GRAY_TEXT
 
 
 def open_settings(self) -> None:
@@ -194,6 +196,15 @@ def open_settings(self) -> None:
     hebrew_israel_cb = QCheckBox("Israel holiday schedule (uncheck for Diaspora)")
     hebrew_israel_cb.setChecked(self._config.hebrew_calendar.israel_holidays)
     hebrew.addWidget(hebrew_israel_cb)
+    observance_cb = QCheckBox("Skip Shabbat && yom tov in series (observance)")
+    observance_cb.setObjectName("observance_enabled_cb")
+    observance_cb.setToolTip(
+        "Recurring series skip Shabbat, yom tov and fast days (meals excepted),\n"
+        "and the assistant declines to book into them. Uncheck to turn the\n"
+        "whole observance gate off.")
+    observance_cb.setChecked(bool(getattr(getattr(self._config, "observance", None),
+                                          "enabled", True)))
+    hebrew.addWidget(observance_cb)
 
     # ── Voice ─────────────────────────────────────────────────────
     voice = section("Voice")
@@ -426,6 +437,9 @@ def open_settings(self) -> None:
                 "hebrew_calendar": {"display_mode": hebrew_mode_combo.currentData(),
                                     "show_holidays": hebrew_holidays_cb.isChecked(),
                                     "israel_holidays": hebrew_israel_cb.isChecked()},
+                # Read by observance.is_enabled() in the API process, which
+                # loads config.yaml itself — nothing to apply in-memory here.
+                "observance": {"enabled": observance_cb.isChecked()},
             })
             if ok:
 

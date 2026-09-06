@@ -1000,6 +1000,30 @@ def create_app() -> Flask:
             return jsonify({"error": "Event not found", "code": 404}), 404
         return jsonify(row)
 
+    @app.get("/events/<int:event_id>.ics")
+    def event_ics(event_id: int):
+        """Share/export one event as an .ics file (import's symmetric half)."""
+        from assistant.ics_export import event_to_ics, filename_for
+        db = get_db()
+        row = db.get_event(event_id)
+        if row is None:
+            return jsonify({"error": "Event not found", "code": 404}), 404
+        resp = app.response_class(event_to_ics(row), mimetype="text/calendar")
+        resp.headers["Content-Disposition"] = \
+            f'attachment; filename="{filename_for(row)}"'
+        return resp
+
+    @app.get("/search")
+    def search():
+        """Substring search over events and tasks for the toolbar/search UIs."""
+        q = (request.args.get("q") or "").strip()
+        if len(q) < 2:
+            return jsonify({"error": "q must be at least 2 characters",
+                            "code": 400}), 400
+        db = get_db()
+        return jsonify({"events": db.search_events(q),
+                        "todos": db.search_todos(q)})
+
     @app.post("/events")
     def event_create():
         data = request.get_json(silent=True) or {}

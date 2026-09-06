@@ -18,7 +18,9 @@ A single 1-second QTimer in TimerView drives all live displays.
 
 from __future__ import annotations
 
+import csv
 import datetime
+import os
 import time as _time
 from typing import Optional
 
@@ -28,6 +30,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QFormLayout,
     QFrame,
     QGridLayout,
@@ -2520,6 +2523,17 @@ class TimerView(QWidget):
             period_row.addWidget(btn)
             setattr(self, f"_period_btn_{period}", btn)
         period_row.addStretch()
+
+        # Export exactly what the tiles are aggregating (same period +
+        # timer-checklist filters) as a CSV file.
+        self._export_btn = QPushButton("Export CSV")
+        self._export_btn.setObjectName("seg_btn")
+        self._export_btn.setFixedHeight(26)
+        self._export_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._export_btn.setToolTip("Save the sessions behind these tiles to a CSV file")
+        self._export_btn.clicked.connect(lambda: self._on_export_csv())
+        period_row.addWidget(self._export_btn)
+
         layout.addLayout(period_row)
 
         tiles_row = QGridLayout()
@@ -2704,34 +2718,47 @@ class TimerView(QWidget):
             self._stats_selected_ids.discard(timer_id)
         self._recompute_stats_tiles()
 
-    def _recompute_stats_tiles(self) -> None:
+    def _stats_sessions(self) -> list[tuple[dict, dict, float]]:
+        """The (timer, session, seconds) rows the Stats tiles aggregate.
+
+        Single source for the tiles and the CSV export: active timers
+        filtered by the checklist selection (none checked = all), sessions
+        filtered by the selected period.
+        """
         active_timers = self._db.get_timers(include_archived=False)
         included_ids = self._stats_selected_ids if self._stats_selected_ids else {t["id"] for t in active_timers}
         period_start = self._period_start_date()
 
-        total_secs = 0.0
-        earn_by_currency: dict[str, float] = {}
-        session_count = 0
-
+        rows: list[tuple[dict, dict, float]] = []
         for t in active_timers:
             if t["id"] not in included_ids:
                 continue
-            sessions = self._db.get_timer_sessions(t["id"])
-            is_work = t.get("timer_type", "work") == "work"
-            currency = t.get("currency", _DEFAULT_CURRENCY)
-            rate = t.get("hourly_rate", 0)
-            for s in sessions:
+            for s in self._db.get_timer_sessions(t["id"]):
                 try:
                     s_date = datetime.datetime.fromisoformat(s["start_time"]).date().isoformat()
                 except Exception:
                     s_date = ""
                 if period_start is not None and s_date < period_start:
                     continue
-                secs = _duration_secs(s["start_time"], s.get("end_time"))
-                total_secs += secs
-                session_count += 1
-                if is_work and rate > 0:
-                    earn_by_currency[currency] = earn_by_currency.get(currency, 0.0) + (secs / 3600) * rate
+                rows.append((t, s, _duration_secs(s["start_time"], s.get("end_time"))))
+        return rows
+
+    def _recompute_stats_tiles(self) -> None:
+        active_timers = self._db.get_timers(include_archived=False)
+        included_ids = self._stats_selected_ids if self._stats_selected_ids else {t["id"] for t in active_timers}
+
+        total_secs = 0.0
+        earn_by_currency: dict[str, float] = {}
+        session_count = 0
+
+        for t, _s, secs in self._stats_sessions():
+            total_secs += secs
+            session_count += 1
+            is_work = t.get("timer_type", "work") == "work"
+            rate = t.get("hourly_rate", 0)
+            if is_work and rate > 0:
+                currency = t.get("currency", _DEFAULT_CURRENCY)
+                earn_by_currency[currency] = earn_by_currency.get(currency, 0.0) + (secs / 3600) * rate
 
         self._tile_tracked_time._value_label.setText(_fmt_duration(total_secs))
         if earn_by_currency:
@@ -2741,6 +2768,58 @@ class TimerView(QWidget):
             self._tile_earnings._value_label.setText("—")
         self._tile_active_timers._value_label.setText(str(len(included_ids)))
         self._tile_sessions._value_label.setText(str(session_count))
+
+    # ------------------------------------------------------------------
+    # CSV export
+    # ------------------------------------------------------------------
+
+    def _on_export_csv(self) -> None:
+        """Save the sessions the Stats tiles are aggregating to a CSV file.
+
+        One row per session — the same rows, period filter and timer
+        selection the tiles show — plus a TOTAL row mirroring the Tracked
+        Time and Total Earnings tiles. Rate/currency/earned stay empty for
+        personal timers and work timers with no rate, exactly as the cards
+        show no earnings for them.
+        """
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export Sessions CSV",
+            os.path.join(os.path.expanduser("~"), "Desktop", "timer_export.csv"),
+            "CSV files (*.csv)",
+        )
+        if not path:
+            return
+
+        total_secs = 0.0
+        earn_by_currency: dict[str, float] = {}
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(
+                ["project", "start", "end", "duration_hours", "hourly_rate", "currency", "earned"]
+            )
+            for t, s, secs in self._stats_sessions():
+                total_secs += secs
+                is_work = t.get("timer_type", "work") == "work"
+                rate = t.get("hourly_rate", 0) if is_work else 0
+                currency = t.get("currency", _DEFAULT_CURRENCY)
+                earned = (secs / 3600) * rate if rate > 0 else None
+                if earned is not None:
+                    earn_by_currency[currency] = earn_by_currency.get(currency, 0.0) + earned
+                writer.writerow([
+                    t.get("title", ""),
+                    s["start_time"],
+                    s.get("end_time") or "",          # empty = still running
+                    f"{secs / 3600:.4f}",
+                    f"{rate:g}" if rate > 0 else "",
+                    currency if rate > 0 else "",
+                    f"{earned:.2f}" if earned is not None else "",
+                ])
+            # Totals row — earnings joined per currency, same format as the
+            # Total Earnings tile.
+            total_earned = "  ·  ".join(
+                f"{_currency_symbol(c)}{amt:,.2f}" for c, amt in earn_by_currency.items()
+            )
+            writer.writerow(["TOTAL", "", "", f"{total_secs / 3600:.4f}", "", "", total_earned])
 
     # ------------------------------------------------------------------
     # Load / reload

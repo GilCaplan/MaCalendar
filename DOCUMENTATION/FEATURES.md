@@ -22,9 +22,12 @@ purely backend (no client code beyond displaying the effects).
 | UI | [Direct editing & undo](#direct-manipulation-editing--undo) | drag-reschedule/resize, dbl-click create, ⌘Z | views, `window.py` |
 | UI | [Morning briefing](#morning-briefing) | Brief Me: today summarised + spoken | `day_view.py` |
 | UI | [Tasks power features](#tasks-power-features) | rich notes, sorts, reorder, cal→tasks sync | `todo_view.py` |
+| UI | [Search & jump-to-date](#search--jump-to-date) | toolbar search over events/tasks; type a date to jump | `window.py`, `SearchView.swift` |
+| UI | [Small conveniences](#small-conveniences) | duplicate event, week numbers, Timer CSV export | `event_dialog.py`, `month_view.py`, `timer_view.py` |
 | hybrid | [Calendar views](#calendar-views-month--week--day) | month/week/day browsing + event CRUD, drag, undo | `calendar_ui/`, iOS views, `db.py` |
 | hybrid | [Tasks](#tasks--to-dos) | Today/General lists, priorities, quantities | `db.py`, `TasksView` |
 | hybrid | [Tag discovery](#tag-discovery--the-class-set-grows-with-consent) | consent-based new classes + history | `actions/todo/tag_discovery.py` |
+| hybrid | [Share event as .ics](#share-event-as-ics) | one event → RFC 5545 file, both platforms | `ics_export.py`, `event_dialog.py` |
 | hybrid | [Voice I/O & capture controls](#voice-in--voice-out--capture-controls) | hotkey/stop-phrases/review-bar; engine-selectable STT; spoken replies | `stt/`, `Voice/`, `tts/` |
 | hybrid | [Edit-transcription gate](#the-edit-transcription-round-trip-needs_edit) | doubted words → editor → learned | `engine/transcript.py` |
 | hybrid | [Self-check & revert](#background-self-check--one-tap-revert) | background re-reasoning, one-tap undo | `engine/__init__.py`, panels |
@@ -285,6 +288,43 @@ panel, macOS app, external devices.
 
 
 ## Purely backend
+
+### Search & jump-to-date
+
+**What:** the Mac toolbar has a search box: type words to find events (title/
+location/description) and tasks (title/notes), pick a result to jump to its
+date or the Tasks tab; type a date ("2026-10-14", "14/10") to jump straight
+there. iOS gets a magnifying-glass sheet over the offline cache, so it works
+away from the Mac.
+**Where:** Mac `calendar_ui/window.py` (`_on_search`, `_parse_jump_date`);
+server `GET /search` (`db.search_events/search_todos`); iOS
+`Views/SearchView.swift`.
+**How:** substring LIKE queries, events soonest-first, open tasks first; the
+Mac GUI queries its local db directly (same path as rendering), iOS filters
+`LocalStore` — no network needed on either.
+
+### Share event as .ics
+
+**What:** one event exported as a standard calendar file — "Share .ics" in
+the Mac event dialog (saves via file dialog), share-sheet on iOS.
+**Where:** `assistant/ics_export.py` (pure), `GET /events/<id>.ics`
+(`server.py`), Mac `event_dialog.py`, iOS `EventDetailView.swift`.
+**How:** one row → one VEVENT deliberately: series are materialized rows
+here, so an RRULE would double-book on re-import and can't express
+observance skips. Floating local times (the store has no timezone), RFC 5545
+escaping + 75-octet folding. Import's symmetric half.
+
+### Small conveniences
+
+**What:** duplicate event (dialog button → one-off copy, undoable); ISO week
+numbers in the month grid (`ui.show_week_numbers`); Timer stats → CSV export
+mirroring exactly what the panel shows.
+**Where:** `event_dialog.py` + `window.py` (duplicate), `month_view.py`
+(week numbers — the row's Monday names the ISO week, since a Sunday-first
+row straddles two), `timer_view.py` (`_on_export_csv`).
+**How:** duplicate strips series identity (a copied instance is a one-off,
+same boundary as undo-restore); CSV derives rows from the panel's own
+aggregation helper so file and tiles can't disagree.
 
 ### The engine (engine-v2) — the brain
 **What:** Speech/text → events, tasks, answers. A fast track (confident rule

@@ -2,7 +2,7 @@
 
 The Mac review panel reads `assistant.trace.STAGE_INFO` directly; the iOS
 `ThinkingView` carries a hand-mirrored Swift copy (`EngineChain.scaffold` in
-VocabularyView.swift), because Swift can't import Python. This pins the two
+ThinkingView.swift), because Swift can't import Python. This pins the two
 together, so editing a step's explanation on one side but not the other fails
 the build — the same drift guard `test_artifact_claims` gives the published
 pages and `test_panel_agreement` gives the chain itself.
@@ -17,7 +17,7 @@ import pytest
 import assistant.trace as trace
 
 IOS = (pathlib.Path(__file__).resolve().parents[2]
-       / "MACalendar-iOS" / "MACalendar-iOS" / "Views" / "VocabularyView.swift")
+       / "MACalendar-iOS" / "MACalendar-iOS" / "Views" / "ThinkingView.swift")
 
 
 def _norm(s: str) -> str:
@@ -36,4 +36,4 @@ def test_ios_chain_info_matches_the_host():
             f"iOS scaffold is missing the heading {heading!r} for slot {label!r}")
         assert _norm(body) in swift, (
             f"iOS scaffold's in-depth copy for {label!r} has drifted from "
-            "trace.STAGE_INFO — update EngineChain.scaffold in VocabularyView.swift")
+            "trace.STAGE_INFO — update EngineChain.scaffold in ThinkingView.swift")

@@ -988,6 +988,26 @@ class CalendarDB:
             row = conn.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
         return dict(row) if row else None
 
+    def search_events(self, q: str, limit: int = 50) -> List[dict]:
+        """Substring match over title/location/description, soonest first."""
+        like = f"%{q}%"
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM events WHERE title LIKE ? OR location LIKE ? "
+                "OR description LIKE ? ORDER BY date, start_time LIMIT ?",
+                (like, like, like, limit)).fetchall()
+        return [dict(r) for r in rows]
+
+    def search_todos(self, q: str, limit: int = 50) -> List[dict]:
+        """Substring match over title/notes; open tasks first, then done."""
+        like = f"%{q}%"
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM todos WHERE title LIKE ? OR notes LIKE ? "
+                "ORDER BY completed, position LIMIT ?",
+                (like, like, limit)).fetchall()
+        return [dict(r) for r in rows]
+
     def get_series_events(self, series_id: int) -> List[dict]:
         """Return all events belonging to a recurring series."""
         with self._conn() as conn:

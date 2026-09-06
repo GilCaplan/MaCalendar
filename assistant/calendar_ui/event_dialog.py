@@ -71,6 +71,7 @@ class EventDialog(QDialog):
         self._default_time = default_time
         self.event_data: Optional[dict] = None
         self.delete_requested: bool = False
+        self.duplicate_requested: bool = False
         self.delete_series_requested: bool = False
 
         # ICS-subscribed events are always read-only (no write endpoint
@@ -261,6 +262,20 @@ class EventDialog(QDialog):
             del_btn.clicked.connect(self._on_delete)
             btn_row.addWidget(del_btn)
 
+            share_btn = QPushButton("Share .ics")
+            share_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            share_btn.setAutoDefault(False)
+            share_btn.setDefault(False)
+            share_btn.clicked.connect(lambda: self._on_share_ics())
+            btn_row.addWidget(share_btn)
+
+            dup_btn = QPushButton("Duplicate")
+            dup_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            dup_btn.setAutoDefault(False)
+            dup_btn.setDefault(False)
+            dup_btn.clicked.connect(lambda: self._on_duplicate())
+            btn_row.addWidget(dup_btn)
+
         btn_row.addStretch()
 
         # Cancel + Save
@@ -278,6 +293,30 @@ class EventDialog(QDialog):
         layout.addLayout(btn_row)
 
         self._title.setFocus()
+
+    def _on_duplicate(self) -> None:
+        # The caller owns the copy (same flag pattern as delete): it strips
+        # series identity so duplicating one instance yields a one-off, not a
+        # second parallel series.
+        self.duplicate_requested = True
+        self.accept()
+
+    def _on_share_ics(self) -> None:
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+
+        from assistant.ics_export import event_to_ics, filename_for
+        import os
+        default = os.path.join(os.path.expanduser("~/Desktop"),
+                               filename_for(self._event))
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Share event as .ics", default, "Calendar file (*.ics)")
+        if not path:
+            return
+        try:
+            with open(path, "w") as f:
+                f.write(event_to_ics(self._event))
+        except OSError as e:
+            QMessageBox.warning(self, "Share failed", str(e))
 
     def _set_read_only_widgets(self) -> None:
         for w in (

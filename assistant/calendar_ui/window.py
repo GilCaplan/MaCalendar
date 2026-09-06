@@ -493,6 +493,15 @@ class CalendarWindow(QMainWindow):
         today_btn.clicked.connect(self._on_today)
         layout.addWidget(today_btn, alignment=v_center)
 
+        layout.addSpacing(6)
+        self._search_box = QLineEdit()
+        self._search_box.setObjectName("toolbar_search")
+        self._search_box.setPlaceholderText("Search, or a date…")
+        self._search_box.setFixedSize(180, 30)
+        self._search_box.setClearButtonEnabled(True)
+        self._search_box.returnPressed.connect(lambda: self._on_search())
+        layout.addWidget(self._search_box, alignment=v_center)
+
         # ── Title ────────────────────────────────────────────────────
         layout.addSpacing(6)
         self._title_label = ElidingLabel()
@@ -642,6 +651,67 @@ class CalendarWindow(QMainWindow):
 
     def _on_sidebar_date(self, date: datetime.date) -> None:
         self._current_date = date
+        self._navigate()
+
+    # ── Toolbar search: find events/tasks, or jump straight to a date ────
+
+    @staticmethod
+    def _parse_jump_date(q: str) -> "datetime.date | None":
+        """'2026-10-14', '14/10' or '14/10/2026' → that date; else None."""
+        try:
+            return datetime.date.fromisoformat(q)
+        except ValueError:
+            pass
+        parts = q.split("/")
+        if len(parts) in (2, 3) and all(p.isdigit() for p in parts):
+            try:
+                day, month = int(parts[0]), int(parts[1])
+                year = int(parts[2]) if len(parts) == 3 else datetime.date.today().year
+                if year < 100:
+                    year += 2000
+                return datetime.date(year, month, day)
+            except ValueError:
+                return None
+        return None
+
+    def _on_search(self) -> None:
+        q = self._search_box.text().strip()
+        if not q:
+            return
+        jump = self._parse_jump_date(q)
+        if jump is not None:
+            self._search_box.clear()
+            if self._view_mode not in ("month", "week", "day"):
+                self._set_view("day")
+            self._current_date = jump
+            self._navigate()
+            return
+        if len(q) < 2:
+            return
+        events = self._db.search_events(q, limit=10)
+        todos = self._db.search_todos(q, limit=6)
+        from PyQt6.QtWidgets import QMenu
+        menu = QMenu(self._search_box)
+        if not events and not todos:
+            menu.addAction("No matches").setEnabled(False)
+        for e in events:
+            act = menu.addAction(f"{e['date']} {e['start_time']}  ·  {e['title'][:44]}")
+            act.triggered.connect(
+                lambda _, d=e["date"]: self._on_search_pick_event(d))
+        if events and todos:
+            menu.addSeparator()
+        for t in todos:
+            mark = "✓ " if t.get("completed") else ""
+            act = menu.addAction(f"task  ·  {mark}{t['title'][:44]}")
+            act.triggered.connect(lambda _: self._set_view("todo"))
+        menu.exec(self._search_box.mapToGlobal(
+            self._search_box.rect().bottomLeft()))
+
+    def _on_search_pick_event(self, date_str: str) -> None:
+        self._search_box.clear()
+        if self._view_mode not in ("month", "week", "day"):
+            self._set_view("day")
+        self._current_date = datetime.date.fromisoformat(date_str)
         self._navigate()
 
     def _on_day_selected(self, date: datetime.date) -> None:
@@ -846,6 +916,25 @@ class CalendarWindow(QMainWindow):
                 self._undo_manager.push(f'Delete "{event["title"]}"', undo, redo)
                 self.refresh_calendar()
                 self.show_toast(f"Deleted \"{event['title']}\"")
+            elif dialog.duplicate_requested and ev_id:
+                copy_data = self._event_content_fields(event)
+                # A duplicated series instance becomes a one-off: a non-empty
+                # recurrence in create_event_from_dict() would spawn a whole
+                # second series (same boundary as undo-restore above).
+                copy_data["recurrence"] = ""
+                copy_data["recurrence_end"] = ""
+                id_holder = {"id": self._db.create_event_from_dict(copy_data)}
+
+                def undo_dup():
+                    self._db.delete_event(id_holder["id"])
+
+                def redo_dup():
+                    id_holder["id"] = self._db.create_event_from_dict(copy_data)
+
+                self._undo_manager.push(f'Duplicate "{event["title"]}"',
+                                        undo_dup, redo_dup)
+                self.refresh_calendar()
+                self.show_toast(f"Duplicated \"{event['title']}\"")
             elif dialog.event_data:
                 ev_id = dialog.event_data.pop("id", None)
                 series_id = dialog.event_data.pop("series_id", None)

@@ -458,12 +458,21 @@ class MonthView(QWidget):
         header_layout = QGridLayout(self._header)
         header_layout.setContentsMargins(0, 0, 0, 0)
         header_layout.setSpacing(0)
+        self._show_wknums = bool(getattr(self._ui_config, "show_week_numbers", True))
+        off = 1 if self._show_wknums else 0
+        if self._show_wknums:
+            corner = QLabel("wk")
+            corner.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            corner.setStyleSheet("color: gray; font-size: 9px;")
+            header_layout.addWidget(corner, 0, 0)
+            header_layout.setColumnMinimumWidth(0, 26)
+            header_layout.setColumnStretch(0, 0)
         for col, name in enumerate(DAY_HEADERS):
             lbl = QLabel(name)
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._header_labels.append(lbl)
-            header_layout.addWidget(lbl, 0, col)
-            header_layout.setColumnStretch(col, 1)
+            header_layout.addWidget(lbl, 0, col + off)
+            header_layout.setColumnStretch(col + off, 1)
         layout.addWidget(self._header)
 
         # Grid
@@ -471,8 +480,11 @@ class MonthView(QWidget):
         self._grid = QGridLayout(self._grid_widget)
         self._grid.setContentsMargins(0, 0, 0, 0)
         self._grid.setSpacing(0)
+        if self._show_wknums:
+            self._grid.setColumnMinimumWidth(0, 26)
+            self._grid.setColumnStretch(0, 0)
         for col in range(7):
-            self._grid.setColumnStretch(col, 1)
+            self._grid.setColumnStretch(col + (1 if self._show_wknums else 0), 1)
         layout.addWidget(self._grid_widget, stretch=1)
 
         self._apply_header_style()
@@ -565,8 +577,17 @@ class MonthView(QWidget):
             last = weeks[-1]
             weeks.append([d + datetime.timedelta(days=7) for d in last])
 
+        off = 1 if self._show_wknums else 0
         for row, week in enumerate(weeks[:6]):
             self._grid.setRowStretch(row, 1)
+            if self._show_wknums:
+                # ISO weeks run Mon-Sun, so a Sunday-first row straddles two of
+                # them; the row's Monday (week[1]) names the week most of the
+                # row belongs to.
+                wk = QLabel(str(week[1].isocalendar()[1]))
+                wk.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                wk.setStyleSheet("color: gray; font-size: 9px;")
+                self._grid.addWidget(wk, row, 0)
             for col, date in enumerate(week):
                 cell = DayCell(date, date.month == self._month)
                 cell._ui_config = self._ui_config
