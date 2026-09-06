@@ -208,6 +208,37 @@ def main() -> int:
                          "(Gil, 2026-09-06).")
     args = ap.parse_args()
 
+    if args.llm.startswith("queue:"):
+        # Persistent-worker bridge (Gil, 2026-09-06): ONE long-lived Claude
+        # subagent per model serves a file queue — no per-call process spawn.
+        # The harness drops <id>.req.json ({system, user}) into the queue dir
+        # and polls for <id>.resp.json; the shepherding session spawns and
+        # recycles the workers. Requests within a worker's ~40-call window
+        # share its conversation (bounded; noted in MODEL_COMPARISON.md).
+        _, _alias, _qdir = args.llm.split(":", 2)
+        _q = pathlib.Path(_qdir); _q.mkdir(parents=True, exist_ok=True)
+        import uuid as _uuid
+        import assistant.intent.parser as _pmod
+        from assistant.exceptions import LLMTimeoutError
+
+        def _queue_call(self, sys_prompt, user):
+            rid = _uuid.uuid4().hex[:12]
+            tmp = _q / f"{rid}.tmp"
+            tmp.write_text(json.dumps({"system": sys_prompt, "user": user}))
+            tmp.rename(_q / f"{rid}.req.json")
+            resp = _q / f"{rid}.resp.json"
+            deadline = time.time() + 600
+            while time.time() < deadline:
+                if resp.exists():
+                    out = resp.read_text()
+                    resp.unlink(missing_ok=True)
+                    return out
+                time.sleep(0.15)
+            raise LLMTimeoutError(f"queue worker did not answer {rid}")
+
+        _pmod.IntentParser._call_claude = _queue_call
+        args.llm = f"claude:queue-{_alias}"
+
     if args.llm.startswith("cli:"):
         # Claude-Code-CLI bridge (Gil, 2026-09-06): each engine LLM call shells
         # out to `claude -p --model <alias>` — runs on the Claude Code plan,
