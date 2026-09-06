@@ -147,6 +147,122 @@ generate.fragment= FastRule(cfg.fragment.threshold)  # 0.60
 # future: FastRule(cfg.by_context["query"].threshold) etc.
 ```
 
+## Full-system pseudo-code (one command, end to end)
+
+```
+# ── ENTRY ────────────────────────────────────────────────────────────────
+Engine.run(prompt, source, trace, view):
+    state = EngineState(raw=prompt, text=prompt, source, trace, view)
+
+    # STEP 0 — intake: coalesce any queued commands, strip stop-words,
+    #          drop trivial false-starts (not remembered)
+    state = intake(state)
+
+    # ── FAST TRACK: FastRule(0.80) is the front door ─────────────────────
+    r = self.front.run(state.text)                 # FastRule → commit or defer
+    if r.committed:
+        state.items    = items_from(r.intents)
+        state.parse_path = "fast"
+        execute(state)                             # writes to db, ~ms, no LLM
+        answer = respond(state)                    # instant answer to the client
+        spawn_background(self.verify.review, state)  # LLM judge runs BEHIND it
+        return answer
+    # r.reason told us why it deferred (below-threshold / not-atomic / …)
+
+    # ── DEEP TRACK: DeepSystem runs the ordered stages ───────────────────
+    return self.deep.run(state)
+
+
+# ── DEEP PIPELINE ────────────────────────────────────────────────────────
+DeepSystem.run(state):
+    reentries = 0
+    for stage in [Transcript, Segment, Decompose, Generate, Validate,
+                  Crosscheck, Label]:
+        if stage.can_skip(state):        # deterministic self-skip (no LLM)
+            continue
+
+        state = stage.run(state, cfg)    # each stage's FROZEN contract
+
+        # crosscheck is the judge; it can send us back
+        if stage is Crosscheck:
+            blame = route(state.findings)          # deterministic blame-by-type
+            if blame and reentries < BUDGET:
+                reentries += 1
+                append_mistake_context(state, blame)
+                rewind_to(blame.stage)             # re-run from the blamed stage
+                continue
+
+    execute(state)                       # commit the deep-track objects
+    return respond(state)
+
+
+# ── SEGMENT / DECOMPOSE (LLM, deterministic-first, self-skipping) ─────────
+Segment.run(state):      # brackets/markers free; else ONE schema-LLM call
+    state.items = split_into(events, tasks, review)   # under-split when unsure
+    return state
+
+Decompose.run(state):    # one bounded pass; recursion depth ≤ 2
+    for item in state.items:
+        item.subitems = split_times / split_tasks / quantity(item)  # free rules
+        # (may be re-entered from Generate when a fragment isn't atomic)
+    return state
+
+
+# ── GENERATE: rules-first per fragment; LLM only on the residue ──────────
+Generate.run(state):
+    for item in atomic_fragments(state):
+        r = self.fragment.run(item.text)           # FastRule(0.60)
+        if r.committed:
+            item.take(r.intents)                   # RULES parsed it — no LLM
+        elif r.reason in ("strong-compound", "mixed-mode-compound"):
+            item.needs_breakdown = True            # NOT atomic → Decompose again
+        else:
+            item.take(llm_parse(item.text))        # genuinely hard → 1 LLM call
+
+    if any(i.needs_breakdown for i in state.items) and depth < 2:
+        rewind_to(Decompose)                       # bounded re-split
+    # honest fallbacks close the ladder:
+    #   event_fallback (grounded default-title), task_fallback,
+    #   invention_guard (drop an LLM title the words never said)
+    return state
+
+
+# ── VALIDATE: ordered named rules; observance gate for AI-created events ─
+Validate.run(state):
+    for rule in [past_date_bump, am_pm_fix, end_before_start,
+                 until_through, weekly_start_day, cadence_round,
+                 observance_gate, …]:
+        state.items, fixes = rule(state.items, state.text)
+        state.record(fixes)                        # every fix → trace
+    return state
+
+
+# ── CROSSCHECK: the LLM extracts, code judges (the single verifier) ──────
+Crosscheck.run(state):
+    said     = llm_extract(state.raw)              # what the RAW words asked for
+    made     = state.items                         # what we produced
+    state.findings = diff(said, made)              # missing / extra / wrong_field
+    return state                                   # DeepSystem.run routes blame
+
+
+# ── BACKGROUND VERIFY on a FAST commit (path B) ──────────────────────────
+Verifier.review(state):                            # same Crosscheck object
+    findings = self.crosscheck.run(state)
+    for f in findings:
+        if   f.tier == "title": rename_in_place(f)         # always
+        elif self.apply:        apply_patch(f)             # once precision earns it
+        else:                   advise(f)                  # "worth a look" + 1-tap
+    publish(verify_token)                          # client polls / HUD shows it
+```
+
+**Read it as:** FastRule is asked first (front door). If it commits, the
+client gets an instant answer and the LLM judge audits it in the background.
+If it defers, the deep pipeline runs — where FastRule is asked *again per
+fragment*, the LLM parses only what FastRule can't, the compound gates catch
+fragments that were never atomic, and the LLM crosscheck is the one judge
+that both gates the deep commit and (in the background) audits every fast
+commit.
+
 ## Preserved exactly (sacred)
 
 - The **7 stage I/O contracts** — frozen; classes wrap, never reshape.
