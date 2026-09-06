@@ -238,6 +238,14 @@ def run(state: EngineState, cfg) -> EngineState:
                 state.add_fix("generate", "event_kind_retry", "", item.text[:40],
                               note="the parse contradicted the item's event kind")
                 got = retried
+        if item.kind == "event" and (not got or all(n == "unknown" for n, _ in got)):
+            fb = _event_fallback(item.text)
+            if fb is not None:
+                item.action, item.intent = "create_event", fb
+                state.add_fix("generate", "event_fallback", "", item.text[:40],
+                              note="literal set-an-event ask with a grounded when")
+                out.append(item)
+                continue
         if item.kind == "task" and (not got or all(n == "unknown" for n, _ in got)):
             # Segmentation already judged these words a to-do; a parse that
             # comes back empty for them is the model failing the words, not
@@ -268,6 +276,39 @@ def run(state: EngineState, cfg) -> EngineState:
             out.append(sub)
     state.items = out
     return state
+
+
+#: The literal ask that grounds a default title — the noun IS in the words.
+_EVENT_ASK = re.compile(
+    r"\b(?:set|make|create|add|schedule|book|put)\b[^.!?]*?\b(event|reminder|appointment)\b"
+    r"|\b(event|reminder|appointment)\b[^.!?]*?\b(?:set|make|create|add|schedule|book|put)\b",
+    re.I)
+
+
+def _event_fallback(text: str):
+    """The event twin of task_fallback (hypothesis #2, cycle 5).
+
+    Fires only after the event-kind retry also produced nothing: when the
+    words LITERALLY ask to set an event/reminder/appointment ("Set a event
+    for the evening", "Set reminder for three o'clock") and the date
+    recognizer grounds a when in those same words, the honest object is a
+    default-titled event — noun and when are both in the transcript, so
+    nothing is invented. No literal ask, or no grounded when, returns None
+    and the item stays unknown; a time is never guessed.
+    """
+    m = _EVENT_ASK.search(text)
+    if not m:
+        return None
+    noun = next(g for g in m.groups() if g)
+    import datetime as _dt
+    from assistant.intent.rule_parser import _extract_temporal
+    t = _extract_temporal(text, _dt.date.today())
+    if not (t.get("date") or t.get("start_time")):
+        return None
+    from assistant.actions.calendar.intent import CalendarIntent
+    return CalendarIntent(title=noun.capitalize(), date=t.get("date"),
+                          start_time=t.get("start_time"),
+                          end_time=t.get("end_time"))
 
 
 def _apply_slots(item: Item) -> None:

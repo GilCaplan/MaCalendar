@@ -51,7 +51,23 @@ rows. Full table, caveats and the three-failure attempt log:
 `dataset/runs/x_sim-{sonnet,haiku}-partial-a`. Cycle slot closes; the queue
 resumes at hypothesis #2 (grounded default-title events).
 
-Every meaningful run, newest first. **Always: metric + slice + the commit that
+Every meaningful run, newest first.
+
+## Cycle 5 — grounded default-title events (hypothesis #2) — PREDICTION (written before the change)
+
+*Stage:* generate — the event twin of `task_fallback`, firing only after the
+event-kind retry also comes back empty/unknown. Gate: the text literally
+asks to set an event/reminder/appointment (the noun is the grounded default
+title) AND the datetime recognizer finds a date or clock time in the words.
+Never invents a time; no gate match ⇒ stays unknown (honest).
+*Predicted:* overall count-correct 78.4 → **79.4–79.9** on dev-fast
+(+1–1.5pt = 3–4 rows: "Set a event for the evening", "please set event on
+Tuesday", "Set reminder for three o'clock" class — simple tier and the e+e/
+e+t halves they sit in). Simple tier should move most; garbage-title rate
+must NOT rise (the title is a literal word from the ask). Adjusted metric
+expected to move in step (+1–1.5). Risk watched: invention-adjacent — any
+new event on a garble row is a regression even if count says otherwise.
+ **Always: metric + slice + the commit that
 produced it.** Baselines are replayed, not frozen — cite the score report and
 md5, not "the dataset".
 
