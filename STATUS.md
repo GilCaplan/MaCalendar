@@ -82,8 +82,10 @@ hand-written audit corpus is now only a regression floor.
    loop/proceed. Replace N per-item LLM parses with rules + one judgment.
    - Cycle 9 (IN FLIGHT) = conservative step 1: fragments trust rules at 0.60,
      LLM per-item fallback still allowed. Reads latency + accuracy.
-   - Cycle 10 = the FULL version IF 9 looks good: rules-first on every
-     fragment, LLM demoted to end-judge (crosscheck) only.
+   - Cycle 10 = the FULL version — CONFIRMED by Gil (2026-09-07) to run right
+     after cycle 9's read: after decompose's separation, EACH fragment goes
+     through the rule system; the LLM is the end-judge (crosscheck) only, not
+     a per-item parser. Gil-authorized design change.
 3. Only after BOTH tracks plateau do queued hypotheses reopen (dentist
    query-mutation bug, #4 list-op misreads, simple-tier fieldq anomaly).
 
