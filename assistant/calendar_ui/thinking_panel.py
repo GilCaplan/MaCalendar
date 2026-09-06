@@ -17,6 +17,7 @@ HUD feeds it from `assistant.trace_bus`.
 from __future__ import annotations
 
 import datetime as _dt
+import time as _time
 
 from PyQt6.QtCore import (
     QEasingCurve, QPoint, QPropertyAnimation, QRect, QSize, Qt, QTimer,
@@ -25,8 +26,8 @@ from PyQt6.QtCore import (
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen
 from PyQt6.QtWidgets import (
     QDialog, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QLabel, QLayout,
-    QLineEdit, QPushButton, QScrollArea, QSizePolicy, QToolTip, QVBoxLayout,
-    QWidget,
+    QLineEdit, QPushButton, QScrollArea, QSizePolicy, QStackedLayout,
+    QToolTip, QVBoxLayout, QWidget,
 )
 
 from assistant import trace as _trace
@@ -61,6 +62,13 @@ def _fmt_ms(ms: int) -> str:
     # Branch on the rounded value, or 999 ms prints "1.00 s" while 1000 ms
     # prints "1.0 s" right next to it.
     return f"{secs:.2f} s" if round(secs, 2) < 1 else f"{secs:.1f} s"
+
+
+def _fmt_live_ms(ms: int) -> str:
+    """The chain rail's live, still-running counter — always one decimal so
+    the digits advance at a steady, readable rate instead of snapping between
+    one and two decimals the way the frozen `_fmt_ms` does at the 1s mark."""
+    return f"{max(0, ms) / 1000:.1f} s"
 
 
 # What the producers call themselves → what to call it on screen. The API
@@ -192,6 +200,20 @@ class _Spinner(QWidget):
     def set_color(self, color: str) -> None:
         self._color = color
         self.update()
+
+    def set_running(self, running: bool) -> None:
+        """Stop ticking when parked in a row that isn't the active one.
+
+        A `_ChainRail` gives every slot its own spinner so no widget is ever
+        reparented between rows; left on a free-running timer, a history of
+        finished runs (each with its own rail, kept behind the current one)
+        would mean dozens of spinners repainting 16 times a second for
+        nothing on screen. Idle ones are simply not ticking.
+        """
+        if running and not self._timer.isActive():
+            self._timer.start(60)
+        elif not running and self._timer.isActive():
+            self._timer.stop()
 
     def _tick(self) -> None:
         self._angle = (self._angle + 30) % 360
@@ -365,6 +387,12 @@ class _ChainRail(QFrame):
     from a live step to a slot is by stage, in order — so the two `rule` slots
     and any stage the deep track self-skips resolve correctly."""
 
+    # Live elapsed counter on the active row: how often it repaints (10Hz —
+    # fast enough to read as "live", cheap enough that a dozen finished rails
+    # sitting idle in history cost nothing, since only a rail with a run still
+    # in flight ever has its timer running at all).
+    _LIVE_TICK_MS = 100
+
     def __init__(self, brain: str, theme: _Theme, parent=None) -> None:
         super().__init__(parent)
         self._brain = brain
@@ -372,9 +400,16 @@ class _ChainRail(QFrame):
         self._slots: list[tuple[str, str]] = list(_trace.CHAINS.get(brain, []))
         self._done: set[int] = set()
         self._active: int | None = None
+        self._active_since: float | None = None   # time.monotonic() when it lit
+        self._durations: dict[int, int] = {}        # slot index -> frozen ms
         self._ptr = 0
         self._finished = False
-        self._rows: list[tuple[int, str, QLabel, QLabel, QLabel]] = []
+        # (index, stage, icon, label, time label, mark stack, mark label, spinner)
+        self._rows: list[tuple[int, str, QLabel, QLabel, QLabel, QStackedLayout, QLabel, _Spinner]] = []
+
+        self._live_timer = QTimer(self)
+        self._live_timer.setInterval(self._LIVE_TICK_MS)
+        self._live_timer.timeout.connect(self._tick_live)
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(10, 8, 10, 8)
@@ -409,16 +444,41 @@ class _ChainRail(QFrame):
             text.setFont(tf)
             row.addWidget(text)
             row.addStretch(1)
+
+            # Duration — right-aligned monospace, same recipe as _StepRow._ms,
+            # so a slot's number reads identically whether it's on the rail or
+            # on the raw step below it.
+            time_lbl = QLabel("")
+            tmf = QFont()
+            tmf.setFamilies(["SF Mono", "Menlo", "Consolas", "monospace"])
+            tmf.setPointSize(max(8, time_lbl.font().pointSize() - 2))
+            time_lbl.setFont(tmf)
+            row.addWidget(time_lbl)
+
+            # The ✓/skipped mark and the in-flight spinner share one fixed-size
+            # slot (a QStackedLayout) so swapping between them never resizes
+            # the row — only one of the two is ever showing.
+            mark_box = QWidget()
+            mark_box.setFixedSize(14, 14)
+            mark_stack = QStackedLayout(mark_box)
+            mark_stack.setContentsMargins(0, 0, 0, 0)
             state = QLabel("")
+            state.setAlignment(Qt.AlignmentFlag.AlignCenter)
             sf = QFont()
             sf.setPointSize(max(8, state.font().pointSize() - 2))
             state.setFont(sf)
-            row.addWidget(state)
+            spinner = _Spinner(theme.accent, size=12)
+            spinner.set_running(False)
+            mark_stack.addWidget(state)
+            mark_stack.addWidget(spinner)
+            mark_stack.setCurrentWidget(state)
+            row.addWidget(mark_box)
+
             info = _trace.stage_info(brain, label)
             if info:
                 row.addWidget(_InfoDot(info[0], info[1], theme))
             lay.addLayout(row)
-            self._rows.append((i, stage, icon, text, state))
+            self._rows.append((i, stage, icon, text, time_lbl, mark_stack, state, spinner))
 
         self.apply_theme(theme)
         self._render()
@@ -431,42 +491,97 @@ class _ChainRail(QFrame):
             return
         for i in range(self._ptr, len(self._slots)):
             if self._slots[i][0] == stage:
-                if self._active is not None:
-                    self._done.add(self._active)
-                self._active = i
-                self._ptr = i + 1
-                self._render()
+                self._advance_to(i, freeze_ms=step.get("ms", 0))
                 return
         # A stage that repeats past the pointer (a loop-back, an extra rule
         # pass) re-lights the last slot of that stage rather than falling off.
         for i in range(len(self._slots) - 1, -1, -1):
             if self._slots[i][0] == stage:
                 self._active = i
+                self._active_since = _time.monotonic()
+                self._live_timer.start()
                 self._render()
                 return
+
+    def _advance_to(self, i: int, freeze_ms: int) -> None:
+        """A new slot lit up — the previous active one (if any) is done.
+
+        Its duration is the arriving step's own `ms`: that step's `ms` is
+        "time since the previous step" (assistant.trace.Trace.step), which is
+        exactly the span the previous slot spent glowing as active — the same
+        number whether this is a live run or a replayed history entry, so a
+        completed slot's seconds are never a locally-reconstructed guess.
+        """
+        if self._active is not None:
+            self._done.add(self._active)
+            self._durations[self._active] = int(freeze_ms or 0)
+        self._active = i
+        self._ptr = i + 1
+        self._active_since = _time.monotonic()
+        self._live_timer.start()
+        self._render()
 
     def finish(self) -> None:
         if self._active is not None:
             self._done.add(self._active)
+            # No further step to source a duration from (this is the chain's
+            # last live slot) — the wall-clock span it spent active is the
+            # only number there is, and it's the same live counter the row
+            # was already showing, simply no longer advancing.
+            if self._active_since is not None and self._active not in self._durations:
+                elapsed = int((_time.monotonic() - self._active_since) * 1000)
+                self._durations[self._active] = elapsed
         self._active = None
+        self._active_since = None
         self._finished = True
+        self._live_timer.stop()
         self._render()
+
+    def _tick_live(self) -> None:
+        if self._active is None or self._active_since is None:
+            return
+        elapsed = int((_time.monotonic() - self._active_since) * 1000)
+        # Update just the live row's number — a full _render() would also
+        # rebuild every icon/mark/style ten times a second for nothing.
+        for i, _stage, _icon, _text, time_lbl, _stack, _state, _spinner in self._rows:
+            if i == self._active:
+                time_lbl.setText(_fmt_live_ms(elapsed))
+                return
 
     def _render(self) -> None:
         theme = self._theme
-        for i, stage, icon, text, state in self._rows:
+        for i, stage, icon, text, time_lbl, mark_stack, state, spinner in self._rows:
             if i in self._done:
-                color, label_col, mark = theme.green, theme.text, "✓"      # ✓
+                color, label_col = theme.green, theme.text
+                mark_stack.setCurrentWidget(state)
+                state.setText("✓")            # ✓
+                spinner.set_running(False)
+                dur = self._durations.get(i)
+                time_lbl.setText(_fmt_ms(dur) if dur is not None else "")
             elif i == self._active and not self._finished:
-                color, label_col, mark = theme.accent, theme.text, "…"     # …
+                color, label_col = theme.accent, theme.text
+                spinner.set_color(theme.accent)
+                mark_stack.setCurrentWidget(spinner)
+                spinner.set_running(True)
+                elapsed = (int((_time.monotonic() - self._active_since) * 1000)
+                           if self._active_since is not None else 0)
+                time_lbl.setText(_fmt_live_ms(elapsed))
             elif self._finished:
-                color, label_col, mark = theme.border, theme.text2, "skipped"
+                color, label_col = theme.border, theme.text2
+                mark_stack.setCurrentWidget(state)
+                state.setText("skipped")
+                spinner.set_running(False)
+                time_lbl.setText("")
             else:
-                color, label_col, mark = theme.border, theme.text2, ""
+                color, label_col = theme.border, theme.text2
+                mark_stack.setCurrentWidget(state)
+                state.setText("")
+                spinner.set_running(False)
+                time_lbl.setText("")
             icon.setPixmap(icons.pixmap(_STAGE_ICONS.get(stage, "pending"), color, 12))
             text.setStyleSheet(f"color: {label_col}; background: transparent;")
-            state.setText(mark)
             state.setStyleSheet(f"color: {color}; background: transparent;")
+            time_lbl.setStyleSheet(f"color: {theme.text2}; background: transparent;")
 
     def apply_theme(self, theme: _Theme) -> None:
         self._theme = theme
