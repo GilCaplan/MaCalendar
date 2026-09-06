@@ -237,3 +237,15 @@ cannot validate them, only protect them:
 - Personal rule mining (fast-lane rules from the user's own vocab/history)
   ships SHADOW-MODE first: would-have-fired logged, never fired, promoted
   only after a quiet week on the weekly instrument.
+
+## Implementation vs. design — the line, and who crosses it (Gil, 2026-09-07)
+
+A normal cycle improves ONE component's IMPLEMENTATION within its frozen
+stage contract; I initiate these. A change to the CORE ALGORITHM / pipeline
+design — when the pipeline trusts rules vs. the LLM, how stages relate, the
+order of steps — is a DESIGN CHANGE: it is Gil's call, authorized
+explicitly at a cycle boundary, and recorded AS a design change (not
+disguised as the next hypothesis). I propose; Gil decides. Cycles 9 (relaxed
+sub-item bar) and 10 (rules-first per fragment, LLM as end-judge) are
+Gil-authorized design changes and are labeled so in HYPOTHESES.md/RESULTS.md
+— the run stands, only the framing was corrected.
