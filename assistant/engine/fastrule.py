@@ -5,10 +5,16 @@ reduced gate set; `.run(prompt)` returns a commit-or-abstain verdict.
 Two live instances, tuned for their populations (see generate.py):
   FastRule(0.80)                      the whole-command fast track —
                                       conservative; the deep track is its net.
-  FastRule(0.60, compound_gates=False) per-fragment inside the deep track —
-                                      aggressive; a fragment is post-decompose
-                                      and atomic, so the compound-splitting
-                                      gates don't apply; crosscheck is its net.
+  FastRule(0.60)                      per-fragment inside the deep track —
+                                      aggressive; crosscheck is its net.
+
+The abstention gates ALWAYS run — on a fragment they double as the atomicity
+check: a fragment that still trips the compound gate is one decompose did
+NOT fully break down, so FastRule abstains with reason "strong-compound" /
+"mixed-mode-compound" and the caller routes it for further breakdown (or the
+LLM). Safe on real fragments because the strong-compound regex keys on true
+joiners ("and then", ". also", "— and"), never a bare conjunction. The two
+instances differ ONLY in their confidence threshold.
 
 All abstention gates live here in ONE place, so both instances behave
 identically and the sandbox can iterate the class directly instead of
@@ -51,9 +57,8 @@ class FastRuleResult:
 
 
 class FastRule:
-    def __init__(self, threshold: float, *, compound_gates: bool = True):
+    def __init__(self, threshold: float):
         self.threshold = float(threshold)
-        self.compound_gates = compound_gates
 
     def run(self, text: str, current_view: str = "month") -> FastRuleResult:
         from assistant.engine.generate import _get_rule_parser
@@ -71,18 +76,19 @@ class FastRule:
         conf = float(rr.confidence)
         intents = rr.intents
 
-        # --- abstention gates, order preserved from the old fast_propose ---
-        if self.compound_gates:
-            if len(intents) <= 1 and _STRONG_COMPOUND_RE.search(text):
-                return FastRuleResult(False, intents, conf, "strong-compound")
-            if (len(intents) >= 2 and _STRONG_COMPOUND_RE.search(text)
-                    and any(n.startswith("create_") for n, _ in intents)
-                    and any(n.startswith(("update_", "delete_", "complete_", "query_"))
-                            for n, _ in intents)):
-                return FastRuleResult(False, intents, conf, "mixed-mode-compound")
-            if (_INTERROGATIVE_RE.search(text)
-                    and any(n.startswith("create_") for n, _ in intents)):
-                return FastRuleResult(False, intents, conf, "interrogative-create")
+        # --- abstention gates (always on; on a fragment they double as the
+        # "is this atomic, or does it need more breakdown?" check) ---
+        if len(intents) <= 1 and _STRONG_COMPOUND_RE.search(text):
+            # not atomic — decompose (or the caller) should split further
+            return FastRuleResult(False, intents, conf, "strong-compound")
+        if (len(intents) >= 2 and _STRONG_COMPOUND_RE.search(text)
+                and any(n.startswith("create_") for n, _ in intents)
+                and any(n.startswith(("update_", "delete_", "complete_", "query_"))
+                        for n, _ in intents)):
+            return FastRuleResult(False, intents, conf, "mixed-mode-compound")
+        if (_INTERROGATIVE_RE.search(text)
+                and any(n.startswith("create_") for n, _ in intents)):
+            return FastRuleResult(False, intents, conf, "interrogative-create")
         for name, intent in intents:
             if name.startswith(("update_", "delete_", "complete_")):
                 target = str(getattr(intent, "match_title", "") or "").strip()

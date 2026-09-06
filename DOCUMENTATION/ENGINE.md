@@ -125,9 +125,13 @@ deterministic rule parser + its abstention gates + a threshold, as a
 self-contained SELECTIVE CLASSIFIER: `FastRule(threshold).run(prompt)` returns
 a commit-or-abstain verdict. Two live instances, tuned per population:
 `FastRule(0.80)` is the conservative whole-command fast track (deep is its
-net); `FastRule(0.60, compound_gates=False)` is the aggressive per-fragment
-instance the deep track calls after decompose (a fragment is atomic, so the
-compound gates are off; crosscheck is its net). Its abstention gates:
+net); `FastRule(0.60)` is the aggressive per-fragment instance the deep track
+calls after decompose (crosscheck is its net). The gates ALWAYS run — on a
+fragment they double as the atomicity check: a fragment still tripping the
+compound gate is one decompose did not fully break down, so FastRule
+abstains ("strong-compound"/"mixed-mode-compound" reason) and the caller
+routes it for further breakdown. The two instances differ ONLY in
+threshold. Gates:
 strong-compound (two-request wording), mixed-mode (create+edit/query),
 interrogative-create (a question producing a create), generic-target (a
 mutation aimed at a bare noun). `fast_propose` (whole input) is the thin
