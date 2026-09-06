@@ -112,7 +112,11 @@ breakdowns** — count-correct (overall/complexity/compound-kind),
 missing-half, latency p50/p95, parse-path mix (n_deep/n_fast + per-path
 correctness), e+e date-collapse, garbage titles — plus a one-line summary.
 The COMPLETE reports (per-slice tables, every failing row, triage) are
-preserved per run in `DOCUMENTATION/experiments/engine_compare/<label>/`. `RESULTS.md` is the prose understanding; the csv is the machine-
+preserved per run in `DOCUMENTATION/experiments/engine_compare/<label>/`.
+**And every change ships a ledger row in `dataset/loop_changes.csv`** (cycle,
+component/stage, kind: bugfix/improvement/convention/feature/metric/process,
+description, commit) — each cycle report to Gil includes the tally: totals +
+breakdown per component, this cycle and cumulative. `RESULTS.md` is the prose understanding; the csv is the machine-
 readable trajectory, so the whole improvement process can be plotted
 (metric-vs-time / metric-vs-cycle) when it concludes. A run that isn't logged
 there didn't happen.

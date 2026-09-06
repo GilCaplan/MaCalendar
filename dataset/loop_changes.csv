@@ -1,0 +1,18 @@
+cycle,date,component,kind,description,commit
+1,2026-09-04,segment,bugfix,"LLM kind-label overrode the pinned remind+clock-time⇒event rule on the deep path; enforced deterministically over LLM labels",e956763
+2,2026-09-04,segment,convention,"Dated occasion reminder ⇒ calendar event (Gil ruling); errand form keeps the clock gate",8a3e127
+3,2026-09-04,generate,bugfix,"Fast path confidently committed single-intent readings of strong-joiner compounds (todo literally titled 'then'); gate refuses and takes deep",ce0c9b3
+4,2026-09-04,segment,improvement,"Data-driven cues: notify joins remind-words, festival joins occasions, 'calendar invite' ⇒ event on its own",f1c8d9d
+4,2026-09-04,process,improvement,"Hypothesis queue (HYPOTHESES.md) ranked best-first; re-ranked every rerun",743a8c0
+-,2026-09-04,process,new,"loop_log.csv: one plottable row per measurement run",e176323
+-,2026-09-05,harness,bugfix,"--limit defaulted to 150 and capped AFTER the rank filter: '--max-rank 600' silently ran 150 rows; all ladder commands carry --limit 0",6dc0fef
+-,2026-09-05,observance,feature,"observance.enabled user flag (config + env override) standing down BOTH gates (engine gate + series skip)",9c33548
+-,2026-09-05,harness,improvement,"Replays frozen at each row's recorded ts (the dataset is a history) with observance off — measurement epoch reset",9c33548
+-,2026-09-05,harness,bugfix,"freeze_time froze time.time and zeroed the latency metric; tick=True keeps durations real",15d15f0
+-,2026-09-05,process,new,"DEVQA.md: async questions instead of blocking prompts",9c33548
+-,2026-09-05,metrics,new,"Item-level micro P/R/F1: recall=nothing missed, precision=nothing invented (creations on query/remove cost it)",3e00b08
+-,2026-09-05,metrics,bugfix,"'off the tuning slice' claims re-counted tuned rows (dev-full ⊇ dev-fast); untuned 251-600 sub-slice now quoted separately",3e00b08
+-,2026-09-05,metrics,new,"Field-quality metric: when .5 (paramount, objective) · title .3 (similarity) · extras .2 (not-invented); tasks title/qty/tag .5/.3/.2; coverage-honest; difficulty-weighted headline",52af656
+-,2026-09-05,metrics,improvement,"Tag component = closed-set classification over the registry's finite classes, referenced to the product's own classifier",405819f
+-,2026-09-05,tagging,improvement,"resolve_tags heals LLM near-miss tags to the closest real class (case/stems/y↔ies/tight fuzzy); far-off names still drop to title inference",0706f1a
+-,2026-09-05,metrics,improvement,"Tag scoring follows the product's outcome (resolve → else infer), never the raw LLM emission",0706f1a
