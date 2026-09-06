@@ -383,3 +383,18 @@ def test_api_key_enforced_when_configured(tmp_path, monkeypatch, sample_config):
 
         wrong_key = client.get("/events", headers={"X-API-Key": "wrong"})
         assert wrong_key.status_code == 401
+
+
+def test_review_feed_excludes_probe_traffic(app_client):
+    """Health probes record with source='test'; they must never reach the
+    phone's review queue (43 identical probes once flooded it)."""
+    from assistant.intent.memory import get_memory
+    mem = get_memory()
+    a = mem.record(transcript="what do I have today", source="test",
+                   actions=[("query_schedule", {})], result="ok", success=True)
+    b = mem.record(transcript="gym tomorrow 7am", source="mac",
+                   actions=[("create_event", {"title": "Gym"})], result="ok", success=True)
+    client, _ = app_client
+    rows = client.get("/memory/unreviewed").get_json()["examples"]
+    ids = {r["id"] for r in rows}
+    assert b in ids and a not in ids
