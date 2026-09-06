@@ -71,6 +71,22 @@ hand-written audit corpus is now only a regression floor.
   beat Claude Sonnet/Haiku drop-ins on identical rows (worktree
   `dataset/MODEL_COMPARISON.md`) — do not respawn the sims.
 
+## Plan of record (Gil, 2026-09-07) — this order, before ANY new hypotheses
+
+1. **Track 1 — improve the rule system in its sandbox** (fast-lane worktree,
+   full-3000 measurable). Batch F3, F4… until abstention + parse quality
+   plateau. Self-contained.
+2. **Track 2 — restructure the deep pipeline around the rule system.** Vision:
+   LLM segments/decomposes → EACH fragment parsed by RULES (not LLM) → the
+   assembled events/tasks judged TOGETHER by the LLM once (crosscheck) →
+   loop/proceed. Replace N per-item LLM parses with rules + one judgment.
+   - Cycle 9 (IN FLIGHT) = conservative step 1: fragments trust rules at 0.60,
+     LLM per-item fallback still allowed. Reads latency + accuracy.
+   - Cycle 10 = the FULL version IF 9 looks good: rules-first on every
+     fragment, LLM demoted to end-judge (crosscheck) only.
+3. Only after BOTH tracks plateau do queued hypotheses reopen (dentist
+   query-mutation bug, #4 list-op misreads, simple-tier fieldq anomaly).
+
 ## The two improvement lanes
 
 **Deep lane** — the 55-min dev-fast cycles below, now pairable (one [fast]
