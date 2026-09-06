@@ -55,3 +55,6 @@ DOCUMENTATION/ASSISTANT_AUDIT.md.json
 dataset/baseline/
 dataset/experiments/
 dataset/snapshots/*/
+
+# Run archives: data stays local (manifests stay tracked as the identity record)
+dataset/runs/**/*.gz
