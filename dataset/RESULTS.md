@@ -1,5 +1,15 @@
 # Results log
 
+## Epoch baseline (2026-09-05, @ f1c8d9d) — the anchor all cycles now compare to
+
+Frozen row-timestamps + observance off + fast path alive (103/250 fast).
+Count-correct **78.4%** (old brain 67.2) · **F1 82.1** (P 85.1 / R 79.3) ·
+**field quality 84.6** (when-correct 85%, coverage 70 items) · complex 52 ·
+e+e 63 / t+t 50 / e+t 46 · p50 7.2 s · garbage 1%. Curiosity for next
+session: simple-tier field quality (75) is LOWER than complex (86). Row 8
+(all-deep bug run) stays as the pure-deep A/B: deep-only buys ~+1 pt count
+and cleaner e+t at ~1.8× the latency.
+
 Every meaningful run, newest first. **Always: metric + slice + the commit that
 produced it.** Baselines are replayed, not frozen — cite the score report and
 md5, not "the dataset".
