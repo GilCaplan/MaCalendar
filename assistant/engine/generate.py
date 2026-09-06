@@ -86,7 +86,7 @@ def reset_parsers() -> None:
 # these.
 #: A mutation whose match_title is just the ask-noun targets nothing (cycle 6).
 _GENERIC_TARGET_RE = re.compile(
-    r"^(?:my |the |a |an )?(?:reminder|alert|event|appointment|task|todo)s?$",
+    r"^(?:my |the |a |an |this )?(?:reminder|alert|event|appointment|task|todo|list)s?$",
     re.I)
 
 _STRONG_COMPOUND_RE = re.compile(
@@ -124,6 +124,19 @@ def fast_propose(state: EngineState, cfg) -> bool:
             state.trace.step(RULE, "Rule parser",
                              "Confident but the words announce a second request "
                              "— deep track", ok=True)
+        return False
+    if (len(rr.intents) >= 2 and _STRONG_COMPOUND_RE.search(state.text)
+            and any(n.startswith(("create_",)) for n, _ in rr.intents)
+            and any(n.startswith(("update_", "delete_", "complete_", "query_"))
+                    for n, _ in rr.intents)):
+        # Sandbox batch F1: a compound read as create-PLUS-mutation/query is
+        # the fast track's worst signature ("Add milk…, and then update work
+        # out list" → create + update_todo that finds nothing). Mixed-mode
+        # compounds are deep's judgment call.
+        if state.trace:
+            state.trace.step(RULE, "Rule parser",
+                             "Confident but a compound mixing create with "
+                             "edit/query — deep track", ok=True)
         return False
     for name, intent in rr.intents:
         # Cycle 6: "set reminder at 3 pm" fast-committed
