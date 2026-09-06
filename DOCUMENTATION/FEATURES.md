@@ -48,7 +48,7 @@ purely backend (no client code beyond displaying the effects).
 | backend | [Categories & stacking](#events-categories-colours--binder-stacking) | auto-colour/categorise; overlaps stack | `actions/calendar/categories.py` |
 | backend | [Hebrew calendar & observance](#hebrew-calendar--observance) | sundown-bounded halachic windows + gate | `observance.py`, `hebrew_calendar.py` |
 | backend | [Recurring events](#recurring-events) | daily/weekly/monthly, announced rounding | `db.py`, `engine/validate.py` |
-| backend | [API server](#the-api-server) | the single front door, 109 endpoints | `api/server.py` |
+| backend | [API server](#the-api-server) | the single front door, 111 endpoints | `api/server.py` |
 | backend | [Hosted calendar sync](#hosted-calendar-sync) | optional Outlook two-way / ICS read | `calendar_sync/` |
 | backend | [Self-improvement loop](#the-self-improvement-loop) | the AI measures & improves itself | `dataset/`, `scripts/` |
 | backend | [Diagnostics & logs](#diagnostics--self-observation-logs) | NLU tracking, LLM-judge bug log, audit, calibration | `scripts/` |
@@ -195,7 +195,7 @@ every command ever run.
 **Where:** `assistant/thinking_hud.py` + `calendar_ui/thinking_panel.py`;
 trace source `assistant/trace.py` + `trace_bus.py`
 (`~/.assistant_tools/trace_bus.jsonl`); iOS `ThinkingView` in
-`Views/VocabularyView.swift`.
+`Views/ThinkingView.swift` (moved out of `VocabularyView.swift` 2026-09-06).
 **How:** The HUD talks to no process — it tails the bus file. Renders by
 brain version: `CHAINS[BRAIN_VERSION]` scaffold rail with per-step ⓘ
 (copy from `trace.STAGE_INFO`, mirrored in Swift, drift-pinned by
@@ -412,7 +412,7 @@ it; weekly series start on the soonest named weekday.
 skipping applies per instance at creation.
 
 ### The API server
-**What:** The single front door — 109 endpoints; every surface is its client.
+**What:** The single front door — 111 endpoints; every surface is its client.
 **Where:** `assistant/api/server.py` (HTTP only — no parsing/execution);
 generated reference `DOCUMENTATION/API_REFERENCE.md`
 (`scripts/gen_api_reference.py`).

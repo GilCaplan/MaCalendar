@@ -3,7 +3,7 @@
 **One-screen reference. A fresh conversation reads this first, then CLAUDE.md.**
 Keep it current and short; details live in the files it points to.
 
-_Updated 2026-09-04 — engine live in production._
+_Updated 2026-09-06 — engine live; improvement loop mid-cycle-5; app batch shipped._
 
 ## The state
 
@@ -90,14 +90,14 @@ merge with `main` + the loop branch between cycles. Queue, in order:
    answers (DEVQA Q4-Q6): Mac-with-calendar-closed?, default lead 0 or 30?,
    in-Shabbat events suppress or pre-candle digest?
 3. ✅ **.ics export/share** — DONE @ 243d99f (ics_export.py, GET
-   /events/<id>.ics, Mac dialog button; iOS share sheet in flight).
+   /events/<id>.ics, Mac dialog button; iOS share sheet ✅ @ 7c9d3ab).
 4. ✅ **Search** — DONE @ 243d99f (GET /search, Mac toolbar box +
-   jump-to-date; iOS offline SearchView in flight).
+   jump-to-date; iOS offline SearchView ✅ @ 7c9d3ab).
 5. **Small wins** — mostly DONE @ 243d99f: duplicate-event ✅ · week
    numbers ✅ (`ui.show_week_numbers`) · Timer CSV ✅ · observance checkbox ✅
    (found + fixed the pydantic-drops-`observance.enabled` bug, DEVQA Q2
-   closed). Remaining: agenda view (agent in flight) · iOS `/heartbeat`
-   (agent in flight — endpoint already existed server-side).
+   closed). Agenda view ✅ @ 3b89809 · iOS `/heartbeat` ✅ @ 7c9d3ab (endpoint
+   already existed server-side). **The approved queue is fully shipped.**
 6. ✅ **Convolution #1** — DONE @ 243d99f: ThinkingView + EngineChain live in
    `Views/ThinkingView.swift` (byte-identical move, simulator build green).
 

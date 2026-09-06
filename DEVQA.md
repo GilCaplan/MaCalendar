@@ -14,11 +14,6 @@ becomes a task; the dataset's ground truth calls it a calendar event. Same
 family as the occasion-reminder rule you approved, one step further (no
 remind-word at all). ~1 row on dev-fast, so low stakes — whenever convenient.
 
-**Q2 — Observance toggle in the Mac settings window?**
-The on/off flag now exists (`observance.enabled` in config.yaml, default on).
-Want a checkbox for it in the Mac settings popup too, or is the config file
-enough?
-
 **Q4 — Notifications: do you want Mac reminders with the calendar CLOSED?**
 That means detaching `assistant.api` into a launchd LaunchAgent (launch-model
 change: --reload, HUD, shutdown ownership). If "no", the phone is officially
@@ -33,6 +28,11 @@ suppress entirely (plan's default) or roll into one pre-candle-lighting
 digest banner?** Lifestyle call, not engineering.
 
 ## Answered (log)
+
+- 2026-09-06 — **Q2 built directly** (checkbox in the settings dialog,
+  243d99f) — and building it exposed that pydantic silently discarded
+  `observance.enabled` (field never declared on ObservanceConfig); fixed +
+  pinned by test.
 
 - 2026-09-06 — **Q3 withdrawn** (API key): the sims run through Claude Code
   subagent workers now, no key or API billing involved.
