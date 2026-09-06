@@ -86,8 +86,13 @@ what teaches the next step.
    top unblocked entry, and after every verification rerun feed the fresh
    failures back into it and re-rank (prune every ~3 cycles). A
    product-convention question in an entry is Gil's call, never assumed.
-3. **Change only that stage's internals** (contracts frozen). No bundling: two
-   fixes in one cycle make the delta — and the hypothesis test — unattributable.
+3. **Change only that stage's internals** (contracts frozen). No bundling of
+   *improvements*: two experiments in one cycle make the delta — and the
+   hypothesis test — unattributable. **Bugs are exempt (Gil, 2026-09-05): fix
+   as many as found, whenever found** — a bug is objectively wrong, not an
+   experiment. Each bug still gets its ledger row, and one that lands between
+   a cycle's two measurements is named in the verdict so its share of the
+   delta isn't silently credited to the hypothesis.
 4. **Measure dev-fast.** Read the delta on the TARGETED slice
    (`by_compound_kind`/`by_complexity`) *and the rows behind it*, not the
    headline alone.
