@@ -51,6 +51,7 @@ generalisation claim.
 |---|---|---|
 | **count-correctness** (right # of events/tasks) | yes — dataset-only | the core one; multi-item drops and duplicate-item invention |
 | **missing-half** (which side drops on event+task) | yes — dataset-only | *what* to fix, not just pass/fail |
+| **item-level P/R/F1** (Gil 2026-09-05: balance missing vs inventing) | yes — dataset-only | recall = asked items created; precision = created items asked-for (excess and creations on query/remove cost it); F1 balances the two. Defined in `engine_dataset_compare._prf` |
 | cross-event date collapse (2+ events, same date+time) | no — general | a compound flattened to one time |
 | garbage titles (a leaked "then"/"also" as a title) | no — general | title defects (proxy, not true quality) |
 | parse-path distribution + latency percentiles | no — general | operational; slice by anything |

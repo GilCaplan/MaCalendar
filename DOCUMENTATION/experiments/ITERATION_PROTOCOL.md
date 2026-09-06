@@ -44,6 +44,15 @@ the last cycle's, not confounded by a different sample.
 `--limit 0` disables the script's default 150-row cap so the rank slice is taken
 whole — without it, `--max-rank 600` still returns only the first 150 rows.
 
+**Small-delta cycles run their verification twice** (replay is ~75%
+deterministic, so ±1–2 rows are noise): when the predicted effect is under
+~4 rows, measure twice and read the pair. **If dev-fast looks overfitted**
+(Gil, 2026-09-05): resample — take a fresh same-size slice of history prompts
+(e.g. ranks 251–500), run the next rounds there, and mark the slice in
+loop_log.csv so scores are never silently mixed. **F1 joins count-correctness**
+as a headline pair: recall (nothing missed) vs precision (nothing invented),
+item-level micro — see DATASET.md's metric table.
+
 **The harness replays history, not "now"** (Gil, 2026-09-05): each row runs
 frozen at its recorded `ts` (freezegun), and observance gating stands down via
 `MACALENDAR_OBSERVANCE=0` — the dataset has no concept of Shabbat, and a

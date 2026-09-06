@@ -150,6 +150,46 @@ def _stamp_ranks(pairs: list[tuple[str, int]]) -> int:
     return stamped
 
 
+
+def _prf(scored, prov, keep=lambda r: True):
+    """Item-level micro precision/recall/F1 over creations (Gil, 2026-09-05:
+    "a balance of the two similar to how the F1 metric works").
+
+    Expected creations per row: a compound kind is EXACT (each was built from
+    exactly two utterances — e+e wants 2/0, t+t 0/2, e+t 1/1); a simple set/
+    createoradd asks for exactly one creation (kind-agnostic); query/remove
+    expects ZERO, so anything created there is pure invention and costs
+    precision only. Shortfalls cost recall; excess costs precision.
+    Rows without usable provenance are excluded (counts reported)."""
+    matched = expected = created = 0
+    for r in scored["per_prompt"]:
+        if not keep(r):
+            continue
+        pr = prov.get(r["transcript"]) or {}
+        intent = pr.get("intent", "")
+        kind = r.get("compound_kind")
+        n_e, n_t = r.get("n_events", 0) or 0, r.get("n_tasks", 0) or 0
+        if kind in ("event+event", "task+task", "event+task"):
+            exp_e = {"event+event": 2, "task+task": 0, "event+task": 1}[kind]
+            exp_t = {"event+event": 0, "task+task": 2, "event+task": 1}[kind]
+            m, e = min(n_e, exp_e) + min(n_t, exp_t), exp_e + exp_t
+        elif intent in ("set", "createoradd"):
+            m, e = min(n_e + n_t, 1), 1
+        elif intent in ("query", "remove"):
+            m, e = 0, 0
+        else:
+            continue
+        matched += m; expected += e; created += n_e + n_t
+    prec = matched / created if created else None
+    rec = matched / expected if expected else None
+    f1 = None
+    if prec is not None and rec is not None:
+        f1 = (2 * prec * rec / (prec + rec)) if (prec + rec) else 0.0
+    rnd = lambda v: round(v, 3) if v is not None else None
+    return {"precision": rnd(prec), "recall": rnd(rec), "f1": rnd(f1),
+            "matched": matched, "expected": expected, "created": created}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--source", type=pathlib.Path,
@@ -245,7 +285,21 @@ def main() -> int:
                       "delta": round(n[0]/n[1] - o[0]/o[1], 3)}
         return out
 
+    prf = {"overall": _prf(engine_scored, prov)}
+    for cx in ("simple", "medium", "complex"):
+        prf[cx] = _prf(engine_scored, prov, keep=lambda r, c=cx: r.get("complexity") == c)
+    # Tuned-vs-untuned honesty: dev-full CONTAINS dev-fast, so a 600-row delta
+    # partly re-counts the tuned rows. Quote the two sub-slices separately.
+    subslices = {
+        "count_ok_ranks_1_250": _slice_rate(engine_scored, 1, 250),
+        "count_ok_ranks_251_600": _slice_rate(engine_scored, 251, 600),
+        "prf_ranks_251_600": _prf(engine_scored, prov,
+                                  keep=lambda r: 251 <= (r.get("tier_rank") or 0) <= 600),
+    }
+
     triage = {
+        "prf": prf,
+        "subslices": subslices,
         "by_complexity": _slice_deltas("complexity"),
         "by_compound_kind": _slice_deltas("compound_kind"),
         "split_policy": "DEV=ranks 1-600 (tunable); HELD-OUT=601-3000 (measure only, never mine)",
@@ -269,6 +323,15 @@ def main() -> int:
     print(f"  flipped better: {len(comparison['flipped_better'])} · "
           f"flipped worse: {len(comparison['flipped_worse'])} · "
           f"unchanged pass/fail: {comparison['n_unchanged_pass']}/{comparison['n_unchanged_fail']}")
+    o = prf["overall"]
+    if o["f1"] is not None:
+        print(f"PRF (engine, item-level micro): precision {o['precision']:.1%} · "
+              f"recall {o['recall']:.1%} · F1 {o['f1']:.1%}  "
+              f"(matched {o['matched']} / expected {o['expected']} / created {o['created']})")
+    r250, r600 = subslices["count_ok_ranks_1_250"], subslices["count_ok_ranks_251_600"]
+    if r600[0] is not None:
+        print(f"  sub-slices: ranks 1-250 count-ok {r250[0]:.1%} (n={r250[1]}) · "
+              f"ranks 251-600 {r600[0]:.1%} (n={r600[1]}) — the 251-600 half is the untuned read")
     print(f"Reports: {args.out_dir}/engine_run.score.md · triage.json")
     return 0
 
