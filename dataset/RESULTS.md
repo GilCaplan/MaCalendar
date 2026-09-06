@@ -12,6 +12,16 @@ and cleaner e+t at ~1.8× the latency.
 
 Every meaningful run, newest first.
 
+## Fast-only, FULL 3000 (sandbox, pre-F1 code, 2026-09-07, ~3 min)
+
+Gil's ruling: the deterministic fast lane may measure the full dataset.
+Commit 1217/3000 (41%) · adjusted-on-committed **dev 84.5% / held-out
+84.4%** — a zero generalization gap, the strongest evidence yet that rule
+iteration on dev travels. By kind on committed (full): query 96 / remove
+97 / createoradd 80 / set 80 / t+t 57 / e+t 19 / e+e 7 — the compound
+weakness F1 (worktree) abstains from; the post-merge full read is the
+before/after. Held-out reported as aggregates only, per discipline.
+
 ## Sandbox batch F1 — abstention cues (fast lane) — PREDICTION (registered before the change)
 
 *Scope (gate-only, no parser internals — batch 2 takes those):* extend the

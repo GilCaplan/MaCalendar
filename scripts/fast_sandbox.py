@@ -73,17 +73,18 @@ def main() -> int:
         where += f" AND tier_rank <= {int(a.max_rank)}"
     with sqlite3.connect(f"file:{SOURCE}?mode=ro", uri=True) as c:
         rows = c.execute(
-            "SELECT COALESCE(NULLIF(raw_transcript,''), transcript), ts "
+            "SELECT COALESCE(NULLIF(raw_transcript,''), transcript), ts, tier_rank "
             f"FROM examples WHERE {where} ORDER BY tier_rank").fetchall()
 
     n = len(rows)
     committed = correct = 0
+    split = {"dev": [0, 0, 0], "held-out": [0, 0, 0]}   # committed, raw-ok, adj-ok
     by_kind: Counter = Counter()
     adj_correct = [0]
     by_kind_ok: Counter = Counter()
     misses: list[tuple[str, str]] = []
 
-    for text, ts in rows:
+    for text, ts, rank in rows:
         p = prov.get(text) or {}
         ctx = freeze_time(_dt.datetime.fromtimestamp(ts), tick=True) if ts \
             else contextlib.nullcontext()
@@ -121,13 +122,19 @@ def main() -> int:
             adj = total >= 2
         else:
             adj = ok
+        seg = "dev" if (rank or 0) <= 600 else "held-out"
+        split[seg][0] += 1
+        split[seg][1] += 1 if ok else 0
+        split[seg][2] += 1 if adj else 0
         by_kind[kind or intent] += 1
         if ok:
             correct += 1
             by_kind_ok[kind or intent] += 1
         if adj:
             adj_correct[0] += 1
-        else:
+        elif (rank or 0) <= 600:
+            # HELD-OUT DISCIPLINE: rows past rank 600 are measured, never
+            # mined - their failing transcripts are never printed.
             misses.append((kind or intent, text[:70]))
 
     print(f"rows {n} · committed {committed} ({committed/n:.0%}) · "
@@ -135,7 +142,10 @@ def main() -> int:
           f"({(correct/committed) if committed else 0:.1%}) · "
           f"ADJUSTED {adj_correct[0]}/{committed} "
           f"({(adj_correct[0]/committed) if committed else 0:.1%})")
-    print("misses below are ADJUSTED misses — true fast errors, conventions forgiven")
+    for seg, (c_, r_, a_) in split.items():
+        if c_:
+            print(f"  {seg:<9} committed {c_:>4} · raw {r_/c_:.1%} · adjusted {a_/c_:.1%}")
+    print("misses below are ADJUSTED misses from DEV ONLY (held-out is never mined)")
     for k in sorted(by_kind):
         print(f"  {k:<14} {by_kind_ok[k]:>3}/{by_kind[k]:<3} "
               f"({by_kind_ok[k]/by_kind[k]:.0%})")

@@ -210,7 +210,13 @@ abstain is deep's job, never a failure). Rules: tweak batches carry ONE
 registered prediction (micro-iterations overfit in seconds); every batch
 gates on dev-full (--max-rank 600, also seconds); held-out stays sealed;
 NOTHING counts on the main board until a full joint run confirms (a better
-parser shifts which rows reach deep). Baseline 2026-09-07 @ dev-fast:
+parser shifts which rows reach deep). **Slice ruling (Gil, 2026-09-07): fast-only sandbox runs MAY use the full
+3000** (deterministic, ~3 min) — held-out reported as AGGREGATES ONLY
+(measured, never mined: no failing transcript past rank 600 is ever
+printed; the script enforces this). Everything touching the LLM keeps the
+subset ladder. Full-3000 pre-F1 baseline: commit 41%, adjusted-on-committed
+dev 84.5% / held-out 84.4% — a ZERO generalization gap on the rule system.
+Baseline 2026-09-07 @ dev-fast:
 39% commit, 78.4% correct-on-committed (query 97 / remove 94 / createoradd
 90 / set 80; compounds t+t 33, e+t 14, e+e 0 — the C3 gate's residue).
 

@@ -34,6 +34,13 @@ protocol's Paired-track section.)*
   misspellings inside otherwise-confident parses. Rule-parser internal.
   *Expected:* +0.5–1 pt on the fast slice. *Effort:* low-medium.
 
+- **[fast] ✅ F1 — mixed-mode compound abstain + "list" generic target**
+  (sandbox-graduated 2026-09-07 @ 68e349d: adjusted-on-committed 82.5 →
+  89.9 dev-fast / 90.1 dev-full gate; joint confirmation rides the next
+  full cycle run). **F2 residuals:** "get rid of this list" still commits
+  (diagnose the veto miss), "sync my calendar with mark"
+  (invention-shaped).
+
 
 - **BUG (open; found 2026-09-06 by the query-no-mutation check): queries can
   emit mutations.** "Is my appointment to the dentist still on for tomorrow

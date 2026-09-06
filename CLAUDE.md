@@ -175,6 +175,10 @@ the full 3000 as the working loop:**
     python -m scripts.engine_dataset_compare --limit 0 --max-rank 600   # dev-full
     python -m scripts.engine_dataset_compare --limit 0 --min-rank 601   # held-out (sealed)
 
+The deterministic FAST track has its own lane: `python -m
+scripts.fast_sandbox` (seconds, full-3000 allowed, selective-classifier
+scoring, held-out aggregates only) — rules in ITERATION_PROTOCOL.md.
+
 (`--limit 0` lifts the script's default 150-row cap — without it a rank slice
 silently returns only its first 150 rows.)
 
