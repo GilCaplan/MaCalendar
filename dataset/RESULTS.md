@@ -69,6 +69,25 @@ e+t halves they sit in). Simple tier should move most; garbage-title rate
 must NOT rise (the title is a literal word from the ask). Adjusted metric
 expected to move in step (+1–1.5). Risk watched: invention-adjacent — any
 new event on a garble row is a regression even if count says otherwise.
+
+**ACTUAL (run 10, 2026-09-06 09:06):** raw **79.2** (+0.8, predicted
++1.0–1.5 — under band and UNDER the ~1.5pt noise floor), adjusted 82.0
+(+0.8). Targeted-slice read (the honest judge): the fallback fired on
+exactly 4 rows, but the hypothesis's evidence was partly STALE — "Set
+reminder for three o'clock" and "please set event on Tuesday" already pass
+under the new epoch (they were old-epoch failures), so the predicted 3–4
+flip rows mostly weren't there to win. Where it fired: 2 sensible defaults
++ 2 loose groundings ("Remind me in the future of this", "Remind me of the
+following event:" — the recognizer grounds vague futurity; both rows passed
+anyway, but these are invention-adjacent and become evidence for the #5
+guard). "Set a event for the evening" still fails honestly (the recognizer
+can't ground "the evening" — by design, no invented time). **Verdict:
+inconclusive on count — kept** (deterministic, honest, pinned by
+test_engine_generate.py, documented in ENGINE.md), but not claimed as a
+win. Novel finds: "set reminder at 3 pm" fails on the FAST path (rule
+parser, not the deep track — new queue evidence), and complex +3 (52→55)
+was the only slice that moved. Lesson for the queue: re-verify an entry's
+evidence rows against the CURRENT epoch before spending a cycle on it.
  **Always: metric + slice + the commit that
 produced it.** Baselines are replayed, not frozen — cite the score report and
 md5, not "the dataset".

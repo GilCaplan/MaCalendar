@@ -1,0 +1,31 @@
+{
+ "loop_run": null,
+ "label": "sim-sonnet-partial-a",
+ "source": "/var/folders/0f/nk3dnvrd54jbjz_qn40_ynwh0000gn/T/engine_compare__8wrmmj7",
+ "source_mtime": "2026-09-06T07:55:13",
+ "archived_at": "2026-09-06T12:03:59+00:00",
+ "n_rows": 64,
+ "parse_paths": {
+  "fast": 24,
+  "deep": 25,
+  "error": 15
+ },
+ "row_ts_range": [
+  1772903595.052664,
+  1773233786.988024
+ ],
+ "files": {
+  "engine_run.db": {
+   "md5": "3e9ceb71c630fc4149cb981fd295b259",
+   "bytes": 57344
+  },
+  "calendar.db": {
+   "md5": "6430e9f6d47d685774de0b331eb9bd64",
+   "bytes": 225280
+  },
+  "trace_bus.jsonl": {
+   "md5": "5fcf8110298ba8ea616176a6b106c6b6",
+   "bytes": 109072
+  }
+ }
+}

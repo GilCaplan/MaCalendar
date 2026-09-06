@@ -48,22 +48,21 @@ needing one is marked **[Gil]** and is blocked until asked.
    queue: dips elsewhere diffed as replay nondeterminism — overall deltas
    under ~1.5 pt on dev-fast are noise; judge cycles by their targeted slice.
 
-2. **🔄 IN FLIGHT (cycle 5, 2026-09-06)** — grounded default-title events —
-   stage: generate (event twin of the existing `task_fallback`). Implemented
-   as `event_fallback` @ b3c6656; dev-fast replay running; prediction
-   78.4 → 79.4–79.9 recorded in RESULTS.md.
-   *Evidence:* explicit asks that name no title die as unknown: "Set a event
-   for the evening" (0 created), "please set event on Tuesday", "Set reminder
-   for three o'clock" (simple row, 0/0). The event-kind retry fires and still
-   gets nothing. *(Scope note after C2: items the occasion rule flips DO get
-   sensible LLM defaults — "my meeting today" → 10:00 event — so this entry is
-   only the title-less/unknown remainder.)*
-   *Hypothesis:* an event-kind item whose text literally asks to set an
-   event/reminder AND names a when (date or time) but no title becomes a
-   default-titled event ("Event", time from the words) instead of unknown.
-   *Expected:* +1–1.5 pt (3–4 rows across simple + compounds). *Effort:* low.
-   *Risk:* invention-adjacent — the title default must be grounded ("event"
-   is in the words); never invent a time that isn't there.
+2. ⚖️ **C5 — grounded default-title events** (generate `event_fallback`,
+   @ b3c6656, run 10). Actual: +0.8 raw / +0.8 adj — under the noise floor;
+   evidence rows were partly stale (already passing under the new epoch).
+   KEPT (honest, deterministic, pinned) but not claimed. Byproducts for the
+   queue: (a) loose groundings ("in the future", "the following event")
+   create default events → direct evidence for #5's invention guard;
+   (b) "set reminder at 3 pm" fails on the FAST path — a rule-parser gap,
+   new entry below. Process lesson: re-verify evidence rows against the
+   current epoch before taking an entry.
+
+2b. **Fast-path "set reminder at TIME"** — stage: rule parser (or the fast
+   gate). *Evidence:* "set reminder at 3 pm" fast-commits wrong (run 10)
+   while the deep fallback handles the same shape. *Expected:* +0.5 pt,
+   simple tier. *Effort:* low. *Risk:* low — either parse it or route it
+   deep.
 
 3. ✅ **C4 — cue iteration** (segment, @ f1c8d9d). notify + festival +
    "calendar invite". Actual: e+t 41 → 46 (top of band; the calendar-invite
