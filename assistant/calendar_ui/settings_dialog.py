@@ -5,6 +5,12 @@ god-file and this dialog was ~450 of them. Moved whole, unchanged — the
 function still takes the window as `self` so every `self._config` /
 `self.show_toast` reference works exactly as before; window.py keeps a
 3-line delegate. Persistence goes through assistant/config_store.
+
+No longer verbatim: the move carried over a read of `self._pipeline._confirmer`,
+an attribute the real Pipeline lost in e3ea4f6, which aborted the whole app on
+open (PyQt6 → qFatal on an exception in a slot). Fixed here, and the rows built
+from config.yaml / categories.json are now tolerant of what those hand-editable
+files actually contain — see tests/unit/test_settings_real_shapes.py.
 """
 from __future__ import annotations
 
@@ -22,6 +28,9 @@ from assistant.calendar_ui import icons
 from assistant.calendar_ui import styles as _styles
 from assistant.calendar_ui.dialog_utils import install_enter_confirms
 from assistant.calendar_ui.styles import GRAY_TEXT
+
+# The "Personal" grey, used when a category's own colour is missing or unparseable.
+_CAT_DOT_FALLBACK = "#64748b"
 
 
 def open_settings(self) -> None:
@@ -85,7 +94,7 @@ def open_settings(self) -> None:
     theme_combo.setMaximumWidth(160)
     appearance_form.addRow("Theme on startup:", theme_combo)
 
-    accent_state = {"hex": self._config.ui.accent_color}
+    accent_state = {"hex": self._config.ui.accent_color or "#f5a524"}
     swatch_row = QHBoxLayout()
     swatch_row.setSpacing(8)
     swatch_buttons: list[QPushButton] = []
@@ -228,7 +237,10 @@ def open_settings(self) -> None:
     notif_lead_combo.addItem("Off", 0)
     for _mins in (5, 10, 15, 30, 60):
         notif_lead_combo.addItem(f"{_mins} minutes", _mins)
-    _lead = int(getattr(notif_cfg, "default_lead_minutes", 0) or 0)
+    try:
+        _lead = int(getattr(notif_cfg, "default_lead_minutes", 0) or 0)
+    except (TypeError, ValueError):
+        _lead = 0                    # hand-edited to something unreadable
     _lead_idx = notif_lead_combo.findData(_lead)
     if _lead_idx < 0:
         # A hand-edited value keeps itself rather than snapping to Off.
@@ -259,18 +271,40 @@ def open_settings(self) -> None:
     cat_grid.setVerticalSpacing(4)
     cat_grid.setHorizontalSpacing(10)
     cat_lead_combos: dict[str, QComboBox] = {}
-    _cat_leads_now = dict(getattr(notif_cfg, "category_leads", {}) or {})
-    for _row, _cat in enumerate(all_categories()):
-        _cname = _cat["name"]
+    # ~/.assistant_tools/categories.json is hand-editable and merged over the
+    # defaults, so an entry here can be anything: no name, a null colour, a
+    # colour Qt cannot parse, a duplicate of a default's name. None of that is
+    # worth aborting the whole app for (PyQt6 qFatal()s on an exception in this
+    # slot), so a bad row degrades to the default dot / Default lead instead.
+    try:
+        _cat_leads_now = dict(getattr(notif_cfg, "category_leads", None) or {})
+    except (TypeError, ValueError):
+        _cat_leads_now = {}
+    try:
+        _all_cats = list(all_categories() or [])
+    except Exception:
+        _all_cats = []
+    _row = 0
+    for _cat in _all_cats:
+        if not isinstance(_cat, dict):
+            continue
+        _cname = str(_cat.get("name") or "").strip()
+        if not _cname or _cname in cat_lead_combos:
+            continue                 # nameless, or a name already given a row
         _dot = QLabel()
         _pm = QPixmap(12, 12)
         _pm.fill(Qt.GlobalColor.transparent)
+        _color = QColor(str(_cat.get("color") or "") or _CAT_DOT_FALLBACK)
+        if not _color.isValid():     # "", "blue-ish", a truncated hex…
+            _color = QColor(_CAT_DOT_FALLBACK)
         _painter = QPainter(_pm)
-        _painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        _painter.setPen(Qt.PenStyle.NoPen)
-        _painter.setBrush(QColor(_cat.get("color", "#64748b")))
-        _painter.drawEllipse(0, 0, 12, 12)
-        _painter.end()
+        try:
+            _painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            _painter.setPen(Qt.PenStyle.NoPen)
+            _painter.setBrush(_color)
+            _painter.drawEllipse(0, 0, 12, 12)
+        finally:
+            _painter.end()           # never leave a painter active on the pixmap
         _dot.setPixmap(_pm)
         cat_grid.addWidget(_dot, _row, 0)
         cat_grid.addWidget(QLabel(_cname), _row, 1)
@@ -281,15 +315,20 @@ def open_settings(self) -> None:
         for _mins in (5, 10, 15, 30, 60):
             _cc.addItem(f"{_mins} minutes", _mins)
         if _cname in _cat_leads_now:
-            _v = int(_cat_leads_now[_cname])
-            _j = _cc.findData(_v)
-            if _j < 0:
-                _cc.addItem(f"{_v} minutes", _v)
-                _j = _cc.count() - 1
-            _cc.setCurrentIndex(_j)
+            try:
+                _v = int(_cat_leads_now[_cname])
+            except (TypeError, ValueError):
+                _v = None            # unreadable lead → show Default
+            if _v is not None:
+                _j = _cc.findData(_v)
+                if _j < 0:
+                    _cc.addItem(f"{_v} minutes", _v)
+                    _j = _cc.count() - 1
+                _cc.setCurrentIndex(_j)
         _cc.setMaximumWidth(130)
         cat_grid.addWidget(_cc, _row, 2)
         cat_lead_combos[_cname] = _cc
+        _row += 1
     cat_grid.setColumnStretch(3, 1)
     notif.addLayout(cat_grid)
 
@@ -357,19 +396,19 @@ def open_settings(self) -> None:
     phrase_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
     stop_phrases_edit = QLineEdit()
     stop_phrases_edit.setPlaceholderText("e.g. finish, that's all, stop recording")
-    stop_phrases_edit.setText(", ".join(self._config.audio.stop_phrases))
+    stop_phrases_edit.setText(", ".join(self._config.audio.stop_phrases or []))
     stop_phrases_edit.setToolTip("Extra words that stop the mic, on top of the built-in ones")
     phrase_form.addRow("Stop phrases:", stop_phrases_edit)
 
     sep_edit = QLineEdit()
     sep_edit.setPlaceholderText('e.g. "next event" — blank to disable')
-    sep_edit.setText(self._config.audio.event_separator)
+    sep_edit.setText(self._config.audio.event_separator or "")
     sep_edit.setToolTip('Say: "meeting at 10am next event lunch at noon"')
     phrase_form.addRow("Event separator:", sep_edit)
 
     keywords_edit = QLineEdit()
     keywords_edit.setPlaceholderText("e.g. meeting, appointment, activity")
-    keywords_edit.setText(", ".join(self._config.nlu.event_keywords))
+    keywords_edit.setText(", ".join(self._config.nlu.event_keywords or []))
     keywords_edit.setToolTip("Create instantly with this as a placeholder title, then let the LLM improve it")
     phrase_form.addRow("Event keywords:", keywords_edit)
     voice.addLayout(phrase_form)
@@ -377,7 +416,15 @@ def open_settings(self) -> None:
     # ── Assistant ─────────────────────────────────────────────────
     assistant = section("Assistant")
     auto_cb = QCheckBox("Auto-approve actions (no confirmations)")
-    auto_cb.setChecked(self._pipeline._confirmer.level == 0)
+    # config.confirmation_level is the source of truth, not the pipeline.
+    # Pipeline._confirmer was deleted in e3ea4f6 ("Delete the Mac's dead half")
+    # when parse+execute moved into the API process — reading it here raised
+    # AttributeError inside the toolbar button's slot, and PyQt6 turns an
+    # unhandled exception in a slot into qFatal(), so the whole calendar app
+    # aborted (SIGABRT) the moment Settings was opened. It stayed green because
+    # both settings test doubles had invented a `_confirmer` the real object
+    # has not had for months.
+    auto_cb.setChecked(int(getattr(self._config, "confirmation_level", 0) or 0) == 0)
     assistant.addWidget(auto_cb)
 
     thinking_cb = QCheckBox("Show assistant thinking (floating step-by-step HUD)")
@@ -478,7 +525,10 @@ def open_settings(self) -> None:
     save_btn = QPushButton("Save Config")
     save_btn.setDefault(True)
     def save_config():
-        self._pipeline._confirmer.level = 0 if auto_cb.isChecked() else 1
+        # Only if this pipeline still has one — see the note by auto_cb above.
+        _confirmer = getattr(self._pipeline, "_confirmer", None)
+        if _confirmer is not None:
+            _confirmer.level = 0 if auto_cb.isChecked() else 1
         self._pipeline._tts.mute = mute_cb.isChecked()
         self._pipeline._tts.rate = speed_spin.value()
         self._pipeline._tts.voice = voice_combo.currentText()
@@ -554,6 +604,7 @@ def open_settings(self) -> None:
                     notif_cfg.category_leads = cat_leads
 
                 # Apply changes immediately
+                self._config.confirmation_level = 0 if auto_cb.isChecked() else 1
                 self._config.ui.font_month = month_spin.value()
                 self._config.ui.font_week = week_spin.value()
                 self._config.ui.font_day = day_spin.value()
