@@ -98,8 +98,12 @@ what teaches the next step.
 
 **Every measurement run also appends one row to `dataset/loop_log.csv`** —
 baseline, fix rerun, upsize confirm, held-out check alike: started/finished
-timestamps, duration, commit, slice, every metric column, and a one-line
-summary. `RESULTS.md` is the prose understanding; the csv is the machine-
+timestamps, duration, commit, slice, and **all five metrics with their
+breakdowns** — count-correct (overall/complexity/compound-kind),
+missing-half, latency p50/p95, parse-path mix (n_deep/n_fast + per-path
+correctness), e+e date-collapse, garbage titles — plus a one-line summary.
+The COMPLETE reports (per-slice tables, every failing row, triage) are
+preserved per run in `DOCUMENTATION/experiments/engine_compare/<label>/`. `RESULTS.md` is the prose understanding; the csv is the machine-
 readable trajectory, so the whole improvement process can be plotted
 (metric-vs-time / metric-vs-cycle) when it concludes. A run that isn't logged
 there didn't happen.
