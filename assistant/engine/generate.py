@@ -86,7 +86,17 @@ def reset_parsers() -> None:
 # these.
 #: A mutation whose match_title is just the ask-noun targets nothing (cycle 6).
 _GENERIC_TARGET_RE = re.compile(
-    r"^(?:my |the |a |an |this )?(?:reminder|alert|event|appointment|task|todo|list)s?$",
+    r"^(?:my |the |a |an |this )?(?:reminder|alert|event|appointment|task|todo|list)s?$"
+    r"|^(?:you|it|me|this|that|them)$",
+    re.I)
+
+#: A question. A confident fast parse of an interrogative that nonetheless
+#: produces a CREATE is invention ("could you tell when we pay for car
+#: insurance?" -> create_todo); route deep (sandbox batch F3). A real query
+#: commits query_schedule/query_todos (no create) and is untouched.
+_INTERROGATIVE_RE = re.compile(
+    r"^\s*(?:hey\s+\w+,?\s*)?(?:who|what|when|where|which|whose|how|do|does|did|is|are|am|can|could|would|will|should)\b"
+    r"|\bcould you (?:tell|let me know|check)\b|\bdo i have\b|\?\s*$",
     re.I)
 
 _STRONG_COMPOUND_RE = re.compile(
@@ -137,6 +147,14 @@ def fast_propose(state: EngineState, cfg) -> bool:
             state.trace.step(RULE, "Rule parser",
                              "Confident but a compound mixing create with "
                              "edit/query — deep track", ok=True)
+        return False
+    if (_INTERROGATIVE_RE.search(state.text)
+            and any(n.startswith("create_") for n, _ in rr.intents)):
+        # F3: a question that produces a create is invention — deep track.
+        if state.trace:
+            state.trace.step(RULE, "Rule parser",
+                             "Confident but a question producing a create — "
+                             "deep track", ok=True)
         return False
     for name, intent in rr.intents:
         # Cycle 6: "set reminder at 3 pm" fast-committed
