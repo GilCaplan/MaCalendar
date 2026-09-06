@@ -459,6 +459,122 @@ def test_the_info_dot_shows_the_in_depth_copy_on_a_real_click(hud):
 
 
 # ---------------------------------------------------------------------------
+# The rail's live spinner + elapsed counter on the row in progress
+# ---------------------------------------------------------------------------
+#
+# Passive rendering, so the real analog of "drive the widget, don't call the
+# handler" is: feed the real _ChainRail a real step stream, let a real QTimer
+# tick a few times (QTest.qWait, not a mocked clock), and read the actual
+# widgets it moved — not the private counters that decided them.
+
+def _row_for(rail, label):
+    """The live row tuple for a chain slot, by its label text."""
+    for row in rail._rows:
+        i = row[0]
+        if rail._slots[i][1] == label:
+            return row
+    raise AssertionError(f"no row for {label!r} — slots are {[s[1] for s in rail._slots]}")
+
+
+def _secs(text: str) -> float:
+    assert text.endswith(" s"), f"not a seconds label: {text!r}"
+    return float(text[:-2])
+
+
+def test_the_active_row_gets_a_live_increasing_timer_and_a_spinner(hud):
+    from PyQt6.QtTest import QTest
+    widget, _, app = hud
+    p = widget.panel
+    p.begin("Mac")
+    p.add_step(_step("vocab", "Vocabulary"))
+    p.add_step(_step("rule", "Rules"))          # "rules first" is now active
+    rail = p._rail
+    assert not rail._finished
+
+    _, _stage, _icon, _text, time_lbl, mark_stack, _state, spinner = _row_for(rail, "rules first")
+
+    # It's the slot in progress: the spinner occupies the mark slot and is
+    # actually ticking, not merely constructed.
+    assert mark_stack.currentWidget() is spinner
+    assert spinner._timer.isActive(), "the active row's spinner is not animating"
+
+    QTest.qWait(150)
+    app.processEvents()
+    first = _secs(time_lbl.text())
+    QTest.qWait(150)
+    app.processEvents()
+    second = _secs(time_lbl.text())
+
+    assert second > first, f"live counter did not advance: {first} -> {second}"
+
+    # A slot the run hasn't reached yet shows neither a mark nor a time.
+    untouched = _row_for(rail, "compare")
+    assert untouched[6].text() == ""            # state label
+    assert untouched[4].text() == ""            # time label
+
+
+def test_finishing_freezes_the_time_and_stops_the_spinner(hud):
+    from PyQt6.QtTest import QTest
+    widget, _, app = hud
+    p = widget.panel
+    p.begin("Mac")
+    p.add_step(_step("vocab", "Vocabulary"))
+    p.add_step(_step("rule", "Rules"))
+    rail = p._rail
+
+    _, _, _, _, active_time, active_stack, active_state, active_spinner = _row_for(rail, "rules first")
+    QTest.qWait(150)
+    app.processEvents()
+    assert active_stack.currentWidget() is active_spinner
+    assert active_spinner._timer.isActive()
+
+    p.finish({"message": "ok", "brain": "engine-v2"})
+    app.processEvents()
+
+    # The row that was live when the run ended: done, spinner gone, its own
+    # elapsed span frozen as a normal seconds label.
+    assert active_stack.currentWidget() is active_state
+    assert active_state.text() == "✓"
+    assert not active_spinner._timer.isActive(), "the spinner kept animating after finish()"
+    assert _secs(active_time.text()) >= 0
+
+    # A row the run passed through earlier already had a real step to source
+    # its duration from — also frozen, in the same "N.NN s" shape as the raw
+    # per-step timeline below it.
+    _, _, _, _, done_time, done_stack, done_state, done_spinner = _row_for(rail, "fix words")
+    assert done_state.text() == "✓"
+    assert done_stack.currentWidget() is done_state
+    assert not done_spinner._timer.isActive()
+    assert _secs(done_time.text()) > 0
+
+    # Never reached at all: "skipped", no time — unchanged from before this
+    # feature, and not accidentally given a duration.
+    _, _, _, _, skip_time, _sstack, skip_state, skip_spinner = _row_for(rail, "compare")
+    assert skip_state.text() == "skipped"
+    assert skip_time.text() == ""
+    assert not skip_spinner._timer.isActive()
+
+
+def test_a_freshly_lit_slot_resets_its_own_timer(hud):
+    """Each slot's live counter starts from zero when IT becomes active, not
+    from whenever the rail itself was created."""
+    from PyQt6.QtTest import QTest
+    widget, _, app = hud
+    p = widget.panel
+    p.begin("Mac")
+    p.add_step(_step("vocab", "Vocabulary"))
+    rail = p._rail
+    QTest.qWait(200)                            # "fix words" ticks for a while
+    app.processEvents()
+
+    p.add_step(_step("rule", "Rules"))          # "rules first" only just lit
+    app.processEvents()
+    _, _, _, _, new_time, _stack, _state, _spinner = _row_for(rail, "rules first")
+    assert _secs(new_time.text()) < 0.1, \
+        f"new active row started at {new_time.text()!r}, not close to zero"
+
+
+# ---------------------------------------------------------------------------
 # One-tap revert of a destructive background patch
 # ---------------------------------------------------------------------------
 

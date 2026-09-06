@@ -15,6 +15,11 @@ struct ChainSlot: Identifiable {
     var id: String { label }
 }
 
+/// What the chain rail is showing right now: which slots are done, which one
+/// (if any) is the live one, and each done slot's duration in ms. See
+/// `ThinkingView.railState`.
+typealias ChainRailState = (done: Set<Int>, active: Int?, durations: [Int: Int])
+
 enum EngineChain {
     /// The chain for a brain version. An unknown version shows no scaffold —
     /// the timeline falls back to the raw steps, exactly as before.
@@ -59,6 +64,18 @@ struct ThinkingView: View {
     /// The step whose ⓘ was tapped — drives the in-depth explanation popover.
     @State private var infoSlot: ChainSlot? = nil
 
+    // -- chain-rail live timer (mirrors the Mac's _ChainRail) --------------
+    // The slot currently glowing, when it lit, and the redraw tick that keeps
+    // its counter moving. `chainFrozenDurationsMs` holds only the one number
+    // `railState` can't derive from the steps themselves: the last live slot,
+    // frozen at whatever `finished` arrives (see the `onChange(of: finished)`
+    // below) — every earlier slot's duration comes straight from the step
+    // that superseded it, exactly like the Mac panel.
+    @State private var chainActiveIndex: Int? = nil
+    @State private var chainActiveSince = Date()
+    @State private var chainFrozenDurationsMs: [Int: Int] = [:]
+    @State private var chainLiveTick = Date()
+
     var body: some View {
         NavigationView {
             ScrollViewReader { proxy in
@@ -90,7 +107,25 @@ struct ThinkingView: View {
                 }
                 .onChange(of: steps.count) { _ in
                     if let last = steps.last { withAnimation { proxy.scrollTo(last.id, anchor: .bottom) } }
+                    syncChainActive()
                 }
+                .onChange(of: finished) { done in
+                    if done {
+                        freezeChainActiveIfNeeded()
+                    } else {
+                        // A new run started in the same presented sheet (a
+                        // command sent again before this one's sheet was
+                        // dismissed) — the previous run's chain bookkeeping
+                        // must not leak into this one.
+                        chainActiveIndex = nil
+                        chainFrozenDurationsMs = [:]
+                        chainActiveSince = Date()
+                    }
+                }
+                .onReceive(Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()) { now in
+                    if !finished { chainLiveTick = now }
+                }
+                .onAppear { syncChainActive() }
             }
             .navigationTitle("Thinking")
             .navigationBarTitleDisplayMode(.inline)
@@ -127,9 +162,25 @@ struct ThinkingView: View {
                             .font(.caption)
                             .foregroundColor(state.done.contains(i) || i == state.active ? .primary : .secondary)
                         Spacer()
-                        Text(stateMark(i, state))
-                            .font(.caption2)
-                            .foregroundColor(slotColor(i, state))
+                        // Seconds, right of the mark — frozen once a slot is
+                        // done, live and ticking while it's the one running,
+                        // blank for a slot not reached (or skipped) yet.
+                        Text(chainTimeText(i, state))
+                            .font(.caption2.monospacedDigit())
+                            .foregroundColor(.secondary)
+                        // A small spinning wheel takes the mark's place only
+                        // for the slot in progress — never resizing the row,
+                        // since both sit in the same fixed-size frame.
+                        Group {
+                            if i == state.active && !finished {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Text(stateMark(i, state))
+                                    .font(.caption2)
+                                    .foregroundColor(slotColor(i, state))
+                            }
+                        }
+                        .frame(width: 14, height: 14)
                         Button { infoSlot = slot } label: {
                             Image(systemName: "info.circle").font(.caption)
                         }
@@ -144,6 +195,59 @@ struct ThinkingView: View {
             .cornerRadius(10)
             .padding(.bottom, 10)
         }
+    }
+
+    /// Sync the chain-rail's live-timer bookkeeping to whichever slot
+    /// `railState` currently reports as active — called whenever a new step
+    /// arrives, and once on appear for a sheet presented mid-run. A slot
+    /// lighting up for the first time gets a fresh start time, mirroring the
+    /// Mac's `_ChainRail._advance_to`, which resets `_active_since` the
+    /// instant a new slot lights.
+    private func syncChainActive() {
+        let slots = EngineChain.scaffold(for: response?.brain ?? "engine-v2")
+        guard !slots.isEmpty else { return }
+        let active = railState(slots).active
+        if active != chainActiveIndex {
+            chainActiveIndex = active
+            chainActiveSince = Date()
+        }
+    }
+
+    /// The run ended while a slot was still live — there's no later step to
+    /// source its duration from (the Mac panel has the identical gap, for the
+    /// identical reason), so the wall-clock span it was active for — the same
+    /// number its live counter was already showing — is frozen in its place.
+    private func freezeChainActiveIfNeeded() {
+        guard let a = chainActiveIndex, chainFrozenDurationsMs[a] == nil else { return }
+        chainFrozenDurationsMs[a] = Int(Date().timeIntervalSince(chainActiveSince) * 1000)
+    }
+
+    private func chainTimeText(_ i: Int, _ state: ChainRailState) -> String {
+        if state.done.contains(i) {
+            let ms = state.durations[i] ?? chainFrozenDurationsMs[i]
+            return ms.map(fmtChainSeconds) ?? ""
+        }
+        if i == state.active && !finished {
+            _ = chainLiveTick   // read the 10Hz tick so this text redraws with it
+            let elapsed = Date().timeIntervalSince(chainActiveSince) * 1000
+            return fmtChainLiveSeconds(Int(elapsed))
+        }
+        return ""
+    }
+
+    // Same "always seconds" shape as the per-step rows below (see `row(_:)`):
+    // two decimals under a second so a fast slot still reads as a duration,
+    // one above it.
+    private func fmtChainSeconds(_ ms: Int) -> String {
+        ms >= 999
+            ? String(format: "%.1f s", Double(ms) / 1000)
+            : String(format: "%.2f s", Double(ms) / 1000)
+    }
+
+    // The live counter always shows tenths — a steady, readable rate rather
+    // than snapping between one and two decimals as it crosses the 1s mark.
+    private func fmtChainLiveSeconds(_ ms: Int) -> String {
+        String(format: "%.1f s", Double(max(0, ms)) / 1000)
     }
 
     /// The in-depth explanation shown when a step's ⓘ is tapped. Kept a real
@@ -163,10 +267,17 @@ struct ThinkingView: View {
         }
     }
 
-    /// Which slots are done and which is live — mapped from the live steps by
-    /// stage, in order (mirrors the Mac panel's `_ChainRail.observe`).
-    private func railState(_ slots: [ChainSlot]) -> (done: Set<Int>, active: Int?) {
+    /// Which slots are done, which is live, and (for a done slot) how long it
+    /// took — mapped from the live steps by stage, in order (mirrors the Mac
+    /// panel's `_ChainRail.observe`/`_advance_to`). A slot's duration is the
+    /// `ms` of the step that superseded it — that step's `ms` is "time since
+    /// the previous step" (assistant.trace.Trace.step), exactly the span the
+    /// earlier slot spent lit, whether this is a live run or a replayed one.
+    /// The one slot this can't cover is whichever is still active when the
+    /// run ends — `freezeChainActiveIfNeeded` supplies that one instead.
+    private func railState(_ slots: [ChainSlot]) -> ChainRailState {
         var done = Set<Int>()
+        var durations: [Int: Int] = [:]
         var active: Int? = nil
         var ptr = 0
         for step in steps {
@@ -176,7 +287,7 @@ struct ThinkingView: View {
             var i = ptr
             while i < slots.count {
                 if slots[i].stage == stage {
-                    if let a = active { done.insert(a) }
+                    if let a = active { done.insert(a); durations[a] = step.ms }
                     active = i; ptr = i + 1; mapped = true; break
                 }
                 i += 1
@@ -188,16 +299,16 @@ struct ThinkingView: View {
             }
         }
         if finished, let a = active { done.insert(a); active = nil }
-        return (done, active)
+        return (done, active, durations)
     }
 
-    private func slotColor(_ i: Int, _ state: (done: Set<Int>, active: Int?)) -> Color {
+    private func slotColor(_ i: Int, _ state: ChainRailState) -> Color {
         if state.done.contains(i) { return .green }
         if i == state.active && !finished { return settings.accentColor }
         return .secondary.opacity(0.5)
     }
 
-    private func stateMark(_ i: Int, _ state: (done: Set<Int>, active: Int?)) -> String {
+    private func stateMark(_ i: Int, _ state: ChainRailState) -> String {
         if state.done.contains(i) { return "✓" }
         if i == state.active && !finished { return "…" }
         return finished ? "skipped" : ""

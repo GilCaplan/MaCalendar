@@ -52,6 +52,8 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>MACalendar uses the microphone to let you add and manage calendar events with your voice.</string>
 	<key>NSCameraUsageDescription</key>

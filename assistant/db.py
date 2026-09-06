@@ -53,6 +53,14 @@ _TODO_MIGRATIONS = [
     # Version stamp, so a client that edited a task while disconnected can say
     # which version it was working from (see PATCH /todos/<id>).
     "ALTER TABLE todos ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''",
+    # Idempotency key for creation. A client mints one token per task the user
+    # asked for and sends it on every attempt — the first live POST and every
+    # later replay of the same queued create. POST /todos returns the existing
+    # row for a token it has already stored instead of inserting a second one,
+    # so a retried create can no longer become a duplicate task. Empty for
+    # rows created in-process (voice, calendar sync, the Mac GUI), which never
+    # go over the wire and so can never be retried.
+    "ALTER TABLE todos ADD COLUMN client_token TEXT NOT NULL DEFAULT ''",
 ]
 
 # Known tag names (so user-created tags persist even when no todo uses them).
@@ -416,6 +424,7 @@ _CREATE_INDEXES = """
 CREATE INDEX IF NOT EXISTS idx_events_date      ON events(date);
 CREATE INDEX IF NOT EXISTS idx_events_series    ON events(series_id);
 CREATE INDEX IF NOT EXISTS idx_todos_list       ON todos(list, completed);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_todos_client_token ON todos(client_token) WHERE client_token != '';
 CREATE INDEX IF NOT EXISTS idx_subtasks_todo    ON subtasks(todo_id, position);
 CREATE INDEX IF NOT EXISTS idx_timer_sessions   ON timer_sessions(timer_id);
 CREATE INDEX IF NOT EXISTS idx_counter_presses  ON counter_presses(counter_id);
@@ -1339,38 +1348,80 @@ class CalendarDB:
         source_event_id: Optional[int] = None,
         tags: Optional[List[str]] = None,
         quantity: int = 1,
+        client_token: str = "",
     ) -> int:
-        """Insert a new todo item. Returns the new row id."""
+        """Insert a new todo item. Returns the new row id.
+
+        `client_token` is a creation idempotency key (see `_TODO_MIGRATIONS`).
+        When a non-empty token has already been stored, the existing row's id is
+        returned and nothing is inserted — a replayed create is a no-op rather
+        than a second copy of the task.
+        """
+        token = (client_token or "").strip()
+        if token:
+            existing = self.get_todo_by_client_token(token)
+            if existing is not None:
+                return int(existing["id"])
         tags_json = self._encode_tags(tags or [])
+        new_id: Optional[int] = None
         with self._conn() as conn:
             max_pos = conn.execute(
                 "SELECT COALESCE(MAX(position), -1) FROM todos WHERE list = ?",
                 (list_name,),
             ).fetchone()[0]
-            cur = conn.execute(
-                """
-                INSERT INTO todos
-                    (title, list, completed, priority, due_date, notes,
-                     source, source_event_id, created_at, updated_at, completed_at,
-                     position, tags, quantity)
-                VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?)
-                """,
-                (
-                    title,
-                    list_name,
-                    priority,
-                    due_date,
-                    notes,
-                    source,
-                    source_event_id,
-                    datetime.datetime.now().isoformat(),
-                    _utcnow_iso(),      # a version for clients to quote back
-                    max_pos + 1,
-                    tags_json,
-                    max(1, int(quantity or 1)),
-                ),
-            )
-            return cur.lastrowid
+            try:
+                cur = conn.execute(
+                    """
+                    INSERT INTO todos
+                        (title, list, completed, priority, due_date, notes,
+                         source, source_event_id, created_at, updated_at, completed_at,
+                         position, tags, quantity, client_token)
+                    VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)
+                    """,
+                    (
+                        title,
+                        list_name,
+                        priority,
+                        due_date,
+                        notes,
+                        source,
+                        source_event_id,
+                        datetime.datetime.now().isoformat(),
+                        _utcnow_iso(),      # a version for clients to quote back
+                        max_pos + 1,
+                        tags_json,
+                        max(1, int(quantity or 1)),
+                        token,
+                    ),
+                )
+            except sqlite3.IntegrityError:
+                # Two flushes of the same queued create raced past the lookup
+                # above; the unique index on client_token is the real referee.
+                # Resolve the winner *outside* this connection — reading through
+                # a second one while this write transaction is still open can
+                # block on the writer's lock.
+                if not token:
+                    raise
+            else:
+                new_id = cur.lastrowid
+        if new_id is not None:
+            return new_id
+        existing = self.get_todo_by_client_token(token)
+        if existing is None:
+            raise sqlite3.IntegrityError(
+                "todos.client_token conflict with no matching row")
+        return int(existing["id"])
+
+    def get_todo_by_client_token(self, client_token: str) -> Optional[dict]:
+        """The todo a client already created under this idempotency key, if any."""
+        token = (client_token or "").strip()
+        if not token:
+            return None
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM todos WHERE client_token = ?", (token,)
+            ).fetchone()
+            return dict(row) if row else None
 
     # ------------------------------------------------------------------
     # Todos: Read

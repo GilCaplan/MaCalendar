@@ -28,7 +28,7 @@ purely backend (no client code beyond displaying the effects).
 | hybrid | [Tasks](#tasks--to-dos) | Today/General lists, priorities, quantities | `db.py`, `TasksView` |
 | hybrid | [Tag discovery](#tag-discovery--the-class-set-grows-with-consent) | consent-based new classes + history | `actions/todo/tag_discovery.py` |
 | hybrid | [Share event as .ics](#share-event-as-ics) | one event → RFC 5545 file, both platforms | `ics_export.py`, `event_dialog.py` |
-| hybrid | [Pre-event notifications](#pre-event-notifications) | phone rings from its cache; server computes policy; per-category mute | `notify.py`, `ReminderScheduler.swift` |
+| hybrid | [Pre-event notifications](#pre-event-notifications) | phone rings from its cache; server computes policy; per-category mute; live "Up Next" lock-screen card | `notify.py`, `ReminderScheduler.swift`, `LiveActivityManager.swift` |
 | hybrid | [Voice I/O & capture controls](#voice-in--voice-out--capture-controls) | hotkey/stop-phrases/review-bar; engine-selectable STT; spoken replies | `stt/`, `Voice/`, `tts/` |
 | hybrid | [Edit-transcription gate](#the-edit-transcription-round-trip-needs_edit) | doubted words → editor → learned | `engine/transcript.py` |
 | hybrid | [Self-check & revert](#background-self-check--one-tap-revert) | background re-reasoning, one-tap undo | `engine/__init__.py`, panels |
@@ -135,7 +135,15 @@ attachments, quantities ("pasta ×5") and subtasks.
 **How:** Quantities parse from speech or typed titles
 (`assistant/intent/quantity.py`, `split_quantity`); list is a column, not a
 table — the two-list design is deliberate (see tag classes for the axis that
-does grow).
+does grow). **Creating a task is idempotent:** a client mints one
+`client_token` per task the user asked for and repeats it on every attempt —
+the live `POST /todos` and each replay of the same queued create — and the
+server returns the row it already stored (200, `{"id": …, "duplicate": true}`)
+instead of inserting a second one. `todos.client_token` carries the key with a
+unique index over non-empty values; in-process creators (voice, calendar sync,
+the Mac tasks pane) leave it empty because they never cross the wire. Added
+2026-09-06 after 32 copies of one task accumulated in Today, one per repeated
+`POST /todos`.
 
 ### Tag discovery — the class set grows with consent
 **What:** When ≥5 distinct untagged tasks share a theme no existing class
@@ -344,17 +352,37 @@ best-effort banners (+ optional spoken heads-up) while the calendar stack
 runs. Quiet windows: evaluated on the FIRE time — an event inside
 Shabbat/yom tov gets no reminder (reason in the payload), a motzei lead is
 clamped past havdala, fasts don't suppress, fail-open like the series skip.
+Additive on top of the banner: an **"Up Next" Live Activity** — a persistent
+lock-screen card (and Dynamic Island) showing the next event's title, clock
+time, category colour and a live countdown, flipping to "NOW" with a
+count-up once it starts and then rolling on to the following event.
 **Where:** policy `assistant/notify.py`; store `events.reminder_minutes` +
 `reminder_log` (`db.py`); Mac thread `assistant/notifier.py` (osascript);
 settings `settings_dialog.py` + iOS `SettingsView`; phone
 `ReminderScheduler.swift` + `NotificationRouter` (tap deep-links to the
 event); per-event picker in both edit surfaces; config `notifications:`
-section (PATCH /config).
+section (PATCH /config). Live Activity: app-side
+`LiveActivityManager.swift`, shared contract
+`MACalendar-iOS/Shared/UpNextActivityAttributes.swift` (compiled into both
+targets), UI in the new `MACalendarWidgets` app-extension target
+(`UpNextLiveActivity.swift`, bundle id `com.macalendar.app.widgets`,
+deployment target 16.2, embedded via "Embed Foundation Extensions");
+`NSSupportsLiveActivities` in the app's `Info.plist`.
 **How:** no new sync surface — the event payload is the contract; the phone
 reconciles ≤55 `UNCalendarNotificationTrigger`s (headroom under the 64 cap
 for workout rest timers); `reminder_log` dedupes across `--reload`
-restarts; late fires obey `catch_up_minutes`. Voice phrase → lead time
-(phase 3) lands after the next branch merge. Plan:
+restarts; late fires obey `catch_up_minutes`. The Live Activity needs no
+push and never gets one: the countdown is `Text(timerInterval:)` /
+`ProgressView(timerInterval:)`, which iOS re-renders on the lock screen with
+the app not running — so the app only has to push content when the *event*
+changes, which it does from the paths where it already wakes
+(`ReminderScheduler.reconcile()`, ContentView's foreground handler, its
+`/changes` branch and its 30 s tick), all funnelled through one debounced
+`LiveActivityManager.sync()`. Cards carry a `staleDate` at exactly the
+moment they stop being true, so a transition missed while the phone is
+locked is dimmed by iOS rather than shown as a lie. Starts only within the
+8 h ActivityKit cap, and respects the device-local reminders toggle. Voice
+phrase → lead time (phase 3) lands after the next branch merge. Plan:
 `NOTIFICATIONS_PLAN.md`.
 
 ### The engine (engine-v2) — the brain

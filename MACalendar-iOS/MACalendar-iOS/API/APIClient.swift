@@ -38,6 +38,11 @@ class APIClient: ObservableObject {
     /// While things are changing (a voice command just ran, an edit was saved) the
     /// background poll drops to 1 s; it returns to 30 s once this window passes.
     private var isFlushingVoice = false
+    /// Same reason as `isFlushingVoice`, for the write queue. Four things ask
+    /// for a flush — the reconnect hook in `request()`, the `.active` scene
+    /// change, the poll loop, and a manual retry — and two overlapping passes
+    /// both read `allPending().first`, so both replay the same queued create.
+    private var isFlushingPending = false
     @Published var burstUntil = Date.distantPast
     func burstRefresh(seconds: TimeInterval = 45) { burstUntil = max(burstUntil, Date().addingTimeInterval(seconds)) }
     var pollInterval: TimeInterval { Date() < burstUntil ? 1 : 30 }
@@ -125,7 +130,10 @@ class APIClient: ObservableObject {
     /// Returns true if anything was synced (caller should refresh UI).
     @discardableResult
     func syncPending() async -> Bool {
+        guard !isFlushingPending else { return false }
         guard !LocalStore.shared.allPending().isEmpty else { return false }
+        isFlushingPending = true
+        defer { isFlushingPending = false }
         var synced = 0
         // Re-read the queue each pass: replaying a create rewrites the paths of
         // later entries that still point at its temporary offline id.
@@ -390,7 +398,13 @@ class APIClient: ObservableObject {
     /// Tags are always sent explicitly (possibly empty) so the server's own
     /// "tag mode" (config.todo.auto_tag) never overrides what the phone chose.
     func createTodo(title: String, list: String = "today", tags: [String] = []) async throws -> Int {
-        let body: [String: Any] = ["title": title, "list_name": list, "tags": tags]
+        // One idempotency token per task the user asked for, minted before the
+        // first attempt and carried by every later one. The Mac returns the row
+        // it already stored for a token it has seen, so a create that arrived
+        // but whose reply was lost — and a queued create replayed twice — can no
+        // longer land as a second copy of the task.
+        let body: [String: Any] = ["title": title, "list_name": list, "tags": tags,
+                                   "client_token": UUID().uuidString]
         do {
             let data = try await request("/todos", method: "POST", body: body)
             let obj  = try JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -834,6 +848,32 @@ class APIClient: ObservableObject {
     func answerTagSuggestion(name: String, accept: Bool) async {
         _ = try? await request("/tags/suggestion/answer", method: "POST",
                                body: ["name": name, "accept": accept])
+    }
+
+    /// Every past suggestion and its verdict, newest first — hidden rows
+    /// included, with their flag, because folding them away is the client's
+    /// decision. Throws so the history view can tell "the Mac is away" from
+    /// "you have never been asked anything".
+    func tagSuggestionHistory() async throws -> [TagSuggestionRecord] {
+        try decode([TagSuggestionRecord].self,
+                   from: try await request("/tags/suggestions/history"))
+    }
+
+    /// Change a past verdict. Un-accepting deletes the class from the registry
+    /// again — and, exactly as deleting a tag by hand does, strips it from
+    /// every task — so callers should refresh their tag list afterwards.
+    func reviseTagSuggestion(name: String, accept: Bool) async throws {
+        _ = try await request("/tags/suggestions/revise", method: "POST",
+                              body: ["name": name, "accept": accept])
+    }
+
+    /// Fold an entry out of the visible history, or back into it. The record
+    /// is kept either way; this only moves a display flag. Sent as its own
+    /// request because the Mac reads `hidden` in preference to `accept` when
+    /// both are present.
+    func setTagSuggestionHidden(name: String, hidden: Bool) async throws {
+        _ = try await request("/tags/suggestions/revise", method: "POST",
+                              body: ["name": name, "hidden": hidden])
     }
 
     func vocab() async throws -> VocabState {

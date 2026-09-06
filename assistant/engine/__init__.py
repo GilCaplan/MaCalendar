@@ -554,6 +554,11 @@ def _revert_spec(kind: str, row: "dict | None") -> "dict | None":
     }
     if not body["title"]:
         return None
+    # Idempotency key for POST /todos, stable per removed row: a Revert pressed
+    # twice (or on two surfaces) puts the task back once, not twice. Only when
+    # the row carries an id — a token that isn't unique would be worse than none.
+    if row.get("id") is not None:
+        body["client_token"] = f"revert-todo-{row['id']}"
     return {"kind": "todo", "body": body}
 
 
