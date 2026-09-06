@@ -12,6 +12,19 @@ and cleaner e+t at ~1.8× the latency.
 
 Every meaningful run, newest first.
 
+## Dev-full anchor, epoch 1 (run 13, 2026-09-06 17:11, 600 rows)
+
+The new epoch's first off-slice read, covering C5+C6+C7 together: **78.0
+raw / 81.0 adjusted**. The three verdicts it delivers: (1) **low overfit** —
+tuned half 79.6 vs untuned 77.7, a 1.9pt gap; (2) **the invention guard
+generalizes** — precision 85.9 off-slice, matching dev-fast's 85.8; (3)
+**cycle 7's field-quality dip was slice noise** — 84.2 on 600 rows, back
+above the baseline's 84.6-adjacent band. Persisting anomalies: simple-tier
+field quality (79.1) still below complex, and the dentist query-mutation
+class appears 2 times at this scale. Held-out trigger status: this is
+dev-full point ONE of the two flat points required — the next graduated
+cycle's dev-full decides.
+
 ## Cycle 7 — invention guard (queue #5) — PREDICTION (written before the change)
 
 *Stage:* generate — after the LLM parses an event-kind item, every content
