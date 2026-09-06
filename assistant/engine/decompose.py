@@ -171,6 +171,11 @@ def _strip_reminder_clause(item) -> None:
         if unit.startswith(("hour", "hr")):
             n *= 60
     remainder = (item.text[:m.start()] + " " + item.text[m.end():]).strip(" ,;")
+    # A leading-form strip can leave courtesy junk ("please remind me 1 hour
+    # before the meeting" -> "please the meeting..."): drop bare courtesy
+    # prefixes so the remainder reads as the ask it is (C8 regression fix).
+    remainder = re.sub(r"^(?:please|kindly|can you|could you|hey)\s+", "",
+                       remainder, flags=re.I).strip()
     if len(remainder.split()) < 2:
         return                        # the clause WAS the command - not inline
     item.slots["reminder_minutes"] = max(1, min(1440, n))

@@ -12,6 +12,35 @@ and cleaner e+t at ~1.8× the latency.
 
 Every meaningful run, newest first.
 
+## Cycle 9 — sub-item rules-first trust (Gil's architecture call) — PREDICTION (registered before the change)
+
+*Stage:* generate `_parse_item` (internal; no contract change). Gil's
+observation: after segment/decompose split a command, each fragment is a
+SIMPLE shape — exactly where the sandbox proved the rule system ≥95% — yet
+per-item rule parses are only accepted at the whole-command threshold
+(0.85). Change: a FRAGMENT (item text ≠ command text) accepts its rule
+parse at ≥0.60 (still no missing slots); stage-6 crosscheck (the LLM
+extract-and-verify) remains the net — which is the "verify using an LLM"
+half of the idea, already in the architecture. Rides along (C8 bugs,
+exempt): courtesy-prefix cleanup after the reminder strip; fallback path
+now applies slots. *Predicted:* deep-path p50 drops (fewer LLM calls):
+7.5s → **6.0–7.0s**; deep-slice count-correct −1 to +2; overall
+78.5–80.5 raw; fieldq holds ≥84.5. Judge: deep latency + deep count.
+This run is ALSO the joint confirmation for sandbox F1+F2 (merged aboard).
+
+## Sandbox batch F2 — verb-map gap + pronoun targets (fast lane) — PREDICTION (registered before the change)
+
+*Diagnosis (fast-lane tree):* "get rid of this list" parses as
+create_todo(["get this list"]) — "get rid of" is missing from the removal
+verb map, so the C6 veto (mutations only) never sees it; "Can you sync my
+calendar with mark?" parses as complete_todo(match_title="you") — a
+pronoun target. *Changes:* [internal] "get rid of" joins the removal verbs
+(the generic-target veto then catches "this list"); [gate] pronouns
+(you/it/me/this/that) join the generic-target set. *Predicted (sandbox
+dev-fast):* both rows abstain; commit 36% → ~34–35%, adjusted-on-committed
+89.9% → **91.5–94%**; simple-ask slices unchanged; full-3000 held-out
+aggregate expected to tick up (same phrasings exist beyond dev).
+
 ## Fast-only, FULL 3000 (sandbox, pre-F1 code, 2026-09-07, ~3 min)
 
 Gil's ruling: the deterministic fast lane may measure the full dataset.

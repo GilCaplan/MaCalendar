@@ -150,3 +150,15 @@ def test_bare_reminder_command_left_for_the_fallback():
     it = Item(id="item_1", kind="event", text="remind me 30 minutes before")
     _strip_reminder_clause(it)
     assert "reminder_minutes" not in it.slots
+
+
+def test_leading_courtesy_prefix_cleaned_after_strip():
+    # C8 regression: "please remind me 1 hour before the meeting..." left
+    # "please the meeting..." - a verbless mangle the LLM misread.
+    from assistant.engine.decompose import _strip_reminder_clause
+    from assistant.engine.state import Item
+    it = Item(id="item_1", kind="event",
+              text="please remind me 1 hour before the meeting I hace tomorrow")
+    _strip_reminder_clause(it)
+    assert it.slots["reminder_minutes"] == 60
+    assert it.text == "the meeting I hace tomorrow"

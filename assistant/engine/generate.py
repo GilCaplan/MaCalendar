@@ -30,6 +30,10 @@ from assistant.engine.state import EngineState, Item
 
 logger = logging.getLogger(__name__)
 
+#: Fragments of a split command accept rule parses at this relaxed bar
+#: (cycle 9, Gil's call); whole commands keep RULE_THRESHOLD.
+SUBITEM_RULE_THRESHOLD = 0.60
+
 _parser = None
 _rule_parser = None
 _RULE_PARSER_MISSING = object()   # spaCy absent: checked once, then skipped
@@ -199,11 +203,19 @@ def _parse_item(item: Item, state: EngineState, cfg) -> "list | None":
     if rule_parser is not None:
         try:
             rr = rule_parser.analyze(item.text, current_view=state.current_view)
-            if rr.confidence >= RULE_THRESHOLD and not rr.missing_slots:
+            # Cycle 9 (Gil): a FRAGMENT of a split command is a simple shape -
+            # the sandbox measured the rule system >=95% on those - so
+            # sub-items trust rules at a relaxed bar; crosscheck (the LLM
+            # extract-and-verify stage) remains the net.
+            is_fragment = item.text.strip() != state.text.strip()
+            bar = SUBITEM_RULE_THRESHOLD if is_fragment else RULE_THRESHOLD
+            if rr.confidence >= bar and not rr.missing_slots and rr.intents:
                 if state.trace:
                     from assistant.trace import RULE
                     state.trace.step(RULE, f"Read {_friendly(item.id)}",
-                                     f"{rr.confidence:.2f}: " + ", ".join(n for n, _ in rr.intents))
+                                     f"{rr.confidence:.2f}"
+                                     + (" (fragment bar)" if is_fragment and rr.confidence < RULE_THRESHOLD else "")
+                                     + ": " + ", ".join(n for n, _ in rr.intents))
                 return rr.intents
             try:
                 got = parser.parse_with_context(item.text, rr)
@@ -300,6 +312,7 @@ def run(state: EngineState, cfg) -> EngineState:
             fb = _event_fallback(item.text)
             if fb is not None:
                 item.action, item.intent = "create_event", fb
+                _apply_slots(item)      # a stripped lead time rides fallbacks too
                 state.add_fix("generate", "event_fallback", "", item.text[:40],
                               note="literal set-an-event ask with a grounded when")
                 out.append(item)
