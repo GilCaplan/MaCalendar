@@ -269,7 +269,9 @@ and **a measured number must cite a run that still exists**
 
 `DOCUMENTATION/TASKS.md` is the tracker and carries the current order of play
 at the bottom — read it before picking up work, and move a row rather than
-starting a parallel list. `DOCUMENTATION/MODELS.md` is the canonical answer to
+starting a parallel list. `DOCUMENTATION/FEATURES.md` is the feature catalog
+(what/where/how per feature, summary table on top) — **a shipped feature adds
+its entry there in the same change.** `DOCUMENTATION/MODELS.md` is the canonical answer to
 which models do what. `DOCUMENTATION/ENGINE.md` is the engine's stage-contract
 reference. `DOCUMENTATION/ARTIFACT_BUILDER.md` is the brief for the published
 explainer pages.

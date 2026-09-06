@@ -16,6 +16,9 @@ A privacy-focused, voice-driven calendar assistant for macOS. This tool uses loc
 > prediction — every score, change and decision recorded. How it works:
 > [DOCUMENTATION/SELF_IMPROVEMENT.md](DOCUMENTATION/SELF_IMPROVEMENT.md).
 
+**Full feature catalog** — every feature, where it lives, and how it's built:
+[DOCUMENTATION/FEATURES.md](DOCUMENTATION/FEATURES.md).
+
 A spoken command goes: **Whisper (MLX, on the Apple GPU)** → **personal vocabulary auto-correct** → **rule parser** (spaCy + date recognizer; answers ~44% of commands in ~100 ms with no LLM) → **local LLM** (Ollama, llama3.1:8b) when the rule parser is unsure, with your most similar past commands injected as examples → validation → actions → SQLite. Every command is remembered; your edits, deletes and approve/reject become feedback that improves the next parse. Details: [DOCUMENTATION/SYSTEM.md](DOCUMENTATION/SYSTEM.md), audit: [DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md](DOCUMENTATION/ASSISTANT_AUDIT_SUMMARY.md).
 
 **The LLM sees every command, whichever path answered it.** A rule-path answer

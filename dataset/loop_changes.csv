@@ -18,3 +18,4 @@ cycle,date,component,kind,description,commit
 -,2026-09-05,metrics,improvement,"Tag scoring follows the product's outcome (resolve → else infer), never the raw LLM emission",0706f1a
 -,2026-09-05,tagging,feature,"Consent-based tag discovery: the registry grows from untagged history — MIN_EVIDENCE=5 distinct uncovered tasks, ≤1 ask/7 days (charged on hand-out), refusals forever; Mac popup + iOS alert; server-side politeness",24fbb7d
 -,2026-09-05,tagging,feature,"Suggestion history: review, reverse a past verdict (un-accept removes the class), hide-but-keep; endpoints /tags/suggestions/{history,revise}",24fbb7d
+-,2026-09-05,process,new,"FEATURES.md: the feature catalog (summary table + what/where/how per feature); convention in CLAUDE.md — a shipped feature adds its entry in the same change",ffdaa36
