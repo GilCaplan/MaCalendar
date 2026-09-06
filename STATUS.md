@@ -78,12 +78,11 @@ compare actual vs. expected in `RESULTS.md` → upsize only as gains slow.
 Work happens in THIS worktree (`../MACalendar-app`, branch `app-features`);
 merge with `main` + the loop branch between cycles. Queue, in order:
 
-1. **Model-comparison results** — if the haiku/sonnet CLI-bridge sims (and the
-   llama true baseline) finished unprocessed, fill `dataset/MODEL_COMPARISON.md`
-   from `engine_compare/model_{haiku,sonnet}/` + the baseline, and report.
-   Known caveat for the reading: Claude models sometimes answer garble/query
-   rows in helpful prose instead of JSON (scored as a parse failure — same
-   treatment llama's `unknown` gets).
+1. **Model-comparison — CLOSED (Gil stopped it, 2026-09-06).** Partial-data
+   verdict in `dataset/MODEL_COMPARISON.md`: on identical rows the tuned
+   local llama beat both Claude drop-ins (deep rows: 80% vs Sonnet 60% /
+   Haiku 53%) — the engine's llama tuning + mechanical schema constraint
+   outweigh raw model strength; privacy costs nothing. Do not respawn sims.
 2. **Notifications** — PLANNED 2026-09-06: `DOCUMENTATION/NOTIFICATIONS_PLAN.md`
    (5 phases; phone = reliable ringer from the offline cache, server computes
    `notify_at`, Mac banners best-effort, observance quiet windows on the fire
