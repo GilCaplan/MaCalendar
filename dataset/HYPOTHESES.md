@@ -77,18 +77,11 @@ needing one is marked **[Gil]** and is blocked until asked.
    "update X with new items" as create is defensible; "give an entry" has no
    content to create (clarify may be the honest answer). Partial [Gil].
 
-5. **Garble→invention guard** — stage: validate.
-   *Evidence:* "new scenario, time or calendar to new list…" produced a
-   fabricated "New Event", conference room, 10:00–11:00 — fields not in the
-   words. **A precision failure count-correctness barely sees** (it even
-   *helped* the count).
-   *Hypothesis:* an AI-created event whose title AND fields aren't grounded in
-   the transcript is held back with the honest message.
-   *Expected on count-correct:* ~0, possibly −0.5 pt. **Queued for product
-   value, not this metric** — pair with a precision/invention measure when we
-   define one. *Effort:* medium. *Risk:* over-blocking legitimate defaults
-   (interacts with #2 — do #2 first, then this guard can key off its
-   grounding rule).
+5. ✅ **C7 — invention guard** (generate, @ 160e9a4, run 12). GRADUATED:
+   precision 85.8 (in band), raw 80.0 best-ever, +4/−0 flips — all four the
+   garble-fabrication rows, resolving correctly once inventions dropped.
+   Novel effect logged: the guard unlocks wins rather than merely trading
+   count for honesty.
 
 6. ✅ **Resolved (Gil, 2026-09-05): NO** — lists stay Today/General + tags,
    no separate lists by voice. The "create a new list" dataset rows are
