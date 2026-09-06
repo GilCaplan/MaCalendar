@@ -223,7 +223,10 @@ def main() -> int:
     t0 = time.perf_counter()
     for i, (text, rank, ts) in enumerate(rows, 1):
         _reset_calendar()
-        frozen = freeze_time(_dt.datetime.fromtimestamp(ts)) if ts else contextlib.nullcontext()
+        # tick=True: the clock STARTS at the row's ts and then advances naturally,
+        # so dates resolve in the recorded frame while durations (total_ms —
+        # the latency metric) stay real instead of freezing to 0.
+        frozen = freeze_time(_dt.datetime.fromtimestamp(ts), tick=True) if ts else contextlib.nullcontext()
         with frozen:
             resp = client.post("/voice/text",
                                json={"transcript": text, "source": "test"}).get_json()
