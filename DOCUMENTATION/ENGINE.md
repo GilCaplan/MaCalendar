@@ -120,8 +120,19 @@ Two passes, both contract:
 Every applied rule lands in `state.fixes` under its name and in the trace.
 
 ### 5 · generate (`generate.py` · trace `rule`/`llm` · tests `test_engine_generate.py` + integration)
-Owns ALL text→intent conversion. `fast_propose` (whole input) is the fast
-track; `run` works per item: rule parser first (~50ms, free), LLM fills gaps
+Owns ALL text→intent conversion. **`FastRule`** (`engine/fastrule.py`) is the
+deterministic rule parser + its abstention gates + a threshold, as a
+self-contained SELECTIVE CLASSIFIER: `FastRule(threshold).run(prompt)` returns
+a commit-or-abstain verdict. Two live instances, tuned per population:
+`FastRule(0.80)` is the conservative whole-command fast track (deep is its
+net); `FastRule(0.60, compound_gates=False)` is the aggressive per-fragment
+instance the deep track calls after decompose (a fragment is atomic, so the
+compound gates are off; crosscheck is its net). Its abstention gates:
+strong-compound (two-request wording), mixed-mode (create+edit/query),
+interrogative-create (a question producing a create), generic-target (a
+mutation aimed at a bare noun). `fast_propose` (whole input) is the thin
+adapter over `FastRule(0.80)`; `run` works per item: FastRule first (~50ms,
+free), LLM fills gaps
 from the rule parser's partial analysis, or parses from scratch — grounded on
 the item's own words, never another item's. An item parsing into several
 intents is expanded into sub-items, one intent each (per-item attribution is
