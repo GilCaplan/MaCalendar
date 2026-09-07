@@ -174,6 +174,21 @@ be reverted or A/B'd against an earlier version.
 `python -m scripts.run_board <run>` prints 1–9 for any run; all values live
 per-run in `loop_log.csv`.
 
+## The persona sets — `dataset/personas/` (2026-09-07)
+
+6 synthetic users × 420 rows, ground truth by construction, **every row is
+test-only** (never fitted on). Composition is matched across personas by
+construction — a shared catalog of 33 asks defined by GRAMMAR, each realised
+in each persona's own voice — so the board isolates voice from content.
+Leak-gated on every build against the real vocabulary.
+
+They exist to answer a question no other dataset can: **does quality vary by
+speaker?** It does, enormously — atomic handle-rate 72.2% for the persona
+who talks like the author vs 33.9% for a terse student. The ablation
+localises it: vocabulary moves the classifiers 0–3 pt, phrasing moves them
+7–29 pt. `scripts/persona_board.py` reports per-persona boards plus the
+spread, which IS the finding.
+
 ## Q9 audit — the confirm-create ruling against this pool (2026-09-07)
 
 The Q9 flow (a first-person create QUESTION — "should i add yoga…?" —

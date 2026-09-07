@@ -97,6 +97,21 @@ hand-written audit corpus is now only a regression floor.
 
 ## Plan of record
 
+**THE NUMBER THAT MATTERS MOST (2026-09-07):** the sealed benchmark reads
+85% while Gil's REAL usage reads 50% (20 real commands, flag rate 50%,
+`scripts/weekly_review.py` — now filtered to exclude our own test traffic,
+which had been inflating it to 83%). The benchmarks are not lying; they
+measure clean prompts. Real speech is rambling multi-event dictation with
+transcript damage, which no dataset we own contains. **A self-driven loop
+started against the current boards would optimise clean prompts and could
+leave that 50% untouched.** The real-speech dataset is the fix, and it is
+queued.
+
+**PERSONA FINDING:** the engine is tuned to sentence SHAPES, not vocabulary
+— swapping content nouns moves the classifiers 0–3 pt, swapping phrasing
+moves them 7–29 pt. Atomic handle-rate 72.2% for the persona who talks like
+Gil vs 33.9% for a terse student. Cause: `^`-anchored operation features.
+
 **LOOP STATE (2026-09-07).** Stage isolation closed; whole-engine cycles
 resume. FastRule: 13 batches, atomic handle-rate 49.7 → 58.4% and
 half-executed compounds 40 → 31 on its own test half; the atomicity model

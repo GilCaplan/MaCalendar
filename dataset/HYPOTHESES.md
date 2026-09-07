@@ -24,7 +24,44 @@ needing one is marked **[Gil]** and is blocked until asked.
 
 ## The queue
 
-**NEXT UP (2026-09-07, after the stage-isolation phase):**
+**NEXT UP — cycle work authorised by Gil (2026-09-07 evening).** All three
+are IMPLEMENTATION (no contract, component or flow changes), so they run
+inside the loop under the normal discipline: registered prediction first,
+judged on the FastRule 7,200 test half AND the persona boards, dual-gated
+against the real pool.
+
+- **[fast] PHRASING VARIANCE — the biggest measured defect.** The persona
+  ablation showed the engine is tuned to sentence SHAPES, not vocabulary:
+  swapping content nouns moves the classifiers 0–3 pt, swapping phrasing
+  moves them 7–29 pt. Mechanism: every `OperationFeatures` verb signal is
+  `^`-anchored, so terse fragments and polite circumlocution fire ZERO
+  non-bias features (48.6% of terse-student rows vs 6.2% for the control).
+  **Fix:** split each verb class into `-initial` and `-anywhere` features so
+  the model LEARNS what position is worth, rather than it being hard-coded
+  at "everything"; add signals that fire without a verb (noun-then-time,
+  bare-NP, determiner opener). *Risk to watch: acting on fragments raises
+  handle rate AND risk — if correctness drops on the persona boards, bank
+  the negative rather than pushing through.*
+- **[fast] DAYPART OVERRIDES AN EXPLICIT TIME — a live defect (mine, F15).**
+  A daypart word anywhere, INCLUDING INSIDE THE TITLE, rewrites a stated
+  clock time: "book the coffee morning … thursday at 7pm" → 08:00, while
+  "coffee meetup" → 19:00. **Fix:** skip the substitution entirely when the
+  utterance already contains an explicit clock time, and require a temporal
+  preposition ("in the morning") rather than matching a bare noun.
+- **[data] THE REAL-SPEECH SET — the gap the benchmarks cannot see.**
+  Sealed benchmark reads 85%; Gil's REAL usage reads 50% (20 commands,
+  flag rate 50%). The failures are rambling multi-event dictation with
+  transcript damage — a distribution no dataset we own contains. Build it
+  from the memory database's own history and the correction pairs.
+
+**OPEN DESIGN QUESTION FOR GIL (not loop work):** should the cleanup stage
+also CANONICALISE phrasing ("would you be kind enough to put the walk in for
+friday" → "add the walk on friday"), not merely remove noise? That would
+close the 38-point persona spread at its root and fits Gil's own rule that
+speech-specific handling belongs in cleanup — but rewrites destroy
+information, which is exactly how the "high priority" retitle bug happened.
+
+**Previously queued:**
 - **[engine] A clean sealed-300 run** — the last one was partial and its
   latency was inflated by a bug since fixed. This is the baseline the
   resumed cycles are judged against.

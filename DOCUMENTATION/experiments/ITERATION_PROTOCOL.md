@@ -365,6 +365,20 @@ md5s, loop run number. Rules:
   **~1.5 pt are noise** — judge a cycle by its targeted slice, and measure
   twice when the predicted effect is under ~4 rows.
 
+## The four instruments, and what each is for
+
+| instrument | question it answers | when |
+|---|---|---|
+| `fastrule_shape` (FastRule 7,200 test half) | does FastRule handle atomic items, and defer the rest? | every fast batch |
+| `persona_board` (6 personas, test-only) | does quality hold for speakers who are NOT the author? | every batch that touches features or routing |
+| `engine_dataset_compare --test` (sealed 300) | the objective engine number | milestones only, every 10 cycles |
+| `weekly_review` (real usage, test traffic excluded) | is the assistant actually working for Gil? | between cycles — the outer gate |
+
+**The last one outranks the others.** It is the only instrument measuring
+real speech, and it currently disagrees with them sharply: 50% flag rate on
+20 real commands against an 85% benchmark. A cycle that moves a benchmark
+while that number stays flat has not helped anybody.
+
 ## Reporting: dataset + metric + meaning, every time (Gil, 2026-09-07)
 
 A bare number is not a report. Every figure carries:
