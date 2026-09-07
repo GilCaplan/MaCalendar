@@ -1254,6 +1254,18 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
     if action_name == "create_event":
         if title:
             slots["title"] = title
+        # F17: recurrence is a SLOT of this one atomic item — db.create_event
+        # expands the series itself. Filling it also supplies the anchor DATE
+        # ("every monday" starts on the soonest Monday, the project's rule),
+        # which is why recurring rows used to defer as "missing date".
+        from assistant.intent import recurrence as _recur
+        _rec = _recur.detect(span.text)
+        if _rec:
+            slots["recurrence"] = _rec.cadence
+            if _rec.rounded_from:
+                slots["recurrence_rounded_from"] = _rec.rounded_from
+            if not temporal.get("date"):
+                slots["date"] = _rec.start_date(datetime.date.today()).isoformat()
         if temporal.get("date"):
             slots["date"] = temporal["date"]
         if temporal.get("start_time"):
