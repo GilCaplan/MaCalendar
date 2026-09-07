@@ -63,11 +63,19 @@ naturally stratified.
 |---|---|---|---|---|---|
 | dev-fast | 1–250 | 250 | ~80 min | 0.40 pt | rapid single-component cycles |
 | dev-full | 1–600 | 600 | ~3¼ h | 0.17 pt | confirm a fast win |
-| held-out | 601–3000 | 2400 | ~13 h | 0.04 pt | generalisation — **never mined** |
+| TRAIN pool | all minus sealed | 2,699 | — | — | mine/train/tune freely |
+| SEALED test | `inputs/test_split.json` | 300 | ~1¾ h | 0.33 pt | milestones only — **never mined, tooling-enforced** |
 
-Dev (1–600) is the only region we inspect/tune against. Held-out (601–3000) is
-sealed: measured, never used to pick a fix, so its delta is the honest
-generalisation claim.
+**Since 2026-09-07 (Gil): train–test supersedes the old held-out seal.** The
+sealed set is 300 stratified rows (drawn from the never-mined 601–3000
+range, seed 42); both runners exclude them by text on every run, and a
+milestone `--test` run reports **aggregates only** (row detail suppressed by
+the tooling — a test result never drives improvement). Everything else —
+2,699 rows — is the training pool. dev-fast/dev-full remain the working
+slices inside it. FastRule additionally has its own 6,000-row set
+(`dataset/fastrule/DATASET.md`, 80–20 by pattern family) plus external
+corpora as train-side augmentation (`DOCUMENTATION/experiments/EXTERNAL_DATASETS.md`)
+— three sources, three roles, per ITERATION_PROTOCOL's data-sources section.
 
 ## The metrics — and always name which one
 
@@ -108,7 +116,7 @@ overfit to a small slice.
 
     python -m scripts.engine_dataset_compare --limit 0 --max-rank 250  # dev-fast (~80 min)
     python -m scripts.engine_dataset_compare --limit 0 --max-rank 600  # dev-full
-    python -m scripts.engine_dataset_compare --limit 0 --min-rank 601  # held-out
+    python -m scripts.engine_dataset_compare --limit 0 --test          # SEALED 300, milestone
 
 (`--limit 0` disables the default 150-row cap so the rank slice is taken whole.)
 

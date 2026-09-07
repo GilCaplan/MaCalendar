@@ -1,5 +1,14 @@
 # The Engine — stage contracts
 
+> **Object layer (Q7, merged 2026-09-07, behavior-identical confirmed):**
+> the orchestrator is now classes — `Engine` (entry; transcript gate, track
+> selection, commit, bookkeeping; `run_transcript()` is a thin shim over it),
+> `DeepSystem` (the ordered re-runnable Stage list + the crosscheck loop) and
+> `Stage` (a named, late-bound handle on a stage module's frozen entry —
+> late-bound so monkeypatched stages still reach the engine;
+> `engine/component.py`). **Every stage contract below is unchanged** — the
+> classes wrap the same modules this document specifies.
+
 This is the document you open when a stage needs fixing. It defines what each
 stage of the deep track receives and must hand on. **These contracts are
 frozen**: they were designed once, before implementation, and do not change at

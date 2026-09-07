@@ -75,3 +75,17 @@ either: human-labelled review verdicts (the existing `feedback`/
 `correction_json` columns in the real command memory already carry some of
 this), or restricting these specific metrics to synthetic/constructed test
 traffic the way this dataset already is.
+
+
+## 6 · Label-correctness (added 2026-09-07, Gil)
+
+On MATCHED items only (an unmatched item is layer-1's failure): **events —
+category accuracy + macro precision/recall/F1** over classes (single-label;
+macro so a rare category's systematic miss stays visible); **tasks — micro
+precision/recall/F1 over tag sets** (multi-label; an expected-empty set
+counts). Ground truth exists where labels are by construction — the FastRule
+6,000 against its canonical `banks/categories_fixture.json`, loaded via
+MACALENDAR_CATEGORIES so personal config never enters scoring. The real pool
+carries no label ground truth (hand-labeling it is an open ruling for Gil).
+Implemented by the FS1 scorer; reported on FS boards like every metric —
+named, sliced, never bare.
