@@ -97,6 +97,14 @@ hand-written audit corpus is now only a regression floor.
 
 ## Plan of record
 
+**STAGE ISOLATION (Gil, 2026-09-07) — see DOCUMENTATION/STAGE_ISOLATION_PLAN.md.**
+Engine cycles paused. Order: (1) FastRule dataset+metrics right — defers on
+non-atomic, creates otherwise; (2) every other stage tested in isolation
+with its OWN dataset (separate dir, own train-test split, no leakage),
+improved separately, each an object where that helps; (3) rebuild the
+system from proven parts and measure connected. Segment + decompose first —
+they ARE the atomizer FastRule depends on.
+
 **ENGINE CYCLES PAUSED (Gil, 2026-09-07, until further notice).** Lane-only
 work: FastRule F-batches toward F15 + K-model iteration. No engine runs, no
 integration (even at F15) without Gil's go.
