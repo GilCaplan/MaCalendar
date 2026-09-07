@@ -53,8 +53,9 @@ if you want to know how it works.
    FastRule can't read. If a piece still looks like two requests, it was never
    atomic — send it back to step 8 to be split again.
 10. **Validate** — run the ordered correctness rules: impossible dates, am/pm,
-    until vs. through, round a recurrence and *say so*, and the Shabbat / holiday
-    rules for anything the AI itself created.
+    until vs. through, round a recurrence and *say so*, and — *only when observance is
+    turned on in settings* — the Shabbat / holiday rules for anything the AI
+    itself created.
 11. **The judge** — the AI reads the *original words* and lists what was asked;
     the code compares that to what was produced and finds anything missing,
     extra, or wrong. On a problem it goes back to whichever step caused it and
@@ -279,6 +280,14 @@ stage's exact I/O.
 ---
 
 ## 6 · Preserved vs. changed
+
+**Config flags an object receives (Gil, 2026-09-07):** the observance gate in
+`Validate` fires **only when observance is enabled** (settings flag
+`observance.enabled`, honoured via `observance.is_enabled()` — which also
+respects the `MACALENDAR_OBSERVANCE` test override). `Validate(cfg)` already
+receives config, so the gate reads the flag per run; off ⇒ the gate is a
+no-op and the AI may book on Shabbat/yom tov like any other time. Same for the
+recurring-series skip. This is why the dataset harness runs observance off.
 
 **Preserved exactly (sacred):** the 7 stage I/O contracts · `EngineState` (the
 single inter-stage object) · `BRAIN_VERSION` / `CHAINS` / the trace contract ·
