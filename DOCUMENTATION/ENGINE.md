@@ -163,7 +163,29 @@ returns a commit-or-abstain verdict (`.committed`, `.intents`, `.confidence`,
 `.reason`). Its gates: strong-compound (two-request wording), mixed-mode
 (create+edit/query), interrogative-create (a question producing a create),
 generic-target (a mutation aimed at a bare noun) — and on a fragment the
-compound gates double as the atomicity check. Threshold tuned 2026-09-07:
+compound gates double as the atomicity check.
+
+**Layer 0 — atomicity (F16–F18, 2026-09-07).** "One item or several" is the
+call the whole architecture rests on (FastRule executes atomic items; deep
+is the atomizer), and it is scored on its own board:
+`python -m scripts.atomicity_board` reports accuracy, compound P/R/F1 and
+BOTH ERROR KINDS AS COUNTS — said-atomic-but-compound (a half-executed
+two-ask command, user-facing) vs said-compound-but-atomic (one slow-path
+row) — on two datasets, the generated FastRule 7,200 and the verification
+pool's real wordings. Three rules hold it together:
+
+- `Atomicity.judge` is **rules OR model, both unconditional** — a union,
+  not a fallback chain. Gating the model behind the parse's intent count
+  once cost the layer 110 of its 195 B-test misses.
+- **The atomicity ANSWER is not the routing DECISION.** A compound whose
+  every ask the parse recovered still commits
+  (`_parse_covers_the_compound`, intents ≥ ask-joiners + 1) — deferring it
+  discards a complete correct answer, and with no LLM reachable discards
+  the command entirely.
+- `ATOMIC_MARGIN_FLOOR` is **set by a sweep on both training halves**
+  (printed by `scripts.fit_route_models`), never assumed.
+
+Threshold tuned 2026-09-07:
 `RULE_THRESHOLD = 0.80` (whole-command) / `SUBITEM_RULE_THRESHOLD = 0.60`
 (per-fragment). `fast_propose` (whole input) is the thin adapter over
 `FastRule(0.80)`; `run` works per item: FastRule first (~50ms, free), LLM

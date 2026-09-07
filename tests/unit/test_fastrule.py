@@ -136,3 +136,38 @@ def test_f16_routing_commits_a_compound_the_parse_fully_covers(fastrule):
     # gates recognised, not a classifier's opinion
     assert not _parse_covers_the_compound(
         "strong-compound", "book gym at 7. Also, add milk to my list", two)
+
+
+def test_f18_the_ambiguity_bucket_is_split_by_evidence(fastrule):
+    """"and" in the middle with nothing else was ONE feature vector.
+
+    235 B-train rows shared it — 160 atomic ("call Devon and Reese this
+    sunday"), 75 compound ("take the medicine at midnight and 9:15") — so
+    the margin floor could only buy or reject the whole pile. Two signals
+    tell the sides apart: a WHEN on both sides of the joiner (two events),
+    and "between X and Y" (a range, one ask).
+    """
+    from assistant.intent.classifier import AtomicityFeatures
+    f = AtomicityFeatures()
+    i_range = f.names.index("between-range")
+    i_both = f.names.index("both-sides-time")
+    v = f.extract("set up therapy session at around lunchtime and town hall at midnight")
+    assert v[i_both] == 1.0 and v[i_range] == 0.0
+    v = f.extract("take the medicine at midnight and 9:15")
+    assert v[i_both] == 1.0, "bare H:MM and 'midnight' are times too"
+    v = f.extract("set up open house between 2 and 4 this afternoon")
+    assert v[i_range] == 1.0 and v[i_both] == 0.0
+    v = f.extract("call Devon and Reese this sunday")
+    assert v[i_both] == 0.0 and v[i_range] == 0.0, "one WHEN for the whole ask"
+
+
+def test_stale_weights_are_refused_rather_than_silently_truncated(fastrule):
+    """`scores` dots with zip, which truncates: a weights file fitted before
+    a feature was added would keep answering, ignoring the new signals — a
+    wrong answer with no error anywhere. Load must refuse it."""
+    from assistant.intent.classifier import LogisticModel, AtomicityFeatures
+    m = LogisticModel("atomicity", ("atomic", "compound"), AtomicityFeatures())
+    short = [0.0] * (len(AtomicityFeatures()) - 2)
+    m.load({"weights": {"atomic": short, "compound": short}})
+    assert m.weights == {}
+    assert m.predict("anything at all") == (None, 0.0)

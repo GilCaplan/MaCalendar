@@ -1250,3 +1250,128 @@ answers per half-execution prevented, where the lost ones still get a
 correct (slow) answer from deep and the half-executions are wrong in front
 of the user. **Floor stays 1.5**: the bucket should be SPLIT, not bought
 wholesale, which is F18.
+
+## F18 (layer 0 — splitting the ambiguity bucket) — REGISTERED PREDICTION 2026-09-07
+
+**Mined from F17's margin cliff (B-train only).** The floor sweep is a
+cliff because 235 B-train rows share ONE feature vector — `{bias, and,
+joiner-mid}`, "an 'and' in the middle and nothing else fires" — all at
+margin 0.64, split **160 atomic / 75 compound**. The floor can only buy or
+reject the whole bucket. Its two sides:
+
+    atomic   "call Devon and Reese this sunday" · "invite Sam and Parker to
+             car service appointment" · "set up open house between 2 and 4"
+    compound "take the medicine at midnight and 9:15" · "set up therapy
+             session at around lunchtime and town hall at midnight"
+
+**Change (2 features, 20 → 22):** (a) **between-range** — `between … and …`
+is a RANGE, one ask, not a joiner; (b) **both-sides-time** — a time
+expression appears on BOTH sides of the first ask-joiner, over a broadened
+time vocabulary that includes bare `H:MM`, "midnight/noon/lunchtime" and
+the dayparts the shipped `two-times` regex misses. Both are general
+statements about compounds, not bucket patches.
+
+| feature set | B-train CV FP@R90 | FP@R95 | FP@R98 | cost k=5 | A-train FP@R95 | FP@R99 |
+|---|---|---|---|---|---|---|
+| F17 shipped (20) | 138 | 290 | 347 | 447 | 16 | 29 |
+| **+ between-range + both-sides-time** | **100** | **144** | **309** | **420** | 16 | 29 |
+| + conj-propn (REJECTED, see below) | 145 | 166 | 174 | 282 | **19** | **51** |
+
+**The cross-dataset finding, banked before it is measured on test.**
+`conj-propn` — the dependency parse showing a PROPER-NOUN conjunct, i.e.
+"and" joining two NAMES — is by far the strongest single feature on B
+(FP@R98 347 → **174**, cost k=5 447 → 282, near-halving the error) and a
+clear REGRESSION on A (FP@R99 29 → **51**). B's NP-decoy families are
+generated with capitalised person names, so the feature may be reading a
+template artifact; A's real utterances carry proper nouns on both sides of
+the question. **The lane's dual-gate rule (ITERATION_PROTOCOL, source B)
+decides it: a change must win on B-train AND not regress A.** Rejected —
+and this is exactly the case the two-dataset instruction exists to catch:
+on B alone it would have shipped as the batch's headline.
+
+**Predict.** *B-test, model tier at floor 1.5:* accuracy 93.1 → 94–95%,
+compound P 87.4 → 90–93%, said-compound-but-atomic 78 → 50–70, R 86.1%
+held (86–89%), FN 87 → 70–87. *B-test, the LAYER:* FP 81 → 55–72, FN 86
+flat (F17 established that layer recall is rules-limited, so I expect the
+gain to bank as precision again). *A-test:* FLAT on every line — the CV
+said flat, and a move there would mean B-fitting. *Downstream
+(`fastrule_shape` B-test):* atomic handle rate 54.0 → 55–57% (this is a
+precision batch, and fewer wrongly-deferred atomic rows is exactly a handle
+rate gain), correct-on-handled ≥72%, non-atomic defer rate 77.8% flat to
++1pp.
+
+## F18 — ACTUAL (2026-09-07): prediction INVERTED — it bought recall, not precision
+
+**B-test, the LAYER: accuracy 93.0 → 93.5%, compound P 87.0 → 87.3%,
+R 86.3 → 87.9%, said-compound-but-atomic 81 → 80, said-atomic-but-COMPOUND
+86 → 76.** I predicted the opposite shape — FP 81 → 55–72 with FN flat —
+and got FN −10 with FP flat. Twice now (F17 predicted precision-flat and
+got precision; F18 predicted precision and got recall) the split between
+the two error kinds has gone the other way than expected, which says
+plainly that I cannot yet predict WHICH error a feature will move, only
+that a feature carrying real information moves the total. Worth saying out
+loud rather than quietly scoring it as "in the band".
+
+**B-test, model tier alone: accuracy 93.1 → 93.6%, P 87.4 → 87.7%,
+R 86.1 → 87.7%, FN 87 → 77, FP 78 → 77.** Predicted accuracy 94–95% and
+FP 50–70: **missed**. The B-train CV gain (FP@R95 290 → 144, a halving)
+did NOT transfer at that magnitude to unseen families — on B-train the
+model reaches R 95.2% at FP 124, on B-test it reaches R 87.7% at FP 77.
+The direction transferred; the size did not. Grouped-CV-by-family is a
+better honesty check than a random split, and still optimistic.
+
+**A-test: flat, as predicted** — layer accuracy 98.1 → 97.9%, R 99.6 →
+99.1%, FN 1 → 2, FP 12 → 12. One row. A remains at ceiling.
+
+**Downstream (`fastrule_shape`, B-test):** atomic handle rate 54.0 →
+**54.2%** (predicted 55–57 — missed; the precision gain I expected did not
+arrive, so neither did its handle-rate consequence), correct-on-handled
+72.6%, non-atomic defer rate 77.8 → **78.2%** (predicted flat–+1 ✔), "knew
+it was compound" 51.8 → **53.2%**, routing violations 125 → 123 of which
+the actual half-executions are **22 → 20**.
+
+**The margin floor: 1.5 → 0.25, and the interesting part is that it stopped
+mattering.** F18's features split the mass the floor existed to reject, so
+the B-train PRODUCT board is now identical from floor 0.0 to 1.5 (handle
+59.6–59.8%, defer 75.7%, half-exec 64, layer FN 66–67) where at F17 the
+same sweep swung the handle rate 3.1pp. The remaining evidence is A-train's,
+and it points the asymmetric way: 0.25 vs 1.5 trades **2 more slow-path
+rows for 8 fewer half-executed commands**. On the test halves the choice is
+a wash on the LAYER (FN 76 either way — the rule gates cover the difference)
+and better on the MODEL ALONE (B-test FN 89 → 77 for +2 FP), so 0.25 is
+kept: the "only speak when decisive" guard was compensating for a feature
+gap that no longer exists, and the model is the part that would be exposed
+if the gates ever changed.
+
+## LAYER 0 — the campaign board, F16 → F18 (2026-09-07)
+
+Every number: which dataset, which metric, what it means.
+
+**B — FastRule 7,200 TEST half (2,400 rows: 626 compound / 1,774 atomic;
+family-split, so these are wordings never trained on). Metric: the
+atomicity binary board.**
+
+| | acc | compound P | R | F1 | said-compound-but-atomic (cheap) | said-atomic-but-COMPOUND (expensive) |
+|---|---|---|---|---|---|---|
+| before (F15 state) | 88.0% | 82.1% | 68.8% | 74.9% | 94 | **195** |
+| after (F18) | **93.5%** | **87.3%** | **87.9%** | **87.6%** | 80 | **76** |
+
+**A — verification pool minus the sealed 300, TEST quarter (672 rows: 227
+compound / 445 atomic; REAL utterances). Same metric.**
+
+| | acc | compound P | R | F1 | cheap | expensive |
+|---|---|---|---|---|---|---|
+| before | 93.3% | 94.6% | 85.0% | 89.6% | 11 | **34** |
+| after | **97.9%** | 94.9% | **99.1%** | **97.0%** | 12 | **2** |
+
+**What it means:** on the generated set the layer now misses 76 compounds
+instead of 195 — 119 fewer commands where FastRule would have executed half
+of what was asked — while wrongly slowing 14 FEWER atomic rows, not more.
+On real wordings it misses 2 instead of 34.
+
+**Downstream product shape (`fastrule_shape`, B-test) — the guard rail
+held:** atomic handle rate 53.5 → **54.2%** (up, not down: layer 0 got more
+precise as well as more sensitive), correct-on-handled 73.1 → 72.6%,
+non-atomic defer rate 77.1 → **78.2%** with the "knew it was compound"
+share 51.2 → **53.2%**, routing violations 129 → 123 of which actual
+half-executions **26 → 20**. Propose defer 70.6% untouched.

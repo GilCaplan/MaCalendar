@@ -106,7 +106,19 @@ class AtomicityFeatures(Featurizer):
              "three-times", "two-dates", "plus-also", "both-domains",
              "len>12", "len>18", "two-create-verbs", "verb-after-and",
              "list-and-cal", "second-remind", "and-count2", "to-my-list-mid",
-             "joiner-mid", "clause-coord"]
+             "joiner-mid", "clause-coord", "between-range", "both-sides-time"]
+
+    #: The shipped `two-times` regex wants "am/pm" or "at <digit>", so it is
+    #: blind to "midnight", "9:15" and "lunchtime" — which is precisely the
+    #: vocabulary the ambiguous compounds use ("take the medicine at midnight
+    #: and 9:15"). F18 counts time with this broader one, on each SIDE of the
+    #: joiner rather than over the whole string.
+    _WHEN_RE = re.compile(
+        r"\b\d{1,2}:\d{2}\b|\b\d{1,2}\s*(?:am|pm)\b|\bat\s+\d{1,2}\b"
+        r"|\b(?:midnight|noon|midday|lunchtime|dinnertime|breakfast|lunch|"
+        r"dinner|tonight|morning|evening|afternoon|o'?clock)\b", re.I)
+    #: "between 2 and 4" is a RANGE — one ask with two endpoints, not two asks.
+    _RANGE_RE = re.compile(r"\bbetween\b.{0,24}\band\b", re.I)
 
     #: An ask-joiner in the MIDDLE of the sentence means two halves; one at
     #: the edge is a trailing tag or a leading address. Position, not
@@ -146,17 +158,40 @@ class AtomicityFeatures(Featurizer):
             1.0 if re.search(r"\bto my (?:\w+\s+)?list\b.{6,}", low) else 0.0,
             self._joiner_mid(text),
             self._clause_coord(text),
+            1.0 if self._RANGE_RE.search(low) else 0.0,
+            self._both_sides_time(text),
         ]
 
     @classmethod
-    def _joiner_mid(cls, text: str) -> float:
+    def _joiner(cls, text: str):
         from assistant.intent.coordination import ASK_JOINER_RE
-        m = ASK_JOINER_RE.search(text)
+        return ASK_JOINER_RE.search(text)
+
+    @classmethod
+    def _joiner_mid(cls, text: str) -> float:
+        m = cls._joiner(text)
         words = len(text.split())
         if not m or not words:
             return 0.0
         pos = len(text[:m.start()].split()) / words
         return 1.0 if cls._MID_LO <= pos <= cls._MID_HI else 0.0
+
+    @classmethod
+    def _both_sides_time(cls, text: str) -> float:
+        """A time expression on BOTH sides of the first ask-joiner.
+
+        The classic two-events signal, and the one that splits F17's
+        ambiguity bucket: "set up therapy session at around lunchtime and
+        town hall at midnight" has its own WHEN either side of the "and",
+        while "call Devon and Reese this sunday" has one WHEN for the whole
+        sentence. Counting times over the whole string cannot tell those
+        apart; counting them per side can.
+        """
+        m = cls._joiner(text)
+        if not m:
+            return 0.0
+        head, tail = text[:m.start()], text[m.end():]
+        return 1.0 if (cls._WHEN_RE.search(head) and cls._WHEN_RE.search(tail)) else 0.0
 
     @staticmethod
     def _clause_coord(text: str) -> float:
@@ -357,10 +392,22 @@ class ModelRouter:
     KIND_MARGIN_FLOOR = 1.5
 
     ATOMICITY = ("atomic", "compound")
-    #: layer 0 acts on the model only when it is decisive AND says compound —
-    #: a wrong "compound" costs a defer (cheap), a wrong "atomic" would let a
-    #: two-ask command half-execute (expensive). Asymmetric by design.
-    ATOMIC_MARGIN_FLOOR = 1.5
+    #: Layer 0 acts on the model only when it says compound — a wrong
+    #: "compound" costs a defer (cheap), a wrong "atomic" lets a two-ask
+    #: command half-execute in front of the user (expensive). Asymmetric by
+    #: design, so this floor is set by a SWEEP on both training halves
+    #: (printed by `scripts.fit_route_models`), never assumed.
+    #:
+    #: It was 1.5, and it was doing a job the FEATURES should have done: at
+    #: F17 the sweep was a cliff, because 235 B-train rows shared one
+    #: feature vector ("an 'and' in the middle, nothing else fires") at
+    #: margin 0.64, 160 atomic to 75 compound — the floor's only power there
+    #: was to reject the whole bucket. F18's between-range / both-sides-time
+    #: split that bucket on evidence, and the sweep went FLAT: on B-train
+    #: the product board is identical from 0.0 to 1.5. What remains is
+    #: A-train's preference, and it is the asymmetric one — 0.25 vs 1.5
+    #: trades 2 more slow-path rows for 8 fewer half-executed commands.
+    ATOMIC_MARGIN_FLOOR = 0.25
 
     def __init__(self, weights_path: "pathlib.Path | None" = None) -> None:
         self.operation = LogisticModel("operation", self.OPS, OperationFeatures())
