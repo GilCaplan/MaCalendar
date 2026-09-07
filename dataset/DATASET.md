@@ -173,3 +173,15 @@ be reverted or A/B'd against an earlier version.
 
 `python -m scripts.run_board <run>` prints 1–9 for any run; all values live
 per-run in `loop_log.csv`.
+
+## Q9 audit — the confirm-create ruling against this pool (2026-09-07)
+
+The Q9 flow (a first-person create QUESTION — "should i add yoga…?" —
+proposes and waits for a confirm) was audited against all 3,000 rows using
+the shipped detector (`segment.is_interrogative_create`): **zero rows
+match**. 478 rows end in "?" but all are schedule/list QUERIES, which the
+ruling does not touch. Consequences: no relabeling, no convention
+overrides, no board impact — the confirm gate is inert on this pool by
+measurement, not assumption. Question-shape ground truth (propose rows,
+confirm subprompts, the two-phase doctrine) lives in the FastRule 6,000
+(`dataset/fastrule/DATASET.md`), which was built after the ruling.
