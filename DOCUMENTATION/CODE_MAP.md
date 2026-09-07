@@ -27,6 +27,7 @@
 | Gate learning (`learn_from_edit`, `confirm_unchanged`, confirms sidecar) | `engine/transcript.py` |
 | Shared LLM transport (`call_json`, MACALENDAR_LLM_DISABLED guard) | `engine/llm.py` |
 | Per-stage live gates | `scripts/engine_stage_check.py` |
+| K1 kind scorer — fit + offline eval (16 explainable weights; wiring = K2) | `scripts/kind_classifier_experiment.py` |
 | Mac gate dialog (`ask_transcript_edit`, STATUS_EDIT) | `calendar_ui/window.py`, `pipeline.py` |
 
 ## Database — `assistant/db.py`
