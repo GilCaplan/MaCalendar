@@ -40,7 +40,8 @@ def test_item_kinds_are_fixed():
 def test_engine_state_fields():
     assert _field_names(EngineState) == {
         # intake
-        "raw_text", "source", "current_view", "supports_edit", "mode",
+        "raw_text", "source", "current_view", "supports_edit",
+        "supports_confirm", "mode",
         # step 1
         "text", "corrections", "needs_edit",
         # steps 2/3
@@ -118,7 +119,7 @@ def test_orchestrator_signature():
     from assistant.engine import run_transcript
     params = list(inspect.signature(run_transcript).parameters)
     assert params == ["text", "trace", "source", "current_view",
-                      "trace_run", "supports_edit"], FROZEN
+                      "trace_run", "supports_edit", "supports_confirm"], FROZEN
 
 
 def test_crosscheck_blame_router_is_deterministic():

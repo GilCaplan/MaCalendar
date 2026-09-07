@@ -242,6 +242,15 @@ merge with `main` + the loop branch between cycles. Queue, in order:
    already existed server-side). **The approved queue is fully shipped.**
 6. ✅ **Convolution #1** — DONE @ 243d99f: ThinkingView + EngineChain live in
    `Views/ThinkingView.swift` (byte-identical move, simulator build green).
+7. ✅ **Confirm-create gate (DEVQA Q9, ruled 2026-09-07)** — DONE: an
+   interrogative create ("should i add yoga to my calendar tomorrow?") is
+   neither executed nor silently dropped. Step 4 holds the validated intent
+   (`interrogative_create_asks_first`), the orchestrator answers
+   `parse: "confirm_create"` with ready-to-POST `proposal` bodies, and
+   `POST /voice/confirm` accepts (replay-safe) or declines (files the memory
+   record as rejected). Gated on `supports_confirm`, so old clients are
+   unchanged. Mac Add/No box + iOS "Add this?" alert; **the phone needs a
+   reinstall** to get it. FEATURES.md + ENGINE.md carry the detail.
 
 ## Working notes
 

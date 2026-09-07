@@ -38,7 +38,8 @@ short-circuited: when `generate.fast_propose` finds the rule parser confident
 about the whole input (≥ `RULE_THRESHOLD`, no missing slots), items are built
 straight from its intents, committed instantly, and the deep track's
 cross-check runs behind the answer. `parse_path` says which happened:
-`"fast"` or `"deep"` (plus `"error"`, `"ignored"`, `"needs_edit"`).
+`"fast"` or `"deep"` (plus `"error"`, `"ignored"`, `"needs_edit"`,
+`"confirm_create"`).
 
 Stages exchange **only** the `EngineState` (`assistant/engine/state.py`) and
 each exposes exactly one public entry point, `run(state, cfg) -> state`
@@ -52,10 +53,11 @@ channel to mutate state through.
 
 | Field | Written by | Read by | Meaning |
 |---|---|---|---|
-| `raw_text`, `source`, `current_view`, `supports_edit`, `mode` | intake | all | read-only after intake; `mode` is `foreground` or `background` (fast-track verify pass) |
+| `raw_text`, `source`, `current_view`, `supports_edit`, `supports_confirm`, `mode` | intake | all | read-only after intake; `mode` is `foreground` or `background` (fast-track verify pass) |
 | `text` | transcript | all later | the working transcript (stop words stripped, vocab applied) |
 | `corrections` | transcript | response | vocab fixes, client shape |
 | `needs_edit` | transcript | orchestrator | doubtful words; non-empty ⇒ the gate fired, nothing executes |
+| `item.slots["confirm_create"]` | validate | orchestrator | an interrogative create; the intent SURVIVES to be offered, nothing executes |
 | `ignored` | transcript | orchestrator | false start: not parsed, not executed, **not remembered** |
 | `items` | segment (create), decompose (split), generate (fill/expand) | validate, commit, label, crosscheck | the item tree; ids `item_1`, `item_1-2` |
 | `item.blocked` | validate | commit | refusal reason; a blocked item is reported, never silently dropped |
@@ -100,7 +102,10 @@ with Tal and Ravid" is immediate garbage. This is the pipeline's single point
 of failure and carries the densest tests. *Status: live — deterministic splits
 plus self-skipping LLM segmentation (a compound hint in the words is required
 before the model is consulted; a split producing a fragment is refused). Gate:
-`engine_stage_check --stage segment`.*
+`engine_stage_check --stage segment`.* Exports the reader
+`is_interrogative_create(text)` — a question in which the speaker weighs their
+OWN create ("should I", "what if we") — read by step 4's confirm gate and
+step 5's fast-track guard, so the two cannot disagree about what a question is.
 
 ### 3 · decompose (`decompose.py` · trace `rule` · tests `test_engine_decompose.py`)
 Reads `items`; may replace an item with sub-items (`item_N-M`, depth ≤ 2) and
@@ -119,7 +124,8 @@ Two passes, both contract:
   order — `anaphor_guard`, `relative_date_pin`, `past_date_bump`,
   `recurrence_words`, `until_exclusive`, `weekly_start_day`,
   `at_time_is_start`, `morning_title_guard`, `bare_hour_pm`,
-  `junk_event_drop`, `due_date_pin`, `cadence_round_and_announce` — and the
+  `junk_event_drop`, `due_date_pin`, `question_creates_nothing`,
+  `interrogative_create_asks_first`, `cadence_round_and_announce` — and the
   **observance gate**: an AI-created one-off event inside Shabbat/yom tov
   (sundown-bounded) must be leyning / a meal / davening; on a fast day a meal
   must not be booked before the fast ends (Yom Kippur: the fast wins). Blocked
@@ -127,6 +133,18 @@ Two passes, both contract:
   edits/additions are never gated; series skipping stays in
   `db._skip_for_observance`. Allowed on any computation failure.
 Every applied rule lands in `state.fixes` under its name and in the trace.
+
+**The confirm-create gate** (`interrogative_create_asks_first`, Gil's ruling
+2026-09-07, DEVQA Q9): an interrogative create — "should i add yoga to my
+calendar tomorrow?", "what if i booked town hall for the 3rd?" — must neither
+auto-create nor be silently dropped. When the client declared
+`supports_confirm` and `engine.confirm_create` is on, the item keeps its
+validated intent and gets `slots["confirm_create"]`; the orchestrator turns
+that into a `confirm_create` response instead of committing. Only when the
+question is the WHOLE command — a confirmation holds everything, so in "book
+gym at 7 and should i add yoga?" the question half keeps its pre-ruling
+behaviour and the booking runs. Without `supports_confirm` nothing changes,
+which is what keeps old clients working.
 
 ### 5 · generate (`generate.py` · trace `rule`/`llm` · tests `test_engine_generate.py` + integration)
 Owns ALL text→intent conversion. **`FastRule`** (`engine/fastrule.py`) is the
@@ -145,7 +163,9 @@ from the rule parser's partial analysis, or parses from scratch — grounded on
 the item's own words, never another item's. An item parsing into several
 intents is expanded into sub-items, one intent each (per-item attribution is
 the row-75 fix). Slots from decomposition land on the intent (`quantity`).
-`AssistantError` propagates: the orchestrator owns offline queueing.
+`AssistantError` propagates: the orchestrator owns offline queueing. An
+interrogative create never takes the fast track whatever the rules score it
+(`is_interrogative_create`): only deep can hold a parse and ask first.
 
 Two deterministic fallbacks close the honest-failure ladder (both pinned in
 `test_engine_generate.py`): **task_fallback** (run 12) — a task-kind item
@@ -158,7 +178,10 @@ invented, no match stays unknown.
 
 ### commit (orchestrator)
 The only place the engine touches the database, via the existing action
-classes. Blocked items → explained refusal; `unknown` → honest "didn't
+classes. Two gates stop execution before it, both the same shape: step 1's
+`needs_edit` (doubted words) and step 4's `confirm_create` (an interrogative
+create, offered as a ready-to-POST `proposal` — the orchestrator only
+short-circuits; the reading is the stage's). Blocked items → explained refusal; `unknown` → honest "didn't
 understand"; `TargetNotFound` → the not-found message (empty slots are the
 right answer for a delete; guessing is not). Records `(kind, row_id, action,
 idx)` per item for the command memory and the 24h corrected/rejected hooks.
@@ -203,14 +226,18 @@ panel's `_RevertBar` and the iOS banner re-POST them to undo. Gate:
 
 `message, actions, refresh ("events"|"todos"|"both"|""), parse, transcript,
 original_transcript, corrections, trace, uncertain_words` + optional
-`memory_id, verify_token, pending_id, needs_edit`. Trace stage names stay
+`memory_id, verify_token, pending_id, needs_edit`, and for a confirm gate
+`proposal` (`[{kind, body, summary}]`, bodies shaped for POST /events and POST
+/todos) plus the server-minted `confirm_token`, answered at
+`POST /voice/confirm`. Trace stage names stay
 `stt/vocab/rule/memory/llm/validate/execute/verify/done/error` — the iOS
 timeline and the HUD key off them. LLM offline ⇒ pending queue + honest
 message; trivial ⇒ `parse: "ignored"` with nothing recorded.
 
 ## Config knobs (mirror into config.example.yaml)
 
-`engine.confirm_transcript` (step 1 gate), `engine.reconcile`
+`engine.confirm_transcript` (step 1 gate), `engine.confirm_create` (step 4
+gate), `engine.reconcile`
 (`always|uncertain`, step 6), `engine.fast_track` (`on|off` escape hatch),
 `engine.coalesce_max_tokens` (step 0). The routing threshold stays
 `RULE_THRESHOLD` in `intent/rule_parser.py`; `rule_confidence` is recorded on

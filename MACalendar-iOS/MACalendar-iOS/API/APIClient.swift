@@ -712,16 +712,30 @@ class APIClient: ObservableObject {
     ///     for this resubmission and learns from the change (or the confirmation).
     ///   - supportsEdit: this client can render the "edit the transcription"
     ///     sheet, so the host may return a needs_edit response.
+    ///   - supportsConfirm: this client can render the "add this?" prompt, so
+    ///     the host may return a confirm_create proposal instead of guessing
+    ///     what to do with a question about creating something.
     func sendText(_ transcript: String, editedFrom: String? = nil,
-                  supportsEdit: Bool = false) async throws -> VoiceResponse {
+                  supportsEdit: Bool = false,
+                  supportsConfirm: Bool = false) async throws -> VoiceResponse {
         // Identify the client. The server treats an unlabelled caller as a
         // test, so that a curl during development cannot masquerade as a
         // command you actually gave the phone.
         var body: [String: Any] = ["transcript": transcript, "source": "ios"]
         if supportsEdit { body["supports_edit"] = true }
+        if supportsConfirm { body["supports_confirm"] = true }
         if let editedFrom { body["edited_from"] = editedFrom }
         let data = try await request("/voice/text", method: "POST", body: body)
         return try decode(VoiceResponse.self, from: data)
+    }
+
+    /// Answer a confirm_create proposal. The host does the creating, through
+    /// exactly the code a POST /events / POST /todos would run — and answering
+    /// twice is safe, so a double-tapped Add creates once.
+    func confirmCreate(token: String, accept: Bool) async throws -> ConfirmResponse {
+        let data = try await request("/voice/confirm", method: "POST",
+                                     body: ["confirm_token": token, "accept": accept])
+        return try decode(ConfirmResponse.self, from: data)
     }
 
     func sendAudio(_ audioData: Data) async throws -> VoiceResponse {
@@ -757,6 +771,7 @@ class APIClient: ObservableObject {
     /// one {"type":"step",...} line per pipeline stage, then {"type":"result",...}.
     /// `onStep` fires on the main actor as each stage arrives.
     func sendAudioStreaming(_ audioData: Data, supportsEdit: Bool = false,
+                            supportsConfirm: Bool = false,
                             onStep: @escaping (TraceStep) -> Void) async throws -> VoiceResponse {
         guard !base.isEmpty, let url = URL(string: base + "/voice/stream") else {
             throw APIError.badURL
@@ -774,6 +789,13 @@ class APIClient: ObservableObject {
         if supportsEdit {
             body.append("--\(boundary)\r\n".data(using: .utf8)!)
             body.append("Content-Disposition: form-data; name=\"supports_edit\"\r\n\r\n".data(using: .utf8)!)
+            body.append("true\r\n".data(using: .utf8)!)
+        }
+        // …and the "add this?" prompt, so a question about creating something
+        // comes back as a proposal rather than being executed or dropped.
+        if supportsConfirm {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"supports_confirm\"\r\n\r\n".data(using: .utf8)!)
             body.append("true\r\n".data(using: .utf8)!)
         }
         body.append("--\(boundary)\r\n".data(using: .utf8)!)

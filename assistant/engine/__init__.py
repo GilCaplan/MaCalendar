@@ -136,6 +136,13 @@ class DeepSystem(Component):
         """Foreground deep track: parse, then the judge BEFORE anything is
         written — findings loop execution back (at most MAX_REENTRIES)."""
         self.parse(state, cfg)
+        self.judge(state, cfg)
+
+    def judge(self, state: EngineState, cfg) -> None:
+        """The crosscheck loop alone — split from run() so the Q9 confirm
+        gate can sit between parse and judge, exactly where the function
+        orchestrator placed it (judging a parse that will only be OFFERED is
+        wasted work and can loop-back for no reason)."""
         reentries = 0
         while reentries < _crosscheck.MAX_REENTRIES:
             self.crosscheck.run(state, cfg)
@@ -176,7 +183,7 @@ class Engine(Component):
 
     def run(self, text: str, trace: Any = None, source: str = "ios",
             current_view: str = "month", trace_run: "str | None" = None,
-            supports_edit: bool = False) -> dict:
+            supports_edit: bool = False, supports_confirm: bool = False) -> dict:
         """Parse and execute one transcript; return the API response dict.
 
         The response contract is frozen (clients depend on every key):
@@ -194,14 +201,15 @@ class Engine(Component):
 
         with _run_lock:
             return self._locked(text, trace, source, current_view, trace_run,
-                                supports_edit, cfg)
+                                supports_edit, supports_confirm, cfg)
 
     def _locked(self, text, trace, source, current_view, trace_run,
-                supports_edit, cfg) -> dict:
+                supports_edit, supports_confirm, cfg) -> dict:
         from assistant.trace import DONE
 
         state = EngineState(raw_text=text, source=source, current_view=current_view,
-                            supports_edit=supports_edit, trace=trace)
+                            supports_edit=supports_edit,
+                            supports_confirm=supports_confirm, trace=trace)
 
         # -- step 1: transcript repair --------------------------------------
         self.transcript.run(state, cfg)
@@ -237,7 +245,15 @@ class Engine(Component):
                 # through the verify-token contract the clients already speak.
                 _start_background_verify(state, cfg)
             else:
-                self.deep.run(state, cfg)
+                self.deep.parse(state, cfg)
+                # The confirm gate (Q9), the same shape as the needs_edit
+                # gate: parse finished and validated, nothing written, the
+                # client said it can ask. Step 4 flagged the item
+                # (slots["confirm_create"]); stop before judge and commit.
+                proposal = _confirm_proposal(state)
+                if proposal:
+                    return _confirm_response(state, cfg, proposal, trace_run)
+                self.deep.judge(state, cfg)
                 _commit(state, cfg)
                 self.label.run(state, cfg)
         except AssistantError as e:
@@ -302,13 +318,15 @@ _engine = Engine()
 
 def run_transcript(text: str, trace: Any = None, source: str = "ios",
                    current_view: str = "month", trace_run: "str | None" = None,
-                   supports_edit: bool = False) -> dict:
+                   supports_edit: bool = False,
+                   supports_confirm: bool = False) -> dict:
     """Thin shim over Engine.run — the entry point every caller already has.
     Kept by design (Q7): the server, the audit and the pending-retry loop go
     on calling this; the brain behind it is the Engine object."""
     return _engine.run(text, trace=trace, source=source,
                        current_view=current_view, trace_run=trace_run,
-                       supports_edit=supports_edit)
+                       supports_edit=supports_edit,
+                       supports_confirm=supports_confirm)
 
 
 
@@ -611,6 +629,278 @@ def _revert_spec(kind: str, row: "dict | None") -> "dict | None":
     if row.get("id") is not None:
         body["client_token"] = f"revert-todo-{row['id']}"
     return {"kind": "todo", "body": body}
+
+
+# ---------------------------------------------------------------------------
+# The confirm-create gate (DEVQA Q9) — a question that would create something
+# ---------------------------------------------------------------------------
+
+def _create_spec(item) -> "list":
+    """A validated create intent as ready-to-POST bodies — the same idea as
+    `_revert_spec`, and deliberately the same shape: POST /events and POST
+    /todos are the endpoints every client already uses, so accepting a
+    proposal is a plain create and needs no second way into `db.py`.
+
+    Returns one {"kind", "body", "summary"} per thing that would be created —
+    a to-do intent can carry several titles, and offering only the first would
+    be the silent drop this gate exists to prevent. Empty when the intent
+    cannot make a POSTable body (no title — the one field both endpoints
+    require).
+    """
+    import uuid as _uuid
+
+    from assistant.actions.calendar.action import _fmt_date, _fmt_time
+
+    intent = item.intent
+    if intent is None:
+        return []
+    if item.action == "create_event":
+        title = (getattr(intent, "title", "") or "").strip()
+        if not title:
+            return []
+        # `attendees` is a list on the intent and a comma-joined string in the
+        # row — POST /events writes what it is handed straight into the column,
+        # so it is joined here exactly as `db.create_event` joins it.
+        body = {
+            "title": title,
+            "date": getattr(intent, "date", None) or "",
+            "start_time": getattr(intent, "start_time", None) or "",
+            "end_time": getattr(intent, "end_time", None) or "",
+            "attendees": ", ".join(getattr(intent, "attendees", None) or []),
+            "location": getattr(intent, "location", None) or "",
+            "description": getattr(intent, "description", None) or "",
+            "recurrence": getattr(intent, "recurrence", None) or "",
+            "recurrence_end": getattr(intent, "recur_until", None) or "",
+        }
+        when = " ".join(p for p in (
+            _fmt_date(body["date"]) if body["date"] else "",
+            f"{_fmt_time(body['start_time'])}–{_fmt_time(body['end_time'])}"
+            if body["start_time"] and body["end_time"]
+            else (_fmt_time(body["start_time"]) if body["start_time"] else ""),
+        ) if p)
+        return [{"kind": "event", "body": body,
+                 "summary": f"“{title}”" + (f" on {when}" if when else "")}]
+    if item.action == "create_todo":
+        titles = [str(t).strip() for t in (getattr(intent, "titles", None) or [])
+                  if str(t).strip()]
+        if not titles:
+            return []
+        # One proposal per task — a to-do intent can carry several, and this is
+        # the gate against silently dropping half of what was asked about.
+        specs = []
+        for i, title in enumerate(titles):
+            body = {
+                "title": title,
+                "list_name": getattr(intent, "list_name", None) or "today",
+                "priority": getattr(intent, "priority", None) or "none",
+                "due_date": getattr(intent, "due_date", None) or "",
+                "tags": list(getattr(intent, "tags", None) or []),
+                "quantity": intent.quantity_for(i) if hasattr(intent, "quantity_for") else 1,
+                # Idempotency key for POST /todos, minted once and carried in
+                # the proposal, so an Add answered twice — or answered on two
+                # surfaces — creates the task once (the same guarantee the
+                # revert spec buys, and the only one events cannot have).
+                "client_token": f"confirm-todo-{_uuid.uuid4()}",
+            }
+            due = f" due {_fmt_date(body['due_date'])}" if body["due_date"] else ""
+            specs.append({"kind": "todo", "body": body,
+                          "summary": f"“{title}”{due}"})
+        return specs
+    return []
+
+
+def _confirm_proposal(state: EngineState) -> "list | None":
+    """The proposals step 4 held back for confirmation, as POSTable bodies.
+
+    None means commit as usual — either nothing was flagged, or the flagged
+    intent could not be turned into a body, in which case the honest answer is
+    the pre-ruling one (the question creates nothing) rather than a dialog
+    offering to create something the client cannot actually POST.
+    """
+    flagged = [it for it in state.items
+               if it.slots.get("confirm_create") and it.intent is not None
+               and not it.blocked]
+    if not flagged:
+        return None
+    per_item = [_create_spec(it) for it in flagged]
+    if not all(per_item):
+        for it in flagged:
+            it.intent = None
+        return None
+    return [spec for specs in per_item for spec in specs]
+
+
+def _confirm_response(state: EngineState, cfg, proposal: list, trace_run) -> dict:
+    """parse: "confirm_create" — nothing executed, the parse offered instead.
+
+    The memory record is written now, unsuccessful, so the client's YES/NO can
+    file its verdict against it through the normal feedback path: a declined
+    proposal is a `rejected` example, which is exactly what the review flows
+    are for.
+    """
+    from assistant.trace import DONE
+
+    what = "; ".join(s["summary"] for s in proposal)
+    prompt = f"Want me to add {what}?"
+    if state.trace:
+        state.trace.step(DONE, "Checking with you",
+                         "That reads as a question about creating something "
+                         f"— asking before adding {what}.")
+    state.memory_id = _record_memory(state, cfg, prompt, success=False)
+    resp: dict = {
+        "message": prompt,
+        "actions": [],
+        "refresh": "",
+        "parse": "confirm_create",
+        "proposal": proposal,
+        "transcript": state.text,
+        "original_transcript": state.raw_text,
+        "corrections": state.corrections,
+        "trace": state.trace.to_list() if state.trace else [],
+        "uncertain_words": _transcript.uncertain_words(state.text),
+        "brain": _brain_version(),
+    }
+    if state.memory_id is not None:
+        resp["memory_id"] = state.memory_id
+    _publish(state, resp, trace_run)
+    return resp
+
+
+
+
+# ---------------------------------------------------------------------------
+# The confirm-create gate (DEVQA Q9) — a question that would create something
+# ---------------------------------------------------------------------------
+
+def _create_spec(item) -> "list":
+    """A validated create intent as ready-to-POST bodies — the same idea as
+    `_revert_spec`, and deliberately the same shape: POST /events and POST
+    /todos are the endpoints every client already uses, so accepting a
+    proposal is a plain create and needs no second way into `db.py`.
+
+    Returns one {"kind", "body", "summary"} per thing that would be created —
+    a to-do intent can carry several titles, and offering only the first would
+    be the silent drop this gate exists to prevent. Empty when the intent
+    cannot make a POSTable body (no title — the one field both endpoints
+    require).
+    """
+    import uuid as _uuid
+
+    from assistant.actions.calendar.action import _fmt_date, _fmt_time
+
+    intent = item.intent
+    if intent is None:
+        return []
+    if item.action == "create_event":
+        title = (getattr(intent, "title", "") or "").strip()
+        if not title:
+            return []
+        # `attendees` is a list on the intent and a comma-joined string in the
+        # row — POST /events writes what it is handed straight into the column,
+        # so it is joined here exactly as `db.create_event` joins it.
+        body = {
+            "title": title,
+            "date": getattr(intent, "date", None) or "",
+            "start_time": getattr(intent, "start_time", None) or "",
+            "end_time": getattr(intent, "end_time", None) or "",
+            "attendees": ", ".join(getattr(intent, "attendees", None) or []),
+            "location": getattr(intent, "location", None) or "",
+            "description": getattr(intent, "description", None) or "",
+            "recurrence": getattr(intent, "recurrence", None) or "",
+            "recurrence_end": getattr(intent, "recur_until", None) or "",
+        }
+        when = " ".join(p for p in (
+            _fmt_date(body["date"]) if body["date"] else "",
+            f"{_fmt_time(body['start_time'])}–{_fmt_time(body['end_time'])}"
+            if body["start_time"] and body["end_time"]
+            else (_fmt_time(body["start_time"]) if body["start_time"] else ""),
+        ) if p)
+        return [{"kind": "event", "body": body,
+                 "summary": f"“{title}”" + (f" on {when}" if when else "")}]
+    if item.action == "create_todo":
+        titles = [str(t).strip() for t in (getattr(intent, "titles", None) or [])
+                  if str(t).strip()]
+        if not titles:
+            return []
+        # One proposal per task — a to-do intent can carry several, and this is
+        # the gate against silently dropping half of what was asked about.
+        specs = []
+        for i, title in enumerate(titles):
+            body = {
+                "title": title,
+                "list_name": getattr(intent, "list_name", None) or "today",
+                "priority": getattr(intent, "priority", None) or "none",
+                "due_date": getattr(intent, "due_date", None) or "",
+                "tags": list(getattr(intent, "tags", None) or []),
+                "quantity": intent.quantity_for(i) if hasattr(intent, "quantity_for") else 1,
+                # Idempotency key for POST /todos, minted once and carried in
+                # the proposal, so an Add answered twice — or answered on two
+                # surfaces — creates the task once (the same guarantee the
+                # revert spec buys, and the only one events cannot have).
+                "client_token": f"confirm-todo-{_uuid.uuid4()}",
+            }
+            due = f" due {_fmt_date(body['due_date'])}" if body["due_date"] else ""
+            specs.append({"kind": "todo", "body": body,
+                          "summary": f"“{title}”{due}"})
+        return specs
+    return []
+
+
+def _confirm_proposal(state: EngineState) -> "list | None":
+    """The proposals step 4 held back for confirmation, as POSTable bodies.
+
+    None means commit as usual — either nothing was flagged, or the flagged
+    intent could not be turned into a body, in which case the honest answer is
+    the pre-ruling one (the question creates nothing) rather than a dialog
+    offering to create something the client cannot actually POST.
+    """
+    flagged = [it for it in state.items
+               if it.slots.get("confirm_create") and it.intent is not None
+               and not it.blocked]
+    if not flagged:
+        return None
+    per_item = [_create_spec(it) for it in flagged]
+    if not all(per_item):
+        for it in flagged:
+            it.intent = None
+        return None
+    return [spec for specs in per_item for spec in specs]
+
+
+def _confirm_response(state: EngineState, cfg, proposal: list, trace_run) -> dict:
+    """parse: "confirm_create" — nothing executed, the parse offered instead.
+
+    The memory record is written now, unsuccessful, so the client's YES/NO can
+    file its verdict against it through the normal feedback path: a declined
+    proposal is a `rejected` example, which is exactly what the review flows
+    are for.
+    """
+    from assistant.trace import DONE
+
+    what = "; ".join(s["summary"] for s in proposal)
+    prompt = f"Want me to add {what}?"
+    if state.trace:
+        state.trace.step(DONE, "Checking with you",
+                         "That reads as a question about creating something "
+                         f"— asking before adding {what}.")
+    state.memory_id = _record_memory(state, cfg, prompt, success=False)
+    resp: dict = {
+        "message": prompt,
+        "actions": [],
+        "refresh": "",
+        "parse": "confirm_create",
+        "proposal": proposal,
+        "transcript": state.text,
+        "original_transcript": state.raw_text,
+        "corrections": state.corrections,
+        "trace": state.trace.to_list() if state.trace else [],
+        "uncertain_words": _transcript.uncertain_words(state.text),
+        "brain": _brain_version(),
+    }
+    if state.memory_id is not None:
+        resp["memory_id"] = state.memory_id
+    _publish(state, resp, trace_run)
+    return resp
 
 
 def _remove_extra(state: EngineState, finding) -> "tuple[str | None, dict | None]":

@@ -20,6 +20,7 @@ All endpoints are served by the Mac at `http://<tailscale-ip>:8080`; the iOS app
 | Method | Path | What it does |
 |---|---|---|
 | `POST` | `/voice` | Accept a multipart audio file, transcribe via Whisper, then execute. |
+| `POST` | `/voice/confirm` | Answer a confirm_create proposal: {"confirm_token", "accept": bool}. |
 | `POST` | `/voice/stream` | Same as POST /voice but streams the thinking trace live as NDJSON. |
 | `POST` | `/voice/text` | Accept a JSON transcript and execute directly (skips STT). |
 | `GET` | `/voice/verify/<token>` | Poll for background LLM verification of a rule-path voice command. |
@@ -119,7 +120,7 @@ All endpoints are served by the Mac at `http://<tailscale-ip>:8080`; the iOS app
 | Method | Path | What it does |
 |---|---|---|
 | `GET` | `/events` |  |
-| `POST` | `/events` |  |
+| `POST` | `/events` | Create an event. |
 | `DELETE` | `/events/<int:event_id>` |  |
 | `GET` | `/events/<int:event_id>` |  |
 | `PATCH` | `/events/<int:event_id>` |  |
@@ -136,7 +137,7 @@ All endpoints are served by the Mac at `http://<tailscale-ip>:8080`; the iOS app
 | Method | Path | What it does |
 |---|---|---|
 | `GET` | `/todos` |  |
-| `POST` | `/todos` |  |
+| `POST` | `/todos` | Create a task. Idempotent on `client_token` — a repeat returns 200 + the existing id. |
 | `DELETE` | `/todos/<int:todo_id>` |  |
 | `PATCH` | `/todos/<int:todo_id>` |  |
 | `PATCH` | `/todos/<int:todo_id>/toggle` |  |

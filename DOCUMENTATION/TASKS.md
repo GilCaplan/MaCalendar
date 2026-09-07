@@ -123,7 +123,11 @@ duplicate event, week numbers, Timer CSV, agenda view, observance checkbox,
 iOS heartbeat/share/search, ThinkingView file move; two bugs found+fixed
 (settings-dialog imports; pydantic dropping `observance.enabled`).
 Notifications is planned only (`DOCUMENTATION/NOTIFICATIONS_PLAN.md`),
-blocked on DEVQA Q4–Q6. Merge all three branches at the next cycle boundary.
+blocked on DEVQA Q4–Q6. Shipped 2026-09-07: the **confirm-create gate**
+(DEVQA Q9) — an interrogative create is offered rather than executed or
+dropped (`parse: "confirm_create"` + `proposal`, `POST /voice/confirm`, Mac
+Add/No box, iOS alert); see FEATURES.md and ENGINE.md.
+Merge all three branches at the next cycle boundary.
 
 Previous thread, as of 2026-09-03 (still relevant on `main`):
 

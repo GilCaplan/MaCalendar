@@ -18,6 +18,10 @@ decompose it, step 6 notices the missing item), where a wrong split of
 
 Kind here is a first reading ("review" for schedule questions, "task" for
 to-do phrasing, "event" for the rest); step 5 settles the actual action.
+
+Also exports one named reader — `is_interrogative_create(text)` — the same
+kind of shared vocabulary `validate` exports: a pure function other stages may
+call, never a channel to mutate state through.
 """
 
 from __future__ import annotations
@@ -76,6 +80,65 @@ _DATED_RE = re.compile(
     r"\bthe\s+\d{1,2}(st|nd|rd|th)?\b|"
     r"\b(january|february|march|april|may|june|july|august|september|october|"
     r"november|december)\b", re.I)
+
+
+# --- interrogative creates (the confirm-create gate) -----------------------
+#
+# A public reader, in the ENGINE.md sense: shared vocabulary other stages may
+# call, never a channel to mutate state through. It lives here because "what
+# shape of utterance is this" is step 2's question — step 4 (which sees the
+# question AND the create-shaped object) and step 5's fast-track gate both ask
+# it, and one regex read two ways is what keeps them agreeing.
+#
+# Gil's ruling (2026-09-07, DEVQA Q9): "should i add yoga to my calendar
+# tomorrow?" must neither auto-create nor be silently dropped. Both halves
+# happened: "should i …" sailed past `_rule_question_creates_nothing` (its
+# `_QUESTION_START` has no "should") and booked yoga, while "what if i booked
+# town hall for the 3rd?" matched it and vanished without a word.
+
+#: The speaker WEIGHING an action of their own — "should I", "what if we",
+#: "do you think", "how about I". First person on purpose: "can you add yoga?"
+#: is a request and must still execute, "can I add yoga?" is a musing.
+_PROPOSAL_RE = re.compile(
+    r"\b(?:should|shall|could|can|would|might|ought(?:\s+to)?)\s+(?:i|we)\b"
+    r"|\b(?:what|how)\s+(?:if|about)\s+(?:i|we)\b"
+    r"|\bdo\s+you\s+(?:think|reckon)\b"
+    r"|\b(?:is|would)\s+it\s+(?:be\s+)?(?:worth|better|a\s+good\s+idea)\b"
+    r"|\bdo\s+i\s+need\s+to\b",
+    re.I)
+
+#: An opener that is a question even when the transcript lost its "?" —
+#: speech recognition drops the mark often enough to matter.
+_PROPOSAL_OPENER_RE = re.compile(
+    r"^(?:so\s+|ok(?:ay)?\s+|hey\s+|hmm\s+)?"
+    r"(?:should|shall|what\s+if|how\s+about|what\s+about|do\s+you\s+think)\b", re.I)
+
+#: The verbs that put something on the calendar or the list, in whatever tense
+#: the hypothetical takes it — "what if I BOOKED", "should I be ADDING".
+_CREATE_VERBISH_RE = re.compile(
+    r"\b(?:add(?:ed|ing)?|book(?:ed|ing)?|schedul(?:e|ed|ing)|creat(?:e|ed|ing)|"
+    r"mak(?:e|ing)|made|put(?:ting)?|set(?:ting)?|pencil(?:led|ed|ling|ing)?|"
+    r"slot(?:ted|ting)?|block(?:ed|ing)?\s+(?:out|off)|plan(?:ned|ning)?)\b", re.I)
+
+
+def is_interrogative_create(text: str) -> bool:
+    """Is this the speaker ASKING whether to create something, rather than
+    telling the assistant to?
+
+    All three have to hold, which is what keeps it off ordinary commands:
+      • it reads as a question (a "?" or a question opener),
+      • the speaker is weighing their OWN action ("should I", "what if we"),
+      • and there is a create verb in the same words.
+
+    "add yoga tomorrow" (no question), "can you add yoga?" (not first person)
+    and "what's on friday?" (no create verb) all return False.
+    """
+    t = (text or "").strip()
+    if not t:
+        return False
+    if not (t.endswith("?") or _PROPOSAL_OPENER_RE.match(t)):
+        return False
+    return bool(_PROPOSAL_RE.search(t) and _CREATE_VERBISH_RE.search(t))
 
 
 def _enforce_pinned_kinds(kind: str, text: str) -> str:

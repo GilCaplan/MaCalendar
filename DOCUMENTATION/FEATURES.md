@@ -31,6 +31,7 @@ purely backend (no client code beyond displaying the effects).
 | hybrid | [Pre-event notifications](#pre-event-notifications) | phone rings from its cache; server computes policy; per-category mute; live "Up Next" lock-screen card | `notify.py`, `ReminderScheduler.swift`, `LiveActivityManager.swift` |
 | hybrid | [Voice I/O & capture controls](#voice-in--voice-out--capture-controls) | hotkey/stop-phrases/review-bar; engine-selectable STT; spoken replies | `stt/`, `Voice/`, `tts/` |
 | hybrid | [Edit-transcription gate](#the-edit-transcription-round-trip-needs_edit) | doubted words → editor → learned | `engine/transcript.py` |
+| hybrid | [Confirm-create gate](#the-confirm-create-gate-confirm_create) | "should I add yoga tomorrow?" → Add / No, never a silent guess | `engine/validate.py`, `/voice/confirm` |
 | hybrid | [Self-check & revert](#background-self-check--one-tap-revert) | background re-reasoning, one-tap undo | `engine/__init__.py`, panels |
 | hybrid | [Review panel / HUD](#the-review-panel-thinking-hud--ios-timeline) | live chain-of-thought card + history | `thinking_hud.py`, `ThinkingView` |
 | hybrid | [Personal vocabulary](#personal-vocabulary) | user's words fix transcripts first | `stt/vocab.py` |
@@ -214,6 +215,28 @@ gate fires less over time.
 **How:** A changed word becomes a vocab alias + phonetic key immediately; an
 unchanged resubmit counts toward whitelisting (2 confirmations); the resubmit
 carries `edited_from` and bypasses the gate once.
+
+### The confirm-create gate (confirm_create)
+**What:** A question about creating something — "should I add yoga to my
+calendar tomorrow?", "what if I booked town hall for the 3rd?" — is neither
+executed nor silently dropped. The parse is finished and offered: the client
+shows what it would create, Add creates it, No discards it.
+**Where:** reader `is_interrogative_create` in `engine/segment.py`; rule
+`interrogative_create_asks_first` in `engine/validate.py`; short-circuit
+`_confirm_proposal` / `_confirm_response` in `engine/__init__.py`; token store
+and `POST /voice/confirm` in `api/server.py`; Mac `ask_create_confirm` in
+`calendar_ui/window.py` (via `pipeline.py`, `supports_confirm: true`); iOS
+"Add this?" alert in `Views/VoiceButton.swift`.
+**How:** Gated on the client declaring `supports_confirm`, exactly like the
+edit round-trip — an older client sees today's behaviour and nothing breaks.
+The response carries `proposal`: ready-to-POST `/events` / `/todos` bodies,
+the same trick one-tap revert uses, so accepting is a plain create through the
+endpoints every client already speaks. Answering twice replays the first
+answer, so a double-tapped Add creates once. A decline files the command
+memory record as `rejected`, which feeds the review flows like any other bad
+answer. Fires only when the question is the whole command; an interrogative
+create never takes the fast track. Knob: `engine.confirm_create`.
+*Ruling: Gil, 2026-09-07 (DEVQA Q9).*
 
 ### Background self-check & one-tap revert
 **What:** Behind a fast answer, the deep track re-reasons: placeholder titles

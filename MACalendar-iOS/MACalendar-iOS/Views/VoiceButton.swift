@@ -24,6 +24,9 @@ struct VoiceButton: View {
     @State private var showFix = false
     /// Set when the host returns needs_edit — drives the transcription editor.
     @State private var editRequest: EditRequest?
+    /// Set when the host returns confirm_create — drives the "add this?" alert.
+    /// Nothing has been created at this point; the alert's answer decides.
+    @State private var confirmRequest: ConfirmRequest?
     /// Rows a destructive background self-check removed — drives the Revert banner.
     @State private var pendingRevert: [RevertItem] = []
 
@@ -90,6 +93,19 @@ struct VoiceButton: View {
             }
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+        }
+        // "should I add yoga tomorrow?" — a question, so the host parsed it and
+        // created nothing. Add creates it; No discards it and files the verdict.
+        .alert("Add this?", isPresented: Binding(
+            get: { confirmRequest != nil },
+            set: { if !$0 { confirmRequest = nil } }
+        ), presenting: confirmRequest) { req in
+            Button("Add") { answerConfirm(req, accept: true) }
+            Button("No", role: .cancel) { answerConfirm(req, accept: false) }
+        } message: { req in
+            Text(req.items.isEmpty ? req.prompt
+                 : req.prompt + "\n\n" + req.items.map { "\u{2022} " + $0.summary }
+                    .joined(separator: "\n"))
         }
     }
 
@@ -308,7 +324,8 @@ struct VoiceButton: View {
                     // Always stream: the Mac reports each stage as it happens, so the
                     // calendar can refresh the moment an action executes (first version)
                     // and again when the self-check has finished (fixed version).
-                    let response = try await api.sendAudioStreaming(audioData, supportsEdit: true) { step in
+                    let response = try await api.sendAudioStreaming(audioData, supportsEdit: true,
+                                                                     supportsConfirm: true) { step in
                         if settings.showThinking {
                             if steps.count == 1, steps[0].title == "Sending" { steps = [] }
                             steps.append(step)
@@ -411,6 +428,16 @@ struct VoiceButton: View {
             return
         }
 
+        // A question about creating something: the parse is offered, not run.
+        // Nothing to refresh, verify or speak until the alert is answered.
+        if response.parse == "confirm_create", let token = response.confirmToken {
+            showThinking = false
+            status = .idle
+            confirmRequest = ConfirmRequest(token: token, prompt: response.message,
+                                            items: response.proposal ?? [])
+            return
+        }
+
         api.burstRefresh()   // poll every second for a while so both devices settle together
         onRefresh?(response.refresh)
         onResponse?(response)
@@ -443,6 +470,41 @@ struct VoiceButton: View {
         status = .idle
     }
 
+    /// The answer to a confirm_create proposal. The host does the creating —
+    /// through exactly the code a POST /events / POST /todos would run — so the
+    /// phone never holds a second create path, and answering twice is safe.
+    private func answerConfirm(_ req: ConfirmRequest, accept: Bool) {
+        confirmRequest = nil
+        Task {
+            do {
+                let r = try await api.confirmCreate(token: req.token, accept: accept)
+                await MainActor.run {
+                    if settings.showThinking {
+                        steps.append(TraceStep(stage: "execute",
+                                               title: accept ? "You said add it" : "You said no",
+                                               detail: r.message, ms: 0,
+                                               atMs: steps.last?.atMs ?? 0, ok: true))
+                    }
+                    if !r.refresh.isEmpty {
+                        api.burstRefresh()
+                        onRefresh?(r.refresh)
+                    }
+                    if !r.message.isEmpty && settings.speakReplies {
+                        player.speak(r.message, voiceIdentifier: settings.ttsVoice)
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    if settings.showThinking {
+                        steps.append(TraceStep(stage: "error", title: "Couldn't answer that",
+                                               detail: error.localizedDescription, ms: 0,
+                                               atMs: steps.last?.atMs ?? 0, ok: false))
+                    }
+                }
+            }
+        }
+    }
+
     /// Second half of the needs_edit round-trip: send the corrected transcript
     /// back as text (with `editedFrom` so the host bypasses the gate and learns
     /// the fix), then run the normal response flow.
@@ -457,7 +519,8 @@ struct VoiceButton: View {
         }
         Task {
             do {
-                let r = try await api.sendText(corrected, editedFrom: editedFrom, supportsEdit: true)
+                let r = try await api.sendText(corrected, editedFrom: editedFrom,
+                                       supportsEdit: true, supportsConfirm: true)
                 await handleResponse(r)
             } catch {
                 await MainActor.run {
@@ -472,6 +535,14 @@ struct VoiceButton: View {
             }
         }
     }
+}
+
+/// A confirm_create proposal awaiting an answer — drives the "add this?" alert.
+struct ConfirmRequest: Identifiable {
+    let id = UUID()
+    let token: String
+    let prompt: String
+    let items: [ProposedCreate]
 }
 
 /// What the host doubted — drives the transcription editor sheet.
