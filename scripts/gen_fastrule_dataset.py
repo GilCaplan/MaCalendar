@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Generate the FastRule 6,000-row eval/train dataset from pattern + filler
-banks under dataset/fastrule/banks/.
+"""Generate the FastRule eval/train dataset from pattern + filler banks
+under dataset/fastrule/banks/. Currently 7,200 rows: the original 6,000-row
+stratified 80/20 pool (train 4,800 / test 1,200) plus a 1,200-row
+forced-test-only pool grown on top of it (Gil, 2026-09-07) — see
+`build_forced_test()` and dataset/fastrule/SPLIT.md.
 
-WHY a generator instead of 6000 hand-written rows: the banks are the
+WHY a generator instead of thousands of hand-written rows: the banks are the
 authored artifact (pattern SKELETONS + generic slot fillers); this script
 deterministically expands them into concrete rows and assigns ground truth
 BY CONSTRUCTION — it knows exactly which filler it dropped into which slot,
@@ -16,10 +19,18 @@ own frozen `banks/categories_fixture.json` — see `setup_label_env()`.
 
 Determinism: a fixed SEED plus the banks' on-disk content are the only
 inputs (no network, no wall-clock, no dict-iteration-order dependence —
-every RNG stream is reseeded from a stable string key). Regenerating
-reproduces the previous fastrule_6000.jsonl byte-for-byte. Stable ids are
-"<family>-<counter>", counter local to that family's rows in the order
-generated.
+every RNG stream is reseeded from a stable string key, independently per
+family, so one family's row content can never depend on any OTHER family
+existing at all — see `_init_family`/`gen_family_rows`). Regenerating
+reproduces the previous fastrule_7200.jsonl byte-for-byte, and growing the
+forced-test pool further leaves every existing row (train AND the original
+stratified test) untouched — that's the whole point of pulling force_split
+families out before the stratified path ever runs (`main()`). Stable ids
+are "<family>-<counter>", counter local to that family's rows in the order
+generated. `SEED` still reads `"fastrule-6000-v1"` — a fixed historical
+identifier now, not a live row-count description; renaming the STRING would
+reseed every family's RNG stream and break every existing row, which is
+exactly the one thing this growth was required not to do.
 
 Usage:
     python -m scripts.gen_fastrule_dataset            # generate + verify
@@ -43,7 +54,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BANKS = ROOT / "dataset" / "fastrule" / "banks"
-OUT = ROOT / "dataset" / "fastrule" / "fastrule_6000.jsonl"
+OUT = ROOT / "dataset" / "fastrule" / "fastrule_7200.jsonl"
 CATEGORIES_FIXTURE = BANKS / "categories_fixture.json"
 
 # Changing SEED changes every row's fillers and the split assignment — only
@@ -53,6 +64,13 @@ SEED = "fastrule-6000-v1"
 SIMPLE_TOTAL = 2000
 COMPLEX_TOTAL = 4000
 TRAIN_FRAC = 0.8
+
+# Test-only growth (Gil, 2026-09-07): families with `force_split: "test"` in
+# the banks are assigned directly to test, on top of (not carved out of) the
+# totals above — see build_forced_test(). Train stays exactly SIMPLE_TOTAL*0.8
+# + COMPLEX_TOTAL*0.8 = 4,800 rows, byte-identical to before this pool existed.
+SIMPLE_FORCE_TEST_TOTAL = 400
+COMPLEX_FORCE_TEST_TOTAL = 800
 
 # action -> (atomic, events, tasks) for SIMPLE-tier families, which are
 # single-intent by construction so this is fully determined by the action.
@@ -68,7 +86,7 @@ ACTION_DEFAULTS = {
     "update_event": (True, 0, 0),
     "update_todo": (True, 0, 0),
 }
-ALL_ACTIONS = set(ACTION_DEFAULTS) | {"mixed", "propose"}   # propose: Q9 - a question proposes, user confirms
+ALL_ACTIONS = set(ACTION_DEFAULTS) | {"mixed", "propose"}   # propose: Q9 ruling - a question proposes, user confirms
 
 # placeholder base name -> (filler bank key, semantic slot key | None).
 # None means the placeholder is cosmetic text only (not ground truth).
@@ -431,20 +449,67 @@ def stratified_split(families: list[dict]) -> dict[str, str]:
     return split
 
 
+def _init_family(fam: dict, tier: str, fillers: dict) -> None:
+    """Shared per-family setup: tier tag, bank/collision validation, simple-tier
+    action defaults, and label-source resolution. Used identically by the
+    stratified path (`build_tier`) and the force-split path
+    (`build_forced_test`) so a family behaves the same regardless of which
+    pool it's declared in."""
+    fam["tier"] = tier
+    validate_family(fam, fillers)
+    if tier == "simple":
+        atomic, events, tasks = ACTION_DEFAULTS[fam["action"]]
+        fam.setdefault("atomic", atomic)
+        fam.setdefault("events", events)
+        fam.setdefault("tasks", tasks)
+    assert fam["action"] in ALL_ACTIONS, f"{fam['family']}: bad action {fam['action']}"
+    assert isinstance(fam["atomic"], bool)
+    assert isinstance(fam["events"], int) and isinstance(fam["tasks"], int)
+    fam["_label_sources"] = resolve_label_sources(fam)
+
+
+def _emit_family_rows(fam: dict, split_name: str, quota: int, tier: str, fillers: dict,
+                       global_seen: set, categories_mod, tagging_mod, task_tag_keywords: dict) -> list[dict]:
+    """Generate `quota` rows for one family already assigned to `split_name`,
+    label them, and return them as finished row dicts."""
+    fam_rows = gen_family_rows(fam, quota, fillers, global_seen)
+    if len(fam_rows) < quota:
+        raise ValueError(
+            f"family {fam['family']} only produced {len(fam_rows)}/{quota} "
+            f"unique rows — widen its filler banks")
+    out = []
+    counter = 0
+    for text, slots in fam_rows:
+        counter += 1
+        add_labels(fam, slots, categories_mod, tagging_mod, task_tag_keywords)
+        out.append({
+            "id": f"{fam['family']}-{counter:03d}",
+            "text": text,
+            "split": split_name,
+            "tier": tier,
+            "family": fam["family"],
+            "expect": {
+                "events": fam["events"],
+                "tasks": fam["tasks"],
+                "action": fam["action"],
+                "atomic": fam["atomic"],
+                "slots": slots,
+            },
+        })
+    return out
+
+
 def build_tier(tier: str, patterns: list[dict], total: int, fillers: dict, global_seen: set,
                 categories_mod, tagging_mod, task_tag_keywords: dict):
+    """The original stratified 80/20 path — unchanged in every particular
+    from before force-split families existed. `patterns` must already
+    exclude any family with `force_split` set (see `main()`): mixing forced
+    families into this function's stratification would shift the hash-based
+    80/20 computation for every OTHER family in their (tier, action) bucket,
+    which is exactly the perturbation force-split exists to avoid."""
     for fam in patterns:
-        fam["tier"] = tier
-        validate_family(fam, fillers)
-        if tier == "simple":
-            atomic, events, tasks = ACTION_DEFAULTS[fam["action"]]
-            fam.setdefault("atomic", atomic)
-            fam.setdefault("events", events)
-            fam.setdefault("tasks", tasks)
-        assert fam["action"] in ALL_ACTIONS, f"{fam['family']}: bad action {fam['action']}"
-        assert isinstance(fam["atomic"], bool)
-        assert isinstance(fam["events"], int) and isinstance(fam["tasks"], int)
-        fam["_label_sources"] = resolve_label_sources(fam)
+        assert "force_split" not in fam, f"{fam['family']}: forced family passed to build_tier"
+        _init_family(fam, tier, fillers)
 
     split_of = stratified_split(patterns)
     for fam in patterns:
@@ -457,30 +522,33 @@ def build_tier(tier: str, patterns: list[dict], total: int, fillers: dict, globa
         fams = [fam for fam in patterns if fam["split"] == split_name]
         quotas = distribute_quota(target, [f["family"] for f in fams], capacities)
         for fam in fams:
-            fam_rows = gen_family_rows(fam, quotas[fam["family"]], fillers, global_seen)
-            if len(fam_rows) < quotas[fam["family"]]:
-                raise ValueError(
-                    f"family {fam['family']} only produced {len(fam_rows)}/"
-                    f"{quotas[fam['family']]} unique rows (capacity "
-                    f"{capacities[fam['family']]}) — widen its filler banks")
-            counter = 0
-            for text, slots in fam_rows:
-                counter += 1
-                add_labels(fam, slots, categories_mod, tagging_mod, task_tag_keywords)
-                rows.append({
-                    "id": f"{fam['family']}-{counter:03d}",
-                    "text": text,
-                    "split": split_name,
-                    "tier": tier,
-                    "family": fam["family"],
-                    "expect": {
-                        "events": fam["events"],
-                        "tasks": fam["tasks"],
-                        "action": fam["action"],
-                        "atomic": fam["atomic"],
-                        "slots": slots,
-                    },
-                })
+            rows += _emit_family_rows(fam, split_name, quotas[fam["family"]], tier, fillers,
+                                       global_seen, categories_mod, tagging_mod, task_tag_keywords)
+    return rows
+
+
+def build_forced_test(tier: str, patterns: list[dict], total: int, fillers: dict, global_seen: set,
+                       categories_mod, tagging_mod, task_tag_keywords: dict):
+    """Families with `force_split: "test"` — assigned directly, bypassing
+    `stratified_split()`'s hash-based 80/20 entirely (that mechanism, and
+    every row it produces for the ORIGINAL families, is untouched — see
+    `build_tier`). `total` is this pool's own row target (SPLIT.md), added
+    ON TOP of the tier's original SIMPLE_TOTAL/COMPLEX_TOTAL, not carved out
+    of it — that's what keeps train exactly as it was."""
+    for fam in patterns:
+        assert fam.get("force_split") == "test", (
+            f"{fam['family']}: build_forced_test only supports force_split='test' "
+            f"(got {fam.get('force_split')!r})")
+        _init_family(fam, tier, fillers)
+        fam["split"] = "test"
+
+    capacities = {fam["family"]: family_capacity(fam, fillers) for fam in patterns}
+    quotas = distribute_quota(total, [f["family"] for f in patterns], capacities)
+
+    rows = []
+    for fam in patterns:
+        rows += _emit_family_rows(fam, "test", quotas[fam["family"]], tier, fillers,
+                                   global_seen, categories_mod, tagging_mod, task_tag_keywords)
     return rows
 
 
@@ -497,12 +565,34 @@ def main():
     task_tag_keywords = {t["name"]: t["keywords"] for t in categories_fixture["task_tags"]}
     categories_mod, tagging_mod = setup_label_env()
 
+    # force_split families are pulled OUT before the stratified path ever
+    # sees them: build_tier's input set (and therefore its hash-based 80/20
+    # bucket membership and every row it produces) is then IDENTICAL to what
+    # it was before any force_split family existed — that's what makes the
+    # train set — and the original 6,000 stratified rows generally —
+    # byte-identical across this growth.
+    simple_free = [f for f in simple_patterns if not f.get("force_split")]
+    simple_forced = [f for f in simple_patterns if f.get("force_split")]
+    complex_free = [f for f in complex_patterns if not f.get("force_split")]
+    complex_forced = [f for f in complex_patterns if f.get("force_split")]
+
     global_seen: set[str] = set()
     rows = []
-    rows += build_tier("simple", simple_patterns, SIMPLE_TOTAL, fillers, global_seen,
+    rows += build_tier("simple", simple_free, SIMPLE_TOTAL, fillers, global_seen,
                         categories_mod, tagging_mod, task_tag_keywords)
-    rows += build_tier("complex", complex_patterns, COMPLEX_TOTAL, fillers, global_seen,
+    rows += build_tier("complex", complex_free, COMPLEX_TOTAL, fillers, global_seen,
                         categories_mod, tagging_mod, task_tag_keywords)
+    stratified_row_count = len(rows)
+
+    # Forced-test families run AFTER the stratified path completes and only
+    # ever APPEND to global_seen/rows — so even in the (astronomically
+    # unlikely) event a new family's text would collide with an existing
+    # one, the EXISTING family always wins the string; new families just
+    # skip to their next candidate. Existing rows never even see this pool.
+    rows += build_forced_test("simple", simple_forced, SIMPLE_FORCE_TEST_TOTAL, fillers, global_seen,
+                               categories_mod, tagging_mod, task_tag_keywords)
+    rows += build_forced_test("complex", complex_forced, COMPLEX_FORCE_TEST_TOTAL, fillers, global_seen,
+                               categories_mod, tagging_mod, task_tag_keywords)
 
     # Final deterministic shuffle so consecutive rows aren't bursts from one
     # family — still 100% reproducible from SEED.
@@ -511,15 +601,36 @@ def main():
 
     # ---- verification -----------------------------------------------
     texts = [r["text"] for r in rows]
-    assert len(rows) == SIMPLE_TOTAL + COMPLEX_TOTAL, len(rows)
+    expected_total = SIMPLE_TOTAL + COMPLEX_TOTAL + SIMPLE_FORCE_TEST_TOTAL + COMPLEX_FORCE_TEST_TOTAL
+    assert len(rows) == expected_total, (len(rows), expected_total)
     assert len(set(texts)) == len(texts), "duplicate text rows"
 
     by_split = Counter(r["split"] for r in rows)
     train_n, test_n = by_split["train"], by_split["test"]
     total = len(rows)
-    test_frac = test_n / total
-    if not (0.19 <= test_frac <= 0.21):
-        raise ValueError(f"split fraction out of tolerance: test={test_frac:.4f}")
+
+    forced_families = {f["family"] for f in (simple_forced + complex_forced)}
+
+    # The ORIGINAL stratified pool must still land at ~80/20 — the same
+    # invariant as before force_split existed, checked over exactly the same
+    # population (excluding the new forced-test rows entirely).
+    assert stratified_row_count == SIMPLE_TOTAL + COMPLEX_TOTAL
+    stratified_test_n = sum(1 for r in rows if r["family"] not in forced_families and r["split"] == "test")
+    stratified_test_frac = stratified_test_n / stratified_row_count
+    if not (0.19 <= stratified_test_frac <= 0.21):
+        raise ValueError(f"stratified-pool split fraction out of tolerance: test={stratified_test_frac:.4f}")
+
+    # Train must be EXACTLY the original 4,800: force_split families are
+    # test-only by construction (build_forced_test asserts this on every
+    # family), so any forced-family row landing in train means the
+    # mechanism leaked, and any drift in the total train count at all means
+    # the stratified pool was perturbed.
+    forced_train_rows = [r for r in rows if r["family"] in forced_families and r["split"] == "train"]
+    if forced_train_rows:
+        raise ValueError(f"force_split family produced train rows: {forced_train_rows[:3]}")
+    expected_train = round(SIMPLE_TOTAL * TRAIN_FRAC) + round(COMPLEX_TOTAL * TRAIN_FRAC)
+    if train_n != expected_train:
+        raise ValueError(f"train count drifted from the original {expected_train}: {train_n}")
 
     fam_counts = Counter(r["family"] for r in rows)
     max_family_frac = max(fam_counts.values()) / total
@@ -537,8 +648,17 @@ def main():
     assert len(set(ids)) == len(ids), "duplicate ids"
 
     # ---- composition table -------------------------------------------
-    print(f"TOTAL rows: {total}  (simple {SIMPLE_TOTAL} / complex {COMPLEX_TOTAL})")
-    print(f"Split: train={train_n} ({train_n/total:.1%})  test={test_n} ({test_n/total:.1%})")
+    print(f"TOTAL rows: {total}  (stratified pool {stratified_row_count}: "
+          f"simple {SIMPLE_TOTAL} / complex {COMPLEX_TOTAL}  +  "
+          f"forced-test pool {SIMPLE_FORCE_TEST_TOTAL + COMPLEX_FORCE_TEST_TOTAL}: "
+          f"simple {SIMPLE_FORCE_TEST_TOTAL} / complex {COMPLEX_FORCE_TEST_TOTAL})")
+    print(f"Split: train={train_n} ({train_n/total:.1%})  test={test_n} ({test_n/total:.1%})  "
+          f"[train is EXACTLY the original {expected_train}]")
+    print(f"  of which forced-test: {len(forced_families)} families, "
+          f"{sum(1 for r in rows if r['family'] in forced_families)} rows "
+          f"(all test, by construction)")
+    print(f"  stratified-pool-only split: test={stratified_test_frac:.1%} "
+          f"(the original ~80/20, unperturbed by the forced pool)")
     print(f"Unique texts: {len(set(texts))}/{total}")
     print(f"Families: {len(fam_counts)} total "
           f"({len(train_families)} train, {len(test_families)} test, "

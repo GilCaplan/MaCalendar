@@ -1,5 +1,12 @@
 # The 80/20 split — how it's built, and the rule that protects it
 
+**Two pools make up `split == "test"` now (2026-09-07 growth): the original
+stratified 80/20's test slice (1,200 rows, 86 families) and a newer
+force-split-only pool grown on top of it (1,200 rows, 101 families — see
+"Growing test-only: force_split" below). Both are equally eval-only. The
+rule in the next section applies to `split == "test"` as a whole, without
+exception for which pool a row came from.**
+
 ## TEST RESULTS ARE NEVER USED TO IMPROVE FASTRULE
 
 **This is the load-bearing rule of this dataset. Read it before you score
@@ -77,13 +84,13 @@ at least one family in both `train` and `test`** — the smallest are
 Nothing scores as "action X, complex tier" in test without a train
 counterpart to have been mined against first.
 
-## The actual numbers (this generation, SEED = "fastrule-6000-v1")
+## The stratified pool's numbers (unchanged by the 2026-09-07 growth)
 
 | | rows | families |
 |---|---:|---:|
 | train | 4,800 (80.0%) | 331 |
 | test | 1,200 (20.0%) | 86 |
-| **total** | **6,000** | **417** |
+| **stratified pool total** | **6,000** | **417** |
 
 Simple tier: 1,600 train / 400 test (of 2,000). Complex tier: 3,200 train /
 800 test (of 4,000). Both exact — the split target is computed independently
@@ -98,15 +105,94 @@ redistribution.)
 Leaked families (present in both splits): **0** — asserted by the generator
 on every run; the script refuses to write the file if this is ever nonzero.
 
+## Growing test-only: `force_split` (Gil, 2026-09-07)
+
+The goal: widen test's **unseen-wording** coverage without touching train at
+all, and without perturbing the stratified 80/20's own hash-based bucket
+membership for any of the original 417 families. Mechanism
+(`scripts/gen_fastrule_dataset.py`):
+
+1. A family may declare `"force_split": "test"` in `simple_patterns.json` /
+   `complex_patterns.json`. Everything else about it — `template`,
+   `action`/`atomic`/`events`/`tasks` (or the simple-tier action defaults),
+   `event_label_sources`/`task_label_sources`, `fixed_slots`, `flags` — works
+   exactly like any other family; only the split assignment differs.
+2. `main()` partitions each tier's families into `free` (no `force_split`)
+   and `forced` **before either pool is touched**. `free` is handed to
+   `build_tier()` — the ORIGINAL stratified path, completely unmodified,
+   operating on the identical input set it always did (a `force_split`
+   family passed to `build_tier()` is a hard assertion failure, not a silent
+   no-op — see `_init_family`/`build_tier`'s assert). `stratified_split()`
+   never even sees a forced family, so it cannot shift any (tier, action)
+   bucket's hash ordering or 80/20 arithmetic for the original families.
+3. `forced` is handed to a new function, `build_forced_test()`: every family
+   in it is assigned `split = "test"` directly (asserted — the function
+   only supports `force_split: "test"` today), given its own row quota via
+   the same `distribute_quota()` largest-remainder mechanism (capacity-aware,
+   same as always), and generated with the same `gen_family_rows()` +
+   labelling pipeline as everything else.
+4. `build_forced_test()` runs **after** `build_tier()` completes for both
+   tiers, and only ever *appends* to `rows`/`global_seen`. A brand-new
+   family's candidate text colliding with an existing row (astronomically
+   unlikely given the filler banks' cardinality, but the dedup logic doesn't
+   assume it away) always loses to the existing row — the new family just
+   tries its next candidate — so existing rows never even have visibility
+   into the forced pool's existence, let alone react to it.
+5. The forced-test row target is its own budget (`SIMPLE_FORCE_TEST_TOTAL =
+   400`, `COMPLEX_FORCE_TEST_TOTAL = 800`), **added on top of**
+   `SIMPLE_TOTAL`/`COMPLEX_TOTAL`, never carved out of them — that's what
+   keeps train exactly 4,800 rather than being diluted.
+
+**101 new families this round** (45 simple + 56 complex), all
+`force_split: "test"`, targeting the tier/action/strata mix the original
+417 already cover (all 8 simple actions, all 9 complex actions including a
+new `propose_confirm` nuance — see DATASET.md) plus genuinely new wording
+skeletons throughout — the whole point being wider unseen-wording coverage,
+not more rows behind the same templates.
+
+**Train-invariance, verified two ways:**
+
+- **Structurally**: `build_tier()`'s input (`free`) and every function it
+  calls are byte-for-byte the same code path operating on the same data as
+  before `force_split` existed; nothing about the forced pool's existence
+  reaches it.
+- **Empirically**: a from-scratch run of `build_tier()` against ONLY the
+  157 simple + 260 complex original (non-`force_split`) families reproduces
+  a train set whose **full-row JSON** (sorted, hashed) and **sorted
+  `text`-only** hashes both match the actual `split == "train"` subset of
+  `fastrule_7200.jsonl` exactly — 4,800 rows, identical ids, identical
+  `expect` blocks, identical everything. `main()` also asserts this at
+  generation time: `train_n` must equal the original `4,800` exactly, and
+  no `force_split` family may produce a single `train` row (both are hard
+  `ValueError`s, not warnings).
+
+## The combined numbers (stratified pool + forced-test pool)
+
+| | rows | families |
+|---|---:|---:|
+| train | 4,800 (66.7%) | 331 |
+| test | 2,400 (33.3%) | 187 |
+| **total** | **7,200** | **518** |
+
+Test's 2,400 = the original stratified 1,200 + the new forced 1,200. The
+stratified pool's OWN internal ratio is still exactly 80/20 (verified
+above) — the overall dataset's ratio moved to roughly 2:1 only because an
+entirely new, additive, test-only pool was grown alongside it; no row that
+used to be train became test, or vice versa.
+
 ## Regenerating
 
-`python -m scripts.gen_fastrule_dataset` rebuilds the split from scratch
-every time — it is not a stored assignment, it's a pure function of the bank
-files + `SEED`. Adding a new family to `banks/simple_patterns.json` or
-`banks/complex_patterns.json` **may reshuffle which existing families land
-in train vs test** (the stable-hash ordering is a function of the full
-bucket membership), so treat a bank edit as "regenerate and re-read
-`fastrule_6000.jsonl`," not "append a delta." `SEED` in
-`scripts/gen_fastrule_dataset.py` is the only knob that changes the split
-deterministically; changing it is a deliberate act, noted here and in
-`DATASET.md`, not a routine operation.
+`python -m scripts.gen_fastrule_dataset` rebuilds the whole dataset from
+scratch every time — it is not a stored assignment, it's a pure function of
+the bank files + `SEED`. Adding a new NON-force_split family to
+`banks/simple_patterns.json` or `banks/complex_patterns.json` **may
+reshuffle which existing (non-forced) families land in train vs test** (the
+stable-hash ordering is a function of the full stratified-pool bucket
+membership), so treat a stratified-pool bank edit as "regenerate and re-read
+`fastrule_7200.jsonl`," not "append a delta." Adding a new `force_split:
+"test"` family carries none of that risk — by construction it can only ever
+add test rows and can only ever change which OTHER forced families' quotas
+absorb the largest-remainder rounding, never anything about `free` families
+or train. `SEED` in `scripts/gen_fastrule_dataset.py` is the only knob that
+changes the *stratified* split deterministically; changing it is a
+deliberate act, noted here and in `DATASET.md`, not a routine operation.

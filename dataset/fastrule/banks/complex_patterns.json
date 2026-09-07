@@ -1223,7 +1223,9 @@
   "events": 0,
   "tasks": 0,
   "template": "should i add {event_title} to my calendar {date}?",
-  "proposal_kind": "event"
+  "proposal_kind": "event",
+  "event_label_sources": [],
+  "task_label_sources": []
  },
  {
   "family": "c_interrog_ce_2",
@@ -1233,7 +1235,9 @@
   "events": 0,
   "tasks": 0,
   "template": "should i book {event_title} for {date} at {time}?",
-  "proposal_kind": "event"
+  "proposal_kind": "event",
+  "event_label_sources": [],
+  "task_label_sources": []
  },
  {
   "family": "c_interrog_ct_1",
@@ -1243,7 +1247,9 @@
   "events": 0,
   "tasks": 0,
   "template": "should i add {task_title} to my list?",
-  "proposal_kind": "task"
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
  },
  {
   "family": "c_interrog_ct_2",
@@ -1253,7 +1259,9 @@
   "events": 0,
   "tasks": 0,
   "template": "should i remind myself to {task_title} {date}?",
-  "proposal_kind": "task"
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
  },
  {
   "family": "c_interrog_ce_3",
@@ -1263,7 +1271,9 @@
   "events": 0,
   "tasks": 0,
   "template": "do you think i should schedule {event_title} for {date}?",
-  "proposal_kind": "event"
+  "proposal_kind": "event",
+  "event_label_sources": [],
+  "task_label_sources": []
  },
  {
   "family": "c_interrog_ct_3",
@@ -1273,7 +1283,9 @@
   "events": 0,
   "tasks": 0,
   "template": "do you think i should {task_title} {date}?",
-  "proposal_kind": "task"
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
  },
  {
   "family": "c_interrog_ce_4",
@@ -1283,7 +1295,9 @@
   "events": 0,
   "tasks": 0,
   "template": "what if i booked {event_title} for {date} at {time}?",
-  "proposal_kind": "event"
+  "proposal_kind": "event",
+  "event_label_sources": [],
+  "task_label_sources": []
  },
  {
   "family": "c_interrog_ct_4",
@@ -1293,7 +1307,9 @@
   "events": 0,
   "tasks": 0,
   "template": "what if i added {task_title} to my list?",
-  "proposal_kind": "task"
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
  },
  {
   "family": "c_polite_ce_1",
@@ -1303,7 +1319,9 @@
   "events": 0,
   "tasks": 0,
   "template": "can you please book {event_title} for {date} at {time}?",
-  "proposal_kind": "event"
+  "proposal_kind": "event",
+  "event_label_sources": [],
+  "task_label_sources": []
  },
  {
   "family": "c_polite_ce_2",
@@ -1313,7 +1331,9 @@
   "events": 0,
   "tasks": 0,
   "template": "could you schedule {event_title} for {date}?",
-  "proposal_kind": "event"
+  "proposal_kind": "event",
+  "event_label_sources": [],
+  "task_label_sources": []
  },
  {
   "family": "c_polite_ct_1",
@@ -1323,7 +1343,9 @@
   "events": 0,
   "tasks": 0,
   "template": "can you please add {task_title} to my list?",
-  "proposal_kind": "task"
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
  },
  {
   "family": "c_polite_ct_2",
@@ -1333,7 +1355,9 @@
   "events": 0,
   "tasks": 0,
   "template": "would you remind me to {task_title} {date}?",
-  "proposal_kind": "task"
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
  },
  {
   "family": "c_polite_ce_3",
@@ -1343,7 +1367,9 @@
   "events": 0,
   "tasks": 0,
   "template": "would you mind booking {event_title} for {date} at {time}?",
-  "proposal_kind": "event"
+  "proposal_kind": "event",
+  "event_label_sources": [],
+  "task_label_sources": []
  },
  {
   "family": "c_polite_ct_3",
@@ -1353,7 +1379,9 @@
   "events": 0,
   "tasks": 0,
   "template": "could you please remind me to {task_title}?",
-  "proposal_kind": "task"
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
  },
  {
   "family": "c_polite_ce_4",
@@ -1363,7 +1391,9 @@
   "events": 0,
   "tasks": 0,
   "template": "hey, can you set up {event_title} for {date} at {time}?",
-  "proposal_kind": "event"
+  "proposal_kind": "event",
+  "event_label_sources": [],
+  "task_label_sources": []
  },
  {
   "family": "c_polite_ct_4",
@@ -1373,7 +1403,9 @@
   "events": 0,
   "tasks": 0,
   "template": "hey, can you add {task_title} to my tasks?",
-  "proposal_kind": "task"
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
  },
  {
   "family": "c_generic_de_1",
@@ -2936,6 +2968,698 @@
   "events": 1,
   "tasks": 0,
   "template": "schedule {event_title} with {name} {recurrence} at {time}"
+ },
+ {
+  "family": "c2_pc_attendee_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "i was thinking about booking {event_title} with {name} {date} at {time}, does that work for you",
+  "force_split": "test",
+  "proposal_kind": "event",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_pc_recurrence_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "what if i set up {event_title} {recurrence} at {time}, does that sound ok",
+  "force_split": "test",
+  "proposal_kind": "event",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_pc_leadtime_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "how about i remind myself to {task_title} {lead_time}, good idea",
+  "force_split": "test",
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_pc_qty_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "maybe i should grab {qty} {item}, what do you think",
+  "force_split": "test",
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_pc_two_events_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": false,
+  "events": 0,
+  "tasks": 0,
+  "template": "i was thinking about booking {event_title} {date} and {event_title2} {date2}, does that work",
+  "force_split": "test",
+  "proposal_kind": "event",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_pc_mixed_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": false,
+  "events": 0,
+  "tasks": 0,
+  "event_label_sources": [],
+  "task_label_sources": [],
+  "template": "how about i book {event_title} {date} at {time} and also add {task_title2} to my list, sound good",
+  "force_split": "test",
+  "proposal_kind": "event"
+ },
+ {
+  "family": "c2_pc_two_tasks_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": false,
+  "events": 0,
+  "tasks": 0,
+  "template": "what if i {task_title} and {task_title2} {date}, does that work",
+  "force_split": "test",
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_pc_delete_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "should we just cancel {event_title}, does that work for everyone",
+  "force_split": "test",
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_pc_query_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "what if you showed me what's on my calendar {query_range}, is that ok",
+  "force_split": "test",
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_pc_update_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "what if we moved {event_title} to {date}, would that work",
+  "force_split": "test",
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_pc_time_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "how does {time} {date} sound for {event_title}",
+  "force_split": "test",
+  "proposal_kind": "event",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_pc_date_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "does {date} work for {event_title}, if so book it at {time}",
+  "force_split": "test",
+  "proposal_kind": "event",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_pc_task_confirm_polite",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "would it be alright if i added {task_title} to my list",
+  "force_split": "test",
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_pc_all_day_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "flags": {
+   "all_day": true
+  },
+  "template": "what if i blocked off {date} for {event_title}, all day, does that work",
+  "force_split": "test",
+  "proposal_kind": "event",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_pc_attendee_two_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "how about {event_title} with {name} and {name2} {date}, does that work for both of you",
+  "force_split": "test",
+  "proposal_kind": "event",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_pc_complete_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "should i just mark {task_title} as done, does that seem right",
+  "force_split": "test",
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_pc_quoted_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "let's call it '{quoted_item}' and put it on {date}, sound good",
+  "force_split": "test",
+  "proposal_kind": "event",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_pc_task_range_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "how about i {task_title} sometime {query_range}, does that work",
+  "force_split": "test",
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_pc_te_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": false,
+  "events": 0,
+  "tasks": 0,
+  "event_label_sources": [],
+  "task_label_sources": [],
+  "template": "what if i remind myself to {task_title} and then book {event_title2} {date} at {time}, does that work",
+  "force_split": "test",
+  "proposal_kind": "event"
+ },
+ {
+  "family": "c2_pc_update_todo_confirm",
+  "nuance": "propose_confirm",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "what if i renamed {task_title} to {task_title2}, would that be clearer",
+  "force_split": "test",
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_and2_ee_1",
+  "nuance": "and_compound",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "get {event_title} on the books for {date} at {time} as well as {event_title2} for {date2}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_and2_tt_1",
+  "nuance": "and_compound",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "make sure to {task_title} along with {task_title2}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_and2_et_1",
+  "nuance": "and_compound",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_2"
+  ],
+  "template": "get {event_title} booked for {date} at {time} plus don't forget to {task_title2}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_joiner2_1",
+  "nuance": "joiner",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "book {event_title} {date} at {time} as well as {event_title2} {date2} at {time2}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_joiner2_2",
+  "nuance": "joiner",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_2"
+  ],
+  "template": "schedule {event_title} for {date}. along with that, remind me to {task_title2}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_mixedmode2_1",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 0,
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [],
+  "template": "scrap {event_title2} off the calendar and throw {event_title} on there instead {date} at {time}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_mixedmode2_2",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 0,
+  "tasks": 1,
+  "event_label_sources": [],
+  "task_label_sources": [
+   "title"
+  ],
+  "template": "forget {task_title2}, i'd rather {task_title} {date}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_attendee2_1",
+  "nuance": "attendee",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "get {name} and me together for {event_title} {date} at {time}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_attendee2_2",
+  "nuance": "attendee",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "loop in {name} for {event_title} {date}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_recur2_1",
+  "nuance": "recurrence",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "put {event_title} on repeat {recurrence} at {time}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_recur2_2",
+  "nuance": "recurrence",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "make {task_title} a {recurrence} thing",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_leadtime2_1",
+  "nuance": "lead_time",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "ping me {lead_time} ahead of {event_title} {date} at {time}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_leadtime2_2",
+  "nuance": "lead_time",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "give me a nudge {lead_time} to {task_title}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_timelist2_1",
+  "nuance": "time_list_vs_range",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "fixed_slots": {
+   "title_2": "{event_title}"
+  },
+  "template": "{event_title} twice, once at {time} and again at {time2}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_range2_1",
+  "nuance": "time_list_vs_range",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "{event_title} {date} spanning {time_range}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_threeask2_1",
+  "nuance": "three_ask",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 3,
+  "template": "on my list today, {task_title}, {task_title2}, and {task_title3}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_npdecoy2_1",
+  "nuance": "np_decoy",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "task_label_sources": [
+   "title"
+  ],
+  "fixed_slots": {
+   "title": "{item} and {item2}"
+  },
+  "template": "swing by the store for {item} and {item2}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_npdecoy2_2",
+  "nuance": "np_decoy",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "fixed_slots": {
+   "title": "bite with {name} and {name2}"
+  },
+  "template": "grab a bite with {name} and {name2} {date}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_generic2_1",
+  "nuance": "generic_target_complex",
+  "action": "delete_event",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "get rid of whatever's on my calendar {date}, the one i mean",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_generic2_2",
+  "nuance": "generic_target_complex",
+  "action": "update_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "fix up {generic_target} on my list, you know the one",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_until2_1",
+  "nuance": "until_through",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "fixed_slots": {
+   "end_inclusive": false
+  },
+  "template": "keep {event_title} going {recurrence} up until {date2}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_datemark2_1",
+  "nuance": "date_marking",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "flags": {
+   "all_day": true
+  },
+  "template": "flag {date} as {occasion} on the calendar",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_encounter2_1",
+  "nuance": "dated_encounter",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "fixed_slots": {
+   "title": "sync up with {name}"
+  },
+  "template": "i need to sync up with {name} {date}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_allday2_1",
+  "nuance": "all_day",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "flags": {
+   "all_day": true
+  },
+  "template": "{event_title} is an all-day thing on {date}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_interrog2_1",
+  "nuance": "interrogative_polite",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "would it make sense to book {event_title} for {date}?",
+  "force_split": "test",
+  "proposal_kind": "event",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_interrog2_2",
+  "nuance": "interrogative_polite",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "is it worth adding {task_title} to my list?",
+  "force_split": "test",
+  "proposal_kind": "task",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c2_remindthen2_1",
+  "nuance": "remind_then",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ],
+  "template": "first {task_title}, then let's get {event_title2} on the calendar for {date}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_query2_1",
+  "nuance": "extra",
+  "action": "query",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "give me the rundown on {query_range}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_query2_2",
+  "nuance": "extra",
+  "action": "query",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "what have i got going {query_range}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_delete2_1",
+  "nuance": "extra",
+  "action": "delete_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "yank {task_title} off my list",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_delete2_2",
+  "nuance": "extra",
+  "action": "delete_event",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "pull {event_title} off the calendar {date}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_update2_1",
+  "nuance": "extra",
+  "action": "update_event",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "swap {event_title} to {time} instead",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_update2_2",
+  "nuance": "extra",
+  "action": "update_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "flip the due date on {task_title} to {date}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_complete2_1",
+  "nuance": "extra",
+  "action": "complete_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "{task_title}, done and dusted",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_threeask2_2",
+  "nuance": "three_ask",
+  "action": "mixed",
+  "atomic": false,
+  "events": 2,
+  "tasks": 1,
+  "event_label_sources": [
+   "title",
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title_3"
+  ],
+  "template": "get {event_title} and {event_title2} on the books for {date} and {date2}, plus don't forget to {task_title3}",
+  "force_split": "test"
+ },
+ {
+  "family": "c2_texture2_1",
+  "nuance": "texture",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_2"
+  ],
+  "template": "uh yeah so book {event_title} {date} at {time} and oh also remind me to {task_title2}",
+  "force_split": "test"
  },
  {
   "family": "c_confsub_ee_1",

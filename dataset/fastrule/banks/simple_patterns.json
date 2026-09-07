@@ -1,166 +1,1078 @@
 [
-  {"family": "s_ce_book_basic", "action": "create_event", "template": "book {event_title} {date} at {time}"},
-  {"family": "s_ce_schedule_basic", "action": "create_event", "template": "schedule {event_title} for {date} at {time}"},
-  {"family": "s_ce_add_calendar", "action": "create_event", "template": "add {event_title} to my calendar {date} at {time}"},
-  {"family": "s_ce_add_calendar_misspelled", "action": "create_event", "template": "add {event_title} to my calender {date} at {time}"},
-  {"family": "s_ce_create_event_basic", "action": "create_event", "template": "create an event for {event_title} {date} at {time}"},
-  {"family": "s_ce_set_up_basic", "action": "create_event", "template": "set up {event_title} {date} at {time}"},
-  {"family": "s_ce_plan_basic", "action": "create_event", "template": "plan {event_title} for {date} at {time}"},
-  {"family": "s_ce_put_on_calendar", "action": "create_event", "template": "put {event_title} on my calendar {date} at {time}"},
-  {"family": "s_ce_can_you_book", "action": "create_event", "template": "can you book {event_title} for {date} at {time}"},
-  {"family": "s_ce_could_you_schedule", "action": "create_event", "template": "could you schedule {event_title} {date} at {time}"},
-  {"family": "s_ce_would_you_add", "action": "create_event", "template": "would you add {event_title} to my calendar {date} at {time}"},
-  {"family": "s_ce_please_book", "action": "create_event", "template": "please book {event_title} {date} at {time}"},
-  {"family": "s_ce_hey_book", "action": "create_event", "template": "hey can you book {event_title} for {date} at {time}"},
-  {"family": "s_ce_filler_um_so", "action": "create_event", "template": "um so i need to book {event_title} {date} at {time}"},
-  {"family": "s_ce_trailing_please", "action": "create_event", "template": "book {event_title} {date} at {time} please"},
-  {"family": "s_ce_filler_like", "action": "create_event", "template": "i think i need to schedule {event_title} like {date} at {time}"},
-  {"family": "s_ce_time_range", "action": "create_event", "template": "book {event_title} {date} {time_range}"},
-  {"family": "s_ce_get_on_calendar", "action": "create_event", "template": "get {event_title} on the calendar for {date} at {time}"},
-  {"family": "s_ce_mark_calendar", "action": "create_event", "template": "mark {event_title} on my calendar for {date} at {time}"},
-  {"family": "s_ce_pencil_in", "action": "create_event", "template": "pencil in {event_title} for {date} at {time}"},
-  {"family": "s_ce_squeeze_in", "action": "create_event", "template": "squeeze in {event_title} {date} at {time}"},
-  {"family": "s_ce_lets_do", "action": "create_event", "template": "let's do {event_title} {date} at {time}"},
-  {"family": "s_ce_im_free_book", "action": "create_event", "template": "i'm free {date} so book {event_title} at {time}"},
-  {"family": "s_ce_uh_i_guess", "action": "create_event", "template": "uh book {event_title} {date} at {time} i guess"},
-  {"family": "s_ce_misspelled_tomorrow", "action": "create_event", "template": "book {event_title} for tommorow at {time}", "fixed_slots": {"date_phrase": "tomorrow"}},
-  {"family": "s_ce_misspelled_schedule_word", "action": "create_event", "template": "shedule {event_title} for {date} at {time}"},
-  {"family": "s_ce_misspelled_appointment", "action": "create_event", "template": "book an apointment for {event_title} {date} at {time}"},
-  {"family": "s_ce_attendee_with_name", "action": "create_event", "template": "schedule {event_title} with {name} {date} at {time}"},
-  {"family": "s_ce_attendee_two_names", "action": "create_event", "template": "book {event_title} {date} at {time} with {name} and {name2}"},
-  {"family": "s_ce_time_before_date", "action": "create_event", "template": "set up {event_title} at {time} {date}"},
-  {"family": "s_ce_reverse_order", "action": "create_event", "template": "at {time} {date}, book {event_title}"},
-  {"family": "s_ce_all_day_basic", "action": "create_event", "template": "book {event_title} {date} all day", "flags": {"all_day": true}},
-  {"family": "s_ce_all_day_whole_day", "action": "create_event", "template": "block off the whole day {date} for {event_title}", "flags": {"all_day": true}},
-  {"family": "s_ce_recurrence_daily", "action": "create_event", "template": "book {event_title} {recurrence} at {time}"},
-  {"family": "s_ce_recurrence_starting", "action": "create_event", "template": "schedule {event_title} {recurrence} starting {date} at {time}"},
-  {"family": "s_ce_around_time", "action": "create_event", "template": "book {event_title} {date} around {time}"},
-
-  {"family": "s_ct_buy_item_qty", "action": "create_todo", "template": "buy {qty} {item}"},
-  {"family": "s_ct_remind_me_buy", "action": "create_todo", "template": "remind me to buy {qty} {item}"},
-  {"family": "s_ct_add_task_todo", "action": "create_todo", "template": "add {task_title} to my to-do list"},
-  {"family": "s_ct_add_task_todo_date", "action": "create_todo", "template": "add {task_title} to my todo list {date}"},
-  {"family": "s_ct_create_task_basic", "action": "create_todo", "template": "create a task to {task_title}"},
-  {"family": "s_ct_remind_me_task", "action": "create_todo", "template": "remind me to {task_title}"},
-  {"family": "s_ct_remind_me_task_date", "action": "create_todo", "template": "remind me to {task_title} {date}"},
-  {"family": "s_ct_can_you_add_task", "action": "create_todo", "template": "can you add {task_title} to my list"},
-  {"family": "s_ct_could_you_remind", "action": "create_todo", "template": "could you remind me to {task_title}"},
-  {"family": "s_ct_would_you_add_task", "action": "create_todo", "template": "would you add {task_title} to my tasks"},
-  {"family": "s_ct_please_remind", "action": "create_todo", "template": "please remind me to {task_title}"},
-  {"family": "s_ct_hey_remind", "action": "create_todo", "template": "hey remind me to {task_title} {date}"},
-  {"family": "s_ct_filler_um_task", "action": "create_todo", "template": "um i need to {task_title}"},
-  {"family": "s_ct_filler_so_task", "action": "create_todo", "template": "so i gotta {task_title} {date}"},
-  {"family": "s_ct_casual_gotta", "action": "create_todo", "template": "i gotta {task_title}"},
-  {"family": "s_ct_casual_need_to", "action": "create_todo", "template": "i need to {task_title} {date}"},
-  {"family": "s_ct_put_on_list", "action": "create_todo", "template": "put {task_title} on my list"},
-  {"family": "s_ct_note_to_self", "action": "create_todo", "template": "note to self, {task_title}"},
-  {"family": "s_ct_task_by_date", "action": "create_todo", "template": "{task_title} by {date}"},
-  {"family": "s_ct_buy_item_no_qty", "action": "create_todo", "template": "i need to buy {item}"},
-  {"family": "s_ct_grab_item_qty", "action": "create_todo", "template": "grab {qty} {item} {date}"},
-  {"family": "s_ct_pick_up_items", "action": "create_todo", "template": "pick up {qty} {item} from the store"},
-  {"family": "s_ct_call_someone", "action": "create_todo", "template": "remind me to call {name}", "fixed_slots": {"title": "call {name}"}},
-  {"family": "s_ct_call_someone_date", "action": "create_todo", "template": "remind me to call {name} {date}", "fixed_slots": {"title": "call {name}"}},
-  {"family": "s_ct_email_someone", "action": "create_todo", "template": "i need to email {name} {date}", "fixed_slots": {"title": "email {name}"}},
-  {"family": "s_ct_misspelled_tomorrow", "action": "create_todo", "template": "remind me to {task_title} tommorow", "fixed_slots": {"date_phrase": "tomorrow"}},
-  {"family": "s_ct_misspelled_reminder", "action": "create_todo", "template": "set a remindar to {task_title} {date}"},
-  {"family": "s_ct_add_with_deadline", "action": "create_todo", "template": "add {task_title} before {date}"},
-  {"family": "s_ct_quiet_task_no_verb", "action": "create_todo", "template": "{task_title} {date}"},
-  {"family": "s_ct_bare_task", "action": "create_todo", "template": "{task_title}"},
-  {"family": "s_ct_task_with_time", "action": "create_todo", "template": "remind me to {task_title} at {time}"},
-  {"family": "s_ct_polite_full", "action": "create_todo", "template": "would you mind reminding me to {task_title}"},
-  {"family": "s_ct_casual_lowercase_ok", "action": "create_todo", "template": "remind me to {task_title} {date} ok"},
-
-  {"family": "s_q_whats_on_calendar", "action": "query", "template": "what's on my calendar {query_range}"},
-  {"family": "s_q_show_schedule", "action": "query", "template": "show me my schedule for {query_range}"},
-  {"family": "s_q_do_i_have_anything", "action": "query", "template": "do i have anything {query_range}"},
-  {"family": "s_q_list_events", "action": "query", "template": "list my events for {query_range}"},
-  {"family": "s_q_check_calendar", "action": "query", "template": "check my calendar for {query_range}"},
-  {"family": "s_q_summarize_day", "action": "query", "template": "summarize my day {query_range}"},
-  {"family": "s_q_whats_next", "action": "query", "template": "what's next on my calendar"},
-  {"family": "s_q_whats_first", "action": "query", "template": "what's my first event {query_range}"},
-  {"family": "s_q_how_many_events", "action": "query", "template": "how many events do i have {query_range}"},
-  {"family": "s_q_am_i_free", "action": "query", "template": "am i free {query_range}"},
-  {"family": "s_q_do_i_have_meetings", "action": "query", "template": "do i have any meetings {query_range}"},
-  {"family": "s_q_read_my_schedule", "action": "query", "template": "read me my schedule for {query_range}"},
-  {"family": "s_q_whats_on_agenda", "action": "query", "template": "what's on my agenda {query_range}"},
-  {"family": "s_q_show_my_tasks", "action": "query", "template": "show me my tasks for {query_range}"},
-  {"family": "s_q_list_my_todos", "action": "query", "template": "list my to-dos"},
-  {"family": "s_q_what_tasks", "action": "query", "template": "what tasks do i have {query_range}"},
-  {"family": "s_q_any_todos_left", "action": "query", "template": "do i have any todos left"},
-  {"family": "s_q_whats_on_list", "action": "query", "template": "what's on my list"},
-  {"family": "s_q_filler_um", "action": "query", "template": "um what do i have going on {query_range}"},
-  {"family": "s_q_casual_plate", "action": "query", "template": "so what's on my plate {query_range}"},
-  {"family": "s_q_polite_tell_me", "action": "query", "template": "could you tell me what's on my calendar {query_range}"},
-  {"family": "s_q_polite_check", "action": "query", "template": "can you check what i have {query_range}"},
-  {"family": "s_q_misspelled_calendar", "action": "query", "template": "what's on my calender {query_range}"},
-  {"family": "s_q_count_tasks", "action": "query", "template": "how many tasks do i have left"},
-
-  {"family": "s_de_cancel_event", "action": "delete_event", "template": "cancel {event_title}"},
-  {"family": "s_de_delete_basic", "action": "delete_event", "template": "delete {event_title} from my calendar"},
-  {"family": "s_de_remove_calendar", "action": "delete_event", "template": "remove {event_title} from my calendar {date}"},
-  {"family": "s_de_clear_event", "action": "delete_event", "template": "clear {event_title} off my calendar"},
-  {"family": "s_de_cancel_event_date", "action": "delete_event", "template": "cancel {event_title} {date}"},
-  {"family": "s_de_quoted_delete", "action": "delete_event", "template": "remove '{quoted_item}' from my calendar"},
-  {"family": "s_de_please_cancel", "action": "delete_event", "template": "please cancel {event_title}"},
-  {"family": "s_de_can_you_cancel", "action": "delete_event", "template": "can you cancel {event_title} for me"},
-  {"family": "s_de_drop_event", "action": "delete_event", "template": "drop {event_title} from my schedule"},
-  {"family": "s_de_casual_cancel", "action": "delete_event", "template": "yeah just cancel {event_title}"},
-  {"family": "s_de_filler_cancel", "action": "delete_event", "template": "um cancel {event_title} {date}"},
-  {"family": "s_de_misspelled_calendar", "action": "delete_event", "template": "delete {event_title} from my calender"},
-  {"family": "s_de_take_off_calendar", "action": "delete_event", "template": "take {event_title} off my calendar"},
-  {"family": "s_de_scrap_event", "action": "delete_event", "template": "scrap {event_title}"},
-  {"family": "s_de_generic_target", "action": "delete_event", "template": "delete {generic_target} from my calendar"},
-
-  {"family": "s_dt_delete_task_basic", "action": "delete_todo", "template": "delete {task_title} from my list"},
-  {"family": "s_dt_remove_task", "action": "delete_todo", "template": "remove {task_title} from my tasks"},
-  {"family": "s_dt_clear_task", "action": "delete_todo", "template": "clear {task_title} off my to-do list"},
-  {"family": "s_dt_cross_off", "action": "delete_todo", "template": "cross {task_title} off my list"},
-  {"family": "s_dt_quoted_delete_task", "action": "delete_todo", "template": "remove '{quoted_item}' from my to-do list"},
-  {"family": "s_dt_please_delete_task", "action": "delete_todo", "template": "please delete {task_title} from my tasks"},
-  {"family": "s_dt_can_you_remove_task", "action": "delete_todo", "template": "can you remove {task_title} from my list"},
-  {"family": "s_dt_casual_get_rid_of", "action": "delete_todo", "template": "just get rid of {task_title} on my list"},
-  {"family": "s_dt_drop_task", "action": "delete_todo", "template": "drop {task_title} from my tasks"},
-  {"family": "s_dt_clear_my_list", "action": "delete_todo", "template": "clear my to-do list"},
-  {"family": "s_dt_generic_target", "action": "delete_todo", "template": "delete {generic_target} from my list"},
-  {"family": "s_dt_delete_misspelled_todo", "action": "delete_todo", "template": "delete {task_title} from my todo list"},
-  {"family": "s_dt_scrap_task", "action": "delete_todo", "template": "scrap the {task_title} task"},
-
-  {"family": "s_co_mark_done", "action": "complete_todo", "template": "mark {task_title} as done"},
-  {"family": "s_co_mark_complete", "action": "complete_todo", "template": "mark {task_title} complete"},
-  {"family": "s_co_check_off", "action": "complete_todo", "template": "check off {task_title}"},
-  {"family": "s_co_finish_task", "action": "complete_todo", "template": "i finished {task_title}"},
-  {"family": "s_co_done_with_task", "action": "complete_todo", "template": "i'm done with {task_title}"},
-  {"family": "s_co_complete_basic", "action": "complete_todo", "template": "complete {task_title}"},
-  {"family": "s_co_tick_off", "action": "complete_todo", "template": "tick {task_title} off my list"},
-  {"family": "s_co_casual_already_did", "action": "complete_todo", "template": "yeah i already did {task_title}"},
-  {"family": "s_co_finished_it", "action": "complete_todo", "template": "just finished {task_title}"},
-  {"family": "s_co_quoted_complete", "action": "complete_todo", "template": "mark '{quoted_item}' as done"},
-  {"family": "s_co_please_mark_done", "action": "complete_todo", "template": "please mark {task_title} as complete"},
-  {"family": "s_co_casual_check", "action": "complete_todo", "template": "check {task_title} off the list"},
-  {"family": "s_co_is_done", "action": "complete_todo", "template": "{task_title} is done"},
-  {"family": "s_co_misspelled_complet", "action": "complete_todo", "template": "mark {task_title} as complet"},
-
-  {"family": "s_ue_reschedule_event", "action": "update_event", "template": "reschedule {event_title} to {date}"},
-  {"family": "s_ue_move_event", "action": "update_event", "template": "move {event_title} to {date} at {time}"},
-  {"family": "s_ue_change_event_time", "action": "update_event", "template": "change {event_title} to {time}"},
-  {"family": "s_ue_rename_event", "action": "update_event", "template": "rename {event_title} to {event_title2}"},
-  {"family": "s_ue_postpone_event", "action": "update_event", "template": "postpone {event_title} to {date}"},
-  {"family": "s_ue_delay_event", "action": "update_event", "template": "delay {event_title} by {duration}"},
-  {"family": "s_ue_extend_event", "action": "update_event", "template": "extend {event_title} {duration}"},
-  {"family": "s_ue_shorten_event", "action": "update_event", "template": "shorten {event_title} {duration}"},
-  {"family": "s_ue_push_event", "action": "update_event", "template": "push {event_title} to {time}"},
-  {"family": "s_ue_generic_target", "action": "update_event", "template": "move {generic_target} to {date}"},
-  {"family": "s_ue_misspelled_reschedule", "action": "update_event", "template": "reshedule {event_title} to {date}"},
-  {"family": "s_ue_quoted_update", "action": "update_event", "template": "move '{quoted_item}' to {date}"},
-
-  {"family": "s_ut_rename_task", "action": "update_todo", "template": "rename {task_title} to {task_title2}"},
-  {"family": "s_ut_add_note", "action": "update_todo", "template": "add a note to {task_title}"},
-  {"family": "s_ut_move_due_date", "action": "update_todo", "template": "change the due date of {task_title} to {date}"},
-  {"family": "s_ut_update_basic", "action": "update_todo", "template": "update {task_title}"},
-  {"family": "s_ut_edit_task", "action": "update_todo", "template": "edit {task_title}"},
-  {"family": "s_ut_set_priority", "action": "update_todo", "template": "set {task_title} as high priority"},
-  {"family": "s_ut_rename_casual", "action": "update_todo", "template": "call it {task_title2} instead of {task_title}"},
-  {"family": "s_ut_generic_target", "action": "update_todo", "template": "update {generic_target}"},
-  {"family": "s_ut_quoted_update_task", "action": "update_todo", "template": "change '{quoted_item}' to {task_title2}"},
-  {"family": "s_ut_misspelled_updat", "action": "update_todo", "template": "updat {task_title} on my list"}
+  {
+    "family": "s_ce_book_basic",
+    "action": "create_event",
+    "template": "book {event_title} {date} at {time}"
+  },
+  {
+    "family": "s_ce_schedule_basic",
+    "action": "create_event",
+    "template": "schedule {event_title} for {date} at {time}"
+  },
+  {
+    "family": "s_ce_add_calendar",
+    "action": "create_event",
+    "template": "add {event_title} to my calendar {date} at {time}"
+  },
+  {
+    "family": "s_ce_add_calendar_misspelled",
+    "action": "create_event",
+    "template": "add {event_title} to my calender {date} at {time}"
+  },
+  {
+    "family": "s_ce_create_event_basic",
+    "action": "create_event",
+    "template": "create an event for {event_title} {date} at {time}"
+  },
+  {
+    "family": "s_ce_set_up_basic",
+    "action": "create_event",
+    "template": "set up {event_title} {date} at {time}"
+  },
+  {
+    "family": "s_ce_plan_basic",
+    "action": "create_event",
+    "template": "plan {event_title} for {date} at {time}"
+  },
+  {
+    "family": "s_ce_put_on_calendar",
+    "action": "create_event",
+    "template": "put {event_title} on my calendar {date} at {time}"
+  },
+  {
+    "family": "s_ce_can_you_book",
+    "action": "create_event",
+    "template": "can you book {event_title} for {date} at {time}"
+  },
+  {
+    "family": "s_ce_could_you_schedule",
+    "action": "create_event",
+    "template": "could you schedule {event_title} {date} at {time}"
+  },
+  {
+    "family": "s_ce_would_you_add",
+    "action": "create_event",
+    "template": "would you add {event_title} to my calendar {date} at {time}"
+  },
+  {
+    "family": "s_ce_please_book",
+    "action": "create_event",
+    "template": "please book {event_title} {date} at {time}"
+  },
+  {
+    "family": "s_ce_hey_book",
+    "action": "create_event",
+    "template": "hey can you book {event_title} for {date} at {time}"
+  },
+  {
+    "family": "s_ce_filler_um_so",
+    "action": "create_event",
+    "template": "um so i need to book {event_title} {date} at {time}"
+  },
+  {
+    "family": "s_ce_trailing_please",
+    "action": "create_event",
+    "template": "book {event_title} {date} at {time} please"
+  },
+  {
+    "family": "s_ce_filler_like",
+    "action": "create_event",
+    "template": "i think i need to schedule {event_title} like {date} at {time}"
+  },
+  {
+    "family": "s_ce_time_range",
+    "action": "create_event",
+    "template": "book {event_title} {date} {time_range}"
+  },
+  {
+    "family": "s_ce_get_on_calendar",
+    "action": "create_event",
+    "template": "get {event_title} on the calendar for {date} at {time}"
+  },
+  {
+    "family": "s_ce_mark_calendar",
+    "action": "create_event",
+    "template": "mark {event_title} on my calendar for {date} at {time}"
+  },
+  {
+    "family": "s_ce_pencil_in",
+    "action": "create_event",
+    "template": "pencil in {event_title} for {date} at {time}"
+  },
+  {
+    "family": "s_ce_squeeze_in",
+    "action": "create_event",
+    "template": "squeeze in {event_title} {date} at {time}"
+  },
+  {
+    "family": "s_ce_lets_do",
+    "action": "create_event",
+    "template": "let's do {event_title} {date} at {time}"
+  },
+  {
+    "family": "s_ce_im_free_book",
+    "action": "create_event",
+    "template": "i'm free {date} so book {event_title} at {time}"
+  },
+  {
+    "family": "s_ce_uh_i_guess",
+    "action": "create_event",
+    "template": "uh book {event_title} {date} at {time} i guess"
+  },
+  {
+    "family": "s_ce_misspelled_tomorrow",
+    "action": "create_event",
+    "template": "book {event_title} for tommorow at {time}",
+    "fixed_slots": {
+      "date_phrase": "tomorrow"
+    }
+  },
+  {
+    "family": "s_ce_misspelled_schedule_word",
+    "action": "create_event",
+    "template": "shedule {event_title} for {date} at {time}"
+  },
+  {
+    "family": "s_ce_misspelled_appointment",
+    "action": "create_event",
+    "template": "book an apointment for {event_title} {date} at {time}"
+  },
+  {
+    "family": "s_ce_attendee_with_name",
+    "action": "create_event",
+    "template": "schedule {event_title} with {name} {date} at {time}"
+  },
+  {
+    "family": "s_ce_attendee_two_names",
+    "action": "create_event",
+    "template": "book {event_title} {date} at {time} with {name} and {name2}"
+  },
+  {
+    "family": "s_ce_time_before_date",
+    "action": "create_event",
+    "template": "set up {event_title} at {time} {date}"
+  },
+  {
+    "family": "s_ce_reverse_order",
+    "action": "create_event",
+    "template": "at {time} {date}, book {event_title}"
+  },
+  {
+    "family": "s_ce_all_day_basic",
+    "action": "create_event",
+    "template": "book {event_title} {date} all day",
+    "flags": {
+      "all_day": true
+    }
+  },
+  {
+    "family": "s_ce_all_day_whole_day",
+    "action": "create_event",
+    "template": "block off the whole day {date} for {event_title}",
+    "flags": {
+      "all_day": true
+    }
+  },
+  {
+    "family": "s_ce_recurrence_daily",
+    "action": "create_event",
+    "template": "book {event_title} {recurrence} at {time}"
+  },
+  {
+    "family": "s_ce_recurrence_starting",
+    "action": "create_event",
+    "template": "schedule {event_title} {recurrence} starting {date} at {time}"
+  },
+  {
+    "family": "s_ce_around_time",
+    "action": "create_event",
+    "template": "book {event_title} {date} around {time}"
+  },
+  {
+    "family": "s_ct_buy_item_qty",
+    "action": "create_todo",
+    "template": "buy {qty} {item}"
+  },
+  {
+    "family": "s_ct_remind_me_buy",
+    "action": "create_todo",
+    "template": "remind me to buy {qty} {item}"
+  },
+  {
+    "family": "s_ct_add_task_todo",
+    "action": "create_todo",
+    "template": "add {task_title} to my to-do list"
+  },
+  {
+    "family": "s_ct_add_task_todo_date",
+    "action": "create_todo",
+    "template": "add {task_title} to my todo list {date}"
+  },
+  {
+    "family": "s_ct_create_task_basic",
+    "action": "create_todo",
+    "template": "create a task to {task_title}"
+  },
+  {
+    "family": "s_ct_remind_me_task",
+    "action": "create_todo",
+    "template": "remind me to {task_title}"
+  },
+  {
+    "family": "s_ct_remind_me_task_date",
+    "action": "create_todo",
+    "template": "remind me to {task_title} {date}"
+  },
+  {
+    "family": "s_ct_can_you_add_task",
+    "action": "create_todo",
+    "template": "can you add {task_title} to my list"
+  },
+  {
+    "family": "s_ct_could_you_remind",
+    "action": "create_todo",
+    "template": "could you remind me to {task_title}"
+  },
+  {
+    "family": "s_ct_would_you_add_task",
+    "action": "create_todo",
+    "template": "would you add {task_title} to my tasks"
+  },
+  {
+    "family": "s_ct_please_remind",
+    "action": "create_todo",
+    "template": "please remind me to {task_title}"
+  },
+  {
+    "family": "s_ct_hey_remind",
+    "action": "create_todo",
+    "template": "hey remind me to {task_title} {date}"
+  },
+  {
+    "family": "s_ct_filler_um_task",
+    "action": "create_todo",
+    "template": "um i need to {task_title}"
+  },
+  {
+    "family": "s_ct_filler_so_task",
+    "action": "create_todo",
+    "template": "so i gotta {task_title} {date}"
+  },
+  {
+    "family": "s_ct_casual_gotta",
+    "action": "create_todo",
+    "template": "i gotta {task_title}"
+  },
+  {
+    "family": "s_ct_casual_need_to",
+    "action": "create_todo",
+    "template": "i need to {task_title} {date}"
+  },
+  {
+    "family": "s_ct_put_on_list",
+    "action": "create_todo",
+    "template": "put {task_title} on my list"
+  },
+  {
+    "family": "s_ct_note_to_self",
+    "action": "create_todo",
+    "template": "note to self, {task_title}"
+  },
+  {
+    "family": "s_ct_task_by_date",
+    "action": "create_todo",
+    "template": "{task_title} by {date}"
+  },
+  {
+    "family": "s_ct_buy_item_no_qty",
+    "action": "create_todo",
+    "template": "i need to buy {item}"
+  },
+  {
+    "family": "s_ct_grab_item_qty",
+    "action": "create_todo",
+    "template": "grab {qty} {item} {date}"
+  },
+  {
+    "family": "s_ct_pick_up_items",
+    "action": "create_todo",
+    "template": "pick up {qty} {item} from the store"
+  },
+  {
+    "family": "s_ct_call_someone",
+    "action": "create_todo",
+    "template": "remind me to call {name}",
+    "fixed_slots": {
+      "title": "call {name}"
+    }
+  },
+  {
+    "family": "s_ct_call_someone_date",
+    "action": "create_todo",
+    "template": "remind me to call {name} {date}",
+    "fixed_slots": {
+      "title": "call {name}"
+    }
+  },
+  {
+    "family": "s_ct_email_someone",
+    "action": "create_todo",
+    "template": "i need to email {name} {date}",
+    "fixed_slots": {
+      "title": "email {name}"
+    }
+  },
+  {
+    "family": "s_ct_misspelled_tomorrow",
+    "action": "create_todo",
+    "template": "remind me to {task_title} tommorow",
+    "fixed_slots": {
+      "date_phrase": "tomorrow"
+    }
+  },
+  {
+    "family": "s_ct_misspelled_reminder",
+    "action": "create_todo",
+    "template": "set a remindar to {task_title} {date}"
+  },
+  {
+    "family": "s_ct_add_with_deadline",
+    "action": "create_todo",
+    "template": "add {task_title} before {date}"
+  },
+  {
+    "family": "s_ct_quiet_task_no_verb",
+    "action": "create_todo",
+    "template": "{task_title} {date}"
+  },
+  {
+    "family": "s_ct_bare_task",
+    "action": "create_todo",
+    "template": "{task_title}"
+  },
+  {
+    "family": "s_ct_task_with_time",
+    "action": "create_todo",
+    "template": "remind me to {task_title} at {time}"
+  },
+  {
+    "family": "s_ct_polite_full",
+    "action": "create_todo",
+    "template": "would you mind reminding me to {task_title}"
+  },
+  {
+    "family": "s_ct_casual_lowercase_ok",
+    "action": "create_todo",
+    "template": "remind me to {task_title} {date} ok"
+  },
+  {
+    "family": "s_q_whats_on_calendar",
+    "action": "query",
+    "template": "what's on my calendar {query_range}"
+  },
+  {
+    "family": "s_q_show_schedule",
+    "action": "query",
+    "template": "show me my schedule for {query_range}"
+  },
+  {
+    "family": "s_q_do_i_have_anything",
+    "action": "query",
+    "template": "do i have anything {query_range}"
+  },
+  {
+    "family": "s_q_list_events",
+    "action": "query",
+    "template": "list my events for {query_range}"
+  },
+  {
+    "family": "s_q_check_calendar",
+    "action": "query",
+    "template": "check my calendar for {query_range}"
+  },
+  {
+    "family": "s_q_summarize_day",
+    "action": "query",
+    "template": "summarize my day {query_range}"
+  },
+  {
+    "family": "s_q_whats_next",
+    "action": "query",
+    "template": "what's next on my calendar"
+  },
+  {
+    "family": "s_q_whats_first",
+    "action": "query",
+    "template": "what's my first event {query_range}"
+  },
+  {
+    "family": "s_q_how_many_events",
+    "action": "query",
+    "template": "how many events do i have {query_range}"
+  },
+  {
+    "family": "s_q_am_i_free",
+    "action": "query",
+    "template": "am i free {query_range}"
+  },
+  {
+    "family": "s_q_do_i_have_meetings",
+    "action": "query",
+    "template": "do i have any meetings {query_range}"
+  },
+  {
+    "family": "s_q_read_my_schedule",
+    "action": "query",
+    "template": "read me my schedule for {query_range}"
+  },
+  {
+    "family": "s_q_whats_on_agenda",
+    "action": "query",
+    "template": "what's on my agenda {query_range}"
+  },
+  {
+    "family": "s_q_show_my_tasks",
+    "action": "query",
+    "template": "show me my tasks for {query_range}"
+  },
+  {
+    "family": "s_q_list_my_todos",
+    "action": "query",
+    "template": "list my to-dos"
+  },
+  {
+    "family": "s_q_what_tasks",
+    "action": "query",
+    "template": "what tasks do i have {query_range}"
+  },
+  {
+    "family": "s_q_any_todos_left",
+    "action": "query",
+    "template": "do i have any todos left"
+  },
+  {
+    "family": "s_q_whats_on_list",
+    "action": "query",
+    "template": "what's on my list"
+  },
+  {
+    "family": "s_q_filler_um",
+    "action": "query",
+    "template": "um what do i have going on {query_range}"
+  },
+  {
+    "family": "s_q_casual_plate",
+    "action": "query",
+    "template": "so what's on my plate {query_range}"
+  },
+  {
+    "family": "s_q_polite_tell_me",
+    "action": "query",
+    "template": "could you tell me what's on my calendar {query_range}"
+  },
+  {
+    "family": "s_q_polite_check",
+    "action": "query",
+    "template": "can you check what i have {query_range}"
+  },
+  {
+    "family": "s_q_misspelled_calendar",
+    "action": "query",
+    "template": "what's on my calender {query_range}"
+  },
+  {
+    "family": "s_q_count_tasks",
+    "action": "query",
+    "template": "how many tasks do i have left"
+  },
+  {
+    "family": "s_de_cancel_event",
+    "action": "delete_event",
+    "template": "cancel {event_title}"
+  },
+  {
+    "family": "s_de_delete_basic",
+    "action": "delete_event",
+    "template": "delete {event_title} from my calendar"
+  },
+  {
+    "family": "s_de_remove_calendar",
+    "action": "delete_event",
+    "template": "remove {event_title} from my calendar {date}"
+  },
+  {
+    "family": "s_de_clear_event",
+    "action": "delete_event",
+    "template": "clear {event_title} off my calendar"
+  },
+  {
+    "family": "s_de_cancel_event_date",
+    "action": "delete_event",
+    "template": "cancel {event_title} {date}"
+  },
+  {
+    "family": "s_de_quoted_delete",
+    "action": "delete_event",
+    "template": "remove '{quoted_item}' from my calendar"
+  },
+  {
+    "family": "s_de_please_cancel",
+    "action": "delete_event",
+    "template": "please cancel {event_title}"
+  },
+  {
+    "family": "s_de_can_you_cancel",
+    "action": "delete_event",
+    "template": "can you cancel {event_title} for me"
+  },
+  {
+    "family": "s_de_drop_event",
+    "action": "delete_event",
+    "template": "drop {event_title} from my schedule"
+  },
+  {
+    "family": "s_de_casual_cancel",
+    "action": "delete_event",
+    "template": "yeah just cancel {event_title}"
+  },
+  {
+    "family": "s_de_filler_cancel",
+    "action": "delete_event",
+    "template": "um cancel {event_title} {date}"
+  },
+  {
+    "family": "s_de_misspelled_calendar",
+    "action": "delete_event",
+    "template": "delete {event_title} from my calender"
+  },
+  {
+    "family": "s_de_take_off_calendar",
+    "action": "delete_event",
+    "template": "take {event_title} off my calendar"
+  },
+  {
+    "family": "s_de_scrap_event",
+    "action": "delete_event",
+    "template": "scrap {event_title}"
+  },
+  {
+    "family": "s_de_generic_target",
+    "action": "delete_event",
+    "template": "delete {generic_target} from my calendar"
+  },
+  {
+    "family": "s_dt_delete_task_basic",
+    "action": "delete_todo",
+    "template": "delete {task_title} from my list"
+  },
+  {
+    "family": "s_dt_remove_task",
+    "action": "delete_todo",
+    "template": "remove {task_title} from my tasks"
+  },
+  {
+    "family": "s_dt_clear_task",
+    "action": "delete_todo",
+    "template": "clear {task_title} off my to-do list"
+  },
+  {
+    "family": "s_dt_cross_off",
+    "action": "delete_todo",
+    "template": "cross {task_title} off my list"
+  },
+  {
+    "family": "s_dt_quoted_delete_task",
+    "action": "delete_todo",
+    "template": "remove '{quoted_item}' from my to-do list"
+  },
+  {
+    "family": "s_dt_please_delete_task",
+    "action": "delete_todo",
+    "template": "please delete {task_title} from my tasks"
+  },
+  {
+    "family": "s_dt_can_you_remove_task",
+    "action": "delete_todo",
+    "template": "can you remove {task_title} from my list"
+  },
+  {
+    "family": "s_dt_casual_get_rid_of",
+    "action": "delete_todo",
+    "template": "just get rid of {task_title} on my list"
+  },
+  {
+    "family": "s_dt_drop_task",
+    "action": "delete_todo",
+    "template": "drop {task_title} from my tasks"
+  },
+  {
+    "family": "s_dt_clear_my_list",
+    "action": "delete_todo",
+    "template": "clear my to-do list"
+  },
+  {
+    "family": "s_dt_generic_target",
+    "action": "delete_todo",
+    "template": "delete {generic_target} from my list"
+  },
+  {
+    "family": "s_dt_delete_misspelled_todo",
+    "action": "delete_todo",
+    "template": "delete {task_title} from my todo list"
+  },
+  {
+    "family": "s_dt_scrap_task",
+    "action": "delete_todo",
+    "template": "scrap the {task_title} task"
+  },
+  {
+    "family": "s_co_mark_done",
+    "action": "complete_todo",
+    "template": "mark {task_title} as done"
+  },
+  {
+    "family": "s_co_mark_complete",
+    "action": "complete_todo",
+    "template": "mark {task_title} complete"
+  },
+  {
+    "family": "s_co_check_off",
+    "action": "complete_todo",
+    "template": "check off {task_title}"
+  },
+  {
+    "family": "s_co_finish_task",
+    "action": "complete_todo",
+    "template": "i finished {task_title}"
+  },
+  {
+    "family": "s_co_done_with_task",
+    "action": "complete_todo",
+    "template": "i'm done with {task_title}"
+  },
+  {
+    "family": "s_co_complete_basic",
+    "action": "complete_todo",
+    "template": "complete {task_title}"
+  },
+  {
+    "family": "s_co_tick_off",
+    "action": "complete_todo",
+    "template": "tick {task_title} off my list"
+  },
+  {
+    "family": "s_co_casual_already_did",
+    "action": "complete_todo",
+    "template": "yeah i already did {task_title}"
+  },
+  {
+    "family": "s_co_finished_it",
+    "action": "complete_todo",
+    "template": "just finished {task_title}"
+  },
+  {
+    "family": "s_co_quoted_complete",
+    "action": "complete_todo",
+    "template": "mark '{quoted_item}' as done"
+  },
+  {
+    "family": "s_co_please_mark_done",
+    "action": "complete_todo",
+    "template": "please mark {task_title} as complete"
+  },
+  {
+    "family": "s_co_casual_check",
+    "action": "complete_todo",
+    "template": "check {task_title} off the list"
+  },
+  {
+    "family": "s_co_is_done",
+    "action": "complete_todo",
+    "template": "{task_title} is done"
+  },
+  {
+    "family": "s_co_misspelled_complet",
+    "action": "complete_todo",
+    "template": "mark {task_title} as complet"
+  },
+  {
+    "family": "s_ue_reschedule_event",
+    "action": "update_event",
+    "template": "reschedule {event_title} to {date}"
+  },
+  {
+    "family": "s_ue_move_event",
+    "action": "update_event",
+    "template": "move {event_title} to {date} at {time}"
+  },
+  {
+    "family": "s_ue_change_event_time",
+    "action": "update_event",
+    "template": "change {event_title} to {time}"
+  },
+  {
+    "family": "s_ue_rename_event",
+    "action": "update_event",
+    "template": "rename {event_title} to {event_title2}"
+  },
+  {
+    "family": "s_ue_postpone_event",
+    "action": "update_event",
+    "template": "postpone {event_title} to {date}"
+  },
+  {
+    "family": "s_ue_delay_event",
+    "action": "update_event",
+    "template": "delay {event_title} by {duration}"
+  },
+  {
+    "family": "s_ue_extend_event",
+    "action": "update_event",
+    "template": "extend {event_title} {duration}"
+  },
+  {
+    "family": "s_ue_shorten_event",
+    "action": "update_event",
+    "template": "shorten {event_title} {duration}"
+  },
+  {
+    "family": "s_ue_push_event",
+    "action": "update_event",
+    "template": "push {event_title} to {time}"
+  },
+  {
+    "family": "s_ue_generic_target",
+    "action": "update_event",
+    "template": "move {generic_target} to {date}"
+  },
+  {
+    "family": "s_ue_misspelled_reschedule",
+    "action": "update_event",
+    "template": "reshedule {event_title} to {date}"
+  },
+  {
+    "family": "s_ue_quoted_update",
+    "action": "update_event",
+    "template": "move '{quoted_item}' to {date}"
+  },
+  {
+    "family": "s_ut_rename_task",
+    "action": "update_todo",
+    "template": "rename {task_title} to {task_title2}"
+  },
+  {
+    "family": "s_ut_add_note",
+    "action": "update_todo",
+    "template": "add a note to {task_title}"
+  },
+  {
+    "family": "s_ut_move_due_date",
+    "action": "update_todo",
+    "template": "change the due date of {task_title} to {date}"
+  },
+  {
+    "family": "s_ut_update_basic",
+    "action": "update_todo",
+    "template": "update {task_title}"
+  },
+  {
+    "family": "s_ut_edit_task",
+    "action": "update_todo",
+    "template": "edit {task_title}"
+  },
+  {
+    "family": "s_ut_set_priority",
+    "action": "update_todo",
+    "template": "set {task_title} as high priority"
+  },
+  {
+    "family": "s_ut_rename_casual",
+    "action": "update_todo",
+    "template": "call it {task_title2} instead of {task_title}"
+  },
+  {
+    "family": "s_ut_generic_target",
+    "action": "update_todo",
+    "template": "update {generic_target}"
+  },
+  {
+    "family": "s_ut_quoted_update_task",
+    "action": "update_todo",
+    "template": "change '{quoted_item}' to {task_title2}"
+  },
+  {
+    "family": "s_ut_misspelled_updat",
+    "action": "update_todo",
+    "template": "updat {task_title} on my list"
+  },
+  {
+    "family": "s2_ce_lock_in",
+    "action": "create_event",
+    "template": "lock in {event_title} {date} at {time}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ce_throw_on_calendar",
+    "action": "create_event",
+    "template": "throw {event_title} on the calendar for {date} at {time}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ce_pop_in",
+    "action": "create_event",
+    "template": "pop {event_title} in for {date} at {time}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ce_save_the_slot",
+    "action": "create_event",
+    "template": "save me a slot for {event_title} {date} at {time}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ce_id_like_to_book",
+    "action": "create_event",
+    "template": "i'd like to book {event_title} for {date} at {time}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ce_make_time_for",
+    "action": "create_event",
+    "template": "make time for {event_title} {date} at {time}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ce_penciling_you_in",
+    "action": "create_event",
+    "template": "penciling in {event_title} for {date} at {time}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ce_slot_me_in",
+    "action": "create_event",
+    "template": "slot me in for {event_title} {date} at {time}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ce_hold_the_time",
+    "action": "create_event",
+    "template": "hold {date} at {time} for {event_title}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ce_dont_forget_to_book",
+    "action": "create_event",
+    "template": "don't forget to book {event_title} {date} at {time}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ce_i_want_to_schedule",
+    "action": "create_event",
+    "template": "i want to schedule {event_title} for {date} at {time}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ce_calendar_this",
+    "action": "create_event",
+    "template": "calendar this, {event_title} {date} at {time}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ct_jot_down",
+    "action": "create_todo",
+    "template": "jot down {task_title}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ct_dont_let_me_forget",
+    "action": "create_todo",
+    "template": "don't let me forget to {task_title} {date}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ct_id_like_a_reminder",
+    "action": "create_todo",
+    "template": "i'd like a reminder to {task_title}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ct_toss_on_list",
+    "action": "create_todo",
+    "template": "toss {task_title} on my list",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ct_make_sure_i",
+    "action": "create_todo",
+    "template": "make sure i {task_title} {date}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ct_get_me_qty_item",
+    "action": "create_todo",
+    "template": "get me {qty} {item}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ct_flag_this_task",
+    "action": "create_todo",
+    "template": "flag this, {task_title}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ct_when_you_can",
+    "action": "create_todo",
+    "template": "when you can, {task_title}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ct_ping_me_to",
+    "action": "create_todo",
+    "template": "ping me to {task_title} {date}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ct_stick_on_todo",
+    "action": "create_todo",
+    "template": "stick {task_title} on my to-do list",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_q_walk_me_through_day",
+    "action": "query",
+    "template": "walk me through my day {query_range}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_q_anything_on_deck",
+    "action": "query",
+    "template": "anything on deck {query_range}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_q_whats_coming_up",
+    "action": "query",
+    "template": "what's coming up {query_range}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_q_run_down_my_tasks",
+    "action": "query",
+    "template": "run down my tasks for {query_range}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_q_free_or_busy",
+    "action": "query",
+    "template": "am i free or busy {query_range}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_de_wipe_off_calendar",
+    "action": "delete_event",
+    "template": "wipe {event_title} off my calendar",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_de_never_mind_event",
+    "action": "delete_event",
+    "template": "never mind {event_title}, cancel it",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_de_lose_the_event",
+    "action": "delete_event",
+    "template": "lose {event_title} {date}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_dt_strike_from_list",
+    "action": "delete_todo",
+    "template": "strike {task_title} from my list",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_dt_never_mind_task",
+    "action": "delete_todo",
+    "template": "never mind {task_title}, forget it",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_dt_axe_the_task",
+    "action": "delete_todo",
+    "template": "axe {task_title} from my tasks",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_co_knocked_out",
+    "action": "complete_todo",
+    "template": "i knocked out {task_title}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_co_wrap_up",
+    "action": "complete_todo",
+    "template": "{task_title}, wrapped up",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ue_bump_to",
+    "action": "update_event",
+    "template": "bump {event_title} to {date}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ue_flip_to_time",
+    "action": "update_event",
+    "template": "flip {event_title} to {time}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ut_retitle_task",
+    "action": "update_todo",
+    "template": "retitle {task_title} to {task_title2}",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_ut_bump_priority",
+    "action": "update_todo",
+    "template": "bump {task_title} to top priority",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_pc_thinking_book",
+    "action": "create_event",
+    "template": "i was thinking about booking {event_title} {date} at {time}, does that work",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_pc_how_about_add",
+    "action": "create_todo",
+    "template": "how about i add {task_title} to my list",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_pc_what_if_schedule",
+    "action": "create_event",
+    "template": "what if we scheduled {event_title} for {date}, sound good",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_pc_lets_book_if_ok",
+    "action": "create_event",
+    "template": "let's book {event_title} {date} at {time}, if that works for you",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_pc_maybe_i_should",
+    "action": "create_todo",
+    "template": "maybe i should {task_title} {date}, what do you think",
+    "force_split": "test"
+  },
+  {
+    "family": "s2_pc_thinking_remind",
+    "action": "create_todo",
+    "template": "i was thinking of setting a reminder to {task_title}, good idea",
+    "force_split": "test"
+  }
 ]
