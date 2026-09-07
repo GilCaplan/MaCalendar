@@ -218,3 +218,24 @@ def test_stale_weights_are_refused_rather_than_silently_truncated(fastrule):
     m.load({"weights": {"atomic": short, "compound": short}})
     assert m.weights == {}
     assert m.predict("anything at all") == (None, 0.0)
+
+
+def test_personalisation_is_lookup_not_training(fastrule):
+    """Gil's principle: the shipped models stay generic and identical for
+    every user; the personal part is the DATA they are pointed at. So a
+    lookup against the user's own stores must (a) resolve what generic
+    English cannot, and (b) never let a wrong parse through just because
+    something was found."""
+    from assistant.db import get_db
+    from assistant.actions.calendar.intent import CalendarIntent
+
+    # nothing in the stores: the rename cannot be resolved, so it defers
+    r = fastrule.run("rename flu shot to sales call")
+    assert not r.committed and r.reason == "rename-misroute"
+
+    get_db().create_event(CalendarIntent(title="flu shot", date="2026-09-10",
+                                         start_time="09:00", end_time="10:00"))
+    # now the store is known — but the parse reads it as a CREATE, which
+    # disagrees. The lookup must CONFIRM a parse, never merely permit one.
+    r = fastrule.run("rename flu shot to sales call")
+    assert not r.committed, "a lookup must not launder a wrong parse"

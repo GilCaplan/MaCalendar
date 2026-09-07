@@ -1,0 +1,26 @@
+{
+  "_comment": [
+    "Shared filler base. A persona file's own `fillers` block is merged OVER this,",
+    "key by key (a persona that names `times` replaces the whole list, it does not",
+    "append). Only the register-neutral banks live here — quantities, clock times,",
+    "date phrases, recurrence phrases. Names, places, activities, item nouns and",
+    "recurring commitments are ALWAYS persona-owned, because they are the thing",
+    "under test.",
+    "",
+    "Several personas still override `dates`/`times`/`filler_words` on purpose:",
+    "how someone says a time ('half seven', '18:30', 'after mincha... no —",
+    "'after the evening minyan') is a speech habit, not a neutral constant."
+  ],
+  "fillers": {
+    "quantities": ["two", "three", "four", "five", "six", "a dozen", "a couple of", "a few", "eight", "ten", "a bag of", "a box of", "a pack of", "some", "twelve"],
+    "dates": ["today", "tomorrow", "tonight", "this evening", "this afternoon", "this morning", "on monday", "on tuesday", "on wednesday", "on thursday", "on friday", "on sunday", "next monday", "next tuesday", "next thursday", "next week", "the day after tomorrow", "on the fourteenth", "on the third", "next sunday", "this weekend", "in two days", "on the twenty second", "next month", "on the ninth"],
+    "times": ["7am", "7:30am", "noon", "midnight", "half past six", "quarter to nine", "8am", "9:15am", "10:30am", "1pm", "2:45pm", "4pm", "5:30pm", "6pm", "7:45pm", "8pm", "9pm", "11am", "3pm", "quarter past five"],
+    "time_ranges": ["from 6 to 8", "between 2 and 4", "from 9 to 2:30", "from noon to 1", "from 10am to 11:30am", "between 5 and 6:30", "from 7 to 9:30"],
+    "recurrences": ["every day", "daily", "every week", "weekly", "every monday", "every tuesday and thursday", "every other week", "every other tuesday", "every weekday", "once a week", "twice a week", "every sunday", "monthly", "every month", "every wednesday"],
+    "lead_times": ["30 minutes before", "an hour before", "15 minutes before", "a day before", "10 minutes before", "two hours before", "20 minutes before", "the night before"],
+    "durations": ["by 30 minutes", "by an hour", "by 15 minutes", "to two hours", "by half an hour", "by 20 minutes", "by 45 minutes"],
+    "query_ranges": ["today", "tomorrow", "this week", "next week", "this month", "this weekend", "on friday", "the rest of the day", "next monday", "the next three days"],
+    "generic_targets": ["this event", "that appointment", "my reminder", "the task", "it", "this one", "that thing", "the last one", "that entry", "this booking"],
+    "filler_words": ["um", "uh", "so", "like", "you know", "i mean", "erm", "right"]
+  }
+}

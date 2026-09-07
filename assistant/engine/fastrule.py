@@ -230,6 +230,56 @@ def _parse_covers_the_compound(reason: str, text: str, intents) -> bool:
     return len(intents) >= 1 + len(_ASK_JOINER_RE.findall(text))
 
 
+def _which_store_holds(title: str) -> "str | None":
+    """"event", "task", or None — where the user's own data says this lives.
+
+    This is the question the rename gate was created because FastRule could
+    NOT answer: "rename flu shot to sales call" defers because the rules
+    cannot know whether "flu shot" is on the calendar or the task list. The
+    user's own stores know. One indexed query answers it, for any user, on
+    day one, with no training and no developer.
+    """
+    q = (title or "").strip()
+    if len(q) < 3:
+        return None
+    try:
+        from assistant.db import get_db
+        db = get_db()
+        ev = db.search_events(q, limit=2)
+        td = db.search_todos(q, limit=2)
+    except Exception:
+        return None
+    if ev and not td:
+        return "event"
+    if td and not ev:
+        return "task"
+    return None          # absent, or ambiguous — defer, never guess
+
+
+def _names_something_real(target: str) -> bool:
+    """Does the user's own calendar or task list actually contain this?
+
+    PERSONALISATION BY LOOKUP, NOT BY TRAINING (Gil, 2026-09-07). The shipped
+    models stay generic and identical for every user; the personal part is
+    the data they are pointed at. So "delete the dentist" is generic English
+    to a model, but if THIS user has an event called "dentist appointment",
+    it names something real and FastRule can act on it. Works for a brand-new
+    user on day one, needs no refit, and needs no developer.
+
+    Costs one indexed query. Any failure means "not resolved" — a lookup
+    problem must never turn into a commit.
+    """
+    q = (target or "").strip()
+    if len(q) < 3:
+        return False
+    try:
+        from assistant.db import get_db
+        db = get_db()
+        return bool(db.search_events(q, limit=1) or db.search_todos(q, limit=1))
+    except Exception:
+        return False
+
+
 class Gatekeeper:
     """Intent-level vetoes, v1 order: interrogative (with the polite
     exemption), rename-misroute, generic-target."""
@@ -241,11 +291,33 @@ class Gatekeeper:
             return "interrogative-create"
         if (re.match(r"^\s*(?:please\s+)?rename\b", text, re.I)
                 and any(n.startswith("create_") for n, _ in intents)):
-            return "rename-misroute"
+            # The gate exists because the rules cannot know WHICH store holds
+            # the old title. The user's own data can: if exactly one store
+            # has it, the rename is resolvable and no longer a misroute.
+            # …and only when the PARSE AGREES with what the data says. The
+            # probe that built this found the gate was doing double duty: it
+            # deferred both because the store was unknown AND because the
+            # parse was wrong ("rename flu shot to sales call" parses as
+            # create_todo). Resolving the store alone would have committed
+            # that wrong action, so the lookup must CONFIRM the parse, never
+            # merely permit it.
+            m = re.match(r"^\s*(?:please\s+)?rename\s+(.+?)\s+to\s+", text, re.I)
+            store = _which_store_holds(m.group(1)) if m else None
+            parsed_domain = ("task" if any("todo" in n for n, _ in intents)
+                             else "event")
+            if store is not None and store == parsed_domain and not any(
+                    n.startswith("create_") for n, _ in intents):
+                pass                    # data and parse agree — resolvable
+            else:
+                return "rename-misroute"
         for name, intent in intents:
             if name.startswith(("update_", "delete_", "complete_")):
                 target = str(getattr(intent, "match_title", "") or "").strip()
                 if _GENERIC_TARGET_RE.match(target):
+                    # …unless the user's own data says it names something.
+                    # "the dentist" is generic English and a real event.
+                    if _names_something_real(target):
+                        continue
                     return f"generic-target:{target}"
         return None
 

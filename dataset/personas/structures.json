@@ -1,0 +1,157 @@
+{
+  "_comment": [
+    "The SHARED STRUCTURE CATALOG for the persona test sets.",
+    "",
+    "Every persona realises EVERY structure in its own words and its own voice.",
+    "A structure fixes the GRAMMAR OF THE ASK (how many asks, which action, which",
+    "slots are present) and therefore the ground truth; a persona fixes the WORDS",
+    "and the PHRASING HABIT. That separation is the experiment: if engine quality",
+    "varies across personas on a structure-matched slice, the variance can only be",
+    "vocabulary + phrasing, because the structural composition is identical.",
+    "",
+    "`tokens` is the exact placeholder set every persona's template for this",
+    "structure must use (order free, no extras, none missing) — gen_personas.py",
+    "fails the build otherwise. That is what keeps the slot ground truth",
+    "shape-identical across personas.",
+    "",
+    "`op_gold` / `kind_gold` are the ModelRouter classifier golds. null means the",
+    "row has no single correct answer for that classifier (a cross-action compound",
+    "is neither 'new' nor 'remove'), and it is EXCLUDED from that classifier's",
+    "score rather than guessed at. Atomicity gold is always `atomic`."
+  ],
+  "structures": [
+    {"id": "ce_datetime", "tier": "simple", "action": "create_event", "atomic": true, "events": 1, "tasks": 0,
+     "tokens": ["event_title", "date", "time"], "op_gold": "new", "kind_gold": "event",
+     "note": "the base case: one event, a date and a clock time"},
+
+    {"id": "ce_date_only", "tier": "simple", "action": "create_event", "atomic": true, "events": 1, "tasks": 0,
+     "tokens": ["event_title", "date"], "op_gold": "new", "kind_gold": "event",
+     "note": "one event, no clock time said — the invention-rate denominator"},
+
+    {"id": "ce_time_only", "tier": "simple", "action": "create_event", "atomic": true, "events": 1, "tasks": 0,
+     "tokens": ["event_title", "time"], "op_gold": "new", "kind_gold": "event",
+     "note": "one event, a time but no date"},
+
+    {"id": "ce_attendee", "tier": "simple", "action": "create_event", "atomic": true, "events": 1, "tasks": 0,
+     "tokens": ["event_title", "name", "date"], "op_gold": "new", "kind_gold": "event",
+     "note": "one event with one named attendee"},
+
+    {"id": "ce_recurring", "tier": "simple", "action": "create_event", "atomic": true, "events": 1, "tasks": 0,
+     "tokens": ["event_title", "recurrence", "time"], "op_gold": "new", "kind_gold": "event",
+     "note": "a recurring series"},
+
+    {"id": "ce_allday", "tier": "simple", "action": "create_event", "atomic": true, "events": 1, "tasks": 0,
+     "tokens": ["occasion", "date"], "op_gold": "new", "kind_gold": "event",
+     "flags": {"all_day": true},
+     "note": "an all-day marker on a date"},
+
+    {"id": "ct_bare", "tier": "simple", "action": "create_todo", "atomic": true, "events": 0, "tasks": 1,
+     "tokens": ["task_title"], "op_gold": "new", "kind_gold": "task",
+     "note": "a bare task, nothing else said"},
+
+    {"id": "ct_dated", "tier": "simple", "action": "create_todo", "atomic": true, "events": 0, "tasks": 1,
+     "tokens": ["task_title", "date"], "op_gold": "new", "kind_gold": "task",
+     "note": "a task with a day attached — the classic event/task confusion"},
+
+    {"id": "ct_buy", "tier": "simple", "action": "create_todo", "atomic": true, "events": 0, "tasks": 1,
+     "tokens": ["qty", "item"], "op_gold": "new", "kind_gold": "task",
+     "note": "a shopping-shaped task with a quantity"},
+
+    {"id": "q_schedule", "tier": "simple", "action": "query", "atomic": true, "events": 0, "tasks": 0,
+     "tokens": ["query_range"], "op_gold": "query", "kind_gold": "event",
+     "note": "asking what is on the calendar"},
+
+    {"id": "q_todos", "tier": "simple", "action": "query", "atomic": true, "events": 0, "tasks": 0,
+     "tokens": ["query_range"], "op_gold": "query", "kind_gold": "task",
+     "note": "asking what is on the list"},
+
+    {"id": "de_named", "tier": "simple", "action": "delete_event", "atomic": true, "events": 0, "tasks": 0,
+     "tokens": ["event_title", "date"], "op_gold": "remove", "kind_gold": "event",
+     "note": "cancel one named event"},
+
+    {"id": "dt_named", "tier": "simple", "action": "delete_todo", "atomic": true, "events": 0, "tasks": 0,
+     "tokens": ["task_title"], "op_gold": "remove", "kind_gold": "task",
+     "note": "drop one named task"},
+
+    {"id": "comp_todo", "tier": "simple", "action": "complete_todo", "atomic": true, "events": 0, "tasks": 0,
+     "tokens": ["task_title"], "op_gold": "complete", "kind_gold": "task",
+     "note": "mark a task done"},
+
+    {"id": "ue_move", "tier": "simple", "action": "update_event", "atomic": true, "events": 0, "tasks": 0,
+     "tokens": ["event_title", "time"], "op_gold": "edit", "kind_gold": "event",
+     "note": "move an existing event to a new time"},
+
+    {"id": "ut_change", "tier": "simple", "action": "update_todo", "atomic": true, "events": 0, "tasks": 0,
+     "tokens": ["task_title", "date"], "op_gold": "edit", "kind_gold": "task",
+     "note": "push an existing task to another day"},
+
+    {"id": "npdecoy_attendees", "tier": "complex", "action": "create_event", "atomic": true, "events": 1, "tasks": 0,
+     "tokens": ["event_title", "name", "name2", "time"], "op_gold": "new", "kind_gold": "event",
+     "note": "'X with A and B' — an NP coordination that must NOT split into two events"},
+
+    {"id": "npdecoy_items", "tier": "complex", "action": "create_todo", "atomic": true, "events": 0, "tasks": 1,
+     "tokens": ["item", "item2"], "op_gold": "new", "kind_gold": "task",
+     "fixed_slots": {"title": "{item} and {item2}"},
+     "note": "'buy A and B' — one task, two nouns; the second-most common false split"},
+
+    {"id": "time_range", "tier": "complex", "action": "create_event", "atomic": true, "events": 1, "tasks": 0,
+     "tokens": ["event_title", "time_range"], "op_gold": "new", "kind_gold": "event",
+     "note": "'from 6 to 8' is one event with two endpoints, not two events"},
+
+    {"id": "leadtime", "tier": "complex", "action": "create_event", "atomic": true, "events": 1, "tasks": 0,
+     "tokens": ["event_title", "date", "time", "lead_time"], "op_gold": "new", "kind_gold": "event",
+     "note": "a reminder lead-time is an ATTRIBUTE of the event, never a second item"},
+
+    {"id": "polite_request", "tier": "complex", "action": "create_event", "atomic": true, "events": 1, "tasks": 0,
+     "tokens": ["event_title", "date", "time"], "op_gold": "new", "kind_gold": "event",
+     "note": "'could you add ...' — a second-person request, still a create"},
+
+    {"id": "propose_q", "tier": "complex", "action": "propose", "atomic": true, "events": 1, "tasks": 0,
+     "tokens": ["event_title", "date"], "op_gold": "new", "kind_gold": "event",
+     "note": "Q9: a first-person create QUESTION proposes; FastRule must defer, not commit"},
+
+    {"id": "quoted_delete", "tier": "complex", "action": "delete_event", "atomic": true, "events": 0, "tasks": 0,
+     "tokens": ["quoted_item"], "op_gold": "remove", "kind_gold": "event",
+     "note": "the target is named inside quotes"},
+
+    {"id": "generic_delete", "tier": "complex", "action": "delete_event", "atomic": true, "events": 0, "tasks": 0,
+     "tokens": ["generic_target"], "op_gold": "remove", "kind_gold": "event",
+     "note": "an unresolvable referring expression — 'delete this one'"},
+
+    {"id": "ramble_ce", "tier": "complex", "action": "create_event", "atomic": true, "events": 1, "tasks": 0,
+     "tokens": ["filler", "event_title", "date", "time"], "op_gold": "new", "kind_gold": "event",
+     "note": "one event buried in speech-disfluency texture"},
+
+    {"id": "and_ee", "tier": "complex", "action": "create_event", "atomic": false, "events": 2, "tasks": 0,
+     "tokens": ["event_title", "date", "time", "event_title2", "time2"], "op_gold": "new", "kind_gold": "event",
+     "note": "two events joined by 'and'"},
+
+    {"id": "and_et", "tier": "complex", "action": "mixed", "atomic": false, "events": 1, "tasks": 1,
+     "tokens": ["event_title", "date", "time", "task_title2"], "op_gold": null, "kind_gold": null,
+     "note": "an event and a task in one breath"},
+
+    {"id": "and_te", "tier": "complex", "action": "mixed", "atomic": false, "events": 1, "tasks": 1,
+     "tokens": ["task_title", "event_title2", "date2"], "op_gold": null, "kind_gold": null,
+     "note": "the task comes first — the order the engine historically half-executed"},
+
+    {"id": "and_tt", "tier": "complex", "action": "create_todo", "atomic": false, "events": 0, "tasks": 2,
+     "tokens": ["task_title", "task_title2"], "op_gold": "new", "kind_gold": "task",
+     "note": "two tasks, homogeneous compound"},
+
+    {"id": "joiner_then_et", "tier": "complex", "action": "mixed", "atomic": false, "events": 1, "tasks": 1,
+     "tokens": ["event_title", "time", "task_title2"], "op_gold": null, "kind_gold": null,
+     "note": "an announced joiner — ', then' / 'and then'"},
+
+    {"id": "also_ee", "tier": "complex", "action": "create_event", "atomic": false, "events": 2, "tasks": 0,
+     "tokens": ["event_title", "date", "event_title2", "date2"], "op_gold": "new", "kind_gold": "event",
+     "note": "'also' / 'as well' joining two events"},
+
+    {"id": "mixed_create_delete", "tier": "complex", "action": "mixed", "atomic": false, "events": 1, "tasks": 0,
+     "tokens": ["event_title2", "event_title", "date"], "op_gold": null, "kind_gold": "event",
+     "note": "cancel one thing and book another — only the booked one is a new event"},
+
+    {"id": "three_ask", "tier": "complex", "action": "mixed", "atomic": false, "events": 2, "tasks": 1,
+     "tokens": ["event_title", "time", "event_title2", "time2", "task_title3"], "op_gold": null, "kind_gold": null,
+     "note": "three asks in one utterance"}
+  ]
+}
