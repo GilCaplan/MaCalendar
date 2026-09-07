@@ -33,6 +33,22 @@ floors 2.5/1.5. **Predict:** operation train-acc 90.9 → 93+ with query/
 remove ≥75% each; kind train-acc 86.4 → 92+; downstream, simple commit
 72.5 → 74–77% at ≥91% correct; A-pool dual-gate within ±0.5 of 94.5.
 
+## TEST-EVAL SNAPSHOT (2026-09-07) — the reporting baseline going forward (Gil)
+
+Reported numbers are B-TEST (full 1,200) from here on; train = tuning only.
+Cumulative F7→F12 on TEST: **overall commit 44.8 → 47.2% · correct-on-
+committed 82.9 → 83.4% · simple tier 72.0% commit at 92.4% correct** (train
+simple 73.1/91.6 — the ~1pp train↔test gap says the batches GENERALIZE; no
+train overfit in the blended system). Atomicity P 90.8 / R 49.4 · title
+78.4 · labels cat 59.6.
+
+Models on TEST: operation macro-F1 **73.4** (train 87.1 — a real
+generalization gap; remove 62, query 62), kind macro-F1 **82.6** (train
+86.2). The models overfit wording families harder than the rules do — the
+margin floors are what keep the blend at 92.4% simple correctness anyway.
+F13's brief: close the TEST macro-F1 gap (query/remove precision features,
+train-mined evidence only).
+
 ## F12 — ACTUAL (2026-09-07): partial — P/R/F1 lens now standard (Gil's ask)
 
 Models: operation train-acc 90.9 → 92.0 (predicted 93+, under), macro-F1
