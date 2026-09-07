@@ -33,6 +33,19 @@ floors 2.5/1.5. **Predict:** operation train-acc 90.9 → 93+ with query/
 remove ≥75% each; kind train-acc 86.4 → 92+; downstream, simple commit
 72.5 → 74–77% at ≥91% correct; A-pool dual-gate within ±0.5 of 94.5.
 
+## F13 (model iteration 2) — REGISTERED PREDICTION 2026-09-07
+
+**Change, features only, floors fixed:** (a) kind model rebuilt on the
+PROVEN K1 feature set — the segment stage's real regexes (occasion,
+remindish, remind-to-verb, clockish, dated, task-phrase, encounter),
+lazily imported, replacing my hand-approximations; (b) operation model
+gains precision-side interaction features for query (query-opener AND
+schedule-noun; create-verb/remind-speak as explicit anti-query signals) and
+remove ("off my/the" tightened to schedule-ish objects). **Predict (TEST
+eval):** kind macro-F1 82.6 → 86+; operation macro-F1 73.4 → 78+ (query P
+57 → 70+, remove F1 62 → 70+); downstream test simple commit 72.0 → 73–75%
+at ≥92% correct; A-pool dual-gate within ±0.5 of 94.3.
+
 ## TEST-EVAL SNAPSHOT (2026-09-07) — the reporting baseline going forward (Gil)
 
 Reported numbers are B-TEST (full 1,200) from here on; train = tuning only.
