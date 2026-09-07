@@ -1,0 +1,291 @@
+====================================================================================================
+PERSONA BOARDS — personas.jsonl (2520 rows, 6 columns x 420, TEST-ONLY)
+fast track only (FastRule + gates, no LLM, no execution) · metrics from scripts/fastrule_shape.py
+====================================================================================================
+                                    observant         parent     consultant        retiree        student            esl
+
+ATOMIC rows — should HANDLE  (n per persona: 303 304 314 323 311 311)
+  handled (committed)                   71.9%          55.6%          52.2%          43.7%          33.1%          64.0%
+  correct-on-handled                    88.1%          91.1%          90.2%          78.7%          78.6%          87.4%
+  deferred (missed work)                28.1%          44.4%          47.8%          56.3%          66.9%          36.0%
+
+TIME CORRECTNESS (committed events)
+  explicit time right                   88.6%          90.9%          95.5%          69.6%          93.3%          91.4%
+    n scored                               35             22             22             23             15             35
+    ...speaker fixed am/pm              88.2%         100.0%         100.0%          82.4%          92.9%          91.7%
+       n                                   34             20             19             17             14             24
+    ...spelled out (see note)          100.0%           0.0%          66.7%          33.3%         100.0%          90.9%
+       n                                    1              2              3              6              1             11
+     (the spelled-out row is CONVENTION-CONFOUNDED: this scorer resolves 'quarter past four'
+      to 04:15, the engine prefers the afternoon. Only the am/pm row is evidence of a defect.)
+  INVENTED a time                        7.1%           0.0%           0.0%           0.0%           0.0%           0.0%
+    n (no time said)                       28              1             17             20              2             21
+
+NON-ATOMIC rows — diagnostic  (n per persona: 105 109 95 86 103 97)
+  deferred, handed up                   79.0%          92.7%          72.6%          88.4%          98.1%          82.5%
+    ...knew it was compound             74.3%          83.5%          62.1%          75.6%          42.7%          55.7%
+  covered (all asks present)            21.0%           5.5%          15.8%           5.8%           0.0%          17.5%
+  HALF-EXECUTED                          0.0%           1.8%          11.6%           5.8%           1.9%           0.0%
+
+PROPOSE rows (Q9) — should DEFER  (n per persona: 12 7 11 11 6 12)
+  defer rate                           100.0%         100.0%         100.0%         100.0%         100.0%         100.0%
+
+TRAINED CLASSIFIERS (assistant/intent/classifier.py, raw argmax)
+  atomicity accuracy                    96.9%          98.3%          94.8%          90.2%          90.5%          95.0%
+    macro-F1                            96.0%          97.9%          93.1%          87.1%          85.1%          92.9%
+  operation accuracy                   100.0%          86.6%          80.8%          79.0%          77.6%          98.6%
+    macro-F1                           100.0%          75.4%          84.5%          57.6%          68.9%          97.9%
+  kind accuracy                         85.3%          76.0%          75.3%          76.2%          64.2%          73.7%
+    macro-F1                            84.0%          76.0%          72.2%          73.0%          64.2%          72.2%
+  compound recall @floor               100.0%         100.0%         100.0%         100.0%          62.1%          87.6%
+  atomic false-compound @floor           4.1%           2.3%           6.8%          12.3%           0.3%           2.8%
+
+  HOW MUCH EVIDENCE THE FEATURIZERS SEE (mean non-bias features fired per row,
+  and the share of rows that fire NONE — those can only get the class prior):
+    operation features fired             1.48           0.87           1.28           0.85           0.62           1.03
+      rows firing none                   6.2%          30.0%          13.6%          39.0%          48.6%          25.0%
+    kind features fired                  3.68           2.82           3.23           3.15           2.15           3.88
+      rows firing none                   4.3%           7.6%           6.0%           4.3%          16.0%           6.7%
+    atomicity features fired             2.05           1.72           1.94           2.34           0.90           1.68
+      rows firing none                  55.7%          54.8%          51.0%          28.3%          71.0%          55.7%
+
+====================================================================================================
+STRUCTURE-MATCHED MACRO — each of the 33 shared structures weighted equally,
+restricted to structures every persona has a defined value for. Composition is
+then identical across personas, so this spread is vocabulary + phrasing ONLY.
+====================================================================================================
+                                    observant         parent     consultant        retiree        student            esl
+  atomic handle-rate [24]               72.2%          52.5%          54.4%          44.2%          33.9%          64.5%
+  correct-on-handled [10]               83.9%          80.8%          77.1%          61.0%          79.0%          92.6%
+  atomic deferred [24]                  27.8%          47.5%          45.6%          55.8%          66.1%          35.5%
+  explicit time right [2]              100.0%          84.5%          93.8%          64.6%          91.7%          93.8%
+    time right (am/pm said) [2]         100.0%         100.0%         100.0%          78.6%          91.7%          91.7%
+  non-atomic deferred [8]               79.6%          92.9%          73.7%          89.1%          97.9%          83.6%
+  non-atomic covered [8]                20.4%           5.2%          13.8%           5.2%           0.0%          16.4%
+  HALF-EXECUTED [8]                      0.0%           1.9%          12.5%           5.7%           2.1%           0.0%
+  propose defer rate [1]               100.0%         100.0%         100.0%         100.0%         100.0%         100.0%
+
+====================================================================================================
+VARIANCE — the spread IS the finding
+====================================================================================================
+
+### across personas
+
+Natural mix (each column's own distribution of asks):
+  atomic handle-rate           38.8 pt   sd  12.7   best observant      71.9%   worst student        33.1%   
+  correct-on-handled           12.5 pt   sd   5.1   best parent         91.1%   worst student        78.6%   
+  atomic deferred              38.8 pt   sd  12.7   best observant      28.1%   worst student        66.9%   
+  explicit time right          25.9 pt   sd   8.6   best consultant     95.5%   worst retiree        69.6%   
+    time right (am/pm said)    17.6 pt   sd   6.3   best parent        100.0%   worst retiree        82.4%   
+  INVENTED a time               7.1 pt   sd   2.7   best parent          0.0%   worst observant       7.1%   
+  non-atomic deferred          25.4 pt   sd   8.5   best student        98.1%   worst consultant     72.6%   
+  non-atomic covered           21.0 pt   sd   7.6   best observant      21.0%   worst student         0.0%   
+  HALF-EXECUTED                11.6 pt   sd   4.1   best observant       0.0%   worst consultant     11.6%   
+  propose defer rate            0.0 pt   sd   0.0   best observant     100.0%   worst observant     100.0%   
+  atomicity accuracy            8.1 pt   sd   3.0   best parent         98.3%   worst retiree        90.2%   
+  operation accuracy           22.4 pt   sd   9.1   best observant     100.0%   worst student        77.6%   
+  kind accuracy                21.1 pt   sd   6.1   best observant      85.3%   worst student        64.2%   
+  compound recall @floor       37.9 pt   sd  13.9   best observant     100.0%   worst student        62.1%   
+
+Structure-matched (identical composition — the clean comparison):
+  atomic handle-rate           38.3 pt   sd  12.5   best observant      72.2%   worst student        33.9%   (24 structures)
+  correct-on-handled           31.6 pt   sd   9.5   best esl            92.6%   worst retiree        61.0%   (10 structures)
+  atomic deferred              38.3 pt   sd  12.5   best observant      27.8%   worst student        66.1%   (24 structures)
+  explicit time right          35.4 pt   sd  11.4   best observant     100.0%   worst retiree        64.6%   (2 structures)
+    time right (am/pm said)    21.4 pt   sd   7.7   best observant     100.0%   worst retiree        78.6%   (2 structures)
+  non-atomic deferred          24.3 pt   sd   8.1   best student        97.9%   worst consultant     73.7%   (8 structures)
+  non-atomic covered           20.4 pt   sd   7.2   best observant      20.4%   worst student         0.0%   (8 structures)
+  HALF-EXECUTED                12.5 pt   sd   4.4   best observant       0.0%   worst consultant     12.5%   (8 structures)
+  propose defer rate            0.0 pt   sd   0.0   best observant     100.0%   worst observant     100.0%   (1 structures)
+
+====================================================================================================
+PER-STRUCTURE correct-on-handled (atomic) / covered (compound) — spread column names the structures that split the personas
+====================================================================================================
+structure                     observant         parent     consultant        retiree        student            esl   spread
+ut_change                        100.0%           0.0%          90.9%           0.0%          33.3%          75.0%   100.0 pt  (correct-on-handled)
+ramble_ce                         87.5%         100.0%           0.0%          88.9%         100.0%         100.0%   100.0 pt  (correct-on-handled)
+quoted_delete                    100.0%         100.0%         100.0%           0.0%            —           100.0%   100.0 pt  (correct-on-handled)
+polite_request                    75.0%         100.0%          80.0%           0.0%         100.0%         100.0%   100.0 pt  (correct-on-handled)
+dt_named                           0.0%          76.9%           0.0%           0.0%          25.0%         100.0%   100.0 pt  (correct-on-handled)
+ce_date_only                      81.8%            —             0.0%         100.0%            —            83.3%   100.0 pt  (correct-on-handled)
+ce_attendee                      100.0%           0.0%         100.0%         100.0%            —             0.0%   100.0 pt  (correct-on-handled)
+ce_allday                         33.3%            —           100.0%          44.4%           0.0%           0.0%   100.0 pt  (correct-on-handled)
+mixed_create_delete               16.7%          18.2%          56.2%           0.0%           0.0%          66.7%    66.7 pt  (covered)
+and_et                            66.7%          12.5%          54.5%          41.7%           0.0%          64.3%    66.7 pt  (covered)
+comp_todo                        100.0%          37.5%         100.0%          42.9%          71.4%          90.9%    62.5 pt  (correct-on-handled)
+and_tt                            41.7%          11.1%           0.0%           0.0%           0.0%           0.0%    41.7 pt  (covered)
+ct_dated                         100.0%          93.3%         100.0%          86.7%          60.0%          80.0%    40.0 pt  (correct-on-handled)
+ct_bare                          100.0%         100.0%            —           100.0%          60.0%         100.0%    40.0 pt  (correct-on-handled)
+and_te                            38.5%           0.0%           0.0%           0.0%           0.0%           0.0%    38.5 pt  (covered)
+ce_recurring                      84.6%         100.0%         100.0%         100.0%         100.0%          80.0%    20.0 pt  (correct-on-handled)
+ce_datetime                       91.7%         100.0%         100.0%          91.7%         100.0%         100.0%     8.3 pt  (correct-on-handled)
+ue_move                          100.0%         100.0%         100.0%            —           100.0%         100.0%     0.0 pt  (correct-on-handled)
+time_range                          —              —              —             0.0%            —             0.0%     0.0 pt  (correct-on-handled)
+three_ask                          0.0%           0.0%           0.0%           0.0%           0.0%           0.0%     0.0 pt  (covered)
+q_todos                          100.0%         100.0%         100.0%         100.0%         100.0%         100.0%     0.0 pt  (correct-on-handled)
+q_schedule                       100.0%         100.0%         100.0%            —           100.0%         100.0%     0.0 pt  (correct-on-handled)
+propose_q                           —              —              —              —              —              —       0.0 pt  (covered)
+npdecoy_items                    100.0%         100.0%         100.0%         100.0%            —           100.0%     0.0 pt  (correct-on-handled)
+npdecoy_attendees                   —              —              —              —              —              —       0.0 pt  (correct-on-handled)
+leadtime                            —           100.0%            —              —           100.0%         100.0%     0.0 pt  (correct-on-handled)
+joiner_then_et                     0.0%           0.0%           0.0%           0.0%           0.0%           0.0%     0.0 pt  (covered)
+generic_delete                   100.0%         100.0%         100.0%         100.0%            —           100.0%     0.0 pt  (correct-on-handled)
+de_named                         100.0%         100.0%         100.0%         100.0%         100.0%         100.0%     0.0 pt  (correct-on-handled)
+ct_buy                           100.0%         100.0%            —           100.0%            —           100.0%     0.0 pt  (correct-on-handled)
+ce_time_only                        —              —              —              —              —              —       0.0 pt  (correct-on-handled)
+and_ee                             0.0%           0.0%           0.0%           0.0%           0.0%           0.0%     0.0 pt  (covered)
+also_ee                            0.0%           0.0%           0.0%           0.0%           0.0%           0.0%     0.0 pt  (covered)
+
+====================================================================================================
+FAILING ROWS (synthetic data — mining these is allowed and is the point)
+====================================================================================================
+
+### observant_student
+  atomic rows deferred, by reason: below-threshold=62, clause-coordination=8, skip=6, model-compound=5, generic-target=4
+  atomic-wrong:
+     [ce_allday] want create_event, got ['complete_todo']  mark on wednesday as reserve duty week
+     [ramble_ce] want create_event, got ['query_schedule']  right i think i need megillah reading on the third at 8pm um
+     [dt_named] want delete_todo, got ['query_todos']  take print the chavruta sheets off my list
+     [dt_named] want delete_todo, got ['query_todos']  take arrange a ride to Ramat Zohar off my list
+     [ce_allday] want create_event, got ['complete_todo']  mark on wednesday as my brother's bar mitzvah
+     [dt_named] want delete_todo, got ['query_todos']  take hand in the lab report off my list
+  atomic-deferred:
+     [ce_time_only/below-threshold] schedule the trip to Ramat Zohar at 5pm
+     [ce_datetime/below-threshold] book the siyum this evening at 8pm
+     [ce_date_only/below-threshold] add the yeshiva open evening next sunday
+     [ce_attendee/below-threshold] book the yeshiva open evening with Adina next week
+     [npdecoy_attendees/below-threshold] book orientation at Ilanot Institute with Asher and Doron at 8pm
+     [ce_date_only/below-threshold] put the yeshiva open evening on the calendar for next month
+  wrong-time-UNAMBIGUOUS:
+     [ramble_ce] said '11:30am' -> want 11:30, got 23:30  right i think i need reserve duty briefing on saturday night at 11:30am like
+     [ramble_ce] said '11:30am' -> want 11:30, got 23:30  so i think i need the siyum this evening at 11:30am you know
+     [polite_request] said '8:45am' -> want 08:45, got 20:45  can you put the siyum in for tonight at 8:45am please
+     [polite_request] said '1:30pm' -> want 13:30, got 16:00  can you put the yeshiva open evening in for tonight at 1:30pm please
+  invented-time:
+     [ce_attendee] no time said, produced 20:00  book night seder with Batya today
+     [ce_date_only] no time said, produced 20:00  put night seder on the calendar for on thursday
+
+### household_parent
+  atomic rows deferred, by reason: skip=81, below-threshold=41, model-compound=7, generic-target=3, interrogative-create=3
+  atomic-wrong:
+     [dt_named] want delete_todo, got ['create_todo']  scrap buy a present for Clemmie
+     [ut_change] want update_todo, got ['create_todo']  order more nappies can wait till next thursday
+     [comp_todo] want complete_todo, got ['create_todo']  pack the swimming kit is done
+     [ut_change] want update_todo, got ['delete_event']  cancel the newspaper can wait till next week
+     [dt_named] want delete_todo, got ['create_todo']  scrap pack the swimming kit
+     [dt_named] want delete_todo, got ['create_todo']  scrap wash the football kit
+  atomic-deferred:
+     [ct_bare/skip] don't let me forget to refill the inhaler prescription
+     [ramble_ce/model-compound] also the orthodontist is next thursday, sorry at 2:30pm i think, put it in
+     [ramble_ce/model-compound] um the childminder handover is this afternoon, oh at 7pm i think, put it in
+     [ce_datetime/skip] stick the orthodontist in after school at 7pm
+     [npdecoy_attendees/model-compound] parents evening with Wren and Sunita at 9am
+     [time_range/skip] the school assembly between 2 and 4
+  half-executed:
+     [mixed_create_delete] want e1/t0 got e0/t1  cancel the PTA meeting and put the vaccination clinic in on thursday
+     [and_et] want e1/t1 got e0/t2  the parent teacher call tomorrow at quarter past four and remind me to label the school jumpers
+  wrong-time:
+     [ce_datetime] said 'quarter past four' -> want 04:15, got 16:15  school photo day on saturday at quarter past four
+     [ce_recurring] said 'half past three' -> want 03:30, got 15:30  every wednesday at half past three it's soccer practice
+
+### freelance_consultant
+  atomic rows deferred, by reason: below-threshold=95, skip=25, clause-coordination=17, interrogative-create=5, model-compound=4, generic-target=4
+  atomic-wrong:
+     [dt_named] want delete_todo, got ['update_todo']  take update the capacity tracker off the list
+     [ce_date_only] want create_event, got ['create_todo']  put a hold on on the fourth for the escalation call
+     [dt_named] want delete_todo, got ['query_todos']  take submit the timesheet off the list
+     [dt_named] want delete_todo, got ['query_todos']  take invoice for the workshop day off the list
+     [dt_named] want delete_todo, got ['create_todo']  take file the quarterly return off the list
+     [dt_named] want delete_todo, got ['query_todos']  take confirm the visa paperwork off the list
+  atomic-deferred:
+     [leadtime/clause-coordination] book the Calderwood steering committee next week at 1pm and give me a nudge an hour before
+     [ce_datetime/below-threshold] block off the onboarding walkthrough on the twenty second at 4:30pm
+     [ce_time_only/below-threshold] block off the contract negotiation at 6:15pm
+     [time_range/below-threshold] block off the discovery call with Northvale from 10am to 11:30am
+     [time_range/below-threshold] block off the Brightwater retro between 2 and 4
+     [npdecoy_attendees/skip] book the escalation call with Aurelio and Lucia for 1pm
+  half-executed:
+     [and_te] want e1/t1 got e0/t2  remind me to confirm the visa paperwork and get the Aldergate kickoff in the diary for on the fourth
+     [and_te] want e1/t1 got e0/t2  remind me to file the quarterly return and get the pricing conversation in the diary for on the twenty second
+     [and_te] want e1/t1 got e0/t2  remind me to send the invoice to Aldergate and get the coworking desk booking in the diary for on thursday
+     [and_te] want e1/t1 got e0/t2  remind me to renew the professional indemnity cover and get the Aldergate kickoff in the diary for next week
+     [and_te] want e1/t1 got e0/t2  remind me to submit the timesheet and get the pricing conversation in the diary for tomorrow
+     [and_te] want e1/t1 got e0/t2  remind me to revoke the Northvale repository access and get the Calderwood steering committee in the diary for tomorrow
+  wrong-time:
+     [ce_recurring] said 'half past eight' -> want 08:30, got 20:30  make the discovery call with Northvale a standing slot monthly at half past eight
+
+### retiree
+  atomic rows deferred, by reason: skip=68, below-threshold=38, generic-target=31, model-compound=20, clause-coordination=19, interrogative-create=6
+  atomic-wrong:
+     [ce_allday] want create_event, got ['complete_todo']  please mark on the twelfth down as the garden open day
+     [ce_allday] want create_event, got ['complete_todo']  please mark on the second of next month down as the garden open day
+     [dt_named] want delete_todo, got ['create_todo']  you can take send the anniversary card off my list now
+     [dt_named] want delete_todo, got ['create_todo']  you can take order my repeat prescription off my list now
+     [ut_change] want update_todo, got ['create_todo']  i shall send the anniversary card on the twelfth instead
+     [dt_named] want delete_todo, got ['create_todo']  you can take water the greenhouse off my list now
+  atomic-deferred:
+     [q_schedule/skip] would you tell me what i have on this weekend
+     [comp_todo/below-threshold] i have already done book the boiler service, do cross it off
+     [polite_request/interrogative-create] would you be kind enough to put the ramblers walk in for on friday at 3pm
+     [polite_request/interrogative-create] would you be kind enough to put the podiatry appointment in for today at quarter to four
+     [time_range/clause-coordination] i have the podiatry appointment between 2 and 4, please put that in the diary
+     [polite_request/skip] would you be kind enough to put my physiotherapy session in for on monday at noon
+  half-executed:
+     [joiner_then_et] want e1/t1 got e0/t2  put the pension review in at half past nine, and then remind me to ring the pharmacy about the delivery
+     [mixed_create_delete] want e1/t0 got e0/t1  please cancel the pension review and put the pension review in for on tuesday instead
+     [mixed_create_delete] want e1/t0 got e0/t1  please cancel choir practice and put the pension review in for today instead
+     [joiner_then_et] want e1/t1 got e0/t2  put the pension review in at eleven o'clock, and then remind me to renew the bus pass
+     [mixed_create_delete] want e1/t0 got e0/t1  please cancel the hearing aid fitting and put the pension review in for on the twelfth instead
+  wrong-time-UNAMBIGUOUS:
+     [ce_datetime] said '7pm' -> want 19:00, got 08:00  would you put the coffee morning at the community centre in the diary for on the second of next month at 7pm
+     [ce_datetime] said '1:30pm' -> want 13:30, got 01:30  i have the memory clinic on wednesday morning at 1:30pm, please put that in the calendar
+     [ce_datetime] said '3pm' -> want 15:00, got 03:00  i have the memory clinic on wednesday morning at 3pm, please put that in the calendar
+  wrong-time:
+     [ce_recurring] said 'quarter to four' -> want 03:45, got 15:45  please put my grandson's school play in every friday at quarter to four
+     [ce_recurring] said 'quarter to four' -> want 03:45, got 15:45  please put my physiotherapy session in every friday at quarter to four
+     [ce_recurring] said 'quarter to four' -> want 03:45, got 15:45  please put the dental hygienist in twice a week at quarter to four
+     [ramble_ce] said 'half past two' -> want 02:30, got 12:00  goodness, i had a letter about the afternoon lecture at the community centre, it is the day after tomorrow at half past two right, please put it in
+
+### uni_student
+  atomic rows deferred, by reason: skip=176, below-threshold=31, model-compound=1
+  atomic-wrong:
+     [ut_change] want update_todo, got ['delete_event']  cancel the gym membership pushed to tuesday
+     [ut_change] want update_todo, got ['complete_todo']  finish the problem set pushed to wednesday
+     [dt_named] want delete_todo, got ['query_schedule']  bin read the chapter for the seminar
+     [dt_named] want delete_todo, got ['create_todo']  bin email the module lead
+     [ct_bare] want create_todo, got ['delete_event']  todo cancel the gym membership
+     [dt_named] want delete_todo, got ['complete_todo']  bin finish the problem set
+  atomic-deferred:
+     [comp_todo/below-threshold] sign up for the exam slot done
+     [ce_date_only/skip] chuck the pub quiz in next friday
+     [de_named/skip] bin society social the weekend
+     [npdecoy_items/skip] need coffee and biros
+     [ce_time_only/skip] the exam 12:30
+     [ct_buy/skip] need a dozen highlighters
+  half-executed:
+     [joiner_then_et] want e1/t1 got e0/t1  the pub quiz midnight then remind me submit the lab report
+     [joiner_then_et] want e1/t1 got e0/t1  football 6am then remind me pay the flat bills
+  wrong-time-UNAMBIGUOUS:
+     [ce_datetime] said '6am' -> want 06:00, got 18:00  the coding workshop 6am tonight
+
+### esl_speaker
+  atomic rows deferred, by reason: below-threshold=62, skip=34, model-compound=6, interrogative-create=4, clause-coordination=3, generic-target=3
+  atomic-wrong:
+     [ce_allday] want create_event, got ['complete_todo']  mark in monday like the visa expiry
+     [ce_allday] want create_event, got ['complete_todo']  mark today like the language test
+     [ce_date_only] want create_event, got ['update_event']  the shift in the warehouse is in the next month, please put in the calendar
+     [time_range] want create_event, got ['create_todo']  i have the video call with family from 9 to 2:30
+     [comp_todo] want complete_todo, got ['create_todo']  renew the permit is finished already
+     [ut_change] want update_todo, got ['create_todo']  move pay the electricity for tomorrow
+  atomic-deferred:
+     [ce_datetime/below-threshold] please to add the medical control in the next month at 8:00
+     [ramble_ce/below-threshold] how to say, i have the football match in this saturday at 18:30, sorry put in calendar
+     [time_range/skip] i have the driving lesson from noon to 1
+     [ce_recurring/below-threshold] i have the driving lesson each monday at 18:30
+     [npdecoy_attendees/below-threshold] i have the interview with Mei and Chiara at 18:30
+     [ce_time_only/below-threshold] make the meeting with the manager at 13:45
+  wrong-time-UNAMBIGUOUS:
+     [ce_recurring] said '07:00' -> want 07:00, got 19:00  i have the driving lesson every day at 07:00
+     [leadtime] said '07:00' -> want 07:00, got 19:00  add the parents meeting in school tomorrow at 07:00, remind me 20 minutes before
+  wrong-time:
+     [ramble_ce] said '6:00' -> want 06:00, got 18:00  yes, i have the football match in tuesday at 6:00, how to say put in calendar

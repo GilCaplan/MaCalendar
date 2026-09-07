@@ -1450,3 +1450,45 @@ the rules' ~36%), which is why that rewiring worked and this one does not.
 **Reverted.** The idea is not dead — it becomes viable if the operation and
 kind models reach the atomicity model's standard. Banked so no future cycle
 re-tries it blind.
+
+## PERSONA FINDING (2026-09-07) — the engine is tuned to SENTENCE SHAPES, not vocabulary
+
+**Dataset:** 6 synthetic personas × 420 rows (`dataset/personas/`), ground
+truth by construction, every row `split: "test"`. Composition is identical
+across personas by construction (a shared catalog of 33 asks defined by
+grammar, each realised in each persona's own voice), so the structure-matched
+board isolates vocabulary+phrasing from "one persona got more compounds".
+
+**The ablation is the result.** Holding one half fixed against the control:
+
+| spread within block | vocabulary varies | phrasing varies |
+|---|---|---|
+| operation accuracy | **0.0 pt** | **20.9 pt** |
+| kind accuracy | 3.2 pt | 17.3 pt |
+| compound recall | 2.0 pt | 28.8 pt |
+| atomic handle-rate | 5.5 pt | 31.5 pt |
+| correct-on-handled | 9.6 pt | **52.4 pt** |
+
+**Gil's hypothesis is confirmed and it was the wrong worry.** Swapping content
+nouns moves the classifiers 0–3 pt: personal vocabulary genuinely does not
+matter. Swapping PHRASING moves them 7–29 pt.
+
+**Mechanism, visible in the code:** every `OperationFeatures` verb signal is
+`^\s*`-anchored, so a terse fragment ("the exam 12:30") or a polite
+circumlocution ("would you be kind enough to put the walk in for friday")
+fires ZERO non-bias operation features and receives only the class prior.
+That is 48.6% of the terse-student rows and 39.0% of the retiree rows,
+against 6.2% for the control persona.
+
+**Consequence:** atomic handle-rate 72.2% for the persona who talks like the
+author vs 33.9% for a terse student — the fast path works twice as well for
+one speaking style as another. (Fast-track only: a deferral still reaches
+the deep track, so this is a latency and offline-robustness disparity rather
+than proof of end-to-end wrongness.)
+
+**Also found — a real defect, minimal-pair confirmed, and mine (F15):** a
+daypart word ANYWHERE in the utterance, including inside the title,
+overrides an explicit clock time. "book the coffee MORNING … thursday at
+7pm" → 08:00, while "coffee meetup" → 19:00. "the siyum TONIGHT at 8:45am"
+→ 20:45. The substitution is unanchored and runs before temporal
+extraction, so a title word silently rewrites the user's stated time.

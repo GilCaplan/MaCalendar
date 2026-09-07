@@ -72,7 +72,14 @@ def set_columns(labels) -> None:
         order += [prefix + p for p in BASE if prefix + p in labels]
     order += sorted(labels - set(order))
     PERSONAS = order
-    SHORT = {p: p[-13:] for p in order}
+    alias = {"observant_student": "observant", "household_parent": "parent",
+             "freelance_consultant": "consultant", "retiree": "retiree",
+             "uni_student": "student", "esl_speaker": "esl"}
+    SHORT = {}
+    for p in order:
+        pre, _, base = p.rpartition(":")
+        tag = {"vocab": "v:", "phrase": "p:"}.get(pre, "")
+        SHORT[p] = (tag + alias.get(base, base))[:14]
 
 
 def blocks_of(labels):
@@ -399,7 +406,7 @@ def main() -> int:
                          "vocabulary-vs-phrasing ablation)")
     a = ap.parse_args()
 
-    path = pathlib.Path(a.data)
+    path = pathlib.Path(a.data).resolve()
     rows = [json.loads(l) for l in path.open(encoding="utf-8")]
     set_columns({r["persona"] for r in rows})
     structures = sorted({r["structure"] for r in rows})
@@ -411,7 +418,8 @@ def main() -> int:
 
     # ---- one board per persona ----------------------------------------
     print("=" * 100)
-    print("PERSONA BOARDS — dataset/personas/personas.jsonl (2,520 rows, 6 personas x 420, "
+    print(f"PERSONA BOARDS — {path.name} "
+          f"({len(rows)} rows, {len(PERSONAS)} columns x {len(rows)//len(PERSONAS)}, "
           "TEST-ONLY)\nfast track only (FastRule + gates, no LLM, no execution) · "
           "metrics from scripts/fastrule_shape.py")
     print("=" * 100)
@@ -507,22 +515,26 @@ def main() -> int:
 
     # ---- THE VARIANCE SUMMARY ------------------------------------------
     print("\n" + "=" * 100)
-    print("VARIANCE ACROSS PERSONAS — the spread IS the finding")
+    print("VARIANCE — the spread IS the finding")
     print("=" * 100)
-    print("\nNatural mix (each persona's own distribution of asks):")
-    for key, label, direction in METRICS:
-        variance_table(label, {p: getattr(totals[p], key) for p in PERSONAS}, direction)
-    if cb:
-        for key in ("atomicity", "operation", "kind"):
-            variance_table(f"{key} accuracy",
-                           {p: (cb[p][key]["accuracy"] if cb[p][key] else None) for p in PERSONAS}, +1)
-        variance_table("compound recall @floor",
-                       {p: cb[p]["compound_recall_at_floor"] for p in PERSONAS}, +1)
-    print("\nStructure-matched (identical composition — the clean comparison):")
-    for key, label, direction in METRICS:
-        vals, n = matched[key]
-        if vals:
-            variance_table(label, vals, direction, note=f"({n} structures)")
+    for block_name, cols in blocks_of(PERSONAS):
+        print(f"\n### {block_name}")
+        print("\nNatural mix (each column's own distribution of asks):")
+        for key, label, direction in METRICS:
+            variance_table(label, {p: getattr(totals[p], key) for p in cols}, direction)
+        if cb:
+            for key in ("atomicity", "operation", "kind"):
+                variance_table(f"{key} accuracy",
+                               {p: (cb[p][key]["accuracy"] if cb[p][key] else None)
+                                for p in cols}, +1)
+            variance_table("compound recall @floor",
+                           {p: cb[p]["compound_recall_at_floor"] for p in cols}, +1)
+        print("\nStructure-matched (identical composition — the clean comparison):")
+        for key, label, direction in METRICS:
+            vals, n = matched[key]
+            if vals:
+                variance_table(label, {p: vals[p] for p in cols}, direction,
+                               note=f"({n} structures)")
 
     # ---- per-structure detail ------------------------------------------
     if a.structures:
