@@ -1,0 +1,167 @@
+{
+  "by_complexity": {
+    "medium": {
+      "n": 210,
+      "old": 0.89,
+      "new": 0.89,
+      "delta": 0.0
+    },
+    "simple": {
+      "n": 208,
+      "old": 0.904,
+      "new": 0.904,
+      "delta": 0.0
+    },
+    "complex": {
+      "n": 182,
+      "old": 0.275,
+      "new": 0.451,
+      "delta": 0.176
+    }
+  },
+  "by_compound_kind": {
+    "event+event": {
+      "n": 59,
+      "old": 0.237,
+      "new": 0.525,
+      "delta": 0.288
+    },
+    "event+task": {
+      "n": 76,
+      "old": 0.171,
+      "new": 0.382,
+      "delta": 0.211
+    },
+    "task+task": {
+      "n": 47,
+      "old": 0.489,
+      "new": 0.468,
+      "delta": -0.021
+    }
+  },
+  "split_policy": "DEV=ranks 1-600 (tunable); HELD-OUT=601-3000 (measure only, never mine)",
+  "dev_rate_old_vs_new": [
+    [
+      0.708,
+      600
+    ],
+    [
+      0.762,
+      600
+    ]
+  ],
+  "heldout_rate_old_vs_new": [
+    [
+      null,
+      0
+    ],
+    [
+      null,
+      0
+    ]
+  ],
+  "shared_prompts": 600,
+  "count_ok_shared_old": 0.7083333333333334,
+  "count_ok_shared_new": 0.7616666666666667,
+  "flipped_better (old fail \u2192 engine pass)": [
+    "Please add brunch with Erin to my calendar at the Diner. Also, add a new list",
+    "Set a reminder to call my mom at 3pm \u2014 and olly, can you please add my dinner reservations to my calender?",
+    "Schedule my 'event' with 'person' at 'time' and 'place' and i want to know could an extra item be added to my grocery list?",
+    "Remind me of the following event:",
+    "Add dentist appointment for Friday at 5 and please add meeting at work to calander",
+    "can you add to my calendar an event for next friday and put xxx on the list",
+    "Who is coming to the meeting tomorrow at 10 AM?",
+    "Set this before event and also add apples to shopping list",
+    "Repeat this event every Friday on my calendar, and then add wine to list",
+    "Please repeat this event. Also, Set up recurring date on my calendar",
+    "PLZ REMIND TO SLEEP AT 9 P.M. Also, add to calendar and repeat",
+    "Set a reminder for the meeting every Monday at 2pm. Also, Make a new list of dog breeds.",
+    "Remind me about my business meeting at 3:45pm \u2014 and get me with new list.",
+    "On the fifth of November, I need to go to Washington, D.C, and then I'd like to set a date for this week?",
+    "Notify me when my rent due?",
+    "Remind me to pick up John from the airport tonight at 8, and then add this to the list",
+    "please add party at chucky cheese to calander \u2014 and i need to add pasta and milk to the grocery list.",
+    "Remember to pick me up by 12 noon from the Airport, I have a 3 pm meeting \u2014 and pDA please make a list.",
+    "alexa set a meeting event reminder with mona on tuesday, and then Set a Thanks Giving event for Friday",
+    "Olly, will you mark that I am busy for an event tomorrow at 2 pm?",
+    "the location is _____",
+    "Add to calendar a home visit everyday this week and also make new list of recent workouts",
+    "Let me know later.",
+    "Remind me on 5th March of every year to arrange wedding anniversary presents and put this on my list",
+    "Schedule and appointment with Mike for next Thursday morning.",
+    "give me the reminders",
+    "Set reminder to print the documents on Tuesday morning",
+    "Add event with these people and also add bread to my grocery list",
+    "please set a reminder for my 5pm meeting today, and then add this to the list",
+    "Add my co worker, Ann to submit project for work on Tuesday. Also, MAKE NEW SHCEDULE FOR TOMORROW MEETING",
+    "Set reminder for three o'clock",
+    "Set a reminder for tomorrow evening",
+    "add 'birthday' wth mom for next month, and then Create a list of books to be ordered",
+    "Create a meeting thursday afternoon for budget review. Also, create a new list of my pending bills",
+    "Please set recurring calendar event and set event in calandar.  repeat event every day",
+    "COULD YOU PLEASE TELL WHEN WE HAVE TO PAY FOR CAR INSURANCE?",
+    "Set a reminder for a meeting at 2pm tomorrow between myself and John.",
+    "Set up a reoccurring grocery store trip for every Sunday",
+    "I need you to add this event to my calendar. Also, Be sure to remind me of this",
+    "PDA, mark sarahs b-day party on the 12th. Also, I need to set up a recurring event in my calendar please",
+    "Olly, set a reminder for my meeting today and create a birthday wish reminder for tommorrow at 10 AM",
+    "please set event on Tuesday \u2014 and alexa remind me to go to my doctors at 4pm on tuesday",
+    "set a list for....",
+    "add a meeting with my mother for next sunday and reopen groceries and add milk",
+    "Make a note of an event  'exhibition 2017 mass' on Mar 25 and also add to the list",
+    "remind me for tomorrow dinner. Also, alert me at the time of the event",
+    "Make a note of an event  'exhibition 2017 mass' on Mar 25, and then include MIke and jack to festival calender",
+    "What are the list of things I need to buy today?",
+    "Add event, book club, Debbie's house, Wednesday night",
+    "please add this event \u2014 and schedule a meeting on Tuesday",
+    "Add Event on Ausgut 21 at 9am and please add an event to my calendar.",
+    "Save event for 5pm to 6pm on March 18th \u2014 and remind me to take my medicine at 9am",
+    "Add dates without me having to tell to, like tv schedules. Also, Please remind me about the 11am business meet",
+    "Olly, please set dinner plans at 7pm for every Friday in April and pDA please set this event on repeat this date",
+    "remind me at 5:00pm that I have a meeting, and then Please create a new list",
+    "PDA, I want to make a list and this should be automatically saved as a text file with the title, list and i need to put together a todo list for work.",
+    "Please set a reminder for church services on Sundays for 11am.",
+    "Add to calendar may 2 is Mary's birthday. Repeat every year and olly later tonight remind me about tomorrows meeting",
+    "Set a reminder for 5pm tomorrow, and then Remind me of Sarah's birthday three days ahead of time.",
+    "Every Wednesday night at 5pm remind me to meet Phil and also make a new list for me, please.",
+    "Please set a reminder for Tuesdays at nine a.m.",
+    "Remind me at the 15th of every month and pUT MILK ON MY SHOPPING LIST",
+    "Block one hour from 10 tomorrow morning, and then Add Diapers in cosmetic list",
+    "please set a reminder for the office party next saturday?"
+  ],
+  "flipped_worse (old pass \u2192 engine fail)": [
+    "Name off all the lists I own.",
+    "On the day project one is due, does my daughter have a recital?",
+    "AAJ MARCH KI 5TH DAY HAI, HAI KI NAHI?",
+    "Can you create a new list in my podcast?",
+    "Favorite places to eat",
+    "give me a reminder at 8pm for the game",
+    "Put working out on my calendar for 8 a.m. every day this week. Also, I want to start a new list.",
+    "Mark reminder with these people, and then Pleas set a reminder for a meeting I have on Tuesday next week.",
+    "Tell me to go to the grocery store after work.",
+    "add 'valentine's day' with her tomorrow",
+    "Can you add an event with John and Mary?",
+    "Can you remind me to order the Turkey three weeks before Thanksgiving?",
+    "add 'christmas' to calendar",
+    "On my sisters birthday send her flowers \u2014 and hey Olly, I need you to make a list of cricket players of Indian team who played for the international team in 2014",
+    "Add a party in NY city for this saturday \u2014 and on Monday, the 20th, I need to have a conversation with Greg about our weekend trip.",
+    "set reminder for tomorrows meeting with {client name} and also add this one also.",
+    "remove 'table' from furniture",
+    "Will you put in my calendar that John C. and his wife are meeting with us at four p.m. tomorrow?",
+    "new scenario, time or calendar to new list and also please create a list of Due payment those who not received more then 10 Months.",
+    "Hey Olly, make a list of names starting with vowels and ending with vowels, and then Start a new grocery list.",
+    "Do I need to be reminded of any meetings on Monday?",
+    "Don't let me forget Rover's vet appointment on the 25th and pDA add Sally's Birthday to Calander for Saturday at 10pm",
+    "Can you make an event for friday night with Emi, Maya, and Mackensie?",
+    "Save this afternoon for my date, and then I would like to start a new list",
+    "Get me the details of upcoming Oscar 2017.",
+    "Will you send a calendar invite out to James and Alice for brunch at 11 am on Tuesday and also my new work schedule list",
+    "Remind me about my next meeting with joe one hour before and schedule a meeting with Brian Billings for 2:30 PM on Friday.",
+    "Set lunch every day at 12:30, and then I want to start a new list of power tools on sale at True Value.",
+    "REMOVE ICECREAM FROM GROCERY",
+    "Is 23 december sunday",
+    "remove milk from my grocery list",
+    "Remove bananas from my shopping list"
+  ],
+  "note": "old-system rows are behavior, not ground truth; each flip needs triage (old right / new right / both wrong) by a human or a judge model that is not the system under test"
+}

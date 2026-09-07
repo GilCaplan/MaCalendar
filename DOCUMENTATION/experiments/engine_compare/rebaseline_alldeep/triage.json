@@ -1,0 +1,197 @@
+{
+  "prf": {
+    "overall": {
+      "precision": 0.867,
+      "recall": 0.797,
+      "f1": 0.831,
+      "matched": 189,
+      "expected": 237,
+      "created": 218
+    },
+    "simple": {
+      "precision": 0.767,
+      "recall": 0.793,
+      "f1": 0.78,
+      "matched": 23,
+      "expected": 29,
+      "created": 30
+    },
+    "medium": {
+      "precision": 0.917,
+      "recall": 0.825,
+      "f1": 0.868,
+      "matched": 33,
+      "expected": 40,
+      "created": 36
+    },
+    "complex": {
+      "precision": 0.875,
+      "recall": 0.792,
+      "f1": 0.831,
+      "matched": 133,
+      "expected": 168,
+      "created": 152
+    }
+  },
+  "subslices": {
+    "count_ok_ranks_1_250": [
+      0.792,
+      250
+    ],
+    "count_ok_ranks_251_600": [
+      null,
+      0
+    ],
+    "prf_ranks_251_600": {
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "matched": 0,
+      "expected": 0,
+      "created": 0
+    }
+  },
+  "by_complexity": {
+    "medium": {
+      "n": 78,
+      "old": 0.91,
+      "new": 0.872,
+      "delta": -0.038
+    },
+    "simple": {
+      "n": 88,
+      "old": 0.898,
+      "new": 0.864,
+      "delta": -0.034
+    },
+    "complex": {
+      "n": 84,
+      "old": 0.214,
+      "new": 0.643,
+      "delta": 0.429
+    }
+  },
+  "by_compound_kind": {
+    "event+event": {
+      "n": 27,
+      "old": 0.185,
+      "new": 0.741,
+      "delta": 0.556
+    },
+    "event+task": {
+      "n": 37,
+      "old": 0.162,
+      "new": 0.703,
+      "delta": 0.541
+    },
+    "task+task": {
+      "n": 20,
+      "old": 0.35,
+      "new": 0.4,
+      "delta": 0.05
+    }
+  },
+  "split_policy": "DEV=ranks 1-600 (tunable); HELD-OUT=601-3000 (measure only, never mine)",
+  "dev_rate_old_vs_new": [
+    [
+      0.672,
+      250
+    ],
+    [
+      0.792,
+      250
+    ]
+  ],
+  "heldout_rate_old_vs_new": [
+    [
+      null,
+      0
+    ],
+    [
+      null,
+      0
+    ]
+  ],
+  "shared_prompts": 250,
+  "count_ok_shared_old": 0.672,
+  "count_ok_shared_new": 0.792,
+  "flipped_better (old fail \u2192 engine pass)": [
+    "Give an entry to this list \u2014 and make a note of this on the list",
+    "Make a reminder at 1PM every Monday until I I remove it, and then Start a new grocery list.",
+    "Olly remind me about the picnic at Regent park \u2014 and add paper towels to the grocery list.",
+    "Add my co worker, Ann to submit project for work on Tuesday. Also, MAKE NEW SHCEDULE FOR TOMORROW MEETING",
+    "I need to set up a meeting with Peter Francis on Monday \u2014 and refresh the list with new one.",
+    "give me the reminders",
+    "please set event on Tuesday \u2014 and alexa remind me to go to my doctors at 4pm on tuesday",
+    "remind me when a contact calls, and then Please set up a meeting with Becky at 3 pm on Tuesday",
+    "can you schedule a meeting with Mr. Chen on next Monday 6:00pm, and then Set reminder in calendar.",
+    "please add this event \u2014 and schedule a meeting on Tuesday",
+    "Alexa add bananas to my shopping list. Also, alexa put shoes on my list",
+    "Remind me at the 15th of every month and pUT MILK ON MY SHOPPING LIST",
+    "Make a note of an event  'exhibition 2017 mass' on Mar 25 and also add to the list",
+    "Add event with these people and also add bread to my grocery list",
+    "add a note to attend. Also, save the new list",
+    "Set a reminder for the meeting every Monday at 2pm. Also, Make a new list of dog breeds.",
+    "Please set a reminder for church services on Sundays for 11am.",
+    "Set reminder for three o'clock",
+    "PDA, mark sarahs b-day party on the 12th. Also, I need to set up a recurring event in my calendar please",
+    "Set reminder for meeting with Mitushree on 04/04/2017 \u2014 and remember me to send the presentation today at 1:00pm",
+    "Add paper towels to the grocery list and also pDA can you create a list for me.",
+    "Please set recurring calendar event and set event in calandar.  repeat event every day",
+    "Remember to pick me up by 12 noon from the Airport, I have a 3 pm meeting \u2014 and pDA please make a list.",
+    "mark 13 october of this year as my birthday",
+    "Olly, add lunch appointment with Lisa to January 2nd at 12:30pm. Also, Remind me at the 15th of every month.",
+    "Every Wednesday night at 5pm remind me to meet Phil and also make a new list for me, please.",
+    "Remind me of the following event:",
+    "What are the list of things I need to buy today?",
+    "On the fifth of November, I need to go to Washington, D.C, and then I'd like to set a date for this week?",
+    "Remind me the wedding on time to buy a present and create a new list of my due bills",
+    "Repeat this event every Friday on my calendar, and then add wine to list",
+    "Add dentist appointment for Friday at 5 and please add meeting at work to calander",
+    "COULD YOU PLEASE TELL WHEN WE HAVE TO PAY FOR CAR INSURANCE?",
+    "Remind me to meet James at work tomorrow at 9am, and then Remind me of my meeting tomorrow at 3:00PM",
+    "set reminder at 3 pm",
+    "Add Event on Ausgut 21 at 9am and please add an event to my calendar.",
+    "PDA, I want to make a list and this should be automatically saved as a text file with the title, list and i need to put together a todo list for work.",
+    "Olly, set a reminder for my meeting today and create a birthday wish reminder for tommorrow at 10 AM",
+    "Schedule my 'event' with 'person' at 'time' and 'place' and i want to know could an extra item be added to my grocery list?",
+    "Notify me when my rent due?",
+    "Remind me on 5th March of every year to arrange wedding anniversary presents and put this on my list",
+    "Please repeat this event. Also, Set up recurring date on my calendar",
+    "Add Moong daal in grocery list, and then Give an entry to this list.",
+    "I have dinner with my sister this Saturday and i want to make next week's to-do list",
+    "Before this event set notification and bring up a new shopping list.",
+    "Set this before event and also add apples to shopping list",
+    "Set a event for the evening, and then get xxx on the list",
+    "Set a reminder for a meeting at 2pm tomorrow between myself and John.",
+    "alexa set a meeting event reminder with mona on tuesday, and then Set a Thanks Giving event for Friday",
+    "Remind me the wedding on time to buy a present \u2014 and grocery list add eggs",
+    "Remind me about next meeting in advance, and then Please add sugar to my grocery list.",
+    "Remind me to send the presentation today at 1:00pm. Also, Go to Stripes at 5pm on 3 April."
+  ],
+  "flipped_worse (old pass \u2192 engine fail)": [
+    "Add red wine to my shopping list and i need to create a new to do list.",
+    "remind me about thing at time",
+    "Do I need to be reminded of any meetings on Monday?",
+    "Create a new list called Grocery Store, please.",
+    "AAJ MARCH KI 5TH DAY HAI, HAI KI NAHI?",
+    "To-do list for today, please.",
+    "Add 'event' to my calendar",
+    "Mark reminder with these people, and then Pleas set a reminder for a meeting I have on Tuesday next week.",
+    "13th june is a day of election result.plz. set it.",
+    "Can you create a new list in my podcast?",
+    "Please add an event to my schedule",
+    "reopen groceries and add milk",
+    "remove 'table' from furniture",
+    "alexa add shoes to my list, and then Could you create a new list for me",
+    "Add a party in NY city for this saturday \u2014 and on Monday, the 20th, I need to have a conversation with Greg about our weekend trip.",
+    "add 'christmas' to calendar",
+    "Is 23 december sunday",
+    "Favorite places to eat",
+    "Church with Mom and Dad on Sunday.",
+    "I need to start a list called and pUT MILK ON MY SHOPPING LIST",
+    "On the day project one is due, does my daughter have a recital?",
+    "new scenario, time or calendar to new list and also please create a list of Due payment those who not received more then 10 Months."
+  ],
+  "note": "old-system rows are behavior, not ground truth; each flip needs triage (old right / new right / both wrong) by a human or a judge model that is not the system under test"
+}

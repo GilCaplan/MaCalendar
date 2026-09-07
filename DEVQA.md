@@ -15,23 +15,6 @@ checkpoint. The proposal + its three open questions (first-move scope;
 Rule going forward: every design-change ask registers a row HERE, with the
 detail in its design doc — this file is the one inbox.
 
-
-**Q1 — Dated "I need to \<meet/talk\>…": event or task?**
-"on Monday, the 20th, I need to have a conversation with Greg" — today this
-becomes a task; the dataset's ground truth calls it a calendar event. Same
-family as the occasion-reminder rule you approved, one step further (no
-remind-word at all). ~1 row on dev-fast, so low stakes — whenever convenient.
-
-**Q4 — Notifications: do you want Mac reminders with the calendar CLOSED?**
-That means detaching `assistant.api` into a launchd LaunchAgent (launch-model
-change: --reload, HUD, shutdown ownership). If "no", the phone is officially
-the only always-on ringer and the plan's riskiest phase disappears.
-*(The build shipped with the phone-only default — this stays reversible.)*
-
-**Q5 — Notifications: default lead time — opt-in (0: only where you asked)
-or blanket (e.g. 30 min before everything)?** Shipped as 0 (opt-in);
-blanket changes the feature's noise level on a dense calendar.
-
 **Q6 — Reminders for events INSIDE Shabbat/yom tov (e.g. Shabbat lunch):
 suppress entirely (shipped default) or roll into one pre-candle-lighting
 digest banner?** Lifestyle call, not engineering.
@@ -67,3 +50,20 @@ digest banner?** Lifestyle call, not engineering.
   graduated cycles. → Standing policy in ITERATION_PROTOCOL.md; first merge
   done (@ a425ca2).
 - 2026-09-04 — **Date-only occasion reminders**: calendar events. → Cycle 2.
+
+## Answered log
+
+**Q1 (2026-09-06): dated "I need to <meet/talk>…" = EVENT.** Implemented same
+day: `_NEED_ENCOUNTER_RE` in segment's pinned-kind rules (encounter verbs +
+date/clock ⇒ event; errands and undated encounters unchanged) + unit tests.
+
+**Q4 (2026-09-06): Mac reminders with the calendar closed = a notification-
+settings OPTION.** Queued in TASKS (app stream): settings toggle first, the
+LaunchAgent detach ships behind it, default off.
+
+**Q5 (2026-09-06): default lead time = PER CATEGORY.** Matches the built
+mechanism (`resolve_lead`: event override → category lead/mute → fallback);
+the per-category leads in notification settings are the primary surface.
+
+**Q6 (2026-09-06): events inside Shabbat/yom tov get NO reminders.** The
+shipped suppress-entirely default is confirmed; no digest.

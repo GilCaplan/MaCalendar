@@ -1,0 +1,114 @@
+{
+  "by_complexity": {
+    "medium": {
+      "n": 78,
+      "old": 0.91,
+      "new": 0.91,
+      "delta": 0.0
+    },
+    "simple": {
+      "n": 88,
+      "old": 0.898,
+      "new": 0.886,
+      "delta": -0.011
+    },
+    "complex": {
+      "n": 84,
+      "old": 0.214,
+      "new": 0.405,
+      "delta": 0.19
+    }
+  },
+  "by_compound_kind": {
+    "event+event": {
+      "n": 27,
+      "old": 0.185,
+      "new": 0.519,
+      "delta": 0.333
+    },
+    "event+task": {
+      "n": 37,
+      "old": 0.162,
+      "new": 0.351,
+      "delta": 0.189
+    },
+    "task+task": {
+      "n": 20,
+      "old": 0.35,
+      "new": 0.35,
+      "delta": 0.0
+    }
+  },
+  "split_policy": "DEV=ranks 1-600 (tunable); HELD-OUT=601-3000 (measure only, never mine)",
+  "dev_rate_old_vs_new": [
+    [
+      0.672,
+      250
+    ],
+    [
+      0.732,
+      250
+    ]
+  ],
+  "heldout_rate_old_vs_new": [
+    [
+      null,
+      0
+    ],
+    [
+      null,
+      0
+    ]
+  ],
+  "shared_prompts": 250,
+  "count_ok_shared_old": 0.672,
+  "count_ok_shared_new": 0.732,
+  "flipped_better (old fail \u2192 engine pass)": [
+    "Please repeat this event. Also, Set up recurring date on my calendar",
+    "Repeat this event every Friday on my calendar, and then add wine to list",
+    "Notify me when my rent due?",
+    "Add dates without me having to tell to, like tv schedules. Also, Please remind me about the 11am business meet",
+    "Make a note of an event  'exhibition 2017 mass' on Mar 25 and also add to the list",
+    "Remind me of the following event:",
+    "Every Wednesday night at 5pm remind me to meet Phil and also make a new list for me, please.",
+    "Set a reminder for a meeting at 2pm tomorrow between myself and John.",
+    "Add dentist appointment for Friday at 5 and please add meeting at work to calander",
+    "Add Event on Ausgut 21 at 9am and please add an event to my calendar.",
+    "COULD YOU PLEASE TELL WHEN WE HAVE TO PAY FOR CAR INSURANCE?",
+    "On the fifth of November, I need to go to Washington, D.C, and then I'd like to set a date for this week?",
+    "Set a reminder for the meeting every Monday at 2pm. Also, Make a new list of dog breeds.",
+    "Add my co worker, Ann to submit project for work on Tuesday. Also, MAKE NEW SHCEDULE FOR TOMORROW MEETING",
+    "Please set recurring calendar event and set event in calandar.  repeat event every day",
+    "Set this before event and also add apples to shopping list",
+    "Olly, please set dinner plans at 7pm for every Friday in April and pDA please set this event on repeat this date",
+    "PDA, mark sarahs b-day party on the 12th. Also, I need to set up a recurring event in my calendar please",
+    "Schedule my 'event' with 'person' at 'time' and 'place' and i want to know could an extra item be added to my grocery list?",
+    "Please set a reminder for church services on Sundays for 11am.",
+    "PDA, I want to make a list and this should be automatically saved as a text file with the title, list and i need to put together a todo list for work.",
+    "set reminder at 3 pm",
+    "alexa set a meeting event reminder with mona on tuesday, and then Set a Thanks Giving event for Friday",
+    "Add event with these people and also add bread to my grocery list",
+    "What are the list of things I need to buy today?",
+    "Add to calendar a home visit everyday this week and also make new list of recent workouts",
+    "please add this event \u2014 and schedule a meeting on Tuesday",
+    "give me the reminders",
+    "Remember to pick me up by 12 noon from the Airport, I have a 3 pm meeting \u2014 and pDA please make a list."
+  ],
+  "flipped_worse (old pass \u2192 engine fail)": [
+    "Favorite places to eat",
+    "Is 23 december sunday",
+    "Mark reminder with these people, and then Pleas set a reminder for a meeting I have on Tuesday next week.",
+    "Add a party in NY city for this saturday \u2014 and on Monday, the 20th, I need to have a conversation with Greg about our weekend trip.",
+    "Can you create a new list in my podcast?",
+    "AAJ MARCH KI 5TH DAY HAI, HAI KI NAHI?",
+    "new scenario, time or calendar to new list and also please create a list of Due payment those who not received more then 10 Months.",
+    "remove 'table' from furniture",
+    "set reminder for tomorrows meeting with {client name} and also add this one also.",
+    "Will you send a calendar invite out to James and Alice for brunch at 11 am on Tuesday and also my new work schedule list",
+    "Please earse the next birthday event",
+    "add 'christmas' to calendar",
+    "On the day project one is due, does my daughter have a recital?",
+    "Do I need to be reminded of any meetings on Monday?"
+  ],
+  "note": "old-system rows are behavior, not ground truth; each flip needs triage (old right / new right / both wrong) by a human or a judge model that is not the system under test"
+}

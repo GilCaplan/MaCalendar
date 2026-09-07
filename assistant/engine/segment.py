@@ -57,6 +57,11 @@ _REMINDISH_RE = re.compile(r"\b(?:remind(?:er)?s?|notify)\b", re.I)   # notify: 
 # The "remind me to <verb> …" errand form — stays a task unless clock-timed.
 _REMIND_TO_VERB_RE = re.compile(r"\bremind\s+\w+\s+to\b", re.I)
 
+# "I need to <meet/talk/…>" — an encounter being arranged, not an errand.
+_NEED_ENCOUNTER_RE = re.compile(
+    r"\bi need to\s+(?:meet|talk|speak|see|catch up|sit down|"
+    r"have\s+a\s+(?:conversation|chat|word|meeting|call))\b", re.I)
+
 # An occasion someone attends (not an errand someone does) …
 _OCCASION_RE = re.compile(
     r"\b(meeting|appointment|party|get-?together|dinner|lunch|brunch|breakfast|"
@@ -93,6 +98,14 @@ def _enforce_pinned_kinds(kind: str, text: str) -> str:
     # needed (cycle 4: "…calendar invite out to James and Alice for brunch at
     # 11 am" was labelled task and produced no event).
     if re.search(r"\bcalendar\s+invite\b", text, re.I):
+        return "event"
+    # Q1 (product convention, Gil 2026-09-06): a dated "I need to <meet/
+    # talk/have a conversation> …" is an appointment being made — "on Monday,
+    # the 20th, I need to have a conversation with Greg" is a calendar event,
+    # no remind-word required. Encounter verbs only: "I need to buy …" is
+    # still an errand, and an undated encounter stays a task.
+    if (_NEED_ENCOUNTER_RE.search(text)
+            and (_DATED_RE.search(text) or _CLOCKISH_RE.search(text))):
         return "event"
     if not _REMINDISH_RE.search(text):
         return kind

@@ -89,6 +89,11 @@ Running list of user-reported issues and feature requests, with status. Update w
 
 | 80 | **Voice lead-times (notifications phase 3, inline shape)** — "book gym tomorrow at 6:30 and give me a heads-up half an hour before" / "with a 15 minute reminder" attaches `reminder_minutes` to the created event. Design: decompose strips the reminder clause into `slots["reminder_minutes"]` BEFORE validate (its `_EXCLUSIVE_END` regex reads a bare "before" as a recurrence-end marker — the C-design catch); generate's `_apply_slots` maps the slot onto `CalendarIntent.reminder_minutes` (new optional field, pinned in `test_engine_contracts.py` in the same change). Standalone-update shape ("remind me 30 min before my meeting" as its own command) deferred to a follow-up row. | done 2026-09-06 | `engine/decompose.py`, `engine/generate.py`, `actions/calendar/intent.py` | run 14 (run 14: board flat as predicted, fieldq 85.3 best-ever; behavioral goal delivered) |
 
+**Q4 (Gil 2026-09-06, app stream):** Mac notification settings gains an
+"remind me even when the calendar is closed" option — the LaunchAgent detach
+ships BEHIND that toggle, default off (it changes the launch model: --reload,
+HUD, shutdown ownership — the plan's riskiest phase, now opt-in).
+
 ## How we are working right now
 
 **The current thread is the deep-track improvement loop** (branch

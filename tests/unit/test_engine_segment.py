@@ -222,3 +222,17 @@ def test_cycle4_cues_each_earned_by_a_failing_row():
     assert f("task", "send a calendar invite out to James and Alice for brunch") == "event"
     # notify without an occasion stays a task — the cue must not over-fire
     assert f("task", "notify me when the package arrives tomorrow") == "task"
+
+
+def test_a_dated_i_need_to_meet_is_an_event_q1():
+    """DEVQA Q1 (Gil, 2026-09-06): a dated "I need to <meet/talk/…>" is an
+    appointment being made, not an errand — the dataset's ground truth calls
+    it a calendar event. Undated encounters and dated errands are unchanged."""
+    from assistant.engine.segment import _enforce_pinned_kinds
+    assert _enforce_pinned_kinds(
+        "task", "on Monday, the 20th, I need to have a conversation with Greg") == "event"
+    assert _enforce_pinned_kinds("task", "I need to meet Sam tomorrow") == "event"
+    assert _enforce_pinned_kinds("task", "I need to talk to the plumber at 3 pm") == "event"
+    # counterexamples: errand with a date stays a task; undated encounter too
+    assert _enforce_pinned_kinds("task", "I need to buy groceries tomorrow") == "task"
+    assert _enforce_pinned_kinds("task", "I need to talk to Greg") == "task"
