@@ -21,6 +21,20 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## Era-2 cycle 4 — REGISTERED PREDICTION 2026-09-07: F6 joint confirmation
+
+**Change under test:** the F6 integration (encounter route-override,
+broadened date-marking, completion phrase-funnel) landing on the full
+engine, alongside the already-merged Q9 confirm gate (inert on this pool by
+audit). Routing effects on the 3000-pool: encounter-family rows FastRule
+used to fast-commit as create_todo now route create_event and abstain on
+missing start_time → deep completes them (Q1 rule + all-day path);
+completion phrasings commit correctly instead of mis-acting.
+**Predict (dev-fast 250 vs run 19):** fast n 86 → 82–86 (encounters move to
+deep); fast correct-on-committed 91 → 91–94; deep n up a few, deep correct
+flat ±2 (absorbing rows deep handles well); overall adjusted 81.0 flat to
++1.0; garbage 0%; no metric worse than noise.
+
 ## F6 — ACTUAL (2026-09-07, fastlane 6c2bca1): three families fixed, prediction narrowly under
 
 **Train (4,800):** correct-on-committed **74.7 → 81.1%** (predicted 82–86 —
