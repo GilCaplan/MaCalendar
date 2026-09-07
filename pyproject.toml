@@ -42,6 +42,10 @@ nlp = [
     "emoji<2.0",
 ]
 dev = [
+    # fit-time only: the routing models are FITTED with sklearn and
+    # exported as JSON weights; the shipped engine never imports it
+    # (inference is a hand-written dot product) - see intent/classifier.py
+    "scikit-learn>=1.4",
     "pytest>=8.0",
     "pytest-mock",
     "pytest-cov",

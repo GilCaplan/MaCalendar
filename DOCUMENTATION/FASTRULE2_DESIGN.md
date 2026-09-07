@@ -15,7 +15,7 @@ B-test):
 - **Simple tier: the star metric.** North star ≥90% commit at ≥95%
   correct-on-committed; the standing milestone on the way is 80% at ≥90%
   (today: 72.0% at 92.4%). Every v2 decision optimizes this first.
-- **Complex tier: NO commit-rate target at all.** Deferring is correct
+- **Complex tier: NO comm/usait-rate target at all.** Deferring is correct
   behavior, not failure. The only complex numbers that matter: whatever
   DOES commit stays ≥90% correct (today's 71% on committed-complex is the
   real complex problem — v2's split-and-recurse commits only all-clear
