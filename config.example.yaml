@@ -194,6 +194,9 @@ nlu:
 engine:
   confirm_transcript: false  # step 1: doubted words block execution behind an "edit the
                              # transcription" round-trip (clients that support it only)
+  confirm_create: true       # step 4: "should I add yoga tomorrow?" is offered for
+                             # confirmation, never executed or dropped silently
+                             # (clients that support it only)
   reconcile: always          # step 6 on the fast track: always | uncertain (decided by telemetry)
   fast_track: true           # false = every command takes the foreground deep track
   coalesce_max_tokens: 300   # step 0: queued commands coalesced into one input up to this budget

@@ -441,7 +441,7 @@ def run_objects(state: EngineState, cfg) -> EngineState:
             _rule_due_date_pin(state, intent, rel, recur, td_idx, n_todos)
             td_idx += 1
 
-    _rule_question_creates_nothing(state, pairs)
+    _rule_question_creates_nothing(state, cfg, pairs)
     _rule_cadence_round_and_announce(state, tl)
 
     applied = state.fixes[fixes_before:]
@@ -730,13 +730,48 @@ _QUERY_OPENER = re.compile(
 _CREATE_VERB = re.compile(r"\b(add|create|make|set|book|schedule|new|start|open)\b", re.I)
 
 
-def _rule_question_creates_nothing(state, pairs) -> None:
+def _rule_interrogative_create_asks_first(state, cfg, item, pairs) -> bool:
+    """Gil's ruling (2026-09-07, DEVQA Q9): an interrogative create —
+    "should i add yoga to my calendar tomorrow?" — must neither auto-create
+    nor be silently dropped. It gets a confirmation prompt instead.
+
+    Returns True when this item is held for confirmation: the intent SURVIVES
+    (fully validated, ready to POST) and `slots["confirm_create"]` tells the
+    orchestrator to ask rather than commit — the same shape as the transcript
+    gate's `needs_edit`, and gated the same way on the client saying it can
+    render the prompt.
+
+    Only when the question is the whole command. A confirmation holds
+    everything, so "book gym at 7 and should i add yoga?" would strand the
+    booking behind a dialog about the yoga; there the question half keeps
+    today's behaviour and the booking runs.
+    """
+    if not state.supports_confirm:
+        return False
+    if not getattr(getattr(cfg, "engine", None), "confirm_create", True):
+        return False
+    from assistant.engine.segment import is_interrogative_create
+    if not is_interrogative_create(item.text or ""):
+        return False
+    if sum(1 for other, _a, _i in pairs if other.intent is not None) != 1:
+        return False
+    item.slots["confirm_create"] = True
+    title = (getattr(item.intent, "title", None)
+             or (getattr(item.intent, "titles", None) or [""])[0] or item.text[:30])
+    state.add_fix("validate", "interrogative_create_asks_first", str(title), "",
+                  note="a question that would create something — asking first")
+    return True
+
+
+def _rule_question_creates_nothing(state, cfg, pairs) -> None:
     """Dataset triage: "…does my daughter have a recital?" INVENTED a task
     from the question's subordinate clause. An item whose own words are a
     question feeds the query — it never creates. Scoped to the item's text,
     so "book gym and what's on friday?" keeps its booking."""
     for item, action, intent in pairs:
         if item.intent is None or not action or not action.startswith("create_"):
+            continue
+        if _rule_interrogative_create_asks_first(state, cfg, item, pairs):
             continue
         text = (item.text or "").strip()
         imperative_query = bool(_QUERY_OPENER.match(text)) and not _CREATE_VERB.search(text)

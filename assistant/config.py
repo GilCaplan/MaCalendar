@@ -246,6 +246,11 @@ class EngineConfig(BaseModel):
     # check the transcription before anything executes (clients that declared
     # supports_edit only). Off = proceed with the best guess + tap-a-word.
     confirm_transcript: bool = False
+    # Step 4's gate: an interrogative create ("should I add yoga tomorrow?")
+    # is offered for confirmation instead of being executed or dropped
+    # (clients that declared supports_confirm only). Off = the pre-ruling
+    # behaviour, where deep decides on its own.
+    confirm_create: bool = True
     # Step 6 on the fast track: cross-check every command, or only ones the
     # rules were less sure about. Decided by loop telemetry, not by taste.
     reconcile: Literal["always", "uncertain"] = "always"

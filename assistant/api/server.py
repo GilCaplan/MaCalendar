@@ -47,6 +47,108 @@ import time as _time
 _verify_store: dict = {}
 _verify_lock = _threading.Lock()
 
+# ---------------------------------------------------------------------------
+# Confirm-create store (DEVQA Q9): an interrogative create the engine parsed
+# but did not run. {token: {"proposal": [...], "expires": float,
+#                          "memory_id": int|None, "source": str,
+#                          "result": dict|None}}
+# `result` is filled on the first answer and replayed on any repeat, so a
+# double-tapped Add creates once — the same intent as the todo client_token,
+# extended to events, which have no idempotency key of their own.
+# ---------------------------------------------------------------------------
+_confirm_store: dict = {}
+_confirm_lock = _threading.Lock()
+#: Long enough to read a proposal and decide, short enough that an answer given
+#: an hour later doesn't book something the speaker has forgotten asking about.
+CONFIRM_TTL_SEC = 600
+
+
+def _confirm_sweep(now: "float | None" = None) -> None:
+    """Drop expired proposals. Called on every touch of the store — there is no
+    timer here on purpose: a handful of dicts does not deserve a thread."""
+    now = _time.time() if now is None else now
+    with _confirm_lock:
+        for tok in [t for t, e in _confirm_store.items() if e.get("expires", 0) <= now]:
+            _confirm_store.pop(tok, None)
+
+
+def create_event_from_body(data: dict) -> "tuple[dict, int]":
+    """POST /events' body → the created event. Shared with /voice/confirm so an
+    accepted proposal is created by exactly the code a client's own POST would
+    have run — one create path, no second way into db.py."""
+    required = {"title", "date", "start_time", "end_time"}
+    missing = required - data.keys()
+    if missing:
+        return {"error": f"Missing fields: {missing}", "code": 400}, 400
+    return {"id": get_db().create_event_from_dict(data)}, 201
+
+
+def create_todo_from_body(data: dict) -> "tuple[dict, int]":
+    """POST /todos' body → the created task, idempotent on `client_token`.
+    Shared with /voice/confirm (see create_event_from_body)."""
+    title = data.get("title", "").strip()
+    if not title:
+        return {"error": "Missing 'title' field", "code": 400}, 400
+    db = get_db()
+    # Creation is idempotent on `client_token`: the client mints one token
+    # per task the user asked for and sends it on the live POST and on every
+    # replay of the same queued create. Without this a create that reached
+    # the Mac but whose reply was lost — or one flushed twice by overlapping
+    # sync passes — landed as another copy of the task; that is how 32
+    # "buy groceries" rows accumulated in the Today list (2026-09-04..06).
+    token = str(data.get("client_token") or "").strip()
+    if token:
+        already = db.get_todo_by_client_token(token)
+        if already is not None:
+            return {"id": already["id"], "duplicate": True}, 200
+    # A count typed into the title works the same as one spoken: "pasta x5"
+    # is one task for five, not a task literally called "pasta x5".
+    from assistant.intent.quantity import split_quantity
+    title, parsed_qty = split_quantity(title)
+    try:
+        quantity = max(1, int(data.get("quantity") or parsed_qty))
+    except (TypeError, ValueError):
+        quantity = parsed_qty
+    list_name = data.get("list_name", "today")
+    todo_cfg = load_config().todo
+    # Second net, for callers that send no token at all. `client_token` is
+    # the precise key, but the partial unique index only referees non-empty
+    # tokens — so a token-less client (the HUD's revert POST, a curl, a
+    # script) could still stack copies of one task. When the same open task,
+    # spelled the same, in the same list, was created seconds ago, read the
+    # repeat as a replay of that create and hand back the row it made.
+    # Completed rows never match, so re-adding a task you ticked off still
+    # works; the window is config'd (todo.duplicate_window_seconds, 0=off).
+    if not token:
+        recent = db.find_recent_open_todo(
+            title, list_name, int(getattr(todo_cfg, "duplicate_window_seconds", 120)))
+        if recent is not None:
+            logger.info("POST /todos: token-less repeat of open todo %s (%r) "
+                        "inside the duplicate window — returning it",
+                        recent["id"], title)
+            return {"id": recent["id"], "duplicate": True,
+                    "reason": "recent-identical"}, 200
+    tags = data.get("tags") or []
+    if not tags:
+        # Client didn't say — server-side "tag mode", else infer from the
+        # title, the same order of precedence voice creation uses.
+        if todo_cfg.auto_tag:
+            tags = [todo_cfg.auto_tag]
+        elif getattr(todo_cfg, "auto_tag_infer", True):
+            from assistant.actions.todo.tagging import suggest_tags
+            tags = suggest_tags(title, [r["name"] for r in db.get_tags()])
+    todo_id = db.create_todo(
+        title=title,
+        list_name=list_name,
+        priority=data.get("priority", "none"),
+        due_date=data.get("due_date", ""),
+        notes=data.get("notes", ""),
+        tags=tags,
+        quantity=quantity,
+        client_token=token,
+    )
+    return {"id": todo_id}, 201
+
 
 def build_stt(cfg):
     """STT provider per config.stt_engine (shared with the Mac pipeline)."""
@@ -267,27 +369,55 @@ def create_app() -> Flask:
     def _run_transcript(transcript: str, trace: "Trace | None" = None,
                         source: str = "ios", current_view: str = "month",
                         trace_run: str | None = None,
-                        supports_edit: bool = False) -> dict[str, Any]:
+                        supports_edit: bool = False,
+                        supports_confirm: bool = False) -> dict[str, Any]:
         """The brain lives in assistant.engine now — the 7-step deep track
         (DOCUMENTATION/ENGINE.md). This wrapper exists so every voice route
-        and the pending-retry loop share one entry point."""
+        and the pending-retry loop share one entry point.
+
+        It also parks a `confirm_create` proposal in the token store on the way
+        out, so every voice route offers the prompt identically — the token and
+        its TTL are HTTP bookkeeping, which is what this layer is for."""
         from assistant.engine import run_transcript as _engine_run
-        return _engine_run(transcript, trace=trace, source=source,
+        resp = _engine_run(transcript, trace=trace, source=source,
                            current_view=current_view, trace_run=trace_run,
-                           supports_edit=supports_edit)
+                           supports_edit=supports_edit,
+                           supports_confirm=supports_confirm)
+        if resp.get("parse") == "confirm_create" and resp.get("proposal"):
+            import uuid as _uuid
+            _confirm_sweep()
+            token = str(_uuid.uuid4())
+            with _confirm_lock:
+                _confirm_store[token] = {
+                    "proposal": resp["proposal"],
+                    "memory_id": resp.get("memory_id"),
+                    "source": source,
+                    "expires": _time.time() + CONFIRM_TTL_SEC,
+                    "result": None,
+                }
+            resp["confirm_token"] = token
+        return resp
+
+    def _flag(name: str, body: "dict[str, Any] | None" = None) -> bool:
+        """Does the caller declare it can render one of the round-trips?
+
+        `supports_edit` (the needs_edit editor) and `supports_confirm` (the
+        confirm-create prompt) are both read this way. `/voice/text` sends them
+        as JSON bools; the audio routes carry them as multipart form fields
+        ("true"), so accept either. Absent (an older client) → False, and it
+        never sees that response shape — the reason the flags exist.
+        `supports_edit` was once read only on `/voice/text`, so the edit
+        round-trip could never fire on a real voice command, which arrives as
+        audio on `/voice/stream`; both flags are read on every route now."""
+        wren = (body or {}).get(name) if body is not None \
+            else request.form.get(name)
+        return str(wren).strip().lower() in ("1", "true", "yes", "on")
 
     def _supports_edit(body: "dict[str, Any] | None" = None) -> bool:
-        """Does the caller declare it can render the needs_edit round-trip?
+        return _flag("supports_edit", body)
 
-        `/voice/text` gets it as a JSON bool; the audio routes carry it as a
-        multipart form field ("true"), so accept either. Absent (an older
-        client) → False, and it never sees a needs_edit response — the reason
-        the flag exists. This was only read on `/voice/text`, so the edit
-        round-trip could never fire on a real voice command, which arrives as
-        audio on `/voice/stream`."""
-        wren = (body or {}).get("supports_edit") if body is not None \
-            else request.form.get("supports_edit")
-        return str(wren).strip().lower() in ("1", "true", "yes", "on")
+    def _supports_confirm(body: "dict[str, Any] | None" = None) -> bool:
+        return _flag("supports_confirm", body)
 
     if not _no_bg:
         start_pending_retry_loop(_run_transcript)
@@ -327,7 +457,8 @@ def create_app() -> Flask:
         logger.info("📱 Transcript: %s", transcript)
         trace.step(STT, "Heard", transcript, transcript=transcript)
         return jsonify(_run_transcript(transcript, trace, source="ios",
-                                       supports_edit=_supports_edit()))
+                                       supports_edit=_supports_edit(),
+                                       supports_confirm=_supports_confirm()))
 
     @app.post("/voice/stream")
     def voice_audio_stream():
@@ -348,11 +479,13 @@ def create_app() -> Flask:
             audio_bytes = request.files["audio"].read()
             text_cmd = None
             edit_ok = _supports_edit()
+            confirm_ok = _supports_confirm()
         else:
             body = request.get_json(silent=True) or {}
             text_cmd = (body.get("transcript") or "").strip()
             audio_bytes = b""
             edit_ok = _supports_edit(body)
+            confirm_ok = _supports_confirm(body)
             if not text_cmd:
                 return jsonify({"error": "Missing 'audio' file or 'transcript'", "code": 400}), 400
 
@@ -380,7 +513,8 @@ def create_app() -> Flask:
                     logger.info("📱 Transcript: %s", transcript)
                     trace.step(STT, "Heard", transcript, transcript=transcript)
                 result = _run_transcript(transcript, trace, source="ios",
-                                         supports_edit=edit_ok)
+                                         supports_edit=edit_ok,
+                                         supports_confirm=confirm_ok)
                 q.put({"type": "result", **result})
             except Exception as e:  # never leave the stream hanging
                 logger.exception("📱 Stream pipeline failed: %s", e)
@@ -430,6 +564,10 @@ def create_app() -> Flask:
         # A client that can show the "edit the transcription" round-trip says
         # so; older clients never see a needs_edit response.
         edit_ok = bool(body.get("supports_edit"))
+        # Likewise the confirm-create prompt: a client that can show it says so,
+        # and only then does an interrogative create come back as a proposal
+        # instead of deep's own verdict (DEVQA Q9).
+        confirm_ok = _supports_confirm(body)
         # The round-trip's second half: `edited_from` carries the transcript
         # the gate doubted. A changed word teaches the vocabulary an alias (so
         # the same mishearing auto-corrects next time); an untouched resubmit
@@ -451,7 +589,92 @@ def create_app() -> Flask:
                                 ", ".join(promoted))
             edit_ok = False
         return jsonify(_run_transcript(transcript, source=src, current_view=view,
-                                       trace_run=run, supports_edit=edit_ok))
+                                       trace_run=run, supports_edit=edit_ok,
+                                       supports_confirm=confirm_ok))
+
+    @app.post("/voice/confirm")
+    def voice_confirm():
+        """Answer a confirm_create proposal: {"confirm_token", "accept": bool}.
+
+        An interrogative create ("should I add yoga tomorrow?") comes back from
+        `/voice*` as `parse: "confirm_create"` with a `proposal` list and a
+        `confirm_token`, having executed nothing. This is the answer:
+
+          accept true  → each proposal body is created through exactly the code
+                         POST /events / POST /todos runs, and the command memory
+                         records an approval.
+          accept false → nothing is created; the memory record is marked
+                         rejected, so the proposal feeds the review flows like
+                         any other bad answer.
+
+        Answering twice is safe: the first answer's result is stored against the
+        token and replayed (with "duplicate": true), so a double-tapped Add
+        creates once. An unknown or expired token is a 404 that says so — the
+        proposal is genuinely gone and re-asking is the honest fix.
+        """
+        body = request.get_json(silent=True) or {}
+        token = str(body.get("confirm_token") or "").strip()
+        if not token:
+            return jsonify({"error": "Missing 'confirm_token'", "code": 400}), 400
+        _confirm_sweep()
+        with _confirm_lock:
+            entry = _confirm_store.get(token)
+        if entry is None:
+            return jsonify({"error": "Unknown or expired confirmation — ask again",
+                            "code": 404}), 404
+        if entry.get("result") is not None:
+            return jsonify({**entry["result"], "duplicate": True})
+
+        accept = bool(body.get("accept"))
+        created: list = []
+        refresh: set = set()
+        errors: list = []
+        if accept:
+            for spec in entry.get("proposal") or []:
+                kind = spec.get("kind")
+                data = dict(spec.get("body") or {})
+                make = create_event_from_body if kind == "event" else create_todo_from_body
+                payload, status = make(data)
+                if status >= 400:
+                    errors.append(payload.get("error") or "could not create it")
+                    continue
+                created.append({"kind": kind, "id": payload.get("id")})
+                refresh.add("events" if kind == "event" else "todos")
+
+        summaries = "; ".join(s.get("summary", "") for s in (entry.get("proposal") or []))
+        if accept and created:
+            message = f"Added {summaries}."
+        elif accept:
+            message = "I couldn't add it: " + ("; ".join(errors) or "nothing to create")
+        else:
+            message = "Okay — I didn't add it."
+
+        mem_id = entry.get("memory_id")
+        if mem_id is not None:
+            try:
+                from assistant.intent.memory import (
+                    FEEDBACK_APPROVED, FEEDBACK_REJECTED, get_memory,
+                )
+                get_memory().set_feedback(
+                    int(mem_id),
+                    FEEDBACK_APPROVED if (accept and created) else FEEDBACK_REJECTED,
+                    notes="confirmed at the create prompt" if accept
+                          else "declined at the create prompt")
+            except Exception as e:
+                logger.warning("Confirm feedback not recorded: %s", e)
+
+        result = {
+            "ok": not errors,
+            "accepted": accept,
+            "created": created,
+            "refresh": ("both" if len(refresh) > 1
+                        else (refresh.pop() if refresh else "")),
+            "message": message,
+        }
+        with _confirm_lock:
+            if token in _confirm_store:
+                _confirm_store[token]["result"] = result
+        return jsonify(result)
 
     # ------------------------------------------------------------------
     # Personal vocabulary (STT auto-correct)
@@ -1038,14 +1261,9 @@ def create_app() -> Flask:
 
     @app.post("/events")
     def event_create():
-        data = request.get_json(silent=True) or {}
-        required = {"title", "date", "start_time", "end_time"}
-        missing = required - data.keys()
-        if missing:
-            return jsonify({"error": f"Missing fields: {missing}", "code": 400}), 400
-        db = get_db()
-        event_id = db.create_event_from_dict(data)
-        return jsonify({"id": event_id}), 201
+        """Create an event."""
+        payload, status = create_event_from_body(request.get_json(silent=True) or {})
+        return jsonify(payload), status
 
     @app.patch("/events/<int:event_id>")
     def event_update(event_id: int):
@@ -1102,77 +1320,17 @@ def create_app() -> Flask:
 
     @app.post("/todos")
     def todo_create():
+        """Create a task. Idempotent on `client_token` — a repeat returns 200 + the existing id."""
         # todo-create fingerprint: an unidentified localhost client has been
         # duplicating creates (34x "buy groceries"); tokened clients are now
         # idempotent, but a token-less caller still gets through - log enough
         # to name it on its next appearance.
+        data = request.get_json(silent=True) or {}
         logger.info("POST /todos from %s ua=%r token=%r",
                     request.remote_addr, request.headers.get("User-Agent", ""),
-                    (request.get_json(silent=True) or {}).get("client_token"))
-        """Create a task. Idempotent on `client_token` — a repeat returns 200 + the existing id."""
-        data = request.get_json(silent=True) or {}
-        title = data.get("title", "").strip()
-        if not title:
-            return jsonify({"error": "Missing 'title' field", "code": 400}), 400
-        db = get_db()
-        # Creation is idempotent on `client_token`: the client mints one token
-        # per task the user asked for and sends it on the live POST and on every
-        # replay of the same queued create. Without this a create that reached
-        # the Mac but whose reply was lost — or one flushed twice by overlapping
-        # sync passes — landed as another copy of the task; that is how 32
-        # "buy groceries" rows accumulated in the Today list (2026-09-04..06).
-        token = str(data.get("client_token") or "").strip()
-        if token:
-            already = db.get_todo_by_client_token(token)
-            if already is not None:
-                return jsonify({"id": already["id"], "duplicate": True}), 200
-        # A count typed into the title works the same as one spoken: "pasta x5"
-        # is one task for five, not a task literally called "pasta x5".
-        from assistant.intent.quantity import split_quantity
-        title, parsed_qty = split_quantity(title)
-        try:
-            quantity = max(1, int(data.get("quantity") or parsed_qty))
-        except (TypeError, ValueError):
-            quantity = parsed_qty
-        list_name = data.get("list_name", "today")
-        todo_cfg = load_config().todo
-        # Second net, for callers that send no token at all. `client_token` is
-        # the precise key, but the partial unique index only referees non-empty
-        # tokens — so a token-less client (the HUD's revert POST, a curl, a
-        # script) could still stack copies of one task. When the same open task,
-        # spelled the same, in the same list, was created seconds ago, read the
-        # repeat as a replay of that create and hand back the row it made.
-        # Completed rows never match, so re-adding a task you ticked off still
-        # works; the window is config'd (todo.duplicate_window_seconds, 0=off).
-        if not token:
-            recent = db.find_recent_open_todo(
-                title, list_name, int(getattr(todo_cfg, "duplicate_window_seconds", 120)))
-            if recent is not None:
-                logger.info("POST /todos: token-less repeat of open todo %s (%r) "
-                            "inside the duplicate window — returning it",
-                            recent["id"], title)
-                return jsonify({"id": recent["id"], "duplicate": True,
-                                "reason": "recent-identical"}), 200
-        tags = data.get("tags") or []
-        if not tags:
-            # Client didn't say — server-side "tag mode", else infer from the
-            # title, the same order of precedence voice creation uses.
-            if todo_cfg.auto_tag:
-                tags = [todo_cfg.auto_tag]
-            elif getattr(todo_cfg, "auto_tag_infer", True):
-                from assistant.actions.todo.tagging import suggest_tags
-                tags = suggest_tags(title, [r["name"] for r in db.get_tags()])
-        todo_id = db.create_todo(
-            title=title,
-            list_name=list_name,
-            priority=data.get("priority", "none"),
-            due_date=data.get("due_date", ""),
-            notes=data.get("notes", ""),
-            tags=tags,
-            quantity=quantity,
-            client_token=token,
-        )
-        return jsonify({"id": todo_id}), 201
+                    data.get("client_token"))
+        payload, status = create_todo_from_body(data)
+        return jsonify(payload), status
 
     @app.patch("/todos/<int:todo_id>")
     def todo_update(todo_id: int):

@@ -30,6 +30,13 @@ digest banner?** Lifestyle call, not engineering.
 
 ## Answered (log)
 
+- 2026-09-07 — **Q9 (interrogative creates)**: "should i add yoga to my
+  calendar tomorrow?" must neither auto-create nor be silently dropped — pop a
+  confirmation showing the parsed proposal; YES creates it, NO discards it and
+  the memory record marks it declined. → *Implemented:* the confirm-create
+  gate (`parse: "confirm_create"` + `proposal`, `POST /voice/confirm`, Mac
+  Add/No box, iOS alert) — FEATURES.md and ENGINE.md carry the detail.
+
 - 2026-09-06 — **Q2 shipped without needing an answer**: the observance
   checkbox is in the Mac settings dialog (243d99f), persisted via
   config_store — and building it exposed that `observance.enabled` was

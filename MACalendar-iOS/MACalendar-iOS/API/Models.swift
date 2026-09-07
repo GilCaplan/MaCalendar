@@ -181,6 +181,12 @@ struct VoiceResponse: Codable {
     // show the transcription editor and resubmit. Same list as uncertainWords,
     // but its presence (with the parse value) is the signal to gate.
     let needsEdit: [UncertainWord]?
+    // parse == "confirm_create": the words were a question about creating
+    // something ("should I add yoga tomorrow?"), so the host parsed it and
+    // executed NOTHING. Show the proposal, then POST the answer to
+    // /voice/confirm with this token. (DEVQA Q9, Gil 2026-09-07.)
+    let confirmToken: String?
+    let proposal: [ProposedCreate]?
     let brain: String?               // assistant.trace.BRAIN_VERSION that answered
 
     enum CodingKeys: String, CodingKey {
@@ -191,7 +197,27 @@ struct VoiceResponse: Codable {
         case pendingId = "pending_id"
         case uncertainWords = "uncertain_words"
         case needsEdit = "needs_edit"
+        case confirmToken = "confirm_token"
+        case proposal
     }
+}
+
+/// One thing a confirm_create proposal would create. The host also sends a
+/// ready-to-POST `body`, which this client deliberately does not decode: the
+/// answer travels by token through /voice/confirm, so the phone never needs to
+/// hold — or could accidentally alter — the fields being created.
+struct ProposedCreate: Codable, Identifiable {
+    var id: String { kind + summary }
+    let kind: String       // "event" | "todo"
+    let summary: String    // "\u{201C}Yoga\u{201D} on Tuesday, Sep 8, 2026 7 AM\u{2013}8 AM"
+}
+
+/// The reply to POST /voice/confirm.
+struct ConfirmResponse: Codable {
+    let ok: Bool
+    let accepted: Bool
+    let refresh: String
+    let message: String
 }
 
 /// A word the assistant isn't sure about — near-miss of a vocab word, or an

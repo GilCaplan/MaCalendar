@@ -35,6 +35,10 @@ STATUS_REVIEW = "review"
 # The engine's transcript gate wants the speaker to check a doubted word
 # before anything executes; the message is a JSON payload for the dialog.
 STATUS_EDIT = "edit_transcript"
+# The engine's confirm gate: the words were a question about creating
+# something, so the parse is offered rather than run. Message is a JSON
+# payload for the Add / No box (DEVQA Q9).
+STATUS_CONFIRM = "confirm_create"
 
 # Two button presses within this window while listening = cancel recording
 _DOUBLE_TAP_SEC = 0.4
@@ -106,6 +110,11 @@ class Pipeline:
         # back to the worker thread (same pattern as the review bar).
         self._edit_event = threading.Event()
         self._edit_text: Optional[str] = None
+        # The engine's confirm gate (DEVQA Q9), same pattern again: the brain
+        # answers confirm_create with a ready-to-POST proposal, the box's
+        # Add / No verdict comes back to the worker thread through this pair.
+        self._confirm_event = threading.Event()
+        self._confirm_choice: Optional[bool] = None
         self._last_listen_press: float = 0.0  # monotonic time of last press during STATUS_LISTENING
 
         self.on_auth_expired: Optional[Callable[[], None]] = None
@@ -447,6 +456,9 @@ class Pipeline:
             # This client can show the "check the transcription" dialog, so the
             # engine's gate may answer needs_edit here.
             "supports_edit": True,
+            # …and the Add / No box, so an interrogative create may come back
+            # as a proposal rather than being executed or dropped.
+            "supports_confirm": True,
         }
         if edited_from:
             payload["edited_from"] = edited_from
@@ -499,6 +511,22 @@ class Pipeline:
             return self._process_transcript(edited, trace, t_start,
                                             raw_transcript=raw_transcript or shown,
                                             edited_from=shown)
+
+        if data.get("parse") == "confirm_create" and data.get("confirm_token"):
+            # A question about creating something. Nothing has run; the box's
+            # answer decides, and the server does the creating so the Mac and
+            # the phone commit through exactly the same path.
+            said = self._await_create_confirm(message, data.get("proposal") or [])
+            outcome = self._answer_create_confirm(data["confirm_token"], said, port, key)
+            if outcome.get("refresh"):
+                self._set_status("refresh", "")
+            reply = outcome.get("message") or ""
+            if reply:
+                self._tts.speak_sync(reply)
+            self._trace_result(transcript=transcript, message=reply)
+            self._phase = STATUS_IDLE
+            self._set_status(STATUS_IDLE, "")
+            return bool(outcome.get("created"))
 
         if data.get("parse") == "error" and not actions:
             self._tts.speak(message or "I couldn't understand that request.")
@@ -665,6 +693,52 @@ class Pipeline:
         """Called by the UI thread with the dialog's verdict (None = cancel)."""
         self._edit_text = text
         self._edit_event.set()
+
+    def _await_create_confirm(self, prompt: str, proposal: list) -> bool:
+        """Block on the Add / No box for a confirm_create proposal.
+
+        Returns True only for an explicit Add. An unanswered box declines: a
+        proposal that quietly books itself minutes later is precisely what the
+        gate exists to prevent (Gil, DEVQA Q9)."""
+        import json as _json
+        self._confirm_choice = None
+        self._confirm_event.clear()
+        self._set_status(STATUS_CONFIRM, _json.dumps(
+            {"prompt": prompt,
+             "items": [s.get("summary", "") for s in proposal if s.get("summary")]}))
+        answered = self._confirm_event.wait(timeout=180)
+        choice = bool(self._confirm_choice) if answered else False
+        self._confirm_choice = None
+        return choice
+
+    def submit_create_confirm(self, accept: "bool | None") -> None:
+        """Called by the UI thread with the box's verdict (None = declined)."""
+        self._confirm_choice = bool(accept)
+        self._confirm_event.set()
+
+    def _answer_create_confirm(self, token: str, accept: bool,
+                               port: int, key: "str | None") -> dict:
+        """POST the verdict to /voice/confirm. The server owns the creating —
+        the GUI must not grow a second create path (the pipeline.py rule)."""
+        import json as _json
+        import urllib.error
+        import urllib.request
+
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{port}/voice/confirm",
+            data=_json.dumps({"confirm_token": token, "accept": accept}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        if key:
+            req.add_header("X-API-Key", key)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return _json.loads(r.read().decode())
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            logger.error("🖥️ Could not answer the confirmation: %s", e)
+            return {"ok": False, "accepted": accept, "created": [], "refresh": "",
+                    "message": "I couldn't reach the assistant service to do that."}
 
     def _trace_begin(self):
         """Start a trace whose steps stream to the HUD as they happen."""

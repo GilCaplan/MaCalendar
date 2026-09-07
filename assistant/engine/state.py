@@ -104,6 +104,7 @@ class EngineState:
     source: str = "test"          # "mac" | "ios" | "test"
     current_view: str = "month"
     supports_edit: bool = False   # client can render a needs_edit round-trip
+    supports_confirm: bool = False  # client can render a confirm_create prompt
     mode: str = "foreground"      # "foreground" | "background" (fast-track
                                   # verify pass runs the same stages in
                                   # background mode: compare, never re-commit)

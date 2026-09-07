@@ -104,6 +104,18 @@ def fast_propose(state: EngineState, cfg) -> bool:
     rule_parser = _get_rule_parser()
     if rule_parser is None:
         return False
+    from assistant.engine.segment import is_interrogative_create
+    if is_interrogative_create(state.text):
+        # "should i add yoga to my calendar tomorrow?" is a question about
+        # doing a thing, and the rules read it as the thing — confidently
+        # enough to fast-commit it (DEVQA Q9, Gil 2026-09-07). Whatever the
+        # score, a hypothetical is deep's call: it is the only track that can
+        # hold the parse and ask first.
+        if state.trace:
+            state.trace.step(RULE, "Rule parser",
+                             "The words ask whether to do this, not to do it "
+                             "— deep track", ok=True)
+        return False
     try:
         rr = rule_parser.analyze(state.text, current_view=state.current_view)
     except RuleParserSkip as e:

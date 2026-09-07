@@ -47,6 +47,7 @@ from assistant.calendar_ui.week_view import WeekView
 from assistant.calendar_ui.importer import parse_ics, scan_macos_calendar, import_events
 from assistant.db import CalendarDB
 from assistant.pipeline import (
+    STATUS_CONFIRM,
     STATUS_DONE,
     STATUS_EDIT,
     STATUS_ERROR,
@@ -76,6 +77,7 @@ _MIC_ICONS = {
     STATUS_LISTENING: "🔴",
     STATUS_REVIEW: "📨",
     STATUS_EDIT: "✏️",
+    STATUS_CONFIRM: "❓",
     STATUS_PROCESSING: "⚙️",
     STATUS_DONE: "✅",
     STATUS_ERROR: "⚠️",
@@ -89,6 +91,7 @@ _MIC_OBJ_NAMES = {
     STATUS_LISTENING: "mic_listening",
     STATUS_REVIEW: "mic_processing",
     STATUS_EDIT: "mic_processing",
+    STATUS_CONFIRM: "mic_processing",
     STATUS_PROCESSING: "mic_processing",
     STATUS_DONE: "mic_idle",
     STATUS_ERROR: "mic_idle",
@@ -290,6 +293,59 @@ def ask_transcript_edit(parent, payload_json: str) -> "str | None":
     text = edit.text().strip()
     dlg.deleteLater()
     return text if (accepted and text) else None
+
+
+def ask_create_confirm(parent, payload_json: str) -> bool:
+    """The confirm-create box, on its own so a test can drive it with real
+    clicks (DEVQA Q9, Gil 2026-09-07).
+
+    "should i add yoga to my calendar tomorrow?" is a question, so nothing has
+    been created — this shows what the brain understood and asks. Returns True
+    for Add, False for No or a closed box: declining is the safe default, which
+    is why there is no third answer.
+    """
+    import json as _json
+
+    from PyQt6.QtWidgets import (
+        QDialog, QDialogButtonBox, QLabel, QVBoxLayout,
+    )
+
+    from assistant.calendar_ui.dialog_utils import install_enter_confirms
+
+    try:
+        payload = _json.loads(payload_json or "{}")
+    except ValueError:
+        payload = {}
+    prompt = payload.get("prompt") or "Add this to your calendar?"
+    items = [str(s) for s in (payload.get("items") or []) if str(s).strip()]
+
+    dlg = QDialog(parent)
+    dlg.setWindowTitle("Add this?")
+    dlg.setObjectName("create_confirm_dialog")
+    lay = QVBoxLayout(dlg)
+    label = QLabel(prompt)
+    label.setObjectName("create_confirm_prompt")
+    label.setWordWrap(True)
+    lay.addWidget(label)
+    if items:
+        detail = QLabel("\n".join(f"• {s}" for s in items))
+        detail.setObjectName("create_confirm_items")
+        detail.setWordWrap(True)
+        lay.addWidget(detail)
+    buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                               | QDialogButtonBox.StandardButton.Cancel)
+    buttons.setObjectName("create_confirm_buttons")
+    add_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+    add_btn.setText("Add")
+    buttons.button(QDialogButtonBox.StandardButton.Cancel).setText("No")
+    buttons.accepted.connect(lambda: dlg.accept())
+    buttons.rejected.connect(lambda: dlg.reject())
+    lay.addWidget(buttons)
+    install_enter_confirms(dlg, add_btn)
+
+    accepted = dlg.exec() == QDialog.DialogCode.Accepted
+    dlg.deleteLater()
+    return accepted
 
 
 class CalendarWindow(QMainWindow):
@@ -1169,6 +1225,13 @@ class CalendarWindow(QMainWindow):
             self._show_transcript_edit(message)
             return
 
+        if status == STATUS_CONFIRM:
+            # Likewise a JSON payload: the words were a question about creating
+            # something, so the brain is offering the parse instead of running
+            # it (DEVQA Q9).
+            self._show_create_confirm(message)
+            return
+
         if message:
             self.show_toast(message)
 
@@ -1190,6 +1253,14 @@ class CalendarWindow(QMainWindow):
         verdict = ask_transcript_edit(self, payload_json)
         if self._pipeline is not None:
             self._pipeline.submit_transcript_edit(verdict)
+
+    def _show_create_confirm(self, payload_json: str) -> None:
+        """The engine's confirm gate: show what the question would create and
+        let the speaker say Add or No. Nothing has been written yet — the
+        answer goes back to the worker thread, which tells the server."""
+        accepted = ask_create_confirm(self, payload_json)
+        if self._pipeline is not None:
+            self._pipeline.submit_create_confirm(accepted)
 
     def _auto_refresh_if_db_changed(self) -> None:
         import os as _os
