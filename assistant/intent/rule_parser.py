@@ -1186,6 +1186,15 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
                 slots["title"] = f"{slots['title'].replace('set ', '')} with {' and '.join(attendees)}"
 
     elif action_name == "update_event":
+        # F10: the mutation phrase delimits multi-word titles noun-chunking
+        # drops ("reschedule HAIRCUT to this weekend"); the generic-target
+        # veto still judges whatever is captured.
+        m10 = re.search(r"\b(?:reschedule|move|push|shift|postpone)\s+(.+?)\s+"
+                        r"(?:to|until|for)\b", span.text, re.IGNORECASE)
+        if m10:
+            cand = _clean_title(m10.group(1))
+            if cand and cand.lower() not in _CALENDAR_SIGNALS:
+                slots.setdefault("match_title", cand)
         # Detect whether this is an extend/shorten action (vs. a move/reschedule)
         is_extend = any(tok.lemma_.lower() in _EXTEND_VERBS for tok in span)
 
@@ -1287,6 +1296,16 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
         titled, names_a_person = _title_with_person(span.text, title)
         if titled and (names_a_person or titled.lower() not in _CALENDAR_SIGNALS):
             slots["match_title"] = titled
+        # F10: "delete WEDDING REHEARSAL from my calendar" — the phrase
+        # delimits what chunking dropped; the veto judges the capture.
+        if not slots.get("match_title"):
+            m10 = re.search(r"\b(?:delete|remove|cancel|drop)\s+(.+?)\s+"
+                            r"from\s+(?:my|the)\s+(?:calendar|schedule)\b",
+                            span.text, re.IGNORECASE)
+            if m10:
+                cand = _clean_title(m10.group(1))
+                if cand and cand.lower() not in _CALENDAR_SIGNALS:
+                    slots["match_title"] = cand
         if temporal.get("date"):
             slots["match_date"] = temporal["date"]
         if temporal.get("start_time"):
@@ -1361,9 +1380,18 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
         # F6c: the completion funnel "mark X as done" delimits X by the
         # phrase itself — noun-chunk extraction returns nothing when X is
         # verb-led ("mark WALK THE DOG as done"), so capture it directly.
-        m6 = re.search(r"\bmark\s+(.+?)\s+as\s+done\b", span.text, re.IGNORECASE)
+        m6 = re.search(r"\bmark\s+(.+?)\s+(?:as\s+)?(?:done|complete[d]?|finished)\b",
+                       span.text, re.IGNORECASE)
         if m6 and not slots.get("match_title"):
             slots["match_title"] = _clean_title(m6.group(1))
+        # F10: mutation phrases delimit multi-word titles noun-chunking
+        # drops ("remove BUY SOCKS from my list", "delete WALK THE DOG").
+        if not slots.get("match_title"):
+            m10 = re.search(r"\b(?:delete|remove|cancel|drop)\s+(.+?)\s+"
+                            r"from\s+(?:my|the)\s+(?:\w+\s+)?(?:list|tasks?|to-?dos?)\b",
+                            span.text, re.IGNORECASE)
+            if m10:
+                slots["match_title"] = _clean_title(m10.group(1))
         # F7b: "set X as <level> priority" — phrase-delimited, like m6
         m7 = re.search(r"\b(?:set|make)\s+(.+?)\s+as\s+(high|medium|low)\s+priority\b",
                        span.text, re.IGNORECASE)

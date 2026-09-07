@@ -61,3 +61,12 @@ def test_f7_priority_setting_is_an_update(fastrule):
     assert "dry cleaning" in (getattr(it, "match_title", "") or "")
     # the rename extractor must not read "as high priority" as a new name
     assert not getattr(it, "new_title", None)
+
+
+def test_f10_mutation_phrases_delimit_multiword_titles(fastrule):
+    """Noun-chunking drops multi-word titles in mutations; the phrase itself
+    delimits them. Generic targets still abstain (the veto judges captures)."""
+    assert fastrule.run("delete wedding rehearsal from my calendar").committed
+    assert fastrule.run("reschedule haircut to this weekend").committed
+    assert fastrule.run("mark walk the dog complete").intents[0][0] == "complete_todo"
+    assert not fastrule.run("delete this event").committed
