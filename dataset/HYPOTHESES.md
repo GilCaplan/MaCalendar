@@ -24,6 +24,18 @@ needing one is marked **[Gil]** and is blocked until asked.
 
 ## The queue
 
+**LANE PRIORITY (Gil, 2026-09-07): SIMPLE FIRST.** FastRule focuses on
+single-request add/edit/remove/complete/query — the felt-latency surface —
+before any further complex-tier tuning. Working target: simple-tier commit
+66% → **80%+ at ≥90% correct-on-committed** (train), title slot up from 83.
+Simple-first order: F7 (rename/update/priority targeting) → R2 reliability
+diagram + simple-slice threshold sweep → title-span quality (research idea
+8) → K1b/K2 kind scorer (kind errors are a simple-tier disease). DEFERRED
+until the simple target holds: gate-recall work, EXT0 compound synthesis,
+further coordination tuning (complex ~28% commit is healthy by design —
+deep's job). Complex regression floor still applies: no simple-first batch
+may worsen the complex board.
+
 *(FS-entries 2026-09-07 — the FastRule data plan, Gil-approved; protocol
 §three-data-sources has the doctrine.)*
 

@@ -104,8 +104,10 @@ structure supervision (dual-gate rule: win on B-train AND no regress on A),
 C external = wording coverage after a conventions pass. Test results never
 drive improvement (tooling-enforced, aggregates only). **Every 10th cycle =
 a sealed-test milestone run on the main engine — pure eval, one aggregate
-line in RESULTS, first at era-2 cycle 10.** Lane order: FS1
-scorer → FS2 baseline → F6 gate-supervision → K1b/K2 → R2 → EXT1.
+line in RESULTS, first at era-2 cycle 10.** Lane order (SIMPLE-FIRST, Gil 2026-09-07): F7 targeting →
+R2 calibration + simple-slice sweep → title spans → K1b/K2. Target: simple
+commit 66→80%+ at ≥90% correct. Complex work (gate recall, EXT0/EXT1)
+deferred until that holds; complex regression floor enforced.
 
 **Era 2 opens with the joint confirmation run** (Gil, 2026-09-06): cycle
 history kept, but boards compare within-era only — the integration changed
