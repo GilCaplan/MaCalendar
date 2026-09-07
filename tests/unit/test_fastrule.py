@@ -75,7 +75,12 @@ def test_f10_mutation_phrases_delimit_multiword_titles(fastrule):
 def test_f11_model_tier_fires_only_where_rules_found_nothing(fastrule):
     """Q10: verbless/unseen phrasings route via the model tier at the
     inference-billed confidence; rule-covered commands are byte-identical."""
-    r = fastrule.run("gym session friday 6pm")     # no verb at all
+    # verbless remind-speak + occasion + date: rules find no verb to route,
+    # both model margins clear the SAFE floors (2.5/1.5 — the dual-gate
+    # tightening), so the model tier composes new×event
+    r = fastrule.run("don't forget the parent teacher conference wednesday 5pm")
     assert r.committed and r.intents[0][0] == "create_event"
+    # a low-margin verbless phrase stays a graceful skip (floors hold)
+    assert not fastrule.run("gym session friday 6pm").committed
     r = fastrule.run("book gym tomorrow at 7am")   # rules tier, unchanged
     assert r.committed and r.confidence > 0.9
