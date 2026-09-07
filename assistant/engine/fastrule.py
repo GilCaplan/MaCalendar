@@ -39,6 +39,13 @@ _GENERIC_TARGET_RE = re.compile(
     r"|^(?:you|it|me|this|that|them)$",
     re.I)
 
+# "Can you create/add/make …" is a polite imperative, not a question —
+# the speaker wants the thing made (F4a; "Can you create a new list in my
+# podcast?" was gate-blocked despite a correct create parse).
+_POLITE_IMPERATIVE_RE = re.compile(
+    r"^\s*(?:hey\s+\w+,?\s*)?(?:can|could|would|will)\s+you\s+(?:please\s+)?"
+    r"(?:create|add|make|set|put|start|book|schedule|remind)\b", re.I)
+
 _INTERROGATIVE_RE = re.compile(
     r"^\s*(?:hey\s+\w+,?\s*)?(?:who|what|when|where|which|whose|how|do|does|did|is|are|am|can|could|would|will|should)\b"
     r"|\bcould you (?:tell|let me know|check)\b|\bdo i have\b|\?\s*$",
@@ -87,6 +94,7 @@ class FastRule:
                         for n, _ in intents)):
             return FastRuleResult(False, intents, conf, "mixed-mode-compound")
         if (_INTERROGATIVE_RE.search(text)
+                and not _POLITE_IMPERATIVE_RE.search(text)
                 and any(n.startswith("create_") for n, _ in intents)):
             return FastRuleResult(False, intents, conf, "interrogative-create")
         for name, intent in intents:

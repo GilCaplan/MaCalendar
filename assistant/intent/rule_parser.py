@@ -154,6 +154,20 @@ _STT_EXPANSIONS: list[tuple[str, str]] = [
     # normalize so ("remove", …) routing applies and a generic target like
     # "this list" hits the fast gate's veto (sandbox batch F2).
     (r"\bget rid of\b", "remove"),
+    # "mark <date> as <occasion>" marks a DAY, it does not tick a task off:
+    # "mark 13 october of this year as my birthday" fast-committed a wrong
+    # complete_todo (F4b). Rewritten to the create shape the parser already
+    # handles ("add my birthday on 13 october …"); requires a date-looking
+    # object so "mark groceries as done" keeps completing, and a done-ish
+    # label is left alone outright.
+    (r"\bmark\s+((?:the\s+)?\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?"
+     r"(?:january|february|march|april|may|june|july|august|september|october|"
+     r"november|december)(?:\s+of\s+this\s+year|\s+this\s+year)?"
+     r"|(?:january|february|march|april|may|june|july|august|september|october|"
+     r"november|december)\s+(?:the\s+)?\d{1,2}(?:st|nd|rd|th)?"
+     r"|today|tomorrow|next\s+\w+day)\s+as\s+"
+     r"(?!done\b|complete\b|completed\b|finished\b)(.+)$",
+     r"add \2 on \1"),
 ]
 
 # ---------------------------------------------------------------------------
