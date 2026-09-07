@@ -51,6 +51,25 @@ free-JSON call (`_call_ollama_verify`) and are parsed defensively.
 model than the parser — it is `null` today, meaning both jobs use 8B. If the
 harness ever shows the self-check is the weak link, that is the knob.
 
+## The kind scorer — the stack's first TRAINED component (K1, status: experiment)
+
+A 16-weight logistic regression for the event-vs-task kind decision
+(Q8, Gil-approved 2026-09-07). Not a neural model: the features are the
+segment stage's own regexes (clock, dated, remindish, occasion, encounter,
+list-words, …) plus a few lexical cues, the output is P(kind = event), and
+the fit is `scripts/kind_classifier_experiment.py`'s pure-python gradient
+descent — no sklearn, no runtime dependency, weights printed and versioned
+like any other constant. Measured: **99.0% dev / 98.5% held-out**
+kind-accuracy vs the deterministic chain's 71.5/67.8 on 1,495 labeled
+create rows.
+
+**Status: experiment passed, NOT yet wired.** K2 (a registered deep cycle)
+wires it into segment as the arbiter ONLY where the pinned convention rules
+are silent — Gil's rulings stay authoritative; the scorer replaces the blind
+fallthrough. K1b first retrains on the full 2,699-row train pool. Until K2
+lands, ENGINE.md and FEATURES.md intentionally do not list it (they document
+the shipped engine).
+
 ## Approach — why it is shaped this way
 
 **Rules first, model second, model again as an auditor.** The rule parser is
