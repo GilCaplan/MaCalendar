@@ -21,7 +21,20 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
-## F5 (sandbox, era 2) — REGISTERED PREDICTION 2026-09-07, before implementation
+## F5 (sandbox) — ACTUAL (2026-09-07, fastlane 88c736b)
+
+**Two of three predictions met.** Dev-full 600 vs F4: committed 230→225
+(predicted −2–5 ✓), correct-on-committed **91.3→92.4 raw / 93.5→94.7
+adjusted** (predicted +0.5–1.5 ✓), recoverable-abstain 7.9→**9.2** (predicted
+flat ✗ — the new gate over-blocked 2 rows; the NP-guard is imperfect on
+dataset text — F6 candidate). Dev-fast adjusted 94.2→95.3. Product framing:
+3 wrong instant answers prevented per 600, at the cost of 2 correct answers
+taking the slow path — the right trade at the front door, where deep is the
+net. The research idea transferred as advertised (13/14 canonical probes;
+the known limit — a wrong NP-parse of a true compound — is documented in
+coordination.py). Graduated; integrates at the 2–3-cycle boundary with F4.
+
+### The registered prediction (kept for the record)
 
 **Change:** R1's coordination-type module (research-backed: multi-intent
 boundary literature; spaCy conj/cc mechanism). New `coordination.py`:
