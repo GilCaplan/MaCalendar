@@ -107,6 +107,12 @@ class FastRule:
                 and not _POLITE_IMPERATIVE_RE.search(text)
                 and any(n.startswith("create_") for n, _ in intents)):
             return FastRuleResult(False, intents, conf, "interrogative-create")
+        if (re.match(r"^\s*(?:please\s+)?rename\b", text, re.I)
+                and any(n.startswith("create_") for n, _ in intents)):
+            # F7a: a rename that parsed as a CREATE is a misroute — and even a
+            # correctly-routed rename can't know which store (event vs todo)
+            # holds the old title; deep's matcher searches both. Abstain.
+            return FastRuleResult(False, intents, conf, "rename-misroute")
         for name, intent in intents:
             if name.startswith(("update_", "delete_", "complete_")):
                 target = str(getattr(intent, "match_title", "") or "").strip()

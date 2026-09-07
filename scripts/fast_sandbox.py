@@ -27,6 +27,13 @@ import pathlib
 import sqlite3
 import sys
 import tempfile
+
+# Lane scripts run BESIDE live engine measurements by design (Gil: FastRule
+# iteration never waits on the deep track). The BLAS single-thread pin is the
+# guard that makes two model-loading processes safe together — structural
+# here, not left to the caller.
+for _blas in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_blas, "1")
 from collections import Counter
 
 # --- isolate BEFORE importing assistant (paths read at import time) --------

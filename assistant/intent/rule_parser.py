@@ -863,6 +863,11 @@ _ROUTE_OVERRIDES = [
     # done" → create_todo). Rewrites funnel done-with/already-did/check-off
     # into this shape; the override then routes them all.
     (re.compile(r"^\s*(?:please\s+)?mark\s+.+\s+as\s+done\b"), "complete_todo"),
+    # F7b: "set X as high priority" is a fully-structured UPDATE — the verb
+    # heuristics read it as a create ("set" → create at 1.00, the worst kind
+    # of confident wrong).
+    (re.compile(r"^\s*(?:please\s+)?(?:set|make)\s+.+\s+as\s+"
+                r"(?:high|medium|low)\s+priority\b"), "update_todo"),
     (re.compile(r"^\s*(?:please\s+)?(?:i\s+)?(?:need|have|want|got)\s+to\s+"), "create_todo"),
     (re.compile(r"^\s*(?:please\s+)?remind me\b"), "create_todo"),
     (re.compile(r"^\s*(?:please\s+)?add\s+(?:a\s+|\d+\s+|two\s+|three\s+)?(?:new\s+)?tasks?\b"), "create_todo"),
@@ -1347,6 +1352,16 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
         m6 = re.search(r"\bmark\s+(.+?)\s+as\s+done\b", span.text, re.IGNORECASE)
         if m6 and not slots.get("match_title"):
             slots["match_title"] = _clean_title(m6.group(1))
+        # F7b: "set X as <level> priority" — phrase-delimited, like m6
+        m7 = re.search(r"\b(?:set|make)\s+(.+?)\s+as\s+(high|medium|low)\s+priority\b",
+                       span.text, re.IGNORECASE)
+        if m7:
+            if not slots.get("match_title"):
+                slots["match_title"] = _clean_title(m7.group(1))
+            slots["priority"] = m7.group(2).lower()
+            # the rename extractor reads "as high priority" as a new NAME —
+            # a priority change must never retitle the task
+            slots.pop("new_title", None)
         # For complete/update/delete, also try extracting the subject noun
         # (e.g. "mark groceries as done" → subject "groceries", not "mark groceries")
         subject_chunks = [
