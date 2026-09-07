@@ -21,6 +21,18 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## F10 (simple-first batch 4) — REGISTERED PREDICTION 2026-09-07
+
+**Target: the 62-row missing:match_title bucket.** Noun-chunk extraction
+fails on multi-word titles in mutation phrases ("delete WEDDING REHEARSAL
+from my calendar", "reschedule HAIRCUT to this weekend", "mark WALK THE DOG
+complete") while the phrase itself delimits the title exactly — the F6c
+phrase-capture pattern, generalized to three shapes: delete/remove/cancel
+X from my …, reschedule/move X to ‹when›, mark X (as )complete/finished.
+**Predict (train simple):** commit 69.6 → 72–75% at ≥91% correct; dual-gate
+flat; the deletes stay behind the generic-target veto (a generic X still
+abstains — the capture feeds the veto, never bypasses it).
+
 ## F9 (simple-first batch 3) — REGISTERED PREDICTION 2026-09-07
 
 **From the abstain-reason mining (simple train: 209 skip / 92 missing-date /
