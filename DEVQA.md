@@ -8,26 +8,6 @@ to the log below so decisions stay findable.
 
 ## Open
 
-**Q9 — Interrogative creates: does a question CREATE?** "should i add yoga
-to my calendar?", "what if i booked town hall for the 3rd?" — the FastRule
-dataset's ground truth labels these CREATE (the speaker is taken to want
-it); the engine's F3 gate deliberately treats questions as not-commits and
-defers to deep, where the LLM decides case by case. The two policies
-disagree, and the answer defines both the gate's target behavior and what
-the labels mean. (Already ruled and NOT in question: polite imperatives —
-"can you add X" — are creates, F4a.)
-  **(a) Questions create** — fast path commits them like any create; snappy,
-  matches the dataset labels; risk: a genuinely deliberative "should I…?"
-  books something the speaker was only weighing.
-  **(b) Questions never auto-create** (my recommendation) — a question is
-  not consent to mutate; deep answers or asks back ("Want me to add it?"),
-  the reply makes one-tap-create easy. Cost: these rows become deliberate
-  non-creates, so the dataset's ~8 interrogative families get relabeled to
-  match the ruling (labels follow product, as with the conventions layer).
-  **(c) Split by shape** — "should i / what if" = ask-back (b), "why don't
-  we / let's…?" = create; most precise, most rules to maintain.
-
-
 **Q6 — Reminders for events INSIDE Shabbat/yom tov (e.g. Shabbat lunch):
 suppress entirely (shipped default) or roll into one pre-candle-lighting
 digest banner?** Lifestyle call, not engineering.
@@ -65,6 +45,15 @@ digest banner?** Lifestyle call, not engineering.
 - 2026-09-04 — **Date-only occasion reminders**: calendar events. → Cycle 2.
 
 ## Answered log
+
+**Q9 (2026-09-07): interrogative creates → CONFIRM PROMPT.** "should i add
+yoga…?" neither auto-creates nor gets silently dropped: the client pops a
+box with the parsed proposal — yes creates it, no discards it. Same
+response-contract pattern as the transcript-edit gate (`needs_edit` +
+`supports_edit`): the server sends a proposal payload only to clients that
+declare `supports_confirm`; older clients keep today's behavior (deep
+decides). Dataset's interrogative families relabel to expect a PROPOSAL,
+not a create — labels follow product.
 
 **Q8 (2026-09-07): APPROVED — "can try the q8 idea."** A small logistic
 regression over hand features for the event-vs-task kind decision, fit

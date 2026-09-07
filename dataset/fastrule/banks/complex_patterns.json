@@ -1,2924 +1,2940 @@
 [
-  {
-    "family": "c_and_ee_1",
-    "nuance": "and_compound",
-    "action": "create_event",
-    "atomic": false,
-    "events": 2,
-    "tasks": 0,
-    "template": "book {event_title} {date} at {time} and {event_title2} {date2} at {time2}"
-  },
-  {
-    "family": "c_and_ee_2",
-    "nuance": "and_compound",
-    "action": "create_event",
-    "atomic": false,
-    "events": 2,
-    "tasks": 0,
-    "template": "schedule {event_title} for {date} and {event_title2} for {date2}"
-  },
-  {
-    "family": "c_and_ee_3",
-    "nuance": "and_compound",
-    "action": "create_event",
-    "atomic": false,
-    "events": 2,
-    "tasks": 0,
-    "template": "add {event_title} to my calendar {date} and {event_title2} {date2}"
-  },
-  {
-    "family": "c_and_ee_4",
-    "nuance": "and_compound",
-    "action": "create_event",
-    "atomic": false,
-    "events": 2,
-    "tasks": 0,
-    "template": "set up {event_title} at {time} and {event_title2} at {time2}"
-  },
-  {
-    "family": "c_and_ee_5",
-    "nuance": "and_compound",
-    "action": "create_event",
-    "atomic": false,
-    "events": 2,
-    "tasks": 0,
-    "template": "book {event_title} {date} and also put {event_title2} on the calendar {date2}"
-  },
-  {
-    "family": "c_and_ee_6",
-    "nuance": "and_compound",
-    "action": "create_event",
-    "atomic": false,
-    "events": 2,
-    "tasks": 0,
-    "template": "put {event_title} on my calendar {date} at {time} and {event_title2} {date2} at {time2}"
-  },
-  {
-    "family": "c_and_tt_1",
-    "nuance": "and_compound",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "buy {qty} {item} and remind me to {task_title2}"
-  },
-  {
-    "family": "c_and_tt_2",
-    "nuance": "and_compound",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "add {task_title} and {task_title2} to my to-do list"
-  },
-  {
-    "family": "c_and_tt_3",
-    "nuance": "and_compound",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "remind me to {task_title} and to {task_title2}"
-  },
-  {
-    "family": "c_and_tt_4",
-    "nuance": "and_compound",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "i need to {task_title} and {task_title2}"
-  },
-  {
-    "family": "c_and_tt_5",
-    "nuance": "and_compound",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "put {task_title} and {task_title2} on my list"
-  },
-  {
-    "family": "c_and_tt_6",
-    "nuance": "and_compound",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "remind me to {task_title} {date} and to {task_title2} {date2}"
-  },
-  {
-    "family": "c_and_et_1",
-    "nuance": "and_compound",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "book {event_title} {date} at {time} and remind me to {task_title2}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": [
-      "title_2"
-    ]
-  },
-  {
-    "family": "c_and_et_2",
-    "nuance": "and_compound",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "schedule {event_title} for {date} and add {task_title2} to my list",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": [
-      "title_2"
-    ]
-  },
-  {
-    "family": "c_and_et_3",
-    "nuance": "and_compound",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "set up {event_title} at {time} and i need to {task_title2}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": [
-      "title_2"
-    ]
-  },
-  {
-    "family": "c_and_et_4",
-    "nuance": "and_compound",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "book {event_title} {date} and buy {qty} {item2}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": [
-      "title_2"
-    ]
-  },
-  {
-    "family": "c_and_et_5",
-    "nuance": "and_compound",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "add {event_title} to my calendar {date} and remind me to {task_title2} {date2}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": [
-      "title_2"
-    ]
-  },
-  {
-    "family": "c_and_et_6",
-    "nuance": "and_compound",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "put {event_title} on the calendar {date} at {time} and put {task_title2} on my list",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": [
-      "title_2"
-    ]
-  },
-  {
-    "family": "c_and_te_1",
-    "nuance": "and_compound",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "remind me to {task_title} and book {event_title2} {date} at {time}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_and_te_2",
-    "nuance": "and_compound",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "add {task_title} to my list and schedule {event_title2} for {date}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_and_te_3",
-    "nuance": "and_compound",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "i need to {task_title} and set up {event_title2} at {time}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_and_te_4",
-    "nuance": "and_compound",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "buy {qty} {item} and book {event_title2} {date}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_and_te_5",
-    "nuance": "and_compound",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "remind me to {task_title} {date} and add {event_title2} to my calendar {date2}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_and_te_6",
-    "nuance": "and_compound",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "put {task_title} on my list and put {event_title2} on the calendar {date} at {time}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_npdecoy_meeting_two",
-    "nuance": "np_decoy",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "schedule a meeting with {name} and {name2} {date} at {time}",
-    "fixed_slots": {
-      "title": "meeting with {name} and {name2}"
-    }
-  },
-  {
-    "family": "c_npdecoy_book_with_two",
-    "nuance": "np_decoy",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} with {name} and {name2} {date}"
-  },
-  {
-    "family": "c_npdecoy_call_with_two",
-    "nuance": "np_decoy",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "set up a call with {name} and {name2} {date}",
-    "fixed_slots": {
-      "title": "call with {name} and {name2}"
-    }
-  },
-  {
-    "family": "c_npdecoy_lunch_two",
-    "nuance": "np_decoy",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "plan lunch with {name} and {name2} {date}",
-    "fixed_slots": {
-      "title": "lunch with {name} and {name2}"
-    }
-  },
-  {
-    "family": "c_npdecoy_event_for_two",
-    "nuance": "np_decoy",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "schedule {event_title} for {name} and {name2} {date} at {time}"
-  },
-  {
-    "family": "c_npdecoy_meeting_between",
-    "nuance": "np_decoy",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book a meeting between {name} and {name2} {date}",
-    "fixed_slots": {
-      "title": "meeting between {name} and {name2}"
-    }
-  },
-  {
-    "family": "c_npdecoy_buy_two_items",
-    "nuance": "np_decoy",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "buy {item} and {item2} {date}",
-    "fixed_slots": {
-      "title": "{item} and {item2}"
-    },
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_npdecoy_pickup_two_items",
-    "nuance": "np_decoy",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "pick up {item} and {item2} from the store",
-    "fixed_slots": {
-      "title": "{item} and {item2}"
-    },
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_npdecoy_buy_two_party",
-    "nuance": "np_decoy",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "buy {item} and {item2} for the party {date}",
-    "fixed_slots": {
-      "title": "{item} and {item2}"
-    },
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_npdecoy_remind_buy_two",
-    "nuance": "np_decoy",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "remind me to buy {item} and {item2}",
-    "fixed_slots": {
-      "title": "{item} and {item2}"
-    },
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_npdecoy_serial_wash_fold",
-    "nuance": "np_decoy",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "wash and fold the laundry {date}",
-    "fixed_slots": {
-      "title": "wash and fold the laundry"
-    }
-  },
-  {
-    "family": "c_npdecoy_serial_clean_organize",
-    "nuance": "np_decoy",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "clean and organize the garage {date}",
-    "fixed_slots": {
-      "title": "clean and organize the garage"
-    }
-  },
-  {
-    "family": "c_npdecoy_serial_pack_label",
-    "nuance": "np_decoy",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "pack and label the boxes {date}",
-    "fixed_slots": {
-      "title": "pack and label the boxes"
-    }
-  },
-  {
-    "family": "c_npdecoy_serial_wash_dry",
-    "nuance": "np_decoy",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "wash and dry the dishes",
-    "fixed_slots": {
-      "title": "wash and dry the dishes"
-    }
-  },
-  {
-    "family": "c_npdecoy_serial_sort_file",
-    "nuance": "np_decoy",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "sort and file the paperwork {date}",
-    "fixed_slots": {
-      "title": "sort and file the paperwork"
-    }
-  },
-  {
-    "family": "c_npdecoy_table_for_two",
-    "nuance": "np_decoy",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book a table for {name} and {name2} {date} at {time}",
-    "fixed_slots": {
-      "title": "table for {name} and {name2}"
-    }
-  },
-  {
-    "family": "c_npdecoy_invite_two",
-    "nuance": "np_decoy",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "invite {name} and {name2} to {event_title} {date}"
-  },
-  {
-    "family": "c_npdecoy_reschedule_call_two",
-    "nuance": "np_decoy",
-    "action": "update_event",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "reschedule the call with {name} and {name2} to {date}",
-    "fixed_slots": {
-      "title": "call with {name} and {name2}"
-    }
-  },
-  {
-    "family": "c_npdecoy_cancel_meeting_two",
-    "nuance": "np_decoy",
-    "action": "delete_event",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "cancel the meeting with {name} and {name2}",
-    "fixed_slots": {
-      "title": "meeting with {name} and {name2}"
-    }
-  },
-  {
-    "family": "c_npdecoy_call_two_task",
-    "nuance": "np_decoy",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "call {name} and {name2} {date}",
-    "fixed_slots": {
-      "title": "call {name} and {name2}"
-    }
-  },
-  {
-    "family": "c_joiner_andthen_ee_1",
-    "nuance": "joiner",
-    "action": "create_event",
-    "atomic": false,
-    "events": 2,
-    "tasks": 0,
-    "template": "book {event_title} {date} at {time} and then {event_title2} {date2} at {time2}"
-  },
-  {
-    "family": "c_joiner_andthen_tt_1",
-    "nuance": "joiner",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "remind me to {task_title} and then {task_title2}"
-  },
-  {
-    "family": "c_joiner_andthen_et_1",
-    "nuance": "joiner",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "book {event_title} {date} and then remind me to {task_title2}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": [
-      "title_2"
-    ]
-  },
-  {
-    "family": "c_joiner_andthen_te_1",
-    "nuance": "joiner",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "buy {qty} {item} and then book {event_title2} {date}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_joiner_andthen_ee_2",
-    "nuance": "joiner",
-    "action": "create_event",
-    "atomic": false,
-    "events": 2,
-    "tasks": 0,
-    "template": "schedule {event_title} for {date} and then set up {event_title2} for {date2}"
-  },
-  {
-    "family": "c_joiner_andthen_tt_2",
-    "nuance": "joiner",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "add {task_title} to my list and then add {task_title2}"
-  },
-  {
-    "family": "c_joiner_commathen_ee_1",
-    "nuance": "joiner",
-    "action": "create_event",
-    "atomic": false,
-    "events": 2,
-    "tasks": 0,
-    "template": "book {event_title} {date} at {time}, then {event_title2} {date2} at {time2}"
-  },
-  {
-    "family": "c_joiner_commathen_te_1",
-    "nuance": "joiner",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "buy {qty} {item}, then remind me to {task_title2}"
-  },
-  {
-    "family": "c_joiner_commathen_et_1",
-    "nuance": "joiner",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "schedule {event_title} for {date}, then add {task_title2} to my list",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": [
-      "title_2"
-    ]
-  },
-  {
-    "family": "c_joiner_commathen_tt_1",
-    "nuance": "joiner",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "call {name}, then call {name2}",
-    "fixed_slots": {
-      "title": "call {name}",
-      "title_2": "call {name2}"
-    }
-  },
-  {
-    "family": "c_joiner_commathen_ee_2",
-    "nuance": "joiner",
-    "action": "create_event",
-    "atomic": false,
-    "events": 2,
-    "tasks": 0,
-    "template": "put {event_title} on my calendar {date}, then {event_title2} {date2}"
-  },
-  {
-    "family": "c_joiner_commathen_te_2",
-    "nuance": "joiner",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "remind me to {task_title}, then book {event_title2} {date} at {time}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_joiner_also_ee_1",
-    "nuance": "joiner",
-    "action": "create_event",
-    "atomic": false,
-    "events": 2,
-    "tasks": 0,
-    "template": "book {event_title} {date} at {time}. also book {event_title2} {date2} at {time2}"
-  },
-  {
-    "family": "c_joiner_also_tt_1",
-    "nuance": "joiner",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "remind me to {task_title}. also remind me to {task_title2}"
-  },
-  {
-    "family": "c_joiner_also_et_1",
-    "nuance": "joiner",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "schedule {event_title} for {date} at {time}. also add {task_title2} to my list",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": [
-      "title_2"
-    ]
-  },
-  {
-    "family": "c_joiner_also_te_1",
-    "nuance": "joiner",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "buy {qty} {item}. also book {event_title2} {date}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_joiner_also_ee_2",
-    "nuance": "joiner",
-    "action": "create_event",
-    "atomic": false,
-    "events": 2,
-    "tasks": 0,
-    "template": "set up {event_title} for {date}. also set up {event_title2} for {date2}"
-  },
-  {
-    "family": "c_joiner_also_tt_2",
-    "nuance": "joiner",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "add {task_title} to my list. also add {task_title2}"
-  },
-  {
-    "family": "c_joiner_plus_ee_1",
-    "nuance": "joiner",
-    "action": "create_event",
-    "atomic": false,
-    "events": 2,
-    "tasks": 0,
-    "template": "book {event_title} {date} at {time}, plus {event_title2} {date2} at {time2}"
-  },
-  {
-    "family": "c_joiner_plus_tt_1",
-    "nuance": "joiner",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "buy {qty} {item}, plus remind me to {task_title2}"
-  },
-  {
-    "family": "c_joiner_plus_et_1",
-    "nuance": "joiner",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "schedule {event_title} for {date}, plus remind me to {task_title2}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": [
-      "title_2"
-    ]
-  },
-  {
-    "family": "c_joiner_plus_te_1",
-    "nuance": "joiner",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "remind me to {task_title}, plus book {event_title2} {date} at {time}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_joiner_plus_ee_2",
-    "nuance": "joiner",
-    "action": "create_event",
-    "atomic": false,
-    "events": 2,
-    "tasks": 0,
-    "template": "add {event_title} to my calendar {date}, plus {event_title2} {date2}"
-  },
-  {
-    "family": "c_joiner_plus_tt_2",
-    "nuance": "joiner",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "add {task_title} to my list, plus {task_title2}"
-  },
-  {
-    "family": "c_remindthen_1",
-    "nuance": "remind_then",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "remind me to {task_title} and then book {event_title2} {date} at {time}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_remindthen_2",
-    "nuance": "remind_then",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "remind me to {task_title} at {time} and then set up {event_title2} for {date}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_remindthen_3",
-    "nuance": "remind_then",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "remind me to {task_title} {date}, then schedule {event_title2} for {date2}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_remindthen_4",
-    "nuance": "remind_then",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "remind me to {task_title}, then add {event_title2} to my calendar {date}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_remindthen_5",
-    "nuance": "remind_then",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "remind me to call {name}, then book {event_title2} {date}",
-    "fixed_slots": {
-      "title": "call {name}"
-    },
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_remindthen_6",
-    "nuance": "remind_then",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "remind me to {task_title} before {event_title2} {date} at {time}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_remindthen_7",
-    "nuance": "remind_then",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "remind me to buy {qty} {item}, then head to {event_title2} {date}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_remindthen_8",
-    "nuance": "remind_then",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "remind me to {task_title} an hour before {event_title2} at {time}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_remindthen_9",
-    "nuance": "remind_then",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "remind me to {task_title}, then remind me to {task_title2}"
-  },
-  {
-    "family": "c_remindthen_10",
-    "nuance": "remind_then",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "remind me to {task_title} and then remind me to {task_title2} {date2}"
-  },
-  {
-    "family": "c_remindthen_11",
-    "nuance": "remind_then",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "remind me to {task_title} {date}, then remind me to {task_title2}"
-  },
-  {
-    "family": "c_remindthen_12",
-    "nuance": "remind_then",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "remind me to {task_title} and then to {task_title2}"
-  },
-  {
-    "family": "c_mixedmode_1",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} {date} at {time} and what's on my calendar {query_range2}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": []
-  },
-  {
-    "family": "c_mixedmode_2",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 0,
-    "tasks": 1,
-    "template": "add {task_title} to my list and show me my tasks for {query_range}",
-    "event_label_sources": [],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_mixedmode_3",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 0,
-    "template": "cancel {event_title2} and book {event_title} {date} at {time}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": []
-  },
-  {
-    "family": "c_mixedmode_4",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 0,
-    "tasks": 1,
-    "template": "delete {task_title2} from my list and remind me to {task_title}",
-    "event_label_sources": [],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_mixedmode_5",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 0,
-    "template": "what's on my calendar {query_range2} and book {event_title} {date} at {time}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": []
-  },
-  {
-    "family": "c_mixedmode_6",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 0,
-    "template": "cancel {event_title2} {date2} and schedule {event_title} for {date}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": []
-  },
-  {
-    "family": "c_mixedmode_7",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 0,
-    "tasks": 1,
-    "template": "remove {task_title2} from my tasks and add {task_title}",
-    "event_label_sources": [],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_mixedmode_8",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 0,
-    "template": "check my calendar for {query_range2} and add {event_title} {date} at {time}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": []
-  },
-  {
-    "family": "c_mixedmode_9",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 0,
-    "template": "clear {event_title2} off my calendar and set up {event_title} for {date}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": []
-  },
-  {
-    "family": "c_mixedmode_10",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 0,
-    "tasks": 1,
-    "template": "how many tasks do i have and remind me to {task_title}",
-    "event_label_sources": [],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_mixedmode_11",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 0,
-    "tasks": 1,
-    "template": "cancel {event_title2} and remind me to {task_title}",
-    "event_label_sources": [],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_mixedmode_12",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 0,
-    "template": "delete {task_title2} and book {event_title} {date}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": []
-  },
-  {
-    "family": "c_mixedmode_13",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 0,
-    "tasks": 1,
-    "template": "show me my schedule for {query_range} and add {task_title} to my list",
-    "event_label_sources": [],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_mixedmode_14",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 0,
-    "template": "do i have anything {query_range2} and if not book {event_title} {date} at {time}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": []
-  },
-  {
-    "family": "c_mixedmode_15",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 0,
-    "template": "reschedule {event_title2} to {date2} and add {event_title} to my calendar {date} at {time}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": []
-  },
-  {
-    "family": "c_mixedmode_16",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 0,
-    "tasks": 1,
-    "template": "mark {task_title2} as done and add {task_title} to my list",
-    "event_label_sources": [],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_mixedmode_17",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 0,
-    "template": "move {event_title2} to {date2} and book {event_title} for {date} at {time}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": []
-  },
-  {
-    "family": "c_mixedmode_18",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 0,
-    "tasks": 1,
-    "template": "check off {task_title2} and remind me to {task_title}",
-    "event_label_sources": [],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_mixedmode_19",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 0,
-    "tasks": 0,
-    "template": "cancel {event_title2} and what's on my calendar {query_range}",
-    "event_label_sources": [],
-    "task_label_sources": []
-  },
-  {
-    "family": "c_mixedmode_20",
-    "nuance": "mixed_mode",
-    "action": "mixed",
-    "atomic": false,
-    "events": 0,
-    "tasks": 1,
-    "template": "clear my to-do list and remind me to {task_title}",
-    "event_label_sources": [],
-    "task_label_sources": [
-      "title"
-    ]
-  },
-  {
-    "family": "c_interrog_ce_1",
-    "nuance": "interrogative_polite",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "should i add {event_title} to my calendar {date}?"
-  },
-  {
-    "family": "c_interrog_ce_2",
-    "nuance": "interrogative_polite",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "should i book {event_title} for {date} at {time}?"
-  },
-  {
-    "family": "c_interrog_ct_1",
-    "nuance": "interrogative_polite",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "should i add {task_title} to my list?"
-  },
-  {
-    "family": "c_interrog_ct_2",
-    "nuance": "interrogative_polite",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "should i remind myself to {task_title} {date}?"
-  },
-  {
-    "family": "c_interrog_ce_3",
-    "nuance": "interrogative_polite",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "do you think i should schedule {event_title} for {date}?"
-  },
-  {
-    "family": "c_interrog_ct_3",
-    "nuance": "interrogative_polite",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "do you think i should {task_title} {date}?"
-  },
-  {
-    "family": "c_interrog_ce_4",
-    "nuance": "interrogative_polite",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "what if i booked {event_title} for {date} at {time}?"
-  },
-  {
-    "family": "c_interrog_ct_4",
-    "nuance": "interrogative_polite",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "what if i added {task_title} to my list?"
-  },
-  {
-    "family": "c_polite_ce_1",
-    "nuance": "interrogative_polite",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "can you please book {event_title} for {date} at {time}?"
-  },
-  {
-    "family": "c_polite_ce_2",
-    "nuance": "interrogative_polite",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "could you schedule {event_title} for {date}?"
-  },
-  {
-    "family": "c_polite_ct_1",
-    "nuance": "interrogative_polite",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "can you please add {task_title} to my list?"
-  },
-  {
-    "family": "c_polite_ct_2",
-    "nuance": "interrogative_polite",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "would you remind me to {task_title} {date}?"
-  },
-  {
-    "family": "c_polite_ce_3",
-    "nuance": "interrogative_polite",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "would you mind booking {event_title} for {date} at {time}?"
-  },
-  {
-    "family": "c_polite_ct_3",
-    "nuance": "interrogative_polite",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "could you please remind me to {task_title}?"
-  },
-  {
-    "family": "c_polite_ce_4",
-    "nuance": "interrogative_polite",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "hey, can you set up {event_title} for {date} at {time}?"
-  },
-  {
-    "family": "c_polite_ct_4",
-    "nuance": "interrogative_polite",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "hey, can you add {task_title} to my tasks?"
-  },
-  {
-    "family": "c_generic_de_1",
-    "nuance": "generic_target_complex",
-    "action": "delete_event",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "um can you just delete {generic_target} for me"
-  },
-  {
-    "family": "c_generic_dt_1",
-    "nuance": "generic_target_complex",
-    "action": "delete_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "yeah just clear {generic_target} off my list please"
-  },
-  {
-    "family": "c_generic_ue_1",
-    "nuance": "generic_target_complex",
-    "action": "update_event",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "move {generic_target} to {date}, i don't remember the name"
-  },
-  {
-    "family": "c_generic_co_1",
-    "nuance": "generic_target_complex",
-    "action": "complete_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "mark {generic_target} as done, the one from {date}"
-  },
-  {
-    "family": "c_generic_de_2",
-    "nuance": "generic_target_complex",
-    "action": "delete_event",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "get rid of {generic_target} on my calendar {date}"
-  },
-  {
-    "family": "c_generic_ut_1",
-    "nuance": "generic_target_complex",
-    "action": "update_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "change {generic_target} on my list, not sure which one"
-  },
-  {
-    "family": "c_generic_dt_2",
-    "nuance": "generic_target_complex",
-    "action": "delete_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "remove {generic_target}, i already did it"
-  },
-  {
-    "family": "c_generic_de_3",
-    "nuance": "generic_target_complex",
-    "action": "delete_event",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "cancel {generic_target}, something came up"
-  },
-  {
-    "family": "c_generic_co_2",
-    "nuance": "generic_target_complex",
-    "action": "complete_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "check off {generic_target}, it's done"
-  },
-  {
-    "family": "c_generic_ue_2",
-    "nuance": "generic_target_complex",
-    "action": "update_event",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "reschedule {generic_target} to {date} at {time}"
-  },
-  {
-    "family": "c_timelist_ce_1",
-    "nuance": "time_list_vs_range",
-    "action": "create_event",
-    "atomic": false,
-    "events": 2,
-    "tasks": 0,
-    "template": "{event_title} at {time} and {time2}",
-    "fixed_slots": {
-      "title_2": "{event_title}"
-    }
-  },
-  {
-    "family": "c_timelist_ct_1",
-    "nuance": "time_list_vs_range",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "walk the dog at {time} and {time2}",
-    "fixed_slots": {
-      "title": "walk the dog",
-      "title_2": "walk the dog"
-    }
-  },
-  {
-    "family": "c_timelist_ct_2",
-    "nuance": "time_list_vs_range",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "{task_title} at {time} and {time2}",
-    "fixed_slots": {
-      "title_2": "{task_title}"
-    }
-  },
-  {
-    "family": "c_timelist_ce_2",
-    "nuance": "time_list_vs_range",
-    "action": "create_event",
-    "atomic": false,
-    "events": 2,
-    "tasks": 0,
-    "template": "book {event_title} at {time} and again at {time2}",
-    "fixed_slots": {
-      "title_2": "{event_title}"
-    }
-  },
-  {
-    "family": "c_timelist_ct_3",
-    "nuance": "time_list_vs_range",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "take the medicine at {time} and {time2}",
-    "fixed_slots": {
-      "title": "take the medicine",
-      "title_2": "take the medicine"
-    }
-  },
-  {
-    "family": "c_timelist_ce_3",
-    "nuance": "time_list_vs_range",
-    "action": "create_event",
-    "atomic": false,
-    "events": 2,
-    "tasks": 0,
-    "template": "remind me about {event_title} at {time} and {time2}",
-    "fixed_slots": {
-      "title_2": "{event_title}"
-    }
-  },
-  {
-    "family": "c_timelist_ct_4",
-    "nuance": "time_list_vs_range",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "water the plants at {time} and at {time2}",
-    "fixed_slots": {
-      "title": "water the plants",
-      "title_2": "water the plants"
-    }
-  },
-  {
-    "family": "c_timelist_ce_4",
-    "nuance": "time_list_vs_range",
-    "action": "create_event",
-    "atomic": false,
-    "events": 2,
-    "tasks": 0,
-    "template": "{event_title} {date} at {time} and at {time2}",
-    "fixed_slots": {
-      "title_2": "{event_title}"
-    }
-  },
-  {
-    "family": "c_range_ce_1",
-    "nuance": "time_list_vs_range",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} {date} {time_range}"
-  },
-  {
-    "family": "c_range_ce_2",
-    "nuance": "time_list_vs_range",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "schedule {event_title} for {date} {time_range}"
-  },
-  {
-    "family": "c_range_ce_3",
-    "nuance": "time_list_vs_range",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "set up {event_title} {time_range} {date}"
-  },
-  {
-    "family": "c_range_ct_1",
-    "nuance": "time_list_vs_range",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "block off time to {task_title} {time_range} {date}"
-  },
-  {
-    "family": "c_range_ce_4",
-    "nuance": "time_list_vs_range",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "put {event_title} on my calendar {date} {time_range}"
-  },
-  {
-    "family": "c_range_ce_5",
-    "nuance": "time_list_vs_range",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "{event_title} {time_range} {date}"
-  },
-  {
-    "family": "c_range_ce_6",
-    "nuance": "time_list_vs_range",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} {date} {time_range} with {name}"
-  },
-  {
-    "family": "c_range_ce_7",
-    "nuance": "time_list_vs_range",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "schedule {event_title} {time_range} {date}, no earlier"
-  },
-  {
-    "family": "c_recur_1",
-    "nuance": "recurrence",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} {recurrence} at {time}"
-  },
-  {
-    "family": "c_recur_2",
-    "nuance": "recurrence",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "schedule {event_title} {recurrence} starting {date}"
-  },
-  {
-    "family": "c_recur_3",
-    "nuance": "recurrence",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "set up {event_title} {recurrence} at {time} starting {date}"
-  },
-  {
-    "family": "c_recur_4",
-    "nuance": "recurrence",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "add {event_title} to my calendar {recurrence} at {time}"
-  },
-  {
-    "family": "c_recur_5",
-    "nuance": "recurrence",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} {recurrence}"
-  },
-  {
-    "family": "c_recur_6",
-    "nuance": "recurrence",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "remind me to {task_title} {recurrence}"
-  },
-  {
-    "family": "c_recur_7",
-    "nuance": "recurrence",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "{task_title} {recurrence} at {time}"
-  },
-  {
-    "family": "c_recur_8",
-    "nuance": "recurrence",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "schedule {event_title} for {recurrence} at {time}, starting {date}"
-  },
-  {
-    "family": "c_recur_9",
-    "nuance": "recurrence",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} {recurrence} except when i'm busy"
-  },
-  {
-    "family": "c_recur_10",
-    "nuance": "recurrence",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "set up {event_title} {recurrence} at {time} for the rest of the year"
-  },
-  {
-    "family": "c_recur_11",
-    "nuance": "recurrence",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} {recurrence} at {time} in the morning"
-  },
-  {
-    "family": "c_recur_12",
-    "nuance": "recurrence",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "remind me to {task_title} {recurrence} at {time}"
-  },
-  {
-    "family": "c_recur_13",
-    "nuance": "recurrence",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "schedule {event_title} {recurrence} at {time} with {name}"
-  },
-  {
-    "family": "c_recur_14",
-    "nuance": "recurrence",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} {recurrence} at {time}, no exceptions"
-  },
-  {
-    "family": "c_recur_15",
-    "nuance": "recurrence",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "add {event_title} {recurrence} starting {date} at {time}"
-  },
-  {
-    "family": "c_recur_16",
-    "nuance": "recurrence",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} {recurrence} at {time} until further notice"
-  },
-  {
-    "family": "c_until_1",
-    "nuance": "until_through",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} {recurrence} at {time} until {date2}",
-    "fixed_slots": {
-      "end_inclusive": false
-    }
-  },
-  {
-    "family": "c_until_2",
-    "nuance": "until_through",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "schedule {event_title} {recurrence} until {date2}",
-    "fixed_slots": {
-      "end_inclusive": false
-    }
-  },
-  {
-    "family": "c_through_1",
-    "nuance": "until_through",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} {recurrence} at {time} through {date2}",
-    "fixed_slots": {
-      "end_inclusive": true
-    }
-  },
-  {
-    "family": "c_including_1",
-    "nuance": "until_through",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "schedule {event_title} {recurrence} at {time}, including {date2}",
-    "fixed_slots": {
-      "end_inclusive": true
-    }
-  },
-  {
-    "family": "c_until_endofmonth",
-    "nuance": "until_through",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} {recurrence} at {time} until the end of the month",
-    "fixed_slots": {
-      "end_inclusive": true,
-      "date_phrase_2": "end of the month"
-    }
-  },
-  {
-    "family": "c_through_2",
-    "nuance": "until_through",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "remind me to {task_title} {recurrence} through {date2}",
-    "fixed_slots": {
-      "end_inclusive": true
-    }
-  },
-  {
-    "family": "c_until_3",
-    "nuance": "until_through",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "remind me to {task_title} {recurrence} until {date2}",
-    "fixed_slots": {
-      "end_inclusive": false
-    }
-  },
-  {
-    "family": "c_until_4",
-    "nuance": "until_through",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "set up {event_title} {recurrence} at {time} until {date2}",
-    "fixed_slots": {
-      "end_inclusive": false
-    }
-  },
-  {
-    "family": "c_through_3",
-    "nuance": "until_through",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} {recurrence} through {date2} at {time}",
-    "fixed_slots": {
-      "end_inclusive": true
-    }
-  },
-  {
-    "family": "c_including_2",
-    "nuance": "until_through",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "{task_title} {recurrence}, including {date2}",
-    "fixed_slots": {
-      "end_inclusive": true
-    }
-  },
-  {
-    "family": "c_attendee_1",
-    "nuance": "attendee",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "schedule {event_title} with {name} {date} at {time}"
-  },
-  {
-    "family": "c_attendee_2",
-    "nuance": "attendee",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} with {name} for {date}"
-  },
-  {
-    "family": "c_attendee_3",
-    "nuance": "attendee",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "set up a meeting with {name} {date} at {time}",
-    "fixed_slots": {
-      "title": "meeting with {name}"
-    }
-  },
-  {
-    "family": "c_attendee_4",
-    "nuance": "attendee",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "invite {name} to {event_title} {date}"
-  },
-  {
-    "family": "c_attendee_5",
-    "nuance": "attendee",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "schedule a call with {name} for {date} at {time}",
-    "fixed_slots": {
-      "title": "call with {name}"
-    }
-  },
-  {
-    "family": "c_attendee_6",
-    "nuance": "attendee",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} for {name} on {date}"
-  },
-  {
-    "family": "c_attendee_7",
-    "nuance": "attendee",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "set up {event_title} with {name} and {name2} {date}"
-  },
-  {
-    "family": "c_attendee_8",
-    "nuance": "attendee",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "remind me to call {name} {date}",
-    "fixed_slots": {
-      "title": "call {name}"
-    }
-  },
-  {
-    "family": "c_attendee_9",
-    "nuance": "attendee",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "remind me to email {name} about {event_title} {date}",
-    "fixed_slots": {
-      "title": "email {name} about {event_title}"
-    }
-  },
-  {
-    "family": "c_attendee_10",
-    "nuance": "attendee",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "schedule {event_title} and invite {name}"
-  },
-  {
-    "family": "c_attendee_11",
-    "nuance": "attendee",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "set up time with {name} {date} at {time}",
-    "fixed_slots": {
-      "title": "time with {name}"
-    }
-  },
-  {
-    "family": "c_attendee_12",
-    "nuance": "attendee",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book a meeting with {name} {date} at {time} to discuss {event_title}",
-    "fixed_slots": {
-      "title": "meeting with {name} about {event_title}"
-    }
-  },
-  {
-    "family": "c_leadtime_1",
-    "nuance": "lead_time",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "remind me {lead_time} about {event_title} {date} at {time}"
-  },
-  {
-    "family": "c_leadtime_2",
-    "nuance": "lead_time",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} {date} at {time} and remind me {lead_time}"
-  },
-  {
-    "family": "c_leadtime_3",
-    "nuance": "lead_time",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "set up {event_title} {date} at {time}, remind me {lead_time}"
-  },
-  {
-    "family": "c_leadtime_4",
-    "nuance": "lead_time",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "schedule {event_title} for {date} at {time} and give me a heads up {lead_time}"
-  },
-  {
-    "family": "c_leadtime_5",
-    "nuance": "lead_time",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} {date} at {time}, notify me {lead_time}"
-  },
-  {
-    "family": "c_leadtime_6",
-    "nuance": "lead_time",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "remind me {lead_time} before {event_title} {date} at {time}"
-  },
-  {
-    "family": "c_leadtime_7",
-    "nuance": "lead_time",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "set a reminder {lead_time} for {event_title} {date}"
-  },
-  {
-    "family": "c_leadtime_8",
-    "nuance": "lead_time",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} {date} at {time} with a reminder {lead_time}"
-  },
-  {
-    "family": "c_leadtime_9",
-    "nuance": "lead_time",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "remind me to {task_title} {lead_time}"
-  },
-  {
-    "family": "c_leadtime_10",
-    "nuance": "lead_time",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "add {task_title} to my list and remind me {lead_time}"
-  },
-  {
-    "family": "c_leadtime_11",
-    "nuance": "lead_time",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "schedule {event_title} {date} at {time}, alert me {lead_time}"
-  },
-  {
-    "family": "c_leadtime_12",
-    "nuance": "lead_time",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "set up {event_title} at {time} {date} and remind me {lead_time} beforehand"
-  },
-  {
-    "family": "c_datemark_1",
-    "nuance": "date_marking",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "mark {date} as {occasion}",
-    "flags": {
-      "all_day": true
-    }
-  },
-  {
-    "family": "c_datemark_2",
-    "nuance": "date_marking",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "mark {date} on my calendar as {occasion}",
-    "flags": {
-      "all_day": true
-    }
-  },
-  {
-    "family": "c_datemark_3",
-    "nuance": "date_marking",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "mark {date} as {occasion} on my calendar",
-    "flags": {
-      "all_day": true
-    }
-  },
-  {
-    "family": "c_datemark_4",
-    "nuance": "date_marking",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "note {date} as {occasion}",
-    "flags": {
-      "all_day": true
-    }
-  },
-  {
-    "family": "c_datemark_5",
-    "nuance": "date_marking",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "label {date} as {occasion} on my calendar",
-    "flags": {
-      "all_day": true
-    }
-  },
-  {
-    "family": "c_datemark_6",
-    "nuance": "date_marking",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "mark {date} down as {occasion}",
-    "flags": {
-      "all_day": true
-    }
-  },
-  {
-    "family": "c_datemark_7",
-    "nuance": "date_marking",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "mark {date} as {occasion}, don't let me forget",
-    "flags": {
-      "all_day": true
-    }
-  },
-  {
-    "family": "c_datemark_8",
-    "nuance": "date_marking",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "put a marker on {date} for {occasion}",
-    "flags": {
-      "all_day": true
-    }
-  },
-  {
-    "family": "c_datemark_9",
-    "nuance": "date_marking",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "mark {date} as {occasion} please",
-    "flags": {
-      "all_day": true
-    }
-  },
-  {
-    "family": "c_datemark_10",
-    "nuance": "date_marking",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "can you mark {date} as {occasion}",
-    "flags": {
-      "all_day": true
-    }
-  },
-  {
-    "family": "c_encounter_1",
-    "nuance": "dated_encounter",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "i need to talk to {name} on {date}",
-    "fixed_slots": {
-      "title": "talk to {name}"
-    }
-  },
-  {
-    "family": "c_encounter_2",
-    "nuance": "dated_encounter",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "i need to talk to {name} {date} about {event_title}",
-    "fixed_slots": {
-      "title": "talk to {name} about {event_title}"
-    }
-  },
-  {
-    "family": "c_encounter_3",
-    "nuance": "dated_encounter",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "i have to meet {name} {date}",
-    "fixed_slots": {
-      "title": "meet {name}"
-    }
-  },
-  {
-    "family": "c_encounter_4",
-    "nuance": "dated_encounter",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "i need to catch up with {name} {date}",
-    "fixed_slots": {
-      "title": "catch up with {name}"
-    }
-  },
-  {
-    "family": "c_encounter_5",
-    "nuance": "dated_encounter",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "i should see {name} {date}",
-    "fixed_slots": {
-      "title": "see {name}"
-    }
-  },
-  {
-    "family": "c_encounter_6",
-    "nuance": "dated_encounter",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "i need to speak with {name} on {date} at {time}",
-    "fixed_slots": {
-      "title": "speak with {name}"
-    }
-  },
-  {
-    "family": "c_encounter_7",
-    "nuance": "dated_encounter",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "gotta talk to {name} {date}",
-    "fixed_slots": {
-      "title": "talk to {name}"
-    }
-  },
-  {
-    "family": "c_encounter_8",
-    "nuance": "dated_encounter",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "need to touch base with {name} {date}",
-    "fixed_slots": {
-      "title": "touch base with {name}"
-    }
-  },
-  {
-    "family": "c_encounter_9",
-    "nuance": "dated_encounter",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "i need to sit down with {name} {date} at {time}",
-    "fixed_slots": {
-      "title": "sit down with {name}"
-    }
-  },
-  {
-    "family": "c_encounter_10",
-    "nuance": "dated_encounter",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "i owe {name} a conversation, let's do {date}",
-    "fixed_slots": {
-      "title": "conversation with {name}"
-    }
-  },
-  {
-    "family": "c_allday_1",
-    "nuance": "all_day",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "block off the whole day {date} for {event_title}",
-    "flags": {
-      "all_day": true
-    }
-  },
-  {
-    "family": "c_allday_2",
-    "nuance": "all_day",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} for all day {date}",
-    "flags": {
-      "all_day": true
-    }
-  },
-  {
-    "family": "c_allday_3",
-    "nuance": "all_day",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "{event_title} {date}, all day",
-    "flags": {
-      "all_day": true
-    }
-  },
-  {
-    "family": "c_allday_4",
-    "nuance": "all_day",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "mark {date} as busy all day for {event_title}",
-    "flags": {
-      "all_day": true
-    }
-  },
-  {
-    "family": "c_allday_5",
-    "nuance": "all_day",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "block my whole calendar {date} for {event_title}",
-    "flags": {
-      "all_day": true
-    }
-  },
-  {
-    "family": "c_allday_6",
-    "nuance": "all_day",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "block out {date} to {task_title}, all day",
-    "flags": {
-      "all_day": true
-    }
-  },
-  {
-    "family": "c_allday_7",
-    "nuance": "all_day",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} {date} for the entire day and remind me {lead_time}",
-    "flags": {
-      "all_day": true
-    }
-  },
-  {
-    "family": "c_allday_8",
-    "nuance": "all_day",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "{event_title} takes all day {date}",
-    "flags": {
-      "all_day": true
-    }
-  },
-  {
-    "family": "c_threeask_ee_1",
-    "nuance": "three_ask",
-    "action": "create_event",
-    "atomic": false,
-    "events": 3,
-    "tasks": 0,
-    "template": "book {event_title} {date} at {time}, {event_title2} {date2} at {time2}, and {event_title3} {date3} at {time3}"
-  },
-  {
-    "family": "c_threeask_tt_1",
-    "nuance": "three_ask",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 3,
-    "template": "remind me to {task_title}, {task_title2}, and {task_title3}"
-  },
-  {
-    "family": "c_threeask_eet_1",
-    "nuance": "three_ask",
-    "action": "mixed",
-    "atomic": false,
-    "events": 2,
-    "tasks": 1,
-    "template": "book {event_title} {date}, {event_title2} {date2}, and remind me to {task_title3}",
-    "event_label_sources": [
-      "title",
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title_3"
-    ]
-  },
-  {
-    "family": "c_threeask_ett_1",
-    "nuance": "three_ask",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 2,
-    "template": "book {event_title} {date} and remind me to {task_title2} and {task_title3}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": [
-      "title_2",
-      "title_3"
-    ]
-  },
-  {
-    "family": "c_threeask_eet_2",
-    "nuance": "three_ask",
-    "action": "mixed",
-    "atomic": false,
-    "events": 2,
-    "tasks": 1,
-    "template": "schedule {event_title} for {date}, add {task_title3} to my list, and book {event_title2} for {date2}",
-    "event_label_sources": [
-      "title",
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title_3"
-    ]
-  },
-  {
-    "family": "c_threeask_ttt_2",
-    "nuance": "three_ask",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 3,
-    "template": "buy {qty} {item}, {item2}, and {item3}",
-    "fixed_slots": {
-      "title": "{item}",
-      "title_2": "{item2}",
-      "title_3": "{item3}"
-    }
-  },
-  {
-    "family": "c_threeask_ee_2",
-    "nuance": "three_ask",
-    "action": "create_event",
-    "atomic": false,
-    "events": 3,
-    "tasks": 0,
-    "template": "add {event_title} to my calendar {date}, then {event_title2} {date2}, then {event_title3} {date3}"
-  },
-  {
-    "family": "c_threeask_ett_2",
-    "nuance": "three_ask",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 2,
-    "template": "remind me to {task_title}, {task_title2}, and book {event_title3} {date}",
-    "event_label_sources": [
-      "title_3"
-    ],
-    "task_label_sources": [
-      "title",
-      "title_2"
-    ]
-  },
-  {
-    "family": "c_threeask_ttt_1",
-    "nuance": "three_ask",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 3,
-    "template": "i need to {task_title}, {task_title2}, and {task_title3} {date}"
-  },
-  {
-    "family": "c_threeask_mixed_del",
-    "nuance": "three_ask",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "cancel {event_title2}, book {event_title} {date}, and remind me to {task_title3}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": [
-      "title_3"
-    ]
-  },
-  {
-    "family": "c_threeask_ee_3",
-    "nuance": "three_ask",
-    "action": "create_event",
-    "atomic": false,
-    "events": 3,
-    "tasks": 0,
-    "template": "set up {event_title} {date} at {time}, {event_title2} {date2}, and {event_title3} {date3}"
-  },
-  {
-    "family": "c_threeask_ett_3",
-    "nuance": "three_ask",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 2,
-    "template": "buy {qty} {item}, remind me to {task_title2}, and book {event_title3} {date}",
-    "event_label_sources": [
-      "title_3"
-    ],
-    "task_label_sources": [
-      "title",
-      "title_2"
-    ]
-  },
-  {
-    "family": "c_threeask_eet_3",
-    "nuance": "three_ask",
-    "action": "mixed",
-    "atomic": false,
-    "events": 2,
-    "tasks": 1,
-    "template": "book {event_title} {date}, {event_title2} {date2}, and add {task_title3} to my list",
-    "event_label_sources": [
-      "title",
-      "title_2"
-    ],
-    "task_label_sources": [
-      "title_3"
-    ]
-  },
-  {
-    "family": "c_threeask_ttt_3",
-    "nuance": "three_ask",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 3,
-    "template": "add {task_title}, {task_title2}, and {task_title3} to my list"
-  },
-  {
-    "family": "c_threeask_ett_4",
-    "nuance": "three_ask",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 2,
-    "template": "remind me to {task_title} and {task_title2}, then book {event_title3} {date} at {time}",
-    "event_label_sources": [
-      "title_3"
-    ],
-    "task_label_sources": [
-      "title",
-      "title_2"
-    ]
-  },
-  {
-    "family": "c_texture_1",
-    "nuance": "texture",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "book {event_title} for tommorow at {time} and remind me to {task_title2}",
-    "fixed_slots": {
-      "date_phrase": "tomorrow"
-    },
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": [
-      "title_2"
-    ]
-  },
-  {
-    "family": "c_texture_2",
-    "nuance": "texture",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "add {task_title} to my todo list and remind me to {task_title2} {date}"
-  },
-  {
-    "family": "c_texture_3",
-    "nuance": "texture",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "um so i need to book {event_title} {date} at {time} and also remind me to {task_title2}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": [
-      "title_2"
-    ]
-  },
-  {
-    "family": "c_texture_4",
-    "nuance": "texture",
-    "action": "create_todo",
-    "atomic": false,
-    "events": 0,
-    "tasks": 2,
-    "template": "so like i gotta {task_title} and {task_title2} {date}"
-  },
-  {
-    "family": "c_texture_5",
-    "nuance": "texture",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 0,
-    "template": "remove '{quoted_item}' from my calendar and book {event_title2} {date} at {time}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": []
-  },
-  {
-    "family": "c_texture_6",
-    "nuance": "texture",
-    "action": "mixed",
-    "atomic": false,
-    "events": 0,
-    "tasks": 1,
-    "template": "mark '{quoted_item}' as done and add {task_title2} to my list",
-    "event_label_sources": [],
-    "task_label_sources": [
-      "title_2"
-    ]
-  },
-  {
-    "family": "c_texture_7",
-    "nuance": "texture",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "add {event_title} to my calender {date} and remind me to {task_title2}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": [
-      "title_2"
-    ]
-  },
-  {
-    "family": "c_texture_8",
-    "nuance": "texture",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 1,
-    "template": "hey um can you book {event_title} {date} at {time} and then also remind me to {task_title2} {date2}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": [
-      "title_2"
-    ]
-  },
-  {
-    "family": "c_texture_9",
-    "nuance": "texture",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 0,
-    "template": "delete {generic_target} and book {event_title2} {date} at {time}",
-    "event_label_sources": [
-      "title_2"
-    ],
-    "task_label_sources": []
-  },
-  {
-    "family": "c_texture_10",
-    "nuance": "texture",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "schedule {event_title} {recurrence} at {time}, i keep mispelling this but you know what i mean"
-  },
-  {
-    "family": "c_texture_11",
-    "nuance": "texture",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "grab like {qty} {item} or so {date}"
-  },
-  {
-    "family": "c_texture_12",
-    "nuance": "texture",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "okay so um i was thinking maybe we could book {event_title} {date} at {time} if that works"
-  },
-  {
-    "family": "c_texture_13",
-    "nuance": "texture",
-    "action": "create_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 1,
-    "template": "you know i really should {task_title} {date} at some point"
-  },
-  {
-    "family": "c_texture_14",
-    "nuance": "texture",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "book {event_title} for teusday at {time}",
-    "fixed_slots": {
-      "date_phrase": "tuesday"
-    }
-  },
-  {
-    "family": "c_texture_15",
-    "nuance": "texture",
-    "action": "mixed",
-    "atomic": false,
-    "events": 1,
-    "tasks": 0,
-    "template": "um what's on my calendar {query_range2} and also book {event_title} {date} at {time}",
-    "event_label_sources": [
-      "title"
-    ],
-    "task_label_sources": []
-  },
-  {
-    "family": "c_extra_ue_1",
-    "nuance": "extra",
-    "action": "update_event",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "push {event_title} back by {duration} {date}"
-  },
-  {
-    "family": "c_extra_ue_2",
-    "nuance": "extra",
-    "action": "update_event",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "extend {event_title} {duration} and let {name} know"
-  },
-  {
-    "family": "c_extra_ut_1",
-    "nuance": "extra",
-    "action": "update_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "change the due date of {task_title} to {date} and add a note"
-  },
-  {
-    "family": "c_extra_ut_2",
-    "nuance": "extra",
-    "action": "update_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "rename {task_title} to {task_title2} on my list"
-  },
-  {
-    "family": "c_extra_q_1",
-    "nuance": "extra",
-    "action": "query",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "what's on my calendar {query_range}, i have a lot going on"
-  },
-  {
-    "family": "c_extra_q_2",
-    "nuance": "extra",
-    "action": "query",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "can you check what i have {query_range} before i commit to anything"
-  },
-  {
-    "family": "c_extra_de_1",
-    "nuance": "extra",
-    "action": "delete_event",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "cancel {event_title} {date}, something came up last minute"
-  },
-  {
-    "family": "c_extra_dt_1",
-    "nuance": "extra",
-    "action": "delete_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "remove {task_title} from my list, i already handled it"
-  },
-  {
-    "family": "c_extra_co_1",
-    "nuance": "extra",
-    "action": "complete_todo",
-    "atomic": true,
-    "events": 0,
-    "tasks": 0,
-    "template": "mark {task_title} as done, finally got to it"
-  },
-  {
-    "family": "c_extra_ce_1",
-    "nuance": "extra",
-    "action": "create_event",
-    "atomic": true,
-    "events": 1,
-    "tasks": 0,
-    "template": "schedule {event_title} with {name} {recurrence} at {time}"
+ {
+  "family": "c_and_ee_1",
+  "nuance": "and_compound",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "book {event_title} {date} at {time} and {event_title2} {date2} at {time2}"
+ },
+ {
+  "family": "c_and_ee_2",
+  "nuance": "and_compound",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "schedule {event_title} for {date} and {event_title2} for {date2}"
+ },
+ {
+  "family": "c_and_ee_3",
+  "nuance": "and_compound",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "add {event_title} to my calendar {date} and {event_title2} {date2}"
+ },
+ {
+  "family": "c_and_ee_4",
+  "nuance": "and_compound",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "set up {event_title} at {time} and {event_title2} at {time2}"
+ },
+ {
+  "family": "c_and_ee_5",
+  "nuance": "and_compound",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "book {event_title} {date} and also put {event_title2} on the calendar {date2}"
+ },
+ {
+  "family": "c_and_ee_6",
+  "nuance": "and_compound",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "put {event_title} on my calendar {date} at {time} and {event_title2} {date2} at {time2}"
+ },
+ {
+  "family": "c_and_tt_1",
+  "nuance": "and_compound",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "buy {qty} {item} and remind me to {task_title2}"
+ },
+ {
+  "family": "c_and_tt_2",
+  "nuance": "and_compound",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "add {task_title} and {task_title2} to my to-do list"
+ },
+ {
+  "family": "c_and_tt_3",
+  "nuance": "and_compound",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "remind me to {task_title} and to {task_title2}"
+ },
+ {
+  "family": "c_and_tt_4",
+  "nuance": "and_compound",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "i need to {task_title} and {task_title2}"
+ },
+ {
+  "family": "c_and_tt_5",
+  "nuance": "and_compound",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "put {task_title} and {task_title2} on my list"
+ },
+ {
+  "family": "c_and_tt_6",
+  "nuance": "and_compound",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "remind me to {task_title} {date} and to {task_title2} {date2}"
+ },
+ {
+  "family": "c_and_et_1",
+  "nuance": "and_compound",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "book {event_title} {date} at {time} and remind me to {task_title2}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_2"
+  ]
+ },
+ {
+  "family": "c_and_et_2",
+  "nuance": "and_compound",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "schedule {event_title} for {date} and add {task_title2} to my list",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_2"
+  ]
+ },
+ {
+  "family": "c_and_et_3",
+  "nuance": "and_compound",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "set up {event_title} at {time} and i need to {task_title2}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_2"
+  ]
+ },
+ {
+  "family": "c_and_et_4",
+  "nuance": "and_compound",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "book {event_title} {date} and buy {qty} {item2}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_2"
+  ]
+ },
+ {
+  "family": "c_and_et_5",
+  "nuance": "and_compound",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "add {event_title} to my calendar {date} and remind me to {task_title2} {date2}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_2"
+  ]
+ },
+ {
+  "family": "c_and_et_6",
+  "nuance": "and_compound",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "put {event_title} on the calendar {date} at {time} and put {task_title2} on my list",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_2"
+  ]
+ },
+ {
+  "family": "c_and_te_1",
+  "nuance": "and_compound",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "remind me to {task_title} and book {event_title2} {date} at {time}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_and_te_2",
+  "nuance": "and_compound",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "add {task_title} to my list and schedule {event_title2} for {date}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_and_te_3",
+  "nuance": "and_compound",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "i need to {task_title} and set up {event_title2} at {time}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_and_te_4",
+  "nuance": "and_compound",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "buy {qty} {item} and book {event_title2} {date}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_and_te_5",
+  "nuance": "and_compound",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "remind me to {task_title} {date} and add {event_title2} to my calendar {date2}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_and_te_6",
+  "nuance": "and_compound",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "put {task_title} on my list and put {event_title2} on the calendar {date} at {time}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_npdecoy_meeting_two",
+  "nuance": "np_decoy",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule a meeting with {name} and {name2} {date} at {time}",
+  "fixed_slots": {
+   "title": "meeting with {name} and {name2}"
   }
+ },
+ {
+  "family": "c_npdecoy_book_with_two",
+  "nuance": "np_decoy",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} with {name} and {name2} {date}"
+ },
+ {
+  "family": "c_npdecoy_call_with_two",
+  "nuance": "np_decoy",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "set up a call with {name} and {name2} {date}",
+  "fixed_slots": {
+   "title": "call with {name} and {name2}"
+  }
+ },
+ {
+  "family": "c_npdecoy_lunch_two",
+  "nuance": "np_decoy",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "plan lunch with {name} and {name2} {date}",
+  "fixed_slots": {
+   "title": "lunch with {name} and {name2}"
+  }
+ },
+ {
+  "family": "c_npdecoy_event_for_two",
+  "nuance": "np_decoy",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} for {name} and {name2} {date} at {time}"
+ },
+ {
+  "family": "c_npdecoy_meeting_between",
+  "nuance": "np_decoy",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book a meeting between {name} and {name2} {date}",
+  "fixed_slots": {
+   "title": "meeting between {name} and {name2}"
+  }
+ },
+ {
+  "family": "c_npdecoy_buy_two_items",
+  "nuance": "np_decoy",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "buy {item} and {item2} {date}",
+  "fixed_slots": {
+   "title": "{item} and {item2}"
+  },
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_npdecoy_pickup_two_items",
+  "nuance": "np_decoy",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "pick up {item} and {item2} from the store",
+  "fixed_slots": {
+   "title": "{item} and {item2}"
+  },
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_npdecoy_buy_two_party",
+  "nuance": "np_decoy",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "buy {item} and {item2} for the party {date}",
+  "fixed_slots": {
+   "title": "{item} and {item2}"
+  },
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_npdecoy_remind_buy_two",
+  "nuance": "np_decoy",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "remind me to buy {item} and {item2}",
+  "fixed_slots": {
+   "title": "{item} and {item2}"
+  },
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_npdecoy_serial_wash_fold",
+  "nuance": "np_decoy",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "wash and fold the laundry {date}",
+  "fixed_slots": {
+   "title": "wash and fold the laundry"
+  }
+ },
+ {
+  "family": "c_npdecoy_serial_clean_organize",
+  "nuance": "np_decoy",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "clean and organize the garage {date}",
+  "fixed_slots": {
+   "title": "clean and organize the garage"
+  }
+ },
+ {
+  "family": "c_npdecoy_serial_pack_label",
+  "nuance": "np_decoy",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "pack and label the boxes {date}",
+  "fixed_slots": {
+   "title": "pack and label the boxes"
+  }
+ },
+ {
+  "family": "c_npdecoy_serial_wash_dry",
+  "nuance": "np_decoy",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "wash and dry the dishes",
+  "fixed_slots": {
+   "title": "wash and dry the dishes"
+  }
+ },
+ {
+  "family": "c_npdecoy_serial_sort_file",
+  "nuance": "np_decoy",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "sort and file the paperwork {date}",
+  "fixed_slots": {
+   "title": "sort and file the paperwork"
+  }
+ },
+ {
+  "family": "c_npdecoy_table_for_two",
+  "nuance": "np_decoy",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book a table for {name} and {name2} {date} at {time}",
+  "fixed_slots": {
+   "title": "table for {name} and {name2}"
+  }
+ },
+ {
+  "family": "c_npdecoy_invite_two",
+  "nuance": "np_decoy",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "invite {name} and {name2} to {event_title} {date}"
+ },
+ {
+  "family": "c_npdecoy_reschedule_call_two",
+  "nuance": "np_decoy",
+  "action": "update_event",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "reschedule the call with {name} and {name2} to {date}",
+  "fixed_slots": {
+   "title": "call with {name} and {name2}"
+  }
+ },
+ {
+  "family": "c_npdecoy_cancel_meeting_two",
+  "nuance": "np_decoy",
+  "action": "delete_event",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "cancel the meeting with {name} and {name2}",
+  "fixed_slots": {
+   "title": "meeting with {name} and {name2}"
+  }
+ },
+ {
+  "family": "c_npdecoy_call_two_task",
+  "nuance": "np_decoy",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "call {name} and {name2} {date}",
+  "fixed_slots": {
+   "title": "call {name} and {name2}"
+  }
+ },
+ {
+  "family": "c_joiner_andthen_ee_1",
+  "nuance": "joiner",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "book {event_title} {date} at {time} and then {event_title2} {date2} at {time2}"
+ },
+ {
+  "family": "c_joiner_andthen_tt_1",
+  "nuance": "joiner",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "remind me to {task_title} and then {task_title2}"
+ },
+ {
+  "family": "c_joiner_andthen_et_1",
+  "nuance": "joiner",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "book {event_title} {date} and then remind me to {task_title2}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_2"
+  ]
+ },
+ {
+  "family": "c_joiner_andthen_te_1",
+  "nuance": "joiner",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "buy {qty} {item} and then book {event_title2} {date}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_joiner_andthen_ee_2",
+  "nuance": "joiner",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "schedule {event_title} for {date} and then set up {event_title2} for {date2}"
+ },
+ {
+  "family": "c_joiner_andthen_tt_2",
+  "nuance": "joiner",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "add {task_title} to my list and then add {task_title2}"
+ },
+ {
+  "family": "c_joiner_commathen_ee_1",
+  "nuance": "joiner",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "book {event_title} {date} at {time}, then {event_title2} {date2} at {time2}"
+ },
+ {
+  "family": "c_joiner_commathen_te_1",
+  "nuance": "joiner",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "buy {qty} {item}, then remind me to {task_title2}"
+ },
+ {
+  "family": "c_joiner_commathen_et_1",
+  "nuance": "joiner",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "schedule {event_title} for {date}, then add {task_title2} to my list",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_2"
+  ]
+ },
+ {
+  "family": "c_joiner_commathen_tt_1",
+  "nuance": "joiner",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "call {name}, then call {name2}",
+  "fixed_slots": {
+   "title": "call {name}",
+   "title_2": "call {name2}"
+  }
+ },
+ {
+  "family": "c_joiner_commathen_ee_2",
+  "nuance": "joiner",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "put {event_title} on my calendar {date}, then {event_title2} {date2}"
+ },
+ {
+  "family": "c_joiner_commathen_te_2",
+  "nuance": "joiner",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "remind me to {task_title}, then book {event_title2} {date} at {time}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_joiner_also_ee_1",
+  "nuance": "joiner",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "book {event_title} {date} at {time}. also book {event_title2} {date2} at {time2}"
+ },
+ {
+  "family": "c_joiner_also_tt_1",
+  "nuance": "joiner",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "remind me to {task_title}. also remind me to {task_title2}"
+ },
+ {
+  "family": "c_joiner_also_et_1",
+  "nuance": "joiner",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "schedule {event_title} for {date} at {time}. also add {task_title2} to my list",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_2"
+  ]
+ },
+ {
+  "family": "c_joiner_also_te_1",
+  "nuance": "joiner",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "buy {qty} {item}. also book {event_title2} {date}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_joiner_also_ee_2",
+  "nuance": "joiner",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "set up {event_title} for {date}. also set up {event_title2} for {date2}"
+ },
+ {
+  "family": "c_joiner_also_tt_2",
+  "nuance": "joiner",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "add {task_title} to my list. also add {task_title2}"
+ },
+ {
+  "family": "c_joiner_plus_ee_1",
+  "nuance": "joiner",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "book {event_title} {date} at {time}, plus {event_title2} {date2} at {time2}"
+ },
+ {
+  "family": "c_joiner_plus_tt_1",
+  "nuance": "joiner",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "buy {qty} {item}, plus remind me to {task_title2}"
+ },
+ {
+  "family": "c_joiner_plus_et_1",
+  "nuance": "joiner",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "schedule {event_title} for {date}, plus remind me to {task_title2}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_2"
+  ]
+ },
+ {
+  "family": "c_joiner_plus_te_1",
+  "nuance": "joiner",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "remind me to {task_title}, plus book {event_title2} {date} at {time}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_joiner_plus_ee_2",
+  "nuance": "joiner",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "add {event_title} to my calendar {date}, plus {event_title2} {date2}"
+ },
+ {
+  "family": "c_joiner_plus_tt_2",
+  "nuance": "joiner",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "add {task_title} to my list, plus {task_title2}"
+ },
+ {
+  "family": "c_remindthen_1",
+  "nuance": "remind_then",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "remind me to {task_title} and then book {event_title2} {date} at {time}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_remindthen_2",
+  "nuance": "remind_then",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "remind me to {task_title} at {time} and then set up {event_title2} for {date}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_remindthen_3",
+  "nuance": "remind_then",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "remind me to {task_title} {date}, then schedule {event_title2} for {date2}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_remindthen_4",
+  "nuance": "remind_then",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "remind me to {task_title}, then add {event_title2} to my calendar {date}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_remindthen_5",
+  "nuance": "remind_then",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "remind me to call {name}, then book {event_title2} {date}",
+  "fixed_slots": {
+   "title": "call {name}"
+  },
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_remindthen_6",
+  "nuance": "remind_then",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "remind me to {task_title} before {event_title2} {date} at {time}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_remindthen_7",
+  "nuance": "remind_then",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "remind me to buy {qty} {item}, then head to {event_title2} {date}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_remindthen_8",
+  "nuance": "remind_then",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "remind me to {task_title} an hour before {event_title2} at {time}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_remindthen_9",
+  "nuance": "remind_then",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "remind me to {task_title}, then remind me to {task_title2}"
+ },
+ {
+  "family": "c_remindthen_10",
+  "nuance": "remind_then",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "remind me to {task_title} and then remind me to {task_title2} {date2}"
+ },
+ {
+  "family": "c_remindthen_11",
+  "nuance": "remind_then",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "remind me to {task_title} {date}, then remind me to {task_title2}"
+ },
+ {
+  "family": "c_remindthen_12",
+  "nuance": "remind_then",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "remind me to {task_title} and then to {task_title2}"
+ },
+ {
+  "family": "c_mixedmode_1",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {date} at {time} and what's on my calendar {query_range2}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": []
+ },
+ {
+  "family": "c_mixedmode_2",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 0,
+  "tasks": 1,
+  "template": "add {task_title} to my list and show me my tasks for {query_range}",
+  "event_label_sources": [],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_mixedmode_3",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 0,
+  "template": "cancel {event_title2} and book {event_title} {date} at {time}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": []
+ },
+ {
+  "family": "c_mixedmode_4",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 0,
+  "tasks": 1,
+  "template": "delete {task_title2} from my list and remind me to {task_title}",
+  "event_label_sources": [],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_mixedmode_5",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 0,
+  "template": "what's on my calendar {query_range2} and book {event_title} {date} at {time}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": []
+ },
+ {
+  "family": "c_mixedmode_6",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 0,
+  "template": "cancel {event_title2} {date2} and schedule {event_title} for {date}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": []
+ },
+ {
+  "family": "c_mixedmode_7",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 0,
+  "tasks": 1,
+  "template": "remove {task_title2} from my tasks and add {task_title}",
+  "event_label_sources": [],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_mixedmode_8",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 0,
+  "template": "check my calendar for {query_range2} and add {event_title} {date} at {time}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": []
+ },
+ {
+  "family": "c_mixedmode_9",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 0,
+  "template": "clear {event_title2} off my calendar and set up {event_title} for {date}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": []
+ },
+ {
+  "family": "c_mixedmode_10",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 0,
+  "tasks": 1,
+  "template": "how many tasks do i have and remind me to {task_title}",
+  "event_label_sources": [],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_mixedmode_11",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 0,
+  "tasks": 1,
+  "template": "cancel {event_title2} and remind me to {task_title}",
+  "event_label_sources": [],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_mixedmode_12",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 0,
+  "template": "delete {task_title2} and book {event_title} {date}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": []
+ },
+ {
+  "family": "c_mixedmode_13",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 0,
+  "tasks": 1,
+  "template": "show me my schedule for {query_range} and add {task_title} to my list",
+  "event_label_sources": [],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_mixedmode_14",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 0,
+  "template": "do i have anything {query_range2} and if not book {event_title} {date} at {time}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": []
+ },
+ {
+  "family": "c_mixedmode_15",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 0,
+  "template": "reschedule {event_title2} to {date2} and add {event_title} to my calendar {date} at {time}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": []
+ },
+ {
+  "family": "c_mixedmode_16",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 0,
+  "tasks": 1,
+  "template": "mark {task_title2} as done and add {task_title} to my list",
+  "event_label_sources": [],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_mixedmode_17",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 0,
+  "template": "move {event_title2} to {date2} and book {event_title} for {date} at {time}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": []
+ },
+ {
+  "family": "c_mixedmode_18",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 0,
+  "tasks": 1,
+  "template": "check off {task_title2} and remind me to {task_title}",
+  "event_label_sources": [],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_mixedmode_19",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 0,
+  "tasks": 0,
+  "template": "cancel {event_title2} and what's on my calendar {query_range}",
+  "event_label_sources": [],
+  "task_label_sources": []
+ },
+ {
+  "family": "c_mixedmode_20",
+  "nuance": "mixed_mode",
+  "action": "mixed",
+  "atomic": false,
+  "events": 0,
+  "tasks": 1,
+  "template": "clear my to-do list and remind me to {task_title}",
+  "event_label_sources": [],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_interrog_ce_1",
+  "nuance": "interrogative_polite",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "should i add {event_title} to my calendar {date}?",
+  "proposal_kind": "event"
+ },
+ {
+  "family": "c_interrog_ce_2",
+  "nuance": "interrogative_polite",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "should i book {event_title} for {date} at {time}?",
+  "proposal_kind": "event"
+ },
+ {
+  "family": "c_interrog_ct_1",
+  "nuance": "interrogative_polite",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "should i add {task_title} to my list?",
+  "proposal_kind": "task"
+ },
+ {
+  "family": "c_interrog_ct_2",
+  "nuance": "interrogative_polite",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "should i remind myself to {task_title} {date}?",
+  "proposal_kind": "task"
+ },
+ {
+  "family": "c_interrog_ce_3",
+  "nuance": "interrogative_polite",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "do you think i should schedule {event_title} for {date}?",
+  "proposal_kind": "event"
+ },
+ {
+  "family": "c_interrog_ct_3",
+  "nuance": "interrogative_polite",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "do you think i should {task_title} {date}?",
+  "proposal_kind": "task"
+ },
+ {
+  "family": "c_interrog_ce_4",
+  "nuance": "interrogative_polite",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "what if i booked {event_title} for {date} at {time}?",
+  "proposal_kind": "event"
+ },
+ {
+  "family": "c_interrog_ct_4",
+  "nuance": "interrogative_polite",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "what if i added {task_title} to my list?",
+  "proposal_kind": "task"
+ },
+ {
+  "family": "c_polite_ce_1",
+  "nuance": "interrogative_polite",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "can you please book {event_title} for {date} at {time}?",
+  "proposal_kind": "event"
+ },
+ {
+  "family": "c_polite_ce_2",
+  "nuance": "interrogative_polite",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "could you schedule {event_title} for {date}?",
+  "proposal_kind": "event"
+ },
+ {
+  "family": "c_polite_ct_1",
+  "nuance": "interrogative_polite",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "can you please add {task_title} to my list?",
+  "proposal_kind": "task"
+ },
+ {
+  "family": "c_polite_ct_2",
+  "nuance": "interrogative_polite",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "would you remind me to {task_title} {date}?",
+  "proposal_kind": "task"
+ },
+ {
+  "family": "c_polite_ce_3",
+  "nuance": "interrogative_polite",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "would you mind booking {event_title} for {date} at {time}?",
+  "proposal_kind": "event"
+ },
+ {
+  "family": "c_polite_ct_3",
+  "nuance": "interrogative_polite",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "could you please remind me to {task_title}?",
+  "proposal_kind": "task"
+ },
+ {
+  "family": "c_polite_ce_4",
+  "nuance": "interrogative_polite",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "hey, can you set up {event_title} for {date} at {time}?",
+  "proposal_kind": "event"
+ },
+ {
+  "family": "c_polite_ct_4",
+  "nuance": "interrogative_polite",
+  "action": "propose",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "hey, can you add {task_title} to my tasks?",
+  "proposal_kind": "task"
+ },
+ {
+  "family": "c_generic_de_1",
+  "nuance": "generic_target_complex",
+  "action": "delete_event",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "um can you just delete {generic_target} for me"
+ },
+ {
+  "family": "c_generic_dt_1",
+  "nuance": "generic_target_complex",
+  "action": "delete_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "yeah just clear {generic_target} off my list please"
+ },
+ {
+  "family": "c_generic_ue_1",
+  "nuance": "generic_target_complex",
+  "action": "update_event",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "move {generic_target} to {date}, i don't remember the name"
+ },
+ {
+  "family": "c_generic_co_1",
+  "nuance": "generic_target_complex",
+  "action": "complete_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "mark {generic_target} as done, the one from {date}"
+ },
+ {
+  "family": "c_generic_de_2",
+  "nuance": "generic_target_complex",
+  "action": "delete_event",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "get rid of {generic_target} on my calendar {date}"
+ },
+ {
+  "family": "c_generic_ut_1",
+  "nuance": "generic_target_complex",
+  "action": "update_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "change {generic_target} on my list, not sure which one"
+ },
+ {
+  "family": "c_generic_dt_2",
+  "nuance": "generic_target_complex",
+  "action": "delete_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "remove {generic_target}, i already did it"
+ },
+ {
+  "family": "c_generic_de_3",
+  "nuance": "generic_target_complex",
+  "action": "delete_event",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "cancel {generic_target}, something came up"
+ },
+ {
+  "family": "c_generic_co_2",
+  "nuance": "generic_target_complex",
+  "action": "complete_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "check off {generic_target}, it's done"
+ },
+ {
+  "family": "c_generic_ue_2",
+  "nuance": "generic_target_complex",
+  "action": "update_event",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "reschedule {generic_target} to {date} at {time}"
+ },
+ {
+  "family": "c_timelist_ce_1",
+  "nuance": "time_list_vs_range",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "{event_title} at {time} and {time2}",
+  "fixed_slots": {
+   "title_2": "{event_title}"
+  }
+ },
+ {
+  "family": "c_timelist_ct_1",
+  "nuance": "time_list_vs_range",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "walk the dog at {time} and {time2}",
+  "fixed_slots": {
+   "title": "walk the dog",
+   "title_2": "walk the dog"
+  }
+ },
+ {
+  "family": "c_timelist_ct_2",
+  "nuance": "time_list_vs_range",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "{task_title} at {time} and {time2}",
+  "fixed_slots": {
+   "title_2": "{task_title}"
+  }
+ },
+ {
+  "family": "c_timelist_ce_2",
+  "nuance": "time_list_vs_range",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "book {event_title} at {time} and again at {time2}",
+  "fixed_slots": {
+   "title_2": "{event_title}"
+  }
+ },
+ {
+  "family": "c_timelist_ct_3",
+  "nuance": "time_list_vs_range",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "take the medicine at {time} and {time2}",
+  "fixed_slots": {
+   "title": "take the medicine",
+   "title_2": "take the medicine"
+  }
+ },
+ {
+  "family": "c_timelist_ce_3",
+  "nuance": "time_list_vs_range",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "remind me about {event_title} at {time} and {time2}",
+  "fixed_slots": {
+   "title_2": "{event_title}"
+  }
+ },
+ {
+  "family": "c_timelist_ct_4",
+  "nuance": "time_list_vs_range",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "water the plants at {time} and at {time2}",
+  "fixed_slots": {
+   "title": "water the plants",
+   "title_2": "water the plants"
+  }
+ },
+ {
+  "family": "c_timelist_ce_4",
+  "nuance": "time_list_vs_range",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "{event_title} {date} at {time} and at {time2}",
+  "fixed_slots": {
+   "title_2": "{event_title}"
+  }
+ },
+ {
+  "family": "c_range_ce_1",
+  "nuance": "time_list_vs_range",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {date} {time_range}"
+ },
+ {
+  "family": "c_range_ce_2",
+  "nuance": "time_list_vs_range",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} for {date} {time_range}"
+ },
+ {
+  "family": "c_range_ce_3",
+  "nuance": "time_list_vs_range",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "set up {event_title} {time_range} {date}"
+ },
+ {
+  "family": "c_range_ct_1",
+  "nuance": "time_list_vs_range",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "block off time to {task_title} {time_range} {date}"
+ },
+ {
+  "family": "c_range_ce_4",
+  "nuance": "time_list_vs_range",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "put {event_title} on my calendar {date} {time_range}"
+ },
+ {
+  "family": "c_range_ce_5",
+  "nuance": "time_list_vs_range",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "{event_title} {time_range} {date}"
+ },
+ {
+  "family": "c_range_ce_6",
+  "nuance": "time_list_vs_range",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {date} {time_range} with {name}"
+ },
+ {
+  "family": "c_range_ce_7",
+  "nuance": "time_list_vs_range",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} {time_range} {date}, no earlier"
+ },
+ {
+  "family": "c_recur_1",
+  "nuance": "recurrence",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {recurrence} at {time}"
+ },
+ {
+  "family": "c_recur_2",
+  "nuance": "recurrence",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} {recurrence} starting {date}"
+ },
+ {
+  "family": "c_recur_3",
+  "nuance": "recurrence",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "set up {event_title} {recurrence} at {time} starting {date}"
+ },
+ {
+  "family": "c_recur_4",
+  "nuance": "recurrence",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "add {event_title} to my calendar {recurrence} at {time}"
+ },
+ {
+  "family": "c_recur_5",
+  "nuance": "recurrence",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {recurrence}"
+ },
+ {
+  "family": "c_recur_6",
+  "nuance": "recurrence",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "remind me to {task_title} {recurrence}"
+ },
+ {
+  "family": "c_recur_7",
+  "nuance": "recurrence",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "{task_title} {recurrence} at {time}"
+ },
+ {
+  "family": "c_recur_8",
+  "nuance": "recurrence",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} for {recurrence} at {time}, starting {date}"
+ },
+ {
+  "family": "c_recur_9",
+  "nuance": "recurrence",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {recurrence} except when i'm busy"
+ },
+ {
+  "family": "c_recur_10",
+  "nuance": "recurrence",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "set up {event_title} {recurrence} at {time} for the rest of the year"
+ },
+ {
+  "family": "c_recur_11",
+  "nuance": "recurrence",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {recurrence} at {time} in the morning"
+ },
+ {
+  "family": "c_recur_12",
+  "nuance": "recurrence",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "remind me to {task_title} {recurrence} at {time}"
+ },
+ {
+  "family": "c_recur_13",
+  "nuance": "recurrence",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} {recurrence} at {time} with {name}"
+ },
+ {
+  "family": "c_recur_14",
+  "nuance": "recurrence",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {recurrence} at {time}, no exceptions"
+ },
+ {
+  "family": "c_recur_15",
+  "nuance": "recurrence",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "add {event_title} {recurrence} starting {date} at {time}"
+ },
+ {
+  "family": "c_recur_16",
+  "nuance": "recurrence",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {recurrence} at {time} until further notice"
+ },
+ {
+  "family": "c_until_1",
+  "nuance": "until_through",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {recurrence} at {time} until {date2}",
+  "fixed_slots": {
+   "end_inclusive": false
+  }
+ },
+ {
+  "family": "c_until_2",
+  "nuance": "until_through",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} {recurrence} until {date2}",
+  "fixed_slots": {
+   "end_inclusive": false
+  }
+ },
+ {
+  "family": "c_through_1",
+  "nuance": "until_through",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {recurrence} at {time} through {date2}",
+  "fixed_slots": {
+   "end_inclusive": true
+  }
+ },
+ {
+  "family": "c_including_1",
+  "nuance": "until_through",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} {recurrence} at {time}, including {date2}",
+  "fixed_slots": {
+   "end_inclusive": true
+  }
+ },
+ {
+  "family": "c_until_endofmonth",
+  "nuance": "until_through",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {recurrence} at {time} until the end of the month",
+  "fixed_slots": {
+   "end_inclusive": true,
+   "date_phrase_2": "end of the month"
+  }
+ },
+ {
+  "family": "c_through_2",
+  "nuance": "until_through",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "remind me to {task_title} {recurrence} through {date2}",
+  "fixed_slots": {
+   "end_inclusive": true
+  }
+ },
+ {
+  "family": "c_until_3",
+  "nuance": "until_through",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "remind me to {task_title} {recurrence} until {date2}",
+  "fixed_slots": {
+   "end_inclusive": false
+  }
+ },
+ {
+  "family": "c_until_4",
+  "nuance": "until_through",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "set up {event_title} {recurrence} at {time} until {date2}",
+  "fixed_slots": {
+   "end_inclusive": false
+  }
+ },
+ {
+  "family": "c_through_3",
+  "nuance": "until_through",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {recurrence} through {date2} at {time}",
+  "fixed_slots": {
+   "end_inclusive": true
+  }
+ },
+ {
+  "family": "c_including_2",
+  "nuance": "until_through",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "{task_title} {recurrence}, including {date2}",
+  "fixed_slots": {
+   "end_inclusive": true
+  }
+ },
+ {
+  "family": "c_attendee_1",
+  "nuance": "attendee",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} with {name} {date} at {time}"
+ },
+ {
+  "family": "c_attendee_2",
+  "nuance": "attendee",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} with {name} for {date}"
+ },
+ {
+  "family": "c_attendee_3",
+  "nuance": "attendee",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "set up a meeting with {name} {date} at {time}",
+  "fixed_slots": {
+   "title": "meeting with {name}"
+  }
+ },
+ {
+  "family": "c_attendee_4",
+  "nuance": "attendee",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "invite {name} to {event_title} {date}"
+ },
+ {
+  "family": "c_attendee_5",
+  "nuance": "attendee",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule a call with {name} for {date} at {time}",
+  "fixed_slots": {
+   "title": "call with {name}"
+  }
+ },
+ {
+  "family": "c_attendee_6",
+  "nuance": "attendee",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} for {name} on {date}"
+ },
+ {
+  "family": "c_attendee_7",
+  "nuance": "attendee",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "set up {event_title} with {name} and {name2} {date}"
+ },
+ {
+  "family": "c_attendee_8",
+  "nuance": "attendee",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "remind me to call {name} {date}",
+  "fixed_slots": {
+   "title": "call {name}"
+  }
+ },
+ {
+  "family": "c_attendee_9",
+  "nuance": "attendee",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "remind me to email {name} about {event_title} {date}",
+  "fixed_slots": {
+   "title": "email {name} about {event_title}"
+  }
+ },
+ {
+  "family": "c_attendee_10",
+  "nuance": "attendee",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} and invite {name}"
+ },
+ {
+  "family": "c_attendee_11",
+  "nuance": "attendee",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "set up time with {name} {date} at {time}",
+  "fixed_slots": {
+   "title": "time with {name}"
+  }
+ },
+ {
+  "family": "c_attendee_12",
+  "nuance": "attendee",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book a meeting with {name} {date} at {time} to discuss {event_title}",
+  "fixed_slots": {
+   "title": "meeting with {name} about {event_title}"
+  }
+ },
+ {
+  "family": "c_leadtime_1",
+  "nuance": "lead_time",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "remind me {lead_time} about {event_title} {date} at {time}"
+ },
+ {
+  "family": "c_leadtime_2",
+  "nuance": "lead_time",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {date} at {time} and remind me {lead_time}"
+ },
+ {
+  "family": "c_leadtime_3",
+  "nuance": "lead_time",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "set up {event_title} {date} at {time}, remind me {lead_time}"
+ },
+ {
+  "family": "c_leadtime_4",
+  "nuance": "lead_time",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} for {date} at {time} and give me a heads up {lead_time}"
+ },
+ {
+  "family": "c_leadtime_5",
+  "nuance": "lead_time",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {date} at {time}, notify me {lead_time}"
+ },
+ {
+  "family": "c_leadtime_6",
+  "nuance": "lead_time",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "remind me {lead_time} before {event_title} {date} at {time}"
+ },
+ {
+  "family": "c_leadtime_7",
+  "nuance": "lead_time",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "set a reminder {lead_time} for {event_title} {date}"
+ },
+ {
+  "family": "c_leadtime_8",
+  "nuance": "lead_time",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {date} at {time} with a reminder {lead_time}"
+ },
+ {
+  "family": "c_leadtime_9",
+  "nuance": "lead_time",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "remind me to {task_title} {lead_time}"
+ },
+ {
+  "family": "c_leadtime_10",
+  "nuance": "lead_time",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "add {task_title} to my list and remind me {lead_time}"
+ },
+ {
+  "family": "c_leadtime_11",
+  "nuance": "lead_time",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} {date} at {time}, alert me {lead_time}"
+ },
+ {
+  "family": "c_leadtime_12",
+  "nuance": "lead_time",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "set up {event_title} at {time} {date} and remind me {lead_time} beforehand"
+ },
+ {
+  "family": "c_datemark_1",
+  "nuance": "date_marking",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "mark {date} as {occasion}",
+  "flags": {
+   "all_day": true
+  }
+ },
+ {
+  "family": "c_datemark_2",
+  "nuance": "date_marking",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "mark {date} on my calendar as {occasion}",
+  "flags": {
+   "all_day": true
+  }
+ },
+ {
+  "family": "c_datemark_3",
+  "nuance": "date_marking",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "mark {date} as {occasion} on my calendar",
+  "flags": {
+   "all_day": true
+  }
+ },
+ {
+  "family": "c_datemark_4",
+  "nuance": "date_marking",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "note {date} as {occasion}",
+  "flags": {
+   "all_day": true
+  }
+ },
+ {
+  "family": "c_datemark_5",
+  "nuance": "date_marking",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "label {date} as {occasion} on my calendar",
+  "flags": {
+   "all_day": true
+  }
+ },
+ {
+  "family": "c_datemark_6",
+  "nuance": "date_marking",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "mark {date} down as {occasion}",
+  "flags": {
+   "all_day": true
+  }
+ },
+ {
+  "family": "c_datemark_7",
+  "nuance": "date_marking",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "mark {date} as {occasion}, don't let me forget",
+  "flags": {
+   "all_day": true
+  }
+ },
+ {
+  "family": "c_datemark_8",
+  "nuance": "date_marking",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "put a marker on {date} for {occasion}",
+  "flags": {
+   "all_day": true
+  }
+ },
+ {
+  "family": "c_datemark_9",
+  "nuance": "date_marking",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "mark {date} as {occasion} please",
+  "flags": {
+   "all_day": true
+  }
+ },
+ {
+  "family": "c_datemark_10",
+  "nuance": "date_marking",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "can you mark {date} as {occasion}",
+  "flags": {
+   "all_day": true
+  }
+ },
+ {
+  "family": "c_encounter_1",
+  "nuance": "dated_encounter",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "i need to talk to {name} on {date}",
+  "fixed_slots": {
+   "title": "talk to {name}"
+  }
+ },
+ {
+  "family": "c_encounter_2",
+  "nuance": "dated_encounter",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "i need to talk to {name} {date} about {event_title}",
+  "fixed_slots": {
+   "title": "talk to {name} about {event_title}"
+  }
+ },
+ {
+  "family": "c_encounter_3",
+  "nuance": "dated_encounter",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "i have to meet {name} {date}",
+  "fixed_slots": {
+   "title": "meet {name}"
+  }
+ },
+ {
+  "family": "c_encounter_4",
+  "nuance": "dated_encounter",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "i need to catch up with {name} {date}",
+  "fixed_slots": {
+   "title": "catch up with {name}"
+  }
+ },
+ {
+  "family": "c_encounter_5",
+  "nuance": "dated_encounter",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "i should see {name} {date}",
+  "fixed_slots": {
+   "title": "see {name}"
+  }
+ },
+ {
+  "family": "c_encounter_6",
+  "nuance": "dated_encounter",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "i need to speak with {name} on {date} at {time}",
+  "fixed_slots": {
+   "title": "speak with {name}"
+  }
+ },
+ {
+  "family": "c_encounter_7",
+  "nuance": "dated_encounter",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "gotta talk to {name} {date}",
+  "fixed_slots": {
+   "title": "talk to {name}"
+  }
+ },
+ {
+  "family": "c_encounter_8",
+  "nuance": "dated_encounter",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "need to touch base with {name} {date}",
+  "fixed_slots": {
+   "title": "touch base with {name}"
+  }
+ },
+ {
+  "family": "c_encounter_9",
+  "nuance": "dated_encounter",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "i need to sit down with {name} {date} at {time}",
+  "fixed_slots": {
+   "title": "sit down with {name}"
+  }
+ },
+ {
+  "family": "c_encounter_10",
+  "nuance": "dated_encounter",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "i owe {name} a conversation, let's do {date}",
+  "fixed_slots": {
+   "title": "conversation with {name}"
+  }
+ },
+ {
+  "family": "c_allday_1",
+  "nuance": "all_day",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "block off the whole day {date} for {event_title}",
+  "flags": {
+   "all_day": true
+  }
+ },
+ {
+  "family": "c_allday_2",
+  "nuance": "all_day",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} for all day {date}",
+  "flags": {
+   "all_day": true
+  }
+ },
+ {
+  "family": "c_allday_3",
+  "nuance": "all_day",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "{event_title} {date}, all day",
+  "flags": {
+   "all_day": true
+  }
+ },
+ {
+  "family": "c_allday_4",
+  "nuance": "all_day",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "mark {date} as busy all day for {event_title}",
+  "flags": {
+   "all_day": true
+  }
+ },
+ {
+  "family": "c_allday_5",
+  "nuance": "all_day",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "block my whole calendar {date} for {event_title}",
+  "flags": {
+   "all_day": true
+  }
+ },
+ {
+  "family": "c_allday_6",
+  "nuance": "all_day",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "block out {date} to {task_title}, all day",
+  "flags": {
+   "all_day": true
+  }
+ },
+ {
+  "family": "c_allday_7",
+  "nuance": "all_day",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {date} for the entire day and remind me {lead_time}",
+  "flags": {
+   "all_day": true
+  }
+ },
+ {
+  "family": "c_allday_8",
+  "nuance": "all_day",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "{event_title} takes all day {date}",
+  "flags": {
+   "all_day": true
+  }
+ },
+ {
+  "family": "c_threeask_ee_1",
+  "nuance": "three_ask",
+  "action": "create_event",
+  "atomic": false,
+  "events": 3,
+  "tasks": 0,
+  "template": "book {event_title} {date} at {time}, {event_title2} {date2} at {time2}, and {event_title3} {date3} at {time3}"
+ },
+ {
+  "family": "c_threeask_tt_1",
+  "nuance": "three_ask",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 3,
+  "template": "remind me to {task_title}, {task_title2}, and {task_title3}"
+ },
+ {
+  "family": "c_threeask_eet_1",
+  "nuance": "three_ask",
+  "action": "mixed",
+  "atomic": false,
+  "events": 2,
+  "tasks": 1,
+  "template": "book {event_title} {date}, {event_title2} {date2}, and remind me to {task_title3}",
+  "event_label_sources": [
+   "title",
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title_3"
+  ]
+ },
+ {
+  "family": "c_threeask_ett_1",
+  "nuance": "three_ask",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 2,
+  "template": "book {event_title} {date} and remind me to {task_title2} and {task_title3}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_2",
+   "title_3"
+  ]
+ },
+ {
+  "family": "c_threeask_eet_2",
+  "nuance": "three_ask",
+  "action": "mixed",
+  "atomic": false,
+  "events": 2,
+  "tasks": 1,
+  "template": "schedule {event_title} for {date}, add {task_title3} to my list, and book {event_title2} for {date2}",
+  "event_label_sources": [
+   "title",
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title_3"
+  ]
+ },
+ {
+  "family": "c_threeask_ttt_2",
+  "nuance": "three_ask",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 3,
+  "template": "buy {qty} {item}, {item2}, and {item3}",
+  "fixed_slots": {
+   "title": "{item}",
+   "title_2": "{item2}",
+   "title_3": "{item3}"
+  }
+ },
+ {
+  "family": "c_threeask_ee_2",
+  "nuance": "three_ask",
+  "action": "create_event",
+  "atomic": false,
+  "events": 3,
+  "tasks": 0,
+  "template": "add {event_title} to my calendar {date}, then {event_title2} {date2}, then {event_title3} {date3}"
+ },
+ {
+  "family": "c_threeask_ett_2",
+  "nuance": "three_ask",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 2,
+  "template": "remind me to {task_title}, {task_title2}, and book {event_title3} {date}",
+  "event_label_sources": [
+   "title_3"
+  ],
+  "task_label_sources": [
+   "title",
+   "title_2"
+  ]
+ },
+ {
+  "family": "c_threeask_ttt_1",
+  "nuance": "three_ask",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 3,
+  "template": "i need to {task_title}, {task_title2}, and {task_title3} {date}"
+ },
+ {
+  "family": "c_threeask_mixed_del",
+  "nuance": "three_ask",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "cancel {event_title2}, book {event_title} {date}, and remind me to {task_title3}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_3"
+  ]
+ },
+ {
+  "family": "c_threeask_ee_3",
+  "nuance": "three_ask",
+  "action": "create_event",
+  "atomic": false,
+  "events": 3,
+  "tasks": 0,
+  "template": "set up {event_title} {date} at {time}, {event_title2} {date2}, and {event_title3} {date3}"
+ },
+ {
+  "family": "c_threeask_ett_3",
+  "nuance": "three_ask",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 2,
+  "template": "buy {qty} {item}, remind me to {task_title2}, and book {event_title3} {date}",
+  "event_label_sources": [
+   "title_3"
+  ],
+  "task_label_sources": [
+   "title",
+   "title_2"
+  ]
+ },
+ {
+  "family": "c_threeask_eet_3",
+  "nuance": "three_ask",
+  "action": "mixed",
+  "atomic": false,
+  "events": 2,
+  "tasks": 1,
+  "template": "book {event_title} {date}, {event_title2} {date2}, and add {task_title3} to my list",
+  "event_label_sources": [
+   "title",
+   "title_2"
+  ],
+  "task_label_sources": [
+   "title_3"
+  ]
+ },
+ {
+  "family": "c_threeask_ttt_3",
+  "nuance": "three_ask",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 3,
+  "template": "add {task_title}, {task_title2}, and {task_title3} to my list"
+ },
+ {
+  "family": "c_threeask_ett_4",
+  "nuance": "three_ask",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 2,
+  "template": "remind me to {task_title} and {task_title2}, then book {event_title3} {date} at {time}",
+  "event_label_sources": [
+   "title_3"
+  ],
+  "task_label_sources": [
+   "title",
+   "title_2"
+  ]
+ },
+ {
+  "family": "c_texture_1",
+  "nuance": "texture",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "book {event_title} for tommorow at {time} and remind me to {task_title2}",
+  "fixed_slots": {
+   "date_phrase": "tomorrow"
+  },
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_2"
+  ]
+ },
+ {
+  "family": "c_texture_2",
+  "nuance": "texture",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "add {task_title} to my todo list and remind me to {task_title2} {date}"
+ },
+ {
+  "family": "c_texture_3",
+  "nuance": "texture",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "um so i need to book {event_title} {date} at {time} and also remind me to {task_title2}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_2"
+  ]
+ },
+ {
+  "family": "c_texture_4",
+  "nuance": "texture",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "so like i gotta {task_title} and {task_title2} {date}"
+ },
+ {
+  "family": "c_texture_5",
+  "nuance": "texture",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 0,
+  "template": "remove '{quoted_item}' from my calendar and book {event_title2} {date} at {time}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": []
+ },
+ {
+  "family": "c_texture_6",
+  "nuance": "texture",
+  "action": "mixed",
+  "atomic": false,
+  "events": 0,
+  "tasks": 1,
+  "template": "mark '{quoted_item}' as done and add {task_title2} to my list",
+  "event_label_sources": [],
+  "task_label_sources": [
+   "title_2"
+  ]
+ },
+ {
+  "family": "c_texture_7",
+  "nuance": "texture",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "add {event_title} to my calender {date} and remind me to {task_title2}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_2"
+  ]
+ },
+ {
+  "family": "c_texture_8",
+  "nuance": "texture",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "hey um can you book {event_title} {date} at {time} and then also remind me to {task_title2} {date2}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": [
+   "title_2"
+  ]
+ },
+ {
+  "family": "c_texture_9",
+  "nuance": "texture",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 0,
+  "template": "delete {generic_target} and book {event_title2} {date} at {time}",
+  "event_label_sources": [
+   "title_2"
+  ],
+  "task_label_sources": []
+ },
+ {
+  "family": "c_texture_10",
+  "nuance": "texture",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} {recurrence} at {time}, i keep mispelling this but you know what i mean"
+ },
+ {
+  "family": "c_texture_11",
+  "nuance": "texture",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "grab like {qty} {item} or so {date}"
+ },
+ {
+  "family": "c_texture_12",
+  "nuance": "texture",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "okay so um i was thinking maybe we could book {event_title} {date} at {time} if that works"
+ },
+ {
+  "family": "c_texture_13",
+  "nuance": "texture",
+  "action": "create_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "you know i really should {task_title} {date} at some point"
+ },
+ {
+  "family": "c_texture_14",
+  "nuance": "texture",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} for teusday at {time}",
+  "fixed_slots": {
+   "date_phrase": "tuesday"
+  }
+ },
+ {
+  "family": "c_texture_15",
+  "nuance": "texture",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 0,
+  "template": "um what's on my calendar {query_range2} and also book {event_title} {date} at {time}",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": []
+ },
+ {
+  "family": "c_extra_ue_1",
+  "nuance": "extra",
+  "action": "update_event",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "push {event_title} back by {duration} {date}"
+ },
+ {
+  "family": "c_extra_ue_2",
+  "nuance": "extra",
+  "action": "update_event",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "extend {event_title} {duration} and let {name} know"
+ },
+ {
+  "family": "c_extra_ut_1",
+  "nuance": "extra",
+  "action": "update_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "change the due date of {task_title} to {date} and add a note"
+ },
+ {
+  "family": "c_extra_ut_2",
+  "nuance": "extra",
+  "action": "update_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "rename {task_title} to {task_title2} on my list"
+ },
+ {
+  "family": "c_extra_q_1",
+  "nuance": "extra",
+  "action": "query",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "what's on my calendar {query_range}, i have a lot going on"
+ },
+ {
+  "family": "c_extra_q_2",
+  "nuance": "extra",
+  "action": "query",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "can you check what i have {query_range} before i commit to anything"
+ },
+ {
+  "family": "c_extra_de_1",
+  "nuance": "extra",
+  "action": "delete_event",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "cancel {event_title} {date}, something came up last minute"
+ },
+ {
+  "family": "c_extra_dt_1",
+  "nuance": "extra",
+  "action": "delete_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "remove {task_title} from my list, i already handled it"
+ },
+ {
+  "family": "c_extra_co_1",
+  "nuance": "extra",
+  "action": "complete_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "mark {task_title} as done, finally got to it"
+ },
+ {
+  "family": "c_extra_ce_1",
+  "nuance": "extra",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} with {name} {recurrence} at {time}"
+ }
 ]

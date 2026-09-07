@@ -94,6 +94,15 @@ Running list of user-reported issues and feature requests, with status. Update w
 ships BEHIND that toggle, default off (it changes the launch model: --reload,
 HUD, shutdown ownership — the plan's riskiest phase, now opt-in).
 
+**Q9 confirm-prompt flow (Gil 2026-09-07, app stream, IN BUILD):** an
+interrogative create ("should i add yoga…?") pops a confirmation box with
+the parsed proposal — yes creates, no discards. Response-contract pattern of
+the transcript gate: server returns `parse:"confirm_create"` + proposal
+payload only when the request declares `supports_confirm`; POST /voice/confirm
+executes or discards; older clients keep deep-decides. Mac dialog + iOS
+sheet. Dataset: 16 interrogative families relabeled action="propose" (251
+rows) — a fast commit on them now scores as a violation.
+
 ## How we are working right now
 
 **The current thread is the deep-track improvement loop** (branch

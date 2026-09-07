@@ -68,7 +68,7 @@ ACTION_DEFAULTS = {
     "update_event": (True, 0, 0),
     "update_todo": (True, 0, 0),
 }
-ALL_ACTIONS = set(ACTION_DEFAULTS) | {"mixed"}
+ALL_ACTIONS = set(ACTION_DEFAULTS) | {"mixed", "propose"}   # propose: Q9 - a question proposes, user confirms
 
 # placeholder base name -> (filler bank key, semantic slot key | None).
 # None means the placeholder is cosmetic text only (not ground truth).
