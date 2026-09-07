@@ -62,6 +62,19 @@ def has_clause_coordination(text: str) -> bool:
             # conjunct WITH its own arguments below counts, so a bare name
             # that collides with a verb ("…with Tal and Mark") stays safe.
             continue
+        # F15 (corrected): a SERIAL VERB shares the head's object — "wash
+        # and fold THE LAUNDRY", "clean and organize THE GARAGE" — one ask.
+        # The tell is positional, not the mere absence of an object: the
+        # conjunct has no object of its own AND the head's object sits
+        # AFTER the conjunct, i.e. both verbs govern the same later noun.
+        # (The first cut just required a dobj on the conjunct, which also
+        # blinded the check to real compounds — violations rose 100→141.)
+        conj_obj = [c for c in tok.children if c.dep_ in ("dobj", "obj", "ccomp", "xcomp")]
+        if not conj_obj:
+            head_obj = [c for c in tok.head.children
+                        if c.dep_ in ("dobj", "obj") and c.i > tok.i]
+            if head_obj:
+                continue          # shared object → serial verb → one ask
         conj_has_own = any(c.dep_ in OWN_ARG for c in tok.children)
         head_has_own = any(c.dep_ in OWN_ARG for c in tok.head.children
                            if c is not tok)

@@ -104,6 +104,16 @@ class Atomicity:
                 and any(n.startswith(("update_", "delete_", "complete_", "query_"))
                         for n, _ in intents)):
             return "mixed-mode-compound"
+        # Model tier (F15): the rules above read announced joiners and the
+        # dependency parse and catch ~36% of true compounds; the classifier
+        # reads the utterance's SHAPE (verb/time/date counts, connectives,
+        # both-domains) and catches ~91%. It only speaks when decisive AND
+        # only to say "compound" — a wrong compound costs a defer, a wrong
+        # atomic half-executes a two-ask command.
+        if len(intents) <= 1:
+            from assistant.intent.classifier import ROUTER
+            if ROUTER.looks_compound(text):
+                return "model-compound"
         return None
 
 

@@ -37,7 +37,7 @@ DATA = ROOT / "dataset" / "fastrule" / "fastrule_7200.jsonl"
 _CLOCK = _dt.datetime(2026, 9, 9, 10, 0)
 #: the layer-0 verdicts — a defer carrying one of these means FastRule
 #: RECOGNISED the compound, rather than tripping over it by luck
-_ATOMICITY_REASONS = {"strong-compound", "clause-coordination", "mixed-mode-compound"}
+_ATOMICITY_REASONS = {"strong-compound", "clause-coordination", "mixed-mode-compound", "model-compound"}
 
 
 def main() -> int:

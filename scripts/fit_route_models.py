@@ -74,6 +74,11 @@ def main() -> int:
     router = ModelRouter()
     router.operation.fit(op_t, op_y)
     router.kind.fit(k_t, k_y)
+    # layer 0's model tier: every row teaches it, including compounds and
+    # propose rows (the question is "one item or several", not "what action")
+    a_t = [r["text"] for r in train]
+    a_y = ["atomic" if r["expect"].get("atomic", True) else "compound" for r in train]
+    router.atomicity.fit(a_t, a_y)
     router.save(note=f"{DATA.name} train half only (leakage rule)")
     print(f"fit: operation {len(op_y)} rows · kind {len(k_y)} rows "
           f"-> {router.weights_path.name}\n")
@@ -83,9 +88,12 @@ def main() -> int:
     print(router.kind.report(k_t, k_y, "kind     "))
 
     t_op_t, t_op_y, t_k_t, t_k_y = _labels(test)
+    t_a_t = [r["text"] for r in test]
+    t_a_y = ["atomic" if r["expect"].get("atomic", True) else "compound" for r in test]
     print("\n=== TEST EVAL (the reported numbers) ===")
     print(router.operation.report(t_op_t, t_op_y, "operation"))
     print(router.kind.report(t_k_t, t_k_y, "kind     "))
+    print(router.atomicity.report(t_a_t, t_a_y, "atomicity"))
     return 0
 
 

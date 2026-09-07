@@ -343,6 +343,22 @@ md5s, loop run number. Rules:
   **~1.5 pt are noise** — judge a cycle by its targeted slice, and measure
   twice when the predicted effect is under ~4 rows.
 
+## Reporting: dataset + metric + meaning, every time (Gil, 2026-09-07)
+
+A bare number is not a report. Every figure carries:
+1. **WHICH DATASET AND SLICE** — FastRule 7,200 (train 4,800 / test 2,400,
+   split by pattern family) · verification pool (train 2,699: dev-fast 250 /
+   dev-full 600) · sealed 300 (milestones only) · which tier or row-bucket
+   (atomic / non-atomic / propose).
+2. **WHICH METRIC** — by name, from the six, or the stage's own named metric
+   (handle rate, correct-on-handled, defer rate, per-class P/R/F1, macro-F1).
+3. **WHAT IT MEANS** — one clause on the consequence for the product. "Defer
+   rate 77.1%" is data; "77.1% of two-ask commands correctly go to the deep
+   track, so ~23% still risk half-executing" is a report.
+
+Train-side figures are labelled "working numbers"; the REPORTED figures are
+the test half's (see the lane-reporting rule above).
+
 ## Report the FULL board, every run (Gil, 2026-09-06)
 
 A cycle close reports EVERY metric — count raw+adjusted, complexity tiers,

@@ -86,6 +86,53 @@ class OperationFeatures(Featurizer):
         ]
 
 
+class AtomicityFeatures(Featurizer):
+    """Signals for ONE atomic item vs several (layer 0's model tier).
+
+    The rules tier reads announced joiners and the dependency parse; this
+    reads the shape of the whole utterance, which is what catches the
+    compounds those miss — counts of verbs, times, list-words and
+    connectives, not any single cue.
+    """
+
+    names = ["bias", "and", "and-then", "comma-then", "semicolon", "two-times",
+             "three-times", "two-dates", "plus-also", "both-domains",
+             "len>12", "len>18", "two-create-verbs", "verb-after-and",
+             "list-and-cal", "second-remind", "and-count2", "to-my-list-mid"]
+
+    def extract(self, text: str) -> "list[float]":
+        low = text.lower()
+        h = lambda p: _has(p, low)          # noqa: E731
+        times = len(re.findall(r"\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b|\bat\s+\d{1,2}\b", low))
+        dates = len(re.findall(r"\b(?:today|tomorrow|monday|tuesday|wednesday|thursday|"
+                               r"friday|saturday|sunday|next week|this week)\b", low))
+        ands = low.count(" and ")
+        creates = len(re.findall(r"\b(?:add|book|schedule|create|put|remind me|set)\b", low))
+        words = len(text.split())
+        return [
+            1.0,
+            1.0 if ands else 0.0,
+            h(r"\band\s+(?:then|also)\b"),
+            h(r",\s*then\b"),
+            h(r"[;.]\s"),
+            1.0 if times >= 2 else 0.0,
+            1.0 if times >= 3 else 0.0,
+            1.0 if dates >= 2 else 0.0,
+            h(r"\b(?:plus|also|as well|too)\b"),
+            1.0 if (re.search(r"\b(?:list|to-?do|task)\b", low)
+                    and re.search(r"\b(?:calendar|schedule|meeting|appointment)\b", low)) else 0.0,
+            1.0 if words > 12 else 0.0,
+            1.0 if words > 18 else 0.0,
+            1.0 if creates >= 2 else 0.0,
+            h(r"\band\s+(?:add|book|schedule|create|put|remind|set|call|buy|get|pick)\b"),
+            1.0 if (re.search(r"\bto my (?:\w+\s+)?list\b", low)
+                    and re.search(r"\bcalendar\b", low)) else 0.0,
+            1.0 if len(re.findall(r"\bremind\b", low)) >= 1 and ands else 0.0,
+            1.0 if ands >= 2 else 0.0,
+            1.0 if re.search(r"\bto my (?:\w+\s+)?list\b.{6,}", low) else 0.0,
+        ]
+
+
 class KindFeatures(Featurizer):
     """Signals for event vs task."""
 
@@ -257,9 +304,16 @@ class ModelRouter:
     OP_MARGIN_FLOOR = 2.5
     KIND_MARGIN_FLOOR = 1.5
 
+    ATOMICITY = ("atomic", "compound")
+    #: layer 0 acts on the model only when it is decisive AND says compound —
+    #: a wrong "compound" costs a defer (cheap), a wrong "atomic" would let a
+    #: two-ask command half-execute (expensive). Asymmetric by design.
+    ATOMIC_MARGIN_FLOOR = 1.5
+
     def __init__(self, weights_path: "pathlib.Path | None" = None) -> None:
         self.operation = LogisticModel("operation", self.OPS, OperationFeatures())
         self.kind = LogisticModel("kind", self.KINDS, KindFeatures())
+        self.atomicity = LogisticModel("atomicity", self.ATOMICITY, AtomicityFeatures())
         self.weights_path = weights_path or (
             pathlib.Path(__file__).with_name("route_model_weights.json"))
         self._loaded = False
@@ -271,6 +325,8 @@ class ModelRouter:
             blob = json.loads(self.weights_path.read_text())
             self.operation.load({"weights": blob["operation"]})
             self.kind.load({"weights": blob["kind"]})
+            if blob.get("atomicity"):
+                self.atomicity.load({"weights": blob["atomicity"]})
         except Exception:
             pass
         self._loaded = True
@@ -281,7 +337,18 @@ class ModelRouter:
             "fitted_on": note,
             "operation": self.operation.weights,
             "kind": self.kind.weights,
+            "atomicity": self.atomicity.weights,
         }, indent=1))
+
+    def looks_compound(self, text: str) -> bool:
+        """Layer 0's model tier: True only when the model is DECISIVE that
+        this is more than one atomic item. Used after the rules tier finds
+        nothing, so a False here means "the rules and the model both saw
+        nothing" — proceed."""
+        if not self.load() or not self.atomicity.weights:
+            return False
+        label, margin = self.atomicity.predict(text)
+        return label == "compound" and margin >= self.ATOMIC_MARGIN_FLOOR
 
     def route(self, text: str) -> "str | None":
         if not self.load():
@@ -297,3 +364,4 @@ class ModelRouter:
 
 #: process-wide instance — weights load once, lazily
 ROUTER = ModelRouter()
+

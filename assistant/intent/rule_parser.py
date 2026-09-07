@@ -183,6 +183,11 @@ _STT_EXPANSIONS: list[tuple[str, str]] = [
     # (b, F6) date-marking beyond explicit month-days: weekdays, relatives,
     #     named days ("christmas day"), "note" as the verb, an optional
     #     "on my calendar" infix. Same rewrite target as F4b.
+    (r"\b(?:mark|note|put)\s+((?:next|this|coming)\s+\w+|today|tomorrow|"
+     r"the\s+day\s+after\s+tomorrow|\w+(?:'s)?\s+day|\w+\s+eve|"
+     r"(?:the\s+)?\d{1,2}(?:st|nd|rd|th)?)\s+down\s+as\s+"
+     r"(?!done\b|complete\b|completed\b|finished\b)(.+)$",
+     r"add \2 on \1"),
     (r"\b(?:mark|note)\s+((?:next|this|coming)\s+\w+|today|tomorrow|"
      r"the\s+day\s+after\s+tomorrow|\w+(?:'s)?\s+day|\w+\s+eve)\s+"
      r"(?:on\s+my\s+calendar\s+)?as\s+"
@@ -198,6 +203,49 @@ _STT_EXPANSIONS: list[tuple[str, str]] = [
      r"i\s+already\s+did|i\s+finished)\s+(.+)$", r"mark \1 as done"),
     (r"^check\s+off\s+(.+)$", r"mark \1 as done"),
     (r"^complete\s+(?!the\s*$)(.+)$", r"mark \1 as done"),
+]
+
+# --- F15 (stage isolation, 2026-09-07): spoken time vocabulary. 807 of the
+# atomic deferrals were a missing date/start_time, and these phrasings are
+# why. re.sub takes a callable, so "quarter to nine" is arithmetic, not 12
+# hand-written rows. Vague dayparts get ONE documented default each — the
+# deep track would resolve them the same way, and a defer helps nobody.
+_WORD_HOUR = {"one":1,"two":2,"three":3,"four":4,"five":5,"six":6,"seven":7,
+              "eight":8,"nine":9,"ten":10,"eleven":11,"twelve":12,
+              "1":1,"2":2,"3":3,"4":4,"5":5,"6":6,"7":7,"8":8,"9":9,
+              "10":10,"11":11,"12":12}
+_HOUR_RE = "|".join(_WORD_HOUR)
+
+
+def _quarter_to(m) -> str:
+    h = _WORD_HOUR[m.group(1).lower()] - 1
+    return f"{12 if h == 0 else h}:45"
+
+
+def _quarter_past(m) -> str:
+    return f"{_WORD_HOUR[m.group(1).lower()]}:15"
+
+
+def _half_past(m) -> str:
+    return f"{_WORD_HOUR[m.group(1).lower()]}:30"
+
+
+_SPOKEN_TIMES = [
+    (rf"\bquarter\s+to\s+({_HOUR_RE})\b", _quarter_to),
+    (rf"\bquarter\s+past\s+({_HOUR_RE})\b", _quarter_past),
+    (rf"\bhalf\s+past\s+({_HOUR_RE})\b", _half_past),
+    # vague dayparts → one documented default each
+    (r"\bfirst thing(?:\s+in the morning)?\b", "at 8am"),
+    (r"\b(?:early|first thing in the)\s+morning\b", "at 8am"),
+    (r"\blate\s+morning\b", "at 11am"),
+    (r"\bmidday\b|\bmid-?day\b", "at 12pm"),
+    (r"\bearly\s+afternoon\b", "at 1pm"),
+    (r"\blate\s+afternoon\b", "at 4pm"),
+    (r"\bearly\s+evening\b", "at 6pm"),
+    (r"\blate\s+evening\b", "at 9pm"),
+    (r"\blate\s+night\b", "at 10pm"),
+    # "all day" is a real answer to "what time?", not a missing slot
+    (r"\bfor\s+all\s+day\b|\ball\s+day\s+long\b|\ball[- ]day\b", "all day"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -396,6 +444,8 @@ def _preprocess(transcript: str) -> tuple[str, bool]:
 
     # Expand STT shorthands
     for pattern, replacement in _STT_EXPANSIONS:
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    for pattern, replacement in _SPOKEN_TIMES:      # F15
         text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
 
     # Complexity gate: content-word count (stop/filler words don't add complexity)
@@ -875,6 +925,9 @@ _ROUTE_OVERRIDES = [
     # done" → create_todo). Rewrites funnel done-with/already-did/check-off
     # into this shape; the override then routes them all.
     (re.compile(r"^\s*(?:please\s+)?mark\s+.+\s+as\s+done\b"), "complete_todo"),
+    # F15: "call it X instead of Y" / "rename X to Y" is renaming, never a
+    # create (14 rows committed create_todo at high confidence).
+    (re.compile(r"^\s*(?:please\s+)?call\s+it\s+.+\s+instead\s+of\b"), "update_todo"),
     # F7b: "set X as high priority" is a fully-structured UPDATE — the verb
     # heuristics read it as a create ("set" → create at 1.00, the worst kind
     # of confident wrong).
@@ -1309,8 +1362,8 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
         # F10: "delete WEDDING REHEARSAL from my calendar" — the phrase
         # delimits what chunking dropped; the veto judges the capture.
         if not slots.get("match_title"):
-            m10 = re.search(r"\b(?:delete|remove|cancel|drop)\s+(.+?)\s+"
-                            r"from\s+(?:my|the)\s+(?:calendar|schedule)\b",
+            m10 = re.search(r"\b(?:delete|remove|cancel|drop|clear|take|wipe)\s+(.+?)\s+"
+                            r"(?:from|off)\s+(?:my|the)\s+(?:calendar|schedule)\b",
                             span.text, re.IGNORECASE)
             if m10:
                 cand = _clean_title(m10.group(1))
@@ -1397,8 +1450,8 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
         # F10: mutation phrases delimit multi-word titles noun-chunking
         # drops ("remove BUY SOCKS from my list", "delete WALK THE DOG").
         if not slots.get("match_title"):
-            m10 = re.search(r"\b(?:delete|remove|cancel|drop)\s+(.+?)\s+"
-                            r"from\s+(?:my|the)\s+(?:\w+\s+)?(?:list|tasks?|to-?dos?)\b",
+            m10 = re.search(r"\b(?:delete|remove|cancel|drop|clear|take)\s+(.+?)\s+"
+                            r"(?:from|off)\s+(?:my|the)\s+(?:\w+\s+)?(?:list|tasks?|to-?dos?)\b",
                             span.text, re.IGNORECASE)
             if m10:
                 slots["match_title"] = _clean_title(m10.group(1))
@@ -1513,6 +1566,13 @@ def _resolve_anaphora(slots: dict, action_name: str, memory) -> tuple[dict, bool
 # ---------------------------------------------------------------------------
 
 
+#: a spoken clock time — if one is present but unparsed, the parse really IS
+#: incomplete and must defer; if absent, "no time" is the answer, not a gap.
+_CLOCK_MENTION_RE = re.compile(
+    r"\b\d{1,2}\s*(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)\b|\b\d{1,2}:\d{2}\b"
+    r"|\bat\s+\d{1,2}\b|\b(?:noon|midnight|o'?clock)\b", re.I)
+
+
 def _compute_missing_slots(action_name: str, slots: dict) -> list[str]:
     # delete_event / update_event: match_title OR match_start_time is sufficient
     if action_name in ("delete_event", "update_event"):
@@ -1520,7 +1580,20 @@ def _compute_missing_slots(action_name: str, slots: dict) -> list[str]:
             return ["match_title"]
         return []
     required = _REQUIRED_SLOTS.get(action_name, [])
-    return [s for s in required if not slots.get(s)]
+    missing = [s for s in required if not slots.get(s)]
+    # F15: a create_event with a DATE but no spoken clock time is an ALL-DAY
+    # event, not an incomplete parse — "add the interview date on next
+    # friday" names everything it needs. Deferring these was the single
+    # largest atomic-defer bucket (215 rows). The intent model fills the
+    # block (00:00–23:59); a missing DATE still defers, and a text that
+    # mentions a time we failed to read still defers (that IS incomplete).
+    if (action_name == "create_event" and missing == ["start_time"]
+            and slots.get("date") and slots.get("title")
+            and not _CLOCK_MENTION_RE.search(slots.get("_raw_text", ""))):
+        slots["start_time"] = "00:00"
+        slots["end_time"] = slots.get("end_time") or "23:59"
+        return []
+    return missing
 
 
 def _compute_confidence(
@@ -1644,7 +1717,9 @@ class RuleBasedParser:
             temporal["_domain_inferred"] = domain_inferred
 
             # Phase 6: Confidence + validation
+            slots["_raw_text"] = span.text
             missing = _compute_missing_slots(action_name, slots)
+            slots.pop("_raw_text", None)
             # Only penalize the guessed domain when it was actually load-bearing in
             # picking the action (domain_material) — a domain-agnostic verb like
             # "buy"/"call"/"email" maps to create_todo regardless of domain, so an

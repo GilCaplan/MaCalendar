@@ -216,6 +216,14 @@ novel effects — in `dataset/RESULTS.md`. A score is a pointer, not the point:
 read the breakdown and the failing rows to understand what it *means*, never
 just the number. Full protocol: `DOCUMENTATION/experiments/ITERATION_PROTOCOL.md`.
 
+**Every number needs three things: the DATASET, the METRIC, and what it
+MEANS** (Gil, 2026-09-07). "50" or "80" is not a result. "handle rate 49.7%
+→ 53.5% on the FastRule 7,200 test half (atomic rows) — it now acts on half
+of the single-item commands instead of deferring them" is. Say which data
+(FastRule 7,200 train/test · verification pool dev-fast/dev-full · sealed
+300), which metric of the six, which slice, and one clause on the
+consequence. This applies in chat and in every md file.
+
 **Always name the metric with the number.** "70→72" is meaningless in a vacuum;
 "count-correct 73.5%→75% on event+task" is a result. There are six metrics
 (count-correctness, missing-half, date-collapse, garbage-titles,
