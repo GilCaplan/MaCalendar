@@ -473,3 +473,22 @@ a delta."
   family models a location/description field at all (see the earlier
   "no location/description fields" note). If a future bank adds those,
   wiring them into `classify()`'s call is a small, localized change.
+
+
+## Schema update — `action: "propose"` (Q9 ruling, 2026-09-07)
+
+Gil ruled that an interrogative create ("should i add yoga to my calendar
+tomorrow?") **proposes**: the client pops a confirmation box with the parsed
+proposal — yes creates, no discards. Labels follow product, so the 16
+interrogative families were relabeled from create_event/create_todo to
+**`action: "propose"`** with `events: 0, tasks: 0` and a `proposal_kind`
+field (event|task) preserving what a YES would create. 251 rows
+(204 train / 47 test); the split
+and every other family are unchanged (regenerated deterministically).
+
+**Scoring semantics under the ruling:** the correct FastRule behavior on a
+propose row is to NOT commit — an abstain (the interrogative gate) scores as
+correct routing, and ANY fast commit scores as a violation (a mutation
+without confirmation). The fastrule6k scorer implements this without special
+cases: propose rows can never satisfy its commit-correctness predicate.
+Current action composition: {'complete_todo': 235, 'create_event': 2166, 'create_todo': 1237, 'delete_event': 269, 'delete_todo': 197, 'mixed': 1005, 'propose': 251, 'query': 215, 'update_event': 248, 'update_todo': 177}.
