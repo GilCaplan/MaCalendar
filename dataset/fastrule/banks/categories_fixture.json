@@ -1,0 +1,100 @@
+{
+  "_comment": "Canonical label fixture for the FastRule dataset's category/tags ground truth. `categories`+`removed` are in the exact format assistant/actions/calendar/categories.py's CATEGORIES_PATH expects, so pointing MACALENDAR_CATEGORIES at this file makes the real classify() use exactly these categories/keywords. `task_tags` is a dataset-only companion (assistant/actions/todo/tagging.py has no file-based override — its KEYWORDS is a hardcoded module dict, not something MACALENDAR_CATEGORIES or any env var can point at), included here so the generator's tag ground truth is anchored to a versioned, inspectable fixture rather than reaching into the live module. Both category and task-tag keyword lists are trimmed, faithful copies of the real shipped defaults (assistant/actions/calendar/categories.py DEFAULTS, assistant/actions/todo/tagging.py KEYWORDS) as of 2026-09-07 — read-only reference, not modified. Dropped from the real DEFAULTS: 'Shabbat Meal' and 'Prayer' (Israeli/Jewish-observance-specific categories this dataset's generic filler banks never exercise) — see DATASET.md.",
+
+  "categories": [
+    {"name": "Work", "color": "#3b82f6", "alt": "#1d4ed8", "keywords": [
+      "work", "office", "shift", "night shift", "job", "client", "standup", "stand-up", "sprint", "deploy",
+      "interview", "ta session", "teaching", "tutoring", "checkpoint", "hw checking", "grading", "grades"]},
+    {"name": "Study", "color": "#8b5cf6", "alt": "#6d28d9", "keywords": [
+      "class", "lecture", "seminar", "course", "exam", "test", "quiz", "homework", "hw", "study", "studying", "lab",
+      "tutorial", "nlp", "robotics", "ethics", "project meeting", "thesis", "semester", "university", "campus",
+      "office hours"]},
+    {"name": "Meeting", "color": "#f59e0b", "alt": "#b45309", "keywords": [
+      "meeting", "meet", "call", "zoom", "sync", "1:1", "one on one", "catch up", "catch-up", "review", "demo",
+      "presentation", "planning", "talk with", "chat with", "discussion"]},
+    {"name": "Social", "color": "#ec4899", "alt": "#be185d", "keywords": [
+      "dinner", "lunch", "coffee", "drinks", "beer", "pub", "bar", "party", "pregame", "pizza", "bbq", "barbecue",
+      "hangout", "hang out", "movie", "cinema", "concert", "show", "game night", "bowling", "birthday", "bday",
+      "wedding", "date", "friends", "with"]},
+    {"name": "Family", "color": "#f97316", "alt": "#c2410c", "keywords": [
+      "family", "mom", "mum", "dad", "sister", "brother", "grandma", "grandpa",
+      "aunt", "uncle", "cousin", "parents", "home", "visit"]},
+    {"name": "Fitness", "color": "#22c55e", "alt": "#15803d", "keywords": [
+      "gym", "workout", "run", "running", "jog", "swim", "swimming", "tennis", "football", "soccer", "basketball",
+      "cycling", "bike", "ride", "hike", "yoga", "pilates", "training", "race", "match", "pushups",
+      "km", "k run", "5k", "10k", "half marathon", "marathon", "mile", "miles",
+      "easy run", "long run", "recovery run", "shakeout", "strides", "tempo",
+      "threshold", "intervals", "interval", "fartlek", "time trial", "reps",
+      "400m", "800m", "1000m", "400 m", "800 m", "1000 m", "1k reps",
+      "hill repeats", "negative split", "speed", "speed session", "w/u", "c/d",
+      "calisthenics", "lifting", "squat", "squats", "deadlift", "bench",
+      "pull-up", "pull-ups", "push-up", "push-ups", "core", "mobility",
+      "stretch", "stretching", "warm-up", "cool-down", "cooldown"]},
+    {"name": "Health", "color": "#ef4444", "alt": "#b91c1c", "keywords": [
+      "doctor", "dentist", "dental", "clinic", "appointment",
+      "checkup", "check-up", "blood test", "vaccine", "physio", "therapy", "pharmacy", "hospital", "optician",
+      "flu shot", "eye exam"]},
+    {"name": "Errand", "color": "#a16207", "alt": "#713f12", "keywords": [
+      "pick up", "pickup", "drop off", "package", "parcel", "post office", "bank",
+      "groceries", "shopping", "supermarket", "super", "laundry", "car",
+      "garage", "mechanic", "haircut", "barber", "repair", "return", "oil change"]},
+    {"name": "Meal", "color": "#eab308", "alt": "#a16207", "keywords": [
+      "breakfast", "brunch", "meal", "eat", "cook", "cooking", "bake", "restaurant", "food"]},
+    {"name": "Travel", "color": "#06b6d4", "alt": "#0e7490", "keywords": [
+      "flight", "fly", "flying", "airport", "train", "bus", "drive to", "trip", "travel", "hotel", "vacation",
+      "holiday", "abroad", "check-in", "checkin", "taxi", "uber"]},
+    {"name": "Personal", "color": "#64748b", "alt": "#475569", "keywords": []}
+  ],
+  "removed": ["Shabbat Meal", "Prayer"],
+
+  "task_tags": [
+    {"name": "Groceries", "keywords": [
+      "groceries", "grocery", "supermarket",
+      "milk", "eggs", "bread", "pita", "challah", "cheese", "butter", "yogurt",
+      "cottage", "hummus", "tahini", "olive oil",
+      "flour", "sugar", "salt", "pepper", "spices", "rice", "pasta", "noodles",
+      "couscous", "quinoa", "lentils", "chickpeas", "beans", "cereal", "granola",
+      "honey", "jam", "peanut butter", "chocolate", "cookies", "snacks", "crackers",
+      "chicken", "beef", "meat", "steak", "turkey", "lamb",
+      "fish", "salmon", "tuna", "tofu", "vegetables", "veggies", "fruit", "apples",
+      "bananas", "oranges", "lemons", "grapes", "avocado", "tomatoes", "cucumbers",
+      "onions", "garlic", "potatoes", "carrots", "lettuce", "salad", "spinach",
+      "coffee", "tea", "juice", "wine", "beer", "soda", "cola",
+      "toilet paper", "paper towels", "napkins", "detergent", "soap", "shampoo",
+      "toothpaste", "garbage bags", "trash bags", "dish soap", "tin foil",
+      "zucchini", "eggplant", "squash", "pumpkin",
+      "peppers", "broccoli", "cauliflower", "mushrooms", "celery", "corn",
+      "peas", "beets", "radish", "cabbage", "leek", "sweet potato", "ginger",
+      "parsley", "cilantro", "coriander", "basil", "mint", "dill", "herbs",
+      "canola oil", "vegetable oil", "sunflower oil", "sesame oil", "vinegar",
+      "ketchup", "mayo", "mayonnaise", "mustard", "soy sauce",
+      "cream", "sour cream", "cream cheese", "almond milk", "oat milk",
+      "soy milk", "ice cream", "frozen",
+      "bagels", "rolls", "buns", "baguette", "cake", "muffins", "pastry",
+      "gatorade", "pepsi", "coke", "coca-cola", "sprite", "fanta",
+      "cold brew", "espresso", "sparkling water",
+      "soda water", "seltzer", "smoothie", "lemonade",
+      "nuts", "almonds", "walnuts", "cashews", "pistachios", "raisins",
+      "dates", "olives", "pickles", "sauce", "pesto", "salsa",
+      "notebooks", "folders", "light bulbs", "batteries", "printer paper",
+      "coffee filters", "stamps", "envelopes", "index cards", "pens",
+      "water bottles", "protein bars", "sticky notes"]},
+    {"name": "Coursework", "keywords": [
+      "homework", "hw", "assignment", "problem set", "pset", "essay",
+      "lab report", "exam", "midterm", "quiz", "lecture", "seminar",
+      "tutorial", "course", "syllabus", "semester", "thesis",
+      "moodle", "study", "studying", "revise", "revision", "grades", "grading",
+      "submission", "nlp", "robotics"]},
+    {"name": "Errands", "keywords": [
+      "pick up", "pickup", "drop off", "dropoff", "post office", "package", "parcel",
+      "bank", "atm", "deposit", "passport", "visa", "license", "renew", "laundry",
+      "dry cleaning", "cleaners", "pharmacy", "haircut", "barber", "garage",
+      "mechanic", "car wash", "petrol", "repair", "return",
+      "appointment", "doctor", "dentist", "clinic"]},
+    {"name": "Work", "keywords": [
+      "work", "office", "shift", "client", "customer", "invoice", "boss", "manager",
+      "standup", "stand-up", "sprint", "deploy", "release", "ticket",
+      "pull request", "code review", "interview", "cv", "resume", "salary",
+      "payslip", "onboarding", "meeting notes", "timesheet"]}
+  ]
+}
