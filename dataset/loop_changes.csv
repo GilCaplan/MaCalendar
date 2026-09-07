@@ -26,3 +26,8 @@ cycle,date,component,kind,description,commit
 7,2026-09-06,engine/generate,improvement,invention guard: LLM event titles must be grounded in the item's words (prefix-stem); fabrications dropped,160e9a4
 2026-09-06,convention,segment,"Q1: dated I-need-to-<encounter> => event (Gil ruling, DEVQA)",loop
 2026-09-07,bugfix,intent-model,"all-day-speak coercion: start_time=all day no longer kills the event",loop
+2026-09-07,improvement,engine/fastrule,"F16 layer 0 rewired: judge() is rules OR model (was model gated behind intent-count); routing carve-out split out into _parse_covers_the_compound. B-test atomicity R 68.8->86.4%, FN 195->85",loop
+2026-09-07,improvement,intent/classifier,"F17 atomicity features +joiner-mid +clause-coord (2 of 15 syntactic candidates; block as a whole banked NEGATIVE). B-test model FN 104->87, FP 90->78",loop
+2026-09-07,improvement,intent/classifier,"F18 atomicity features +between-range +both-sides-time split the {and,joiner-mid} ambiguity bucket; conj-propn REJECTED by the dual gate (wins B, regresses A). Floor 1.5->0.25 by sweep. B-test layer FN 86->76",loop
+2026-09-07,bugfix,intent/classifier,"LogisticModel.load refuses a weight vector whose length != featurizer; scores() zip was truncating silently after a feature was added",loop
+2026-09-07,metric,scripts,"scripts/atomicity_board.py: layer 0's binary board (rules/model/layer x two datasets, both error kinds as counts); fit_route_models prints it plus a margin-floor sweep on both training halves",loop

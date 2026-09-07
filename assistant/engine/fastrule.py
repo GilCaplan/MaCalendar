@@ -22,11 +22,11 @@ Scorer signals, slot-specs-as-data — land as later measured batches.
                   components is v2.x; the ROUTER's two-subsystem tier —
                   rules then models — already lives at rule_parser's
                   route fallthrough per Q10)
-    Atomicity   — layer 0 (Gil): the compound gates. Runs post-parse in
-                  v2.0 because v1's gates read the intent count ("buy milk
-                  and buy bread" parses as TWO intents and rightly
-                  commits; only a single-intent parse of compound wording
-                  defers).
+    Atomicity   — layer 0 (Gil): one item or several. Rules OR model, both
+                  unconditional (F16). It answers only that question; what
+                  routing does about a compound is `run`'s business, via
+                  `_parse_covers_the_compound` — v1 had the two fused, and
+                  the fusion cost the layer half its recall.
     Gatekeeper  — the intent-level vetoes (interrogative→defer,
                   rename-misroute, generic-target), v1 order preserved.
     Scorer      — the commit predicate (threshold + missing slots) and the
@@ -37,6 +37,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+
+#: `_parse_covers_the_compound` counts asks with the intent layer's joiner
+#: pattern — the same one `AtomicityFeatures`' joiner-mid signal reads, so
+#: routing and the model can never disagree about where a sentence divides.
+from assistant.intent.coordination import ASK_JOINER_RE as _ASK_JOINER_RE
 
 # The gate patterns and the verdict type (carried from v1 at retirement).
 _STRONG_COMPOUND_RE = re.compile(
@@ -126,11 +131,23 @@ def reason_class(reason: "str | None") -> "str | None":
 
 
 class Atomicity:
-    """Layer 0 (Gil): is this ONE atomic item? Rules tier = the compound
-    gates, verbatim v1 semantics. Model tier (the atomicity logistic on
-    dataset B's atomic flags) is a later measured batch."""
+    """Layer 0 (Gil): is this ONE atomic item, or several?
 
-    def judge(self, text: str, intents) -> "str | None":
+    Two tiers, and since F16 they are a UNION rather than a fallback chain:
+    the gates read announced joiners and the dependency parse, the logistic
+    reads the utterance's shape, and each catches compounds the other has no
+    cue for. Scored on its own board — `scripts/atomicity_board.py`.
+    """
+
+    def rule_verdict(self, text: str, intents) -> "str | None":
+        """The rules tier alone — the three gates, v1 semantics verbatim.
+
+        Extracted from `judge` so the board
+        (`scripts/atomicity_board.py`) can score rules, model and the wired
+        layer as three separate predictors: when the layer scores worse than
+        its own model, the WIRING is the bug, and only separate lines show
+        that.
+        """
         if len(intents) <= 1 and _STRONG_COMPOUND_RE.search(text):
             return "strong-compound"
         if len(intents) <= 1 and " and " in text.lower():
@@ -142,17 +159,75 @@ class Atomicity:
                 and any(n.startswith(("update_", "delete_", "complete_", "query_"))
                         for n, _ in intents)):
             return "mixed-mode-compound"
-        # Model tier (F15): the rules above read announced joiners and the
-        # dependency parse and catch ~36% of true compounds; the classifier
-        # reads the utterance's SHAPE (verb/time/date counts, connectives,
-        # both-domains) and catches ~91%. It only speaks when decisive AND
-        # only to say "compound" — a wrong compound costs a defer, a wrong
-        # atomic half-executes a two-ask command.
-        if len(intents) <= 1:
-            from assistant.intent.classifier import ROUTER
-            if ROUTER.looks_compound(text):
-                return "model-compound"
         return None
+
+    def judge(self, text: str, intents) -> "str | None":
+        """The MODEL LEADS; the rule gates are overrides for their own
+        catches (F16, measured).
+
+        Until F16 the model was a last resort behind `len(intents) <= 1`,
+        and the layer scored WORSE than the model it contained — B-test
+        compound recall 68.8% for the layer vs 83.4% for the model alone.
+        110 of the layer's 195 misses there were one guard clause: rows the
+        rule parser had split into ≥2 intents, every one of them compound,
+        which the layer answered "atomic" for without ever asking the model.
+        That guard was an EXECUTION judgement ("two intents parsed, so both
+        can be run") wearing an ATOMICITY answer's clothes. Execution is the
+        Scorer's business; this method answers one question only.
+
+        So: rules OR model, both unconditional. The rules keep their own
+        reason strings (a defer that names `strong-compound` is a different
+        diagnosis from one that names `model-compound`, and the shape board
+        splits on exactly that), and they still fire where the model is not
+        decisive — the model reads the utterance's shape, the gates read an
+        announced joiner and the dependency parse.
+        """
+        reason = self.rule_verdict(text, intents)
+        if reason:
+            return reason
+        from assistant.intent.classifier import ROUTER
+        if ROUTER.looks_compound(text):
+            return "model-compound"
+        return None
+
+
+def _parse_covers_the_compound(reason: str, text: str, intents) -> bool:
+    """Is this a compound the parse ALREADY answers in full? (F16)
+
+    Layer 0 says "several items"; that is a fact about the sentence. What to
+    DO about it is a routing question, and the answer is not always "defer":
+    when the rule parser has itself read two requests and produced an intent
+    for each, FastRule is not half-executing a two-ask command — it is
+    executing all of it. Deferring there throws a complete, correct answer
+    away, and with no LLM reachable it throws away the ONLY answer: measured
+    2026-09-07, "book gym on tuesday at 7am and remind me to buy milk"
+    routed to the deep track produces nothing at all when Ollama is down,
+    where the fast track produced both records.
+
+    So the carve-out is narrow and named, and it lives HERE — in routing —
+    instead of inside the atomicity answer, which is where it used to hide
+    (as `len(intents) <= 1` guarding the model tier) and where it cost the
+    layer 110 of its 195 B-test misses.
+
+    The RULE verdicts are never carved out: `strong-compound`,
+    `clause-coordination` and `mixed-mode-compound` name a specific structure
+    the gates recognised, and `mixed-mode-compound` in particular fires only
+    on ≥2 intents already. Only `model-compound` — the shape classifier's
+    opinion, which has no view of what the parse recovered — yields to a
+    parse that covers the ask.
+
+    "Covers" is not "≥2 intents". B-train mining (2026-09-07): of 381
+    compound rows committed on a ≥2-intent parse, 276 covered the ask and
+    **105 did not — and 80% of those 105 were THREE-ask families** where the
+    parse found two intents and dropped the third ("book flu shot this
+    morning, training session the 3rd, and remind me to …" → one event, one
+    task, one ask lost). Those are the real half-executions. So the parse
+    must produce at least as many intents as the sentence's joiners announce
+    asks, which is the one thing that separates the two piles.
+    """
+    if reason != "model-compound" or len(intents) < 2:
+        return False
+    return len(intents) >= 1 + len(_ASK_JOINER_RE.findall(text))
 
 
 class Gatekeeper:
@@ -211,7 +286,11 @@ class FastRule:
             return FastRuleResult(False, [], 0.0, f"error:{e}")
 
         reason = self.atomicity.judge(text, rr.intents)
-        if reason:
+        # both halves of the merge: the coverage carve-out (a compound the
+        # parse fully covers may still commit — Gil's Q13 "easy enough to
+        # complete", and the only path that survives the LLM being down)
+        # AND the raw parse riding along so the deep track inherits the work
+        if reason and not _parse_covers_the_compound(reason, text, rr.intents):
             return FastRuleResult(False, rr.intents, float(rr.confidence), reason,
                                   rule_result=rr)
         reason = self.gatekeeper.judge(text, rr.intents)

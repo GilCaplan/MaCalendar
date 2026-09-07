@@ -109,6 +109,19 @@ they ARE the atomizer FastRule depends on.
 work: FastRule F-batches toward F15 + K-model iteration. No engine runs, no
 integration (even at F15) without Gil's go.
 
+**LAYER 0 (atomicity) — F16–F18b landed on `fast-lane`, 2026-09-07.**
+`python -m scripts.atomicity_board` is the new instrument: the binary
+"one item or several" board, three predictors (rules / model / the wired
+layer) × two datasets, both error kinds as COUNTS because the cost is
+asymmetric. **B-test (FastRule 7,200 test half): layer accuracy 88.0 →
+93.5%, compound recall 68.8 → 87.9%, half-executable misses 195 → 76.
+A-test (verification pool, real wordings): 93.3 → 97.9%, recall 85.0 →
+99.1%, misses 34 → 2.** Downstream `fastrule_shape` B-test: handle rate
+53.5 → 54.2%, defer 77.1 → 78.2%, actual half-executions 26 → 20.
+**Open for Gil: DEVQA Q13** — is a fast commit on a compound a routing
+violation when it produces exactly the right records? The answer moves the
+non-atomic defer rate between 78.2% and 95.6%.
+
 **Data plan (Gil, 2026-09-07):** sealed 300 on the real pool + FastRule's
 own 6,000 (80–20 by family) + external corpora as train-side augmentation
 only. Three sources, three roles — A real pool = calibration, B generated =

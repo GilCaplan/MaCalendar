@@ -1062,3 +1062,360 @@ query routes for "do i have…" / "am i free…".
 **Predict (test half):** atomic handle rate 55.0% → 59–62%;
 correct-on-handled 73.9% → 74–76% (these rows are unambiguous once routed);
 non-atomic defer rate unchanged (no gate touched).
+## F16 (layer 0 — the WIRING) — REGISTERED PREDICTION 2026-09-07
+
+**The instrument first.** `scripts/atomicity_board.py` scores layer 0's own
+binary question — one atomic item or several — as three separate predictors
+(rules alone / model alone / the wired layer) on two datasets: **B** (the
+FastRule 7,200, `expect.atomic` by construction, family-split) and **A**
+(the verification pool minus the sealed 300, `scenario == "compound"` as
+ground truth, deterministic sha1 75/25 split). Error counts are reported
+un-aggregated because the cost is asymmetric: an FN ("said atomic, was
+compound") half-executes a two-ask command and reaches the user; an FP
+("said compound, was atomic") costs one slow-path row.
+
+**Baseline it exposes — the layer scores WORSE than the model it contains,
+on both datasets:**
+
+| dataset · slice | predictor | acc | compound P | R | F1 | FP cheap | FN expensive |
+|---|---|---|---|---|---|---|---|
+| B-test (2,400: 626 c / 1,774 a) | rules only | 84.3% | 87.8% | 46.2% | 60.5% | 40 | 337 |
+| B-test | model only (floor 1.5) | 91.9% | 85.3% | 83.4% | 84.3% | 90 | **104** |
+| B-test | LAYER as shipped | 88.0% | 82.1% | 68.8% | 74.9% | 94 | **195** |
+| A-test (672: 227 c / 445 a) | rules only | 93.6% | 96.9% | 83.7% | 89.8% | 6 | 37 |
+| A-test | model only (floor 1.5) | 98.2% | 95.4% | 99.6% | 97.4% | 11 | **1** |
+| A-test | LAYER as shipped | 93.3% | 94.6% | 85.0% | 89.6% | 11 | **34** |
+
+**Diagnosis (train-side mining only).** `judge()` consults the model only
+behind `len(intents) <= 1`. In B-test **110 rows parse to ≥2 intents and
+every one of them is compound**, and the layer calls all 110 atomic without
+ever asking the model: 110 of its 195 misses are one guard clause. The
+guard exists for a real reason (v1: "buy milk and buy bread" parses as two
+intents and rightly commits) — but that is an EXECUTION judgement, not an
+ATOMICITY judgement, and it was smuggled into the atomicity answer.
+
+**Change:** the model LEADS and the rule gates become overrides for their
+own catches — `judge()` becomes rules-OR-model, with the model's
+`len(intents) <= 1` guard removed. No feature or weight change; wiring only.
+
+**Predict (B-test):** layer recall 68.8 → 82–84% (it should land on the
+model's own line), FN 195 → ~105, accuracy 88.0 → 91–92%, precision
+82.1 → 84–86%. **(A-test):** layer recall 85.0 → 98–100%, FN 34 → ≤3,
+accuracy 93.3 → 97–98%. **Downstream (`fastrule_shape`, B-test):**
+non-atomic DEFER RATE 77.1 → 85–90% with the "knew it was compound" share
+51.2 → 68–75%; routing violations 129 → 55–70. Atomic handle rate 53.5%
+should fall by ≤1.5pp (no B-test atomic row parses to ≥2 intents, so the
+only new defers there are model FPs already counted above);
+correct-on-handled 73.1% flat or up.
+
+## F16 — ACTUAL (2026-09-07): the wiring WAS the bug; the routing was a second, separate bug
+
+**The atomicity board — predicted band beaten on B, met on A.**
+
+| dataset · slice | predictor | acc | compound P | R | F1 | FP cheap | FN expensive |
+|---|---|---|---|---|---|---|---|
+| B-test | LAYER before | 88.0% | 82.1% | 68.8% | 74.9% | 94 | 195 |
+| B-test | LAYER after | **92.5%** | **85.2%** | **86.4%** | **85.8%** | 94 | **85** |
+| B-test | (model alone, for reference) | 91.9% | 85.3% | 83.4% | 84.3% | 90 | 104 |
+| A-test | LAYER before | 93.3% | 94.6% | 85.0% | 89.6% | 11 | 34 |
+| A-test | LAYER after | **98.1%** | **95.0%** | **99.6%** | **97.2%** | 12 | **1** |
+
+Predicted B-test recall 82–84% (i.e. "it should land on the model's own
+line"); **actual 86.4%, above the model alone**. The reason is the finding:
+rules-OR-model is a genuine union — the gates catch compounds the classifier
+is not decisive about, and the classifier catches the quiet ones the gates
+have no cue for — so the wired layer now beats BOTH its parts (F1 85.8 vs
+84.3 model / 60.5 rules). B-test half-executions 195 → 85, at zero
+precision cost (FP 94 → 94). A-test met the band exactly: 34 → **1**
+missed compound in 227.
+
+**NOVEL EFFECT — and it changed the design.** Feeding the honest atomicity
+verdict straight into ROUTING (defer on any compound) gave a much better
+product-shape board — non-atomic defer 77.1 → **95.6%**, violations 129 →
+25 — and was still WRONG. Two measurements said so:
+
+1. Of the 104 rows it stopped committing, **96 had been producing the RIGHT
+   counts** on the fast track (shape board's "of which produced right counts
+   anyway": 103 → 7). Those are not half-executions; they are complete
+   answers being thrown away.
+2. With the LLM unreachable — CI, or Ollama down — "book gym on tuesday at
+   7am and remind me to buy milk" routed to the deep track produces
+   **nothing at all** (verified by raising from `engine.llm.call_json`),
+   where the fast track produced both records. `test_a_two_intent_parse_
+   keeps_fast_despite_a_joiner` and `test_a_mixed_command_is_answered_by_
+   the_rules_alone` were red for exactly this reason, and they were right.
+
+So the answer and the decision were split. `Atomicity.judge()` reports the
+truth ("several items"); `_parse_covers_the_compound()` — in routing, where
+it belongs — lets FastRule commit anyway when the parse already covers the
+ask. **"Covers" is not "≥2 intents".** B-train mining: of 381 compound rows
+committed on a ≥2-intent parse, 105 did NOT cover the ask and **80% of those
+were three-ask families** ("book flu shot this morning, training session the
+3rd, and remind me to …" → two intents, one ask lost). Requiring
+`len(intents) ≥ 1 + ask-joiners` cuts that pile 105 → 14 on B-train, and the
+14 survivors are KIND errors (event parsed as task), not lost asks.
+
+**Downstream (`fastrule_shape`, B-test), with the split in place:** atomic
+handle rate **53.5% → 53.5%** and correct-on-handled **73.1% → 73.1%** (the
+brief's guard rail: untouched); non-atomic defer rate 77.1 → **77.8%**, the
+"knew it was compound" share 51.2 → **52.0%**, routing violations 129 →
+**125** — of which the half-executions (wrong counts) are **26 → 22** and
+the complete-answer commits are 103 → 103. Propose defer 70.6% unchanged.
+A modest downstream move is the honest price of not throwing away 96 correct
+answers; the big number is the atomicity board's, which is what layer 0 is.
+
+**Open product question for Gil (DEVQA):** `fastrule_shape` scores ANY
+commit on a non-atomic row as a routing violation, including the 103 that
+produce exactly the right records. If the ruling is "violation regardless",
+delete `_parse_covers_the_compound` and the board jumps to 95.6% defer —
+but the LLM-free path loses those commands entirely.
+
+## F17 (layer 0 — the MODEL) — REGISTERED PREDICTION 2026-09-07
+
+**Selection method (no test rows touched).** Candidate features were judged
+by a **5-fold GroupKFold over B-train's pattern families** — the same unit
+the real split uses, so a feature that only memorises a wording family
+shows up as a fold loss — plus a fit on all of B-train scored against
+**A-train**, a differently-shaped dataset. Because the cost is asymmetric,
+they are compared at MATCHED RECALL (how many atomic rows must be wrongly
+deferred to reach 90/95/98% compound recall) rather than at argmax, where
+a precision-heavy feature can look good while losing the rows that matter.
+
+**Banked negative, first: the syntactic block as a whole LOSES.** 15
+dependency/structural features (clause coordination, conj counts, verb
+counts, joiner counts and position, temporal subordinators, comma counts,
+"to <verb>" counts) added together move B-train CV FP@R98 373 → **534** and
+A-train FP@R99 54 → **67** — worse on both, at the operating point the cost
+model actually selects. It is F13's lesson again: features that sharpen the
+boundary on seen families blur it on unseen ones. Per-feature ablation
+found only two that help, and only these two survive combination:
+
+| feature set | B-train CV FP@R90 | FP@R95 | FP@R98 | A-train FP@R95 | FP@R99 |
+|---|---|---|---|---|---|
+| base 18 (shipped) | 210 | 327 | 373 | 19 | 54 |
+| + all 15 syntactic | 179 | 286 | **534** | **29** | **67** |
+| + joiner-mid | 220 | 294 | 334 | 16 | 56 |
+| + clause-coord | 141 | 309 | 402 | 19 | 29 |
+| **+ joiner-mid + clause-coord** | **138** | **290** | **347** | **16** | **29** |
+
+**Change:** `AtomicityFeatures` gains exactly two signals, 18 → 20.
+(a) **joiner-mid** — an ask-joiner falls in the middle 20–80% of the
+sentence, i.e. the utterance has two HALVES rather than a trailing tag;
+this is the "connective position" idea, and position is what separates
+"meeting with Tal and Sam at 5" from "book the gym and remind me to call".
+(b) **clause-coord** — `coordination.has_clause_coordination` as a FEATURE
+rather than a gate, so the model can WEIGH the dependency parse's verdict
+alongside the rest of the shape instead of it being an all-or-nothing veto.
+The parse it needs is memoised so the gate and the feature share one spaCy
+call.
+
+**Predict.** *B-test, model tier alone at the shipped floor 1.5:* compound
+recall 83.4 → 85–88%, said-atomic-but-COMPOUND 104 → 75–95, precision held
+≥84% (FP 90 → ≤105). *B-test, the LAYER:* FN 85 → 70–80, accuracy 92.5 →
+92.8–93.5%. *A-test:* recall stays ≥99% (it is already 99.6) with FP 12 →
+≤10 — the A gain in CV was at the far-recall end, which A-test already
+sits at, so I expect A to be FLAT and would read a drop as overfitting to
+B. *Downstream (`fastrule_shape` B-test):* atomic handle rate within −1pp
+of 53.5%, non-atomic defer rate 77.8 → 78–80%.
+
+## F17 — ACTUAL (2026-09-07): the model improved on BOTH error kinds; the LAYER banked it as precision
+
+**B-test, MODEL TIER alone at floor 1.5 — prediction met on every line:**
+accuracy 91.9 → **93.1%**, compound P 85.3 → **87.4%**, R 83.4 → **86.1%**
+(predicted 85–88), said-atomic-but-COMPOUND 104 → **87** (predicted 75–95),
+said-compound-but-atomic 90 → **78**. Both error kinds fell — unusual, and
+the sign that two features added information rather than moving the
+boundary.
+
+**B-test, the LAYER: accuracy 92.5 → 93.0%, P 85.2 → 87.0%, R 86.4 → 86.3%,
+FP 94 → 81, FN 85 → 86.** Prediction MISSED on the expensive side: I said
+FN 85 → 70–80 and it is flat. The reason is worth keeping: the compounds
+the improved model newly catches were **already being caught by the rule
+gates** — the union had them. What the better model bought is PRECISION,
+so the gain shows up as 13 fewer atomic rows wrongly deferred, not as
+fewer half-executions. Layer recall is now rules-limited, not model-limited.
+
+**A-test: exactly flat** — accuracy 98.1%, R 99.6%, FN 1, FP 12 (predicted
+flat; FP predicted ≤10, so a hair outside). A was already at ceiling: its
+compounds are two real utterances joined by an announced connective (82%
+carry "and", 36% "also", 22% "then"), so A measures "did you see the
+joiner" and B measures the quiet compounds. Reporting them separately is
+what makes that visible — a single blended number would have hidden it.
+
+**Downstream (`fastrule_shape`, B-test):** atomic handle rate 53.5 →
+**54.0%** (predicted "within −1pp"; it went UP, which is the precision gain
+landing), correct-on-handled 73.1 → 72.7%, non-atomic defer rate 77.8%
+FLAT (predicted 78–80 — missed, same reason as the layer FN), "knew" 51.8%,
+violations 125, propose defer 70.6%.
+
+**Two negatives banked.** (1) The 15-feature syntactic block, added
+wholesale, is worse than no syntactic features at all at the recall the
+cost model selects (B-train CV FP@R98 373 → 534, A-train FP@R99 54 → 67).
+(2) Dropping `class_weight="balanced"` for atomicity — tested because the
+balanced intercept was suspected of pushing featureless utterances to
+"compound" — is a wash on B (CV FP@R98 348 vs 347) and clearly WORSE on A
+(FP@R99 42 vs 29). Balanced stays.
+
+**The margin floor is now justified, not assumed** (B-train sweep, printed
+by `fit_route_models`). The sweep is a cliff, and the cliff is ONE
+ambiguity bucket: 235 B-train rows share a single feature vector —
+`{bias, and, joiner-mid}`, i.e. "there is an 'and' in the middle and
+nothing else fires" — all at margin 0.64, and they are **160 atomic / 75
+compound**. Floor 1.5 rejects the whole bucket; floor 0.5 accepts the whole
+bucket. Priced on the product board (B-train): 1.5 → 0.5 buys 32 fewer
+half-executions and 81 fewer layer FNs, and costs **97 correct fast
+handles** (handle rate 59.7 → 56.6%) — roughly three lost fast-correct
+answers per half-execution prevented, where the lost ones still get a
+correct (slow) answer from deep and the half-executions are wrong in front
+of the user. **Floor stays 1.5**: the bucket should be SPLIT, not bought
+wholesale, which is F18.
+
+## F18 (layer 0 — splitting the ambiguity bucket) — REGISTERED PREDICTION 2026-09-07
+
+**Mined from F17's margin cliff (B-train only).** The floor sweep is a
+cliff because 235 B-train rows share ONE feature vector — `{bias, and,
+joiner-mid}`, "an 'and' in the middle and nothing else fires" — all at
+margin 0.64, split **160 atomic / 75 compound**. The floor can only buy or
+reject the whole bucket. Its two sides:
+
+    atomic   "call Devon and Reese this sunday" · "invite Sam and Parker to
+             car service appointment" · "set up open house between 2 and 4"
+    compound "take the medicine at midnight and 9:15" · "set up therapy
+             session at around lunchtime and town hall at midnight"
+
+**Change (2 features, 20 → 22):** (a) **between-range** — `between … and …`
+is a RANGE, one ask, not a joiner; (b) **both-sides-time** — a time
+expression appears on BOTH sides of the first ask-joiner, over a broadened
+time vocabulary that includes bare `H:MM`, "midnight/noon/lunchtime" and
+the dayparts the shipped `two-times` regex misses. Both are general
+statements about compounds, not bucket patches.
+
+| feature set | B-train CV FP@R90 | FP@R95 | FP@R98 | cost k=5 | A-train FP@R95 | FP@R99 |
+|---|---|---|---|---|---|---|
+| F17 shipped (20) | 138 | 290 | 347 | 447 | 16 | 29 |
+| **+ between-range + both-sides-time** | **100** | **144** | **309** | **420** | 16 | 29 |
+| + conj-propn (REJECTED, see below) | 145 | 166 | 174 | 282 | **19** | **51** |
+
+**The cross-dataset finding, banked before it is measured on test.**
+`conj-propn` — the dependency parse showing a PROPER-NOUN conjunct, i.e.
+"and" joining two NAMES — is by far the strongest single feature on B
+(FP@R98 347 → **174**, cost k=5 447 → 282, near-halving the error) and a
+clear REGRESSION on A (FP@R99 29 → **51**). B's NP-decoy families are
+generated with capitalised person names, so the feature may be reading a
+template artifact; A's real utterances carry proper nouns on both sides of
+the question. **The lane's dual-gate rule (ITERATION_PROTOCOL, source B)
+decides it: a change must win on B-train AND not regress A.** Rejected —
+and this is exactly the case the two-dataset instruction exists to catch:
+on B alone it would have shipped as the batch's headline.
+
+**Predict.** *B-test, model tier at floor 1.5:* accuracy 93.1 → 94–95%,
+compound P 87.4 → 90–93%, said-compound-but-atomic 78 → 50–70, R 86.1%
+held (86–89%), FN 87 → 70–87. *B-test, the LAYER:* FP 81 → 55–72, FN 86
+flat (F17 established that layer recall is rules-limited, so I expect the
+gain to bank as precision again). *A-test:* FLAT on every line — the CV
+said flat, and a move there would mean B-fitting. *Downstream
+(`fastrule_shape` B-test):* atomic handle rate 54.0 → 55–57% (this is a
+precision batch, and fewer wrongly-deferred atomic rows is exactly a handle
+rate gain), correct-on-handled ≥72%, non-atomic defer rate 77.8% flat to
++1pp.
+
+## F18 — ACTUAL (2026-09-07): prediction INVERTED — it bought recall, not precision
+
+**B-test, the LAYER: accuracy 93.0 → 93.5%, compound P 87.0 → 87.3%,
+R 86.3 → 87.9%, said-compound-but-atomic 81 → 80, said-atomic-but-COMPOUND
+86 → 76.** I predicted the opposite shape — FP 81 → 55–72 with FN flat —
+and got FN −10 with FP flat. Twice now (F17 predicted precision-flat and
+got precision; F18 predicted precision and got recall) the split between
+the two error kinds has gone the other way than expected, which says
+plainly that I cannot yet predict WHICH error a feature will move, only
+that a feature carrying real information moves the total. Worth saying out
+loud rather than quietly scoring it as "in the band".
+
+**B-test, model tier alone: accuracy 93.1 → 93.6%, P 87.4 → 87.7%,
+R 86.1 → 87.7%, FN 87 → 77, FP 78 → 77.** Predicted accuracy 94–95% and
+FP 50–70: **missed**. The B-train CV gain (FP@R95 290 → 144, a halving)
+did NOT transfer at that magnitude to unseen families — on B-train the
+model reaches R 95.2% at FP 124, on B-test it reaches R 87.7% at FP 77.
+The direction transferred; the size did not. Grouped-CV-by-family is a
+better honesty check than a random split, and still optimistic.
+
+**A-test: flat, as predicted** — layer accuracy 98.1 → 97.9%, R 99.6 →
+99.1%, FN 1 → 2, FP 12 → 12. One row. A remains at ceiling.
+
+**Downstream (`fastrule_shape`, B-test):** atomic handle rate 54.0 →
+**54.2%** (predicted 55–57 — missed; the precision gain I expected did not
+arrive, so neither did its handle-rate consequence), correct-on-handled
+72.6%, non-atomic defer rate 77.8 → **78.2%** (predicted flat–+1 ✔), "knew
+it was compound" 51.8 → **53.2%**, routing violations 125 → 123 of which
+the actual half-executions are **22 → 20**.
+
+**The margin floor: 1.5 → 0.25, and the interesting part is that it stopped
+mattering.** F18's features split the mass the floor existed to reject, so
+the B-train PRODUCT board is now identical from floor 0.0 to 1.5 (handle
+59.6–59.8%, defer 75.7%, half-exec 64, layer FN 66–67) where at F17 the
+same sweep swung the handle rate 3.1pp. The remaining evidence is A-train's,
+and it points the asymmetric way: 0.25 vs 1.5 trades **2 more slow-path
+rows for 8 fewer half-executed commands**. On the test halves the choice is
+a wash on the LAYER (FN 76 either way — the rule gates cover the difference)
+and better on the MODEL ALONE (B-test FN 89 → 77 for +2 FP), so 0.25 is
+kept: the "only speak when decisive" guard was compensating for a feature
+gap that no longer exists, and the model is the part that would be exposed
+if the gates ever changed.
+
+## LAYER 0 — the campaign board, F16 → F18 (2026-09-07)
+
+Every number: which dataset, which metric, what it means.
+
+**B — FastRule 7,200 TEST half (2,400 rows: 626 compound / 1,774 atomic;
+family-split, so these are wordings never trained on). Metric: the
+atomicity binary board.**
+
+| | acc | compound P | R | F1 | said-compound-but-atomic (cheap) | said-atomic-but-COMPOUND (expensive) |
+|---|---|---|---|---|---|---|
+| before (F15 state) | 88.0% | 82.1% | 68.8% | 74.9% | 94 | **195** |
+| after (F18) | **93.5%** | **87.3%** | **87.9%** | **87.6%** | 80 | **76** |
+
+**A — verification pool minus the sealed 300, TEST quarter (672 rows: 227
+compound / 445 atomic; REAL utterances). Same metric.**
+
+| | acc | compound P | R | F1 | cheap | expensive |
+|---|---|---|---|---|---|---|
+| before | 93.3% | 94.6% | 85.0% | 89.6% | 11 | **34** |
+| after | **97.9%** | 94.9% | **99.1%** | **97.0%** | 12 | **2** |
+
+**What it means:** on the generated set the layer now misses 76 compounds
+instead of 195 — 119 fewer commands where FastRule would have executed half
+of what was asked — while wrongly slowing 14 FEWER atomic rows, not more.
+On real wordings it misses 2 instead of 34.
+
+**Downstream product shape (`fastrule_shape`, B-test) — the guard rail
+held:** atomic handle rate 53.5 → **54.2%** (up, not down: layer 0 got more
+precise as well as more sensitive), correct-on-handled 73.1 → 72.6%,
+non-atomic defer rate 77.1 → **78.2%** with the "knew it was compound"
+share 51.2 → **53.2%**, routing violations 129 → 123 of which actual
+half-executions **26 → 20**. Propose defer 70.6% untouched.
+
+## F18b — the latency the parse feature cost, and getting it back (2026-09-07)
+
+The clause-coord feature parses with spaCy, and unlike the gate that used
+to be its only caller it wanted a parse for EVERY utterance, not just ones
+containing " and ". Measured on FastRule.run over 300 rows with the memo
+cleared per row (the real per-command case): **p50 36.1 → 41.9 ms, p95
+69.3 → 77.5 ms** — a 16% tax on the fast track, against a ~50 ms budget
+that p95 was already over.
+
+A `conj` dependency needs a coordinator, so an utterance with none cannot
+have clause coordination and never needed parsing. `_COORDINATOR_RE` (and
+/ or / but / plus / as well as / along with / comma / semicolon) skips it:
+**57% of the two datasets' 9,899 utterances match nothing**, and the guard
+is verified lossless over both in full — it changes 7 verdicts of 9,899,
+all of them rename commands ("call it X instead of Y") where spaCy invents
+a coordinator-less `conj` and False is the better answer anyway. It is
+deliberately WIDER than `ASK_JOINER_RE`, because a cheap pre-filter must
+never be the thing that decides.
+
+**FastRule.run p50 41.9 → 39.0 ms, p95 77.5 → 67.1 ms** — the fast track
+is now FASTER than before the feature landed (the guard short-circuits the
+rules gate too), and the atomicity board and product-shape board are
+byte-identical after a refit. A cost worth measuring, and worth measuring
+again after removing it.

@@ -19,6 +19,61 @@ the floor, so a parse outage can never over-abstain.
 
 from __future__ import annotations
 
+import functools
+import re
+
+#: One ASK-JOINER between two asks; N joiners announce N+1 asks. ", and" and
+#: "and then" are ONE joiner, not two — the alternation is ordered longest-
+#: first so the compound forms win, and a trailing comma is swallowed. A
+#: comma inside a single ask ("friday, march 5th") over-counts, which is the
+#: safe direction for both consumers: FastRule's `_parse_covers_the_compound`
+#: then prefers to defer, and the `joiner-mid` feature then prefers "middle".
+ASK_JOINER_RE = re.compile(
+    r"(?:"
+    r",?\s*\band\s+(?:then|also)\b"
+    r"|,\s*(?:then|also|plus)\b"
+    r"|[.;!?]\s+(?:also|then|plus|and)\b"
+    r"|\s[—–]\s*and\b"
+    r"|,?\s*\band\b"
+    r"|[;,]"
+    r"),?",
+    re.I)
+
+
+#: A `conj` dependency needs a coordinator, so a sentence with none cannot
+#: have clause coordination and does not need to be parsed at all. 57% of
+#: the two datasets' 9,899 utterances match nothing here, and the parse is
+#: ~9 ms — the difference between the check being free on a simple command
+#: and being the fast track's largest single cost. Deliberately WIDER than
+#: `ASK_JOINER_RE` ("or", "but", "plus", "as well as"): a cheap pre-filter
+#: must never be the thing that decides, and this one is verified lossless
+#: over both datasets in full.
+_COORDINATOR_RE = re.compile(
+    r"\b(?:and|or|but|plus|as well as|along with)\b|[,;]", re.I)
+
+
+@functools.lru_cache(maxsize=256)
+def parsed(text: str):
+    """The spaCy doc for `text`, memoised.
+
+    Two callers now want the same parse of the same utterance in the same
+    ~50 ms: this check (layer 0's rules tier) and `AtomicityFeatures`'
+    clause-coord signal (its model tier, F17). Without the cache the parse
+    is paid twice per command. Returns None — never raises — when spaCy is
+    unavailable or the parse fails, so every caller degrades to "saw
+    nothing" rather than to an exception.
+    """
+    from assistant.intent import rule_parser as _rp
+
+    _rp._ensure_nlp()
+    nlp = _rp._NLP
+    if nlp is None or not text or " " not in text:
+        return None
+    try:
+        return nlp(text)
+    except Exception:
+        return None
+
 
 def has_clause_coordination(text: str) -> bool:
     """True when the parse shows two coordinated CLAUSES (two asks).
@@ -31,15 +86,10 @@ def has_clause_coordination(text: str) -> bool:
     which spaCy's small model handles well enough for POS at this coarseness;
     the NOUN/PROPN check is the guard against splitting names.
     """
-    from assistant.intent import rule_parser as _rp
-
-    _rp._ensure_nlp()
-    nlp = _rp._NLP
-    if nlp is None or not text or " " not in text:
-        return False
-    try:
-        doc = nlp(text)
-    except Exception:
+    if not _COORDINATOR_RE.search(text):
+        return False                 # no coordinator ⇒ no `conj` ⇒ nothing to see
+    doc = parsed(text)
+    if doc is None:
         return False
     OWN_ARG = ("dobj", "obj", "ccomp", "xcomp", "dative", "attr", "oprd",
                "npadvmod", "appos", "compound", "prep", "prt", "advcl")
