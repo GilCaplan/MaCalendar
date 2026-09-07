@@ -4,6 +4,28 @@
 
 # ═══ ERA 2 — post-integration (opens with the joint confirmation run) ═══
 
+## Run 16 — the era-2 baseline (joint confirmation of the integration) · 2026-09-06 · effebeb · dev-fast-250
+
+**Predicted:** more fast commits (0.80 bar, +2pp coverage per the sandbox
+sweep) at flat-or-better correctness; F1/F3 gates re-route a few wrong-fast
+rows to deep.
+
+**Actual — prediction HALF right, and the half that missed is the
+interesting one:** commit coverage went DOWN, not up (fast n 98→87): the
+F1/F3 abstention gates removed more commits than the lower threshold added.
+But what stayed committed got much safer — **fast correct-on-committed 79%
+→ 90% (+11)** — and the headline is flat within the noise floor (raw
+78.0→77.0 · adjusted 80.8→**80.0** · F1 82.0→81.1 · fieldq 85.3→84.5 ·
+garbage 0%). Deep 78→71 is composition, not regression: it inherited ~11
+hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
+
+**Verdict: CONFIRMED — merged to main.** The integration's promise was
+precision-on-committed and it delivered exactly that; coverage is the open
+debt, measured as recoverable-abstain (17.4% standalone), and is F4's
+explicit target in the sandbox lane. These numbers are the era-2 baseline
+all subsequent cycles compare to.
+
+
 *2026-09-06 (Gil): big changes landed — FastRule object + F1/F2/F3 gates +
 tuned 0.80/0.60 thresholds integrated into the engine (`effebeb`). History
 above/below this line is kept and re-scorable, but era-2 boards are compared

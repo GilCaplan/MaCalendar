@@ -75,8 +75,9 @@ hand-written audit corpus is now only a regression floor.
 
 1. ✅ **INTEGRATED @ effebeb (2026-09-07)** — FastRule object + F1/F2/F3 +
    0.80 threshold on the loop tree; sandbox matches (34%/93.0% adj); joint
-   confirmation run IN FLIGHT (`scratchpad/joint_confirm.log`). Merges to
-   main only after it confirms. Original plan:
+   confirmation run **CONFIRMED 2026-09-06** (run 16 = era-2 baseline: adj
+   80.0 flat-within-noise, fast correct 79→90). **Merged to main**; fastlane
+   worktree reset onto the integrated state (pre-integration tag kept). Original plan:
    INTEGRATE the stacked fast-lane work into the loop tree — F1+F2+F3
    vetoes + tuned RULE_THRESHOLD 0.80 + SUBITEM 0.60 + cycle-9 sub-item
    trust — and run ONE joint full-engine cycle (the remerge gate: nothing
