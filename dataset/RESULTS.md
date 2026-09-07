@@ -21,7 +21,20 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
-## Era-2 cycle 3 — REGISTERED PREDICTION 2026-09-07: F4+F5 joint confirmation
+## Era-2 cycle 3 — ACTUAL (run 19, 2026-09-07): CONFIRMED, first real era-2 gain
+
+**All four predicted directions correct, and the sizes beat the prediction:**
+adjusted count-correct **80.0→81.0** · F1 **81.3→82.7** (P 85.9 / R 79.7) ·
+**complex 52→56** · **event+task 46→51** · task+task 45→50 · fast n 87→86
+(predicted 83–86 ✓) at **91%** correct (predicted 91–93 ✓) · deep 71→73
+despite absorbing the harder deferred rows · garbage 0% · p50 8.1s.
+
+**The mechanism worked as designed:** F5 defers plain-"and" compound swallows
+to the deep track, where segment/decompose split them — that's the complex
+and event+task movement, the two families that had been stuck since era 1.
+F4+F5 are CONFIRMED on the main board; the sandbox numbers transferred.
+
+### The registered prediction (kept for the record)
 
 **Change under test:** the boundary integration (fast-lane merge). Routing
 changes: F5's clause-coordination gate defers plain-"and" compounds the
