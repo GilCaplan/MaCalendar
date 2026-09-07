@@ -204,7 +204,10 @@ def confirming_engine(monkeypatch):
                                                   end_time="08:00"))]
         _validate.run_objects(state, cfg)
 
-    monkeypatch.setattr("assistant.engine._deep_parse", fake_deep)
+    # the orchestrator is object-based (Q7): the deep parse lives on the
+    # Engine singleton's DeepSystem, not at module level
+    import assistant.engine as _e
+    monkeypatch.setattr(_e._engine.deep, "parse", fake_deep)
     monkeypatch.setattr(_generate, "fast_propose", lambda state, cfg: False)
     monkeypatch.setattr("assistant.engine._crosscheck.run",
                         lambda state, cfg: state)
