@@ -58,7 +58,35 @@ def main() -> int:
     all_rows = [json.loads(l) for l in
                 (ROOT / "dataset" / "fastrule" / "fastrule_6000.jsonl").open()]
     rows = [r for r in all_rows if r["split"] == "train"]
+
+    # F14: the A-pool's real-usage wordings join the TRAINING text (never the
+    # sealed 300 - load_test_split excludes them by text; B-test untouched).
+    # A teaches the classes its labels support: kind via the K1 derivation,
+    # operation for new/query/remove - hundreds of real phrasings for
+    # exactly the starved classes.
+    from scripts.score_dataset_run import load_provenance, load_test_split
+    _sealed = load_test_split()
+    A_KIND = {("calendar", "set"): "event", ("lists", "createoradd"): "task",
+              ("compound", "event+event"): "event", ("compound", "task+task"): "task"}
+    A_OP = {"set": "new", "createoradd": "new", "query": "query", "remove": "remove"}
+    F14_MIX_A_POOL = False   # measured 2026-09-07: A-mixing costs B-test
+                             # macro-F1 (op 73.4->69.3) - two dialects, one
+                             # linear boundary. Kept as a switch for when a
+                             # richer model or EXT variety changes the math.
+    a_rows = []
+    for r in (load_provenance().values() if F14_MIX_A_POOL else []):
+        if r.get("tier_rank") is None or r["text"] in _sealed:
+            continue
+        sc, it = r.get("scenario", ""), r.get("intent", "")
+        a_rows.append((r["text"], A_KIND.get((sc, it)),
+                       A_OP.get(it) if sc != "compound" else None))
     op_X, op_y, k_X, k_y = [], [], [], []
+    for text, kind, op in a_rows:
+        if op:
+            op_X.append(op_features(text)); op_y.append(op)
+        if kind:
+            k_X.append(kind_features(text)); k_y.append(kind)
+    n_a_op, n_a_k = len(op_y), len(k_y)
     for r in rows:
         e = r["expect"]
         a = e.get("action", "")
@@ -77,7 +105,8 @@ def main() -> int:
     }
     dest = ROOT / "assistant" / "intent" / "route_model_weights.json"
     dest.write_text(json.dumps(out, indent=1))
-    print(f"fit: operation on {len(op_y)} rows · kind on {len(k_y)} rows -> {dest.name}")
+    print(f"fit: operation on {len(op_y)} rows ({n_a_op} from A-pool) · "
+          f"kind on {len(k_y)} rows ({n_a_k} from A-pool) -> {dest.name}")
     # train-side sanity (never test here)
     from assistant.intent.route_models import _scores, _top2
 
