@@ -21,6 +21,18 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## F12 (model iteration 1) — REGISTERED PREDICTION 2026-09-07
+
+**Change:** features only, floors untouched. (a) K3b: class-targeted
+operation features for the starved classes — query (61%) and remove (67%) —
+e.g. bare-noun-phrase-with-?-forms, "off my/the" removal speak, "am i
+free / is there anything" query openers; (b) kind model: close the gap to
+K1's proven feature set (86.4% train vs K1's 99 — add occasion/list
+signal parity). Re-fit (train-only, balanced), re-measure through FIXED
+floors 2.5/1.5. **Predict:** operation train-acc 90.9 → 93+ with query/
+remove ≥75% each; kind train-acc 86.4 → 92+; downstream, simple commit
+72.5 → 74–77% at ≥91% correct; A-pool dual-gate within ±0.5 of 94.5.
+
 ## F11 — ACTUAL (2026-09-07): Q10 router wired; dual-gate did its job
 
 First cut: simple 74.7% commit but the A-pool dual-gate CAUGHT a violation
