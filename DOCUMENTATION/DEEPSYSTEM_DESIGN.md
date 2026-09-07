@@ -40,7 +40,7 @@ if you want to know how it works.
    immediately (milliseconds, no AI model). Then, quietly in the background,
    **the judge** re-checks it and fixes or flags anything wrong. Done.
 5. **If FastRule defers →** the command enters the *deep track*, the careful
-   multi-step pipeline (steps 6–11).
+   multi-step pipeline (steps 6–13).
 6. **Repair the transcript** — fix mis-heard words against the user's personal
    vocabulary.
 7. **Segment** — split the command into its separate things: events, tasks, a
@@ -48,19 +48,21 @@ if you want to know how it works.
    Ravid" together than to shatter a name).
 8. **Decompose** — break each of those into *atomic* pieces: two times → two
    events, "buy 5 apples" → one task of five, a recurrence → its cadence.
-9. **Generate** — turn each atomic piece into a concrete event or task. For
-   each piece, **ask FastRule first**; call the AI model only for the pieces
-   FastRule can't read. If a piece still looks like two requests, it was never
-   atomic — send it back to step 8 to be split again.
-10. **Validate** — run the ordered correctness rules: impossible dates, am/pm,
+9. **Validate (text pass)** — clean up the pieces' text before they're made
+   into objects (grammar, garbled fragments).
+10. **Generate** — turn each atomic piece into a concrete event or task. For
+    each piece, **ask FastRule first**; call the AI model only for the pieces
+    FastRule can't read. If a piece still looks like two requests, it was never
+    atomic — send it back to Decompose to be split again.
+11. **Validate (object pass)** — run the ordered correctness rules: impossible dates, am/pm,
     until vs. through, round a recurrence and *say so*, and — *only when observance is
     turned on in settings* — the Shabbat / holiday rules for anything the AI
     itself created.
-11. **The judge** — the AI reads the *original words* and lists what was asked;
+12. **The judge** — the AI reads the *original words* and lists what was asked;
     the code compares that to what was produced and finds anything missing,
     extra, or wrong. On a problem it goes back to whichever step caused it and
     re-runs (a few times at most).
-12. **Label & commit** — colour and categorise events, tag tasks, write it all
+13. **Label & commit** — colour and categorise events, tag tasks, write it all
     to the calendar / task list, and answer the user.
 
 ### Reusable pieces (read only if you want the detail)
@@ -152,8 +154,8 @@ Engine.run(prompt, source, trace, view):
 ```
 DeepSystem.run(state):
     reentries = 0
-    for stage in self.stages:          # Transcript→Segment→Decompose→Generate
-                                       # →Validate→Crosscheck→Label
+    for stage in self.stages:          # Transcript→Segment→Decompose→Validate(text)
+                                       # →Generate→Validate(objects)→Crosscheck→Label
         if stage.can_skip(state):      # deterministic self-skip (no LLM)
             continue
         state = stage.run(state, cfg)  # each stage's FROZEN contract
@@ -239,7 +241,9 @@ class Engine:
 class DeepSystem:
     def __init__(self, config):
         self.stages = [Transcript(cfg), Segment(cfg), Decompose(cfg),
-                       Generate(cfg), Validate(cfg), Crosscheck(cfg), Label(cfg)]
+                       Validate(cfg), Generate(cfg), Crosscheck(cfg), Label(cfg)]
+        # NB: Validate runs TWICE — a text pass (run) before Generate and an
+        # object pass (run_objects) after; the list is schematic
         self.crosscheck = <the Crosscheck stage>   # exposed; also the verifier
     def run(self, state) -> state                   # §2.2
 ```
