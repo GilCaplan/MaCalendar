@@ -113,7 +113,10 @@ def test_the_routing_threshold_matches_the_parser(all_prose):
     for name, text in all_prose.items():
         if "rout" not in text.lower():
             continue
-        assert str(RULE_THRESHOLD) in text, (
+        import re as _re
+        # word-bounded: "0.8" must not be satisfied by the "0.85" inside a
+        # multiplier row (that substring accident green-lit a stale page once)
+        assert _re.search(rf"{_re.escape(str(RULE_THRESHOLD))}(?![0-9])", text), (
             f"the parser routes at {RULE_THRESHOLD}; {name} says otherwise")
 
 

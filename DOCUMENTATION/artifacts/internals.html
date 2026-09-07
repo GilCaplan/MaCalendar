@@ -338,7 +338,7 @@
     <h2><span class="num">03</span>One number decides everything</h2>
     <p>
       Every command is scored for confidence before anything happens to it. Above
-      <code>0.85</code> the rules answer it themselves, in about a tenth of a second;
+      <code>0.8</code> the rules answer it themselves, in about a tenth of a second;
       below it, the sentence goes to llama first. That threshold routes roughly 44% of
       commands one way and 56% the other.
     </p>
@@ -358,7 +358,7 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
 
     <figure>
       <svg viewBox="0 0 720 250" role="img"
-           aria-label="A confidence scale from zero to one. Commands scoring above 0.85 are answered first by the rule parser; below it they go to the LLM first. Either way the LLM reviews the result afterwards. Four real examples are plotted: book gym tomorrow at 7am scores 1.00, remind me to buy milk 0.95, set a meeting 0.32, and lunch at noon and coffee at 9 is skipped entirely.">
+           aria-label="A confidence scale from zero to one. Commands scoring above 0.8 are answered first by the rule parser; below it they go to the LLM first. Either way the LLM reviews the result afterwards. Four real examples are plotted: book gym tomorrow at 7am scores 1.00, remind me to buy milk 0.95, set a meeting 0.32, and lunch at noon and coffee at 9 is skipped entirely.">
 
         <!-- annotations, each on its own baseline with a leader to its point -->
         <text x="70" y="26" font-size="10.5" fill="var(--verify)">"lunch at noon and coffee at 9"</text>
@@ -375,8 +375,8 @@ base       = <span class="a">required slots filled ÷ required slots</span>   <s
         <path d="M 232 104 L 259 142" fill="none" stroke="currentColor" stroke-opacity=".28"></path>
 
         <!-- threshold -->
-        <line x1="580" y1="122" x2="580" y2="168" stroke="var(--accent)" stroke-width="2"></line>
-        <text x="588" y="134" text-anchor="start" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--accent)">0.85</text>
+        <line x1="550" y1="122" x2="550" y2="168" stroke="var(--accent)" stroke-width="2"></line>
+        <text x="558" y="134" text-anchor="start" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--accent)">0.8</text>
 
         <!-- the scale itself -->
         <line x1="70" y1="150" x2="670" y2="150" stroke="currentColor" stroke-opacity=".35"></line>
@@ -1105,7 +1105,7 @@ class RuleParseResult:
 
     <p>
       Two fields decide routing, not one. A result is answered directly only when
-      <code>confidence &gt;= 0.85</code> <em>and</em> <code>missing_slots</code> is empty —
+      <code>confidence &gt;= 0.8</code> <em>and</em> <code>missing_slots</code> is empty —
       a high score with a hole in it still goes to the model.
       <code>dropped_spans</code> is the quieter signal: it counts parts of the sentence the
       rules never accounted for, which is how a half-understood command is told apart

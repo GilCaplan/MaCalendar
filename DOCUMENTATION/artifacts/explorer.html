@@ -80,8 +80,11 @@
   .pbar button:hover{border-color:var(--amber); color:var(--amber);}
   #pbody{overflow-y:auto; padding:14px 18px 6px; font-size:14.5px;}
   #pbody p{margin:0 0 12px; max-width:62ch;}
-  #pbody ul{margin:0 0 12px; padding-left:20px;}
+  #pbody ul, #pbody ol{margin:0 0 12px; padding-left:20px;}
   #pbody li{margin:0 0 8px;}
+  #pbody h3{font:600 13.5px/1.3 'IBM Plex Mono',monospace; letter-spacing:.02em;
+            margin:18px 0 8px; color:var(--ink);}
+  #pbody h3:first-child{margin-top:0;}
   #pbody code{font:500 12.5px 'IBM Plex Mono',monospace; background:var(--codebg);
               padding:1px 5px; border-radius:4px;}
   #pbody .figs{font:500 13px/1.7 'IBM Plex Mono',monospace; color:var(--amber);}
@@ -196,55 +199,73 @@
       </g>
     </g>
 
-    <!-- pipeline chain: the engine's deep track, with the fast lane at step 4 -->
+    <!-- pipeline chain: the engine's deep track, with the fast fork at step 4 -->
     <g data-panel="correct" role="button" tabindex="0" aria-label="Step 2: fix the words against a personal vocabulary; a doubted word can be checked with you first.">
-      <rect class="frame" x="262" y="172" width="181" height="22" rx="4" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="352" y="187" text-anchor="middle" font-size="10">2 · fix words</text>
+      <rect class="frame" x="262" y="173" width="181" height="16" rx="3" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="352" y="182" text-anchor="middle" font-size="10">2 · fix words</text>
     </g>
-    <line x1="352" y1="194" x2="352" y2="198" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <line x1="352" y1="189" x2="352" y2="194" stroke="var(--muted)" marker-end="url(#mi)"/>
     <g data-panel="parse" role="button" tabindex="0" aria-label="Step 3: rule parser, 76 verb mappings, scores its own confidence.">
-      <rect class="frame" x="262" y="200" width="181" height="22" rx="4" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="352" y="215" text-anchor="middle" font-size="10">3 · rules first</text>
+      <rect class="frame" x="262" y="194" width="181" height="16" rx="3" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="352" y="203" text-anchor="middle" font-size="10">3 · rules first</text>
     </g>
-    <line x1="352" y1="222" x2="352" y2="226" stroke="var(--muted)" marker-end="url(#mi)"/>
-    <g data-panel="route" role="button" tabindex="0" aria-label="Step 4: the fast lane runs in parallel with the deep pipeline. A confident rule parse answers instantly while the deep track verifies behind it; anything uncertain takes the deep track in front of you.">
-      <rect class="frame" x="262" y="228" width="181" height="22" rx="4" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="352" y="243" text-anchor="middle" font-size="10">4 · fast lane ∥ deep</text>
+    <line x1="352" y1="210" x2="352" y2="215" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <g data-panel="route" role="button" tabindex="0" aria-label="Step 4: the fork. A confident rule parse commits instantly and the judge follows behind it in the background; anything uncertain takes the deep track in front of you instead.">
+      <rect class="frame" x="262" y="215" width="181" height="16" rx="3" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="352" y="224" text-anchor="middle" font-size="10">4 · fork: fast ∥ deep</text>
     </g>
-    <line x1="352" y1="250" x2="352" y2="254" stroke="var(--muted)" marker-end="url(#mi)"/>
-    <g data-panel="split" role="button" tabindex="0" aria-label="Step 5: split the command into its independent items, then split again — two times is two events, a list is one task per thing.">
-      <rect class="frame" x="262" y="256" width="181" height="22" rx="4" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="352" y="271" text-anchor="middle" font-size="10">5 · split · split again</text>
+    <path d="M 443 220 L 457 220" stroke="var(--amber)" stroke-width="1" stroke-dasharray="2 2" marker-end="url(#ma)"/>
+    <text x="459" y="219" font-size="6.3" fill="var(--amber)">fast: instant,</text>
+    <text x="459" y="227" font-size="6.3" fill="var(--muted)">judge follows (bg)</text>
+    <line x1="352" y1="231" x2="352" y2="236" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <g data-panel="split" role="button" tabindex="0" aria-label="Step 5: segment — split the transcript into its independent asks, biased to under-split when unsure.">
+      <rect class="frame" x="262" y="236" width="181" height="16" rx="3" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="352" y="245" text-anchor="middle" font-size="10">5 · segment</text>
     </g>
-    <line x1="352" y1="278" x2="352" y2="282" stroke="var(--muted)" marker-end="url(#mi)"/>
-    <g data-panel="check" role="button" tabindex="0" aria-label="Step 6: named deterministic rules repair fields and guard the calendar; the observance gate lives here.">
-      <rect class="frame" x="262" y="284" width="181" height="22" rx="4" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="352" y="299" text-anchor="middle" font-size="10">6 · repair · 15 rules</text>
+    <line x1="352" y1="252" x2="352" y2="257" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <g data-panel="decompose" role="button" tabindex="0" aria-label="Step 6: decompose — one bounded pass breaking each item into atomic pieces: two times is two events, a list is one task per thing, a count is one task times N.">
+      <rect class="frame" x="262" y="257" width="181" height="16" rx="3" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="352" y="266" text-anchor="middle" font-size="10">6 · split again</text>
     </g>
-    <line x1="352" y1="306" x2="352" y2="310" stroke="var(--muted)" marker-end="url(#mi)"/>
-    <g data-panel="write" role="button" tabindex="0" aria-label="Step 7: per item, the rules or the model produce the action; it is written to the local database and labelled.">
-      <rect class="frame" x="262" y="312" width="181" height="22" rx="4" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="352" y="327" text-anchor="middle" font-size="10">7 · make · write · label</text>
+    <line x1="352" y1="273" x2="352" y2="278" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <g data-panel="cleantext" role="button" tabindex="0" aria-label="Step 7: clean the text before anything is turned into an action — stray brackets and quotes, doubled words, one bounded rewrite only when the words are clearly garbled.">
+      <rect class="frame" x="262" y="278" width="181" height="16" rx="3" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="352" y="287" text-anchor="middle" font-size="10">7 · clean text</text>
     </g>
-    <line x1="352" y1="334" x2="352" y2="338" stroke="var(--muted)" marker-end="url(#mi)"/>
-    <g data-panel="review" role="button" tabindex="0" aria-label="Step 8: the cross-check compares what was produced against the words, loops a wrong stage back at most three times, and behind a fast answer proposes rather than rewrites.">
-      <rect class="frame" x="262" y="340" width="181" height="22" rx="4" fill="var(--screen)" stroke="var(--line)" stroke-dasharray="4 3"/>
-      <text x="352" y="355" text-anchor="middle" font-size="10">8 · compare · loop ≤3</text>
+    <line x1="352" y1="294" x2="352" y2="299" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <g data-panel="write" role="button" tabindex="0" aria-label="Step 8: make — per piece, the rules read it first, free; the model fills only what the rules can't, grounded on that piece's own words.">
+      <rect class="frame" x="262" y="299" width="181" height="16" rx="3" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="352" y="308" text-anchor="middle" font-size="10">8 · make</text>
+    </g>
+    <line x1="352" y1="315" x2="352" y2="320" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <g data-panel="check" role="button" tabindex="0" aria-label="Step 9: fifteen named deterministic rules repair the finished fields and guard the calendar; the observance gate lives here.">
+      <rect class="frame" x="262" y="320" width="181" height="16" rx="3" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="352" y="329" text-anchor="middle" font-size="10">9 · 15 rules</text>
+    </g>
+    <line x1="352" y1="336" x2="352" y2="341" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <g data-panel="review" role="button" tabindex="0" aria-label="Step 10: the judge compares what was produced against the words, loops a wrong stage back at most three times, and behind a fast answer proposes rather than rewrites.">
+      <rect class="frame" x="262" y="341" width="181" height="16" rx="3" fill="var(--screen)" stroke="var(--line)" stroke-dasharray="4 3"/>
+      <text x="352" y="350" text-anchor="middle" font-size="10">10 · judge · loop ≤3</text>
+    </g>
+    <line x1="352" y1="357" x2="352" y2="362" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <g data-panel="label" role="button" tabindex="0" aria-label="Step 11: once the judge has nothing left to blame, colour and category are decided, tasks are tagged, and everything is written to the local database.">
+      <rect class="frame" x="262" y="362" width="181" height="16" rx="3" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="352" y="371" text-anchor="middle" font-size="10">11 · label · commit</text>
     </g>
 
-    <!-- route <-> model server -->
-    <line x1="248" y1="256" x2="210" y2="256" stroke="var(--muted)" marker-start="url(#mi)" marker-end="url(#mi)"/>
-    <text x="229" y="241" text-anchor="middle" font-size="8" fill="var(--muted)">asks it</text>
-      <text x="229" y="272" text-anchor="middle" font-size="8" fill="var(--muted)">~5–10 s</text>
+    <!-- the assistant <-> model server: called from "make", and from the judge -->
+    <line x1="248" y1="307" x2="210" y2="307" stroke="var(--muted)" marker-start="url(#mi)" marker-end="url(#mi)"/>
+    <text x="229" y="294" text-anchor="middle" font-size="8" fill="var(--muted)">asks it</text>
+      <text x="229" y="323" text-anchor="middle" font-size="8" fill="var(--muted)">~5–10 s</text>
 
     <!-- answer to calendar window -->
     <line x1="457" y1="150" x2="474" y2="150" stroke="var(--muted)" marker-end="url(#mi)"/>
     <text x="466" y="122" text-anchor="middle" font-size="8" fill="var(--muted)">answer</text>
 
     <!-- writes / remembers / appends -->
-    <path d="M 262 328 L 252 328 L 252 398" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <path d="M 262 372 L 252 372 L 252 398" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
     <text x="262" y="394" text-anchor="end" font-size="8" fill="var(--muted)">writes</text>
-    <path d="M 412 372 L 412 398" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <path d="M 412 388 L 412 398" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
     <text x="418" y="396" font-size="8" fill="var(--muted)">remembers</text>
     <path d="M 457 352 L 500 352 L 500 400" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
     <text x="468" y="346" font-size="8" fill="var(--muted)">appends</text>
@@ -305,11 +326,11 @@
       <path class="frame" d="M 252 406 L 332 406 L 342 416 L 342 444 L 252 444 Z" fill="var(--panel)" stroke="var(--line)" stroke-width="1.5"/>
       <text x="297" y="424" text-anchor="middle" font-size="9">calendar db</text>
     </g>
-    <g data-panel="learn" role="button" tabindex="0" aria-label="Step 9: the command memory file. Every command, what it produced, and your verdict.">
+    <g data-panel="learn" role="button" tabindex="0" aria-label="Step 12: the command memory file. Every command, what it produced, and your verdict.">
       <path class="frame" d="M 362 406 L 442 406 L 452 416 L 452 444 L 362 444 Z" fill="var(--panel)" stroke="var(--line)" stroke-width="1.5"/>
       <text x="407" y="424" text-anchor="middle" font-size="9">memory db</text>
       <circle cx="366" cy="406" r="7.5" fill="var(--amber)"/>
-      <text x="366" y="409.5" text-anchor="middle" font-size="9" font-weight="600" fill="var(--bg)">9</text>
+      <text x="366" y="409.5" text-anchor="middle" font-size="9" font-weight="600" fill="var(--bg)">12</text>
     </g>
     <g data-panel="tracelog" role="button" tabindex="0" aria-label="The trace log: JSON lines the brain appends and the review panel tails.">
       <path class="frame" d="M 472 406 L 552 406 L 562 416 L 562 444 L 472 444 Z" fill="var(--panel)" stroke="var(--line)" stroke-width="1.5"/>
@@ -474,15 +495,19 @@
 
 <nav id="rail" aria-label="Jump to any step">
   <button data-go="home" id="bhome">⌂ system</button>
+  <button data-go="brain">◆ walkthrough</button>
   <button data-go="hear"><b>1</b>hear</button>
-  <button data-go="correct"><b>2</b>correct</button>
+  <button data-go="correct"><b>2</b>words</button>
   <button data-go="parse"><b>3</b>rules</button>
-  <button data-go="route"><b>4</b>fast?</button>
-  <button data-go="split"><b>5</b>split</button>
-  <button data-go="check"><b>6</b>repair</button>
-  <button data-go="write"><b>7</b>write</button>
-  <button data-go="review"><b>8</b>compare</button>
-  <button data-go="learn"><b>9</b>learn</button>
+  <button data-go="route"><b>4</b>fork</button>
+  <button data-go="split"><b>5</b>segment</button>
+  <button data-go="decompose"><b>6</b>resplit</button>
+  <button data-go="cleantext"><b>7</b>clean</button>
+  <button data-go="write"><b>8</b>make</button>
+  <button data-go="check"><b>9</b>repair</button>
+  <button data-go="review"><b>10</b>judge</button>
+  <button data-go="label"><b>11</b>label</button>
+  <button data-go="learn"><b>12</b>learn</button>
   <button data-go="batch">several at once</button>
   <button data-go="queue">host away</button>
 </nav>
@@ -494,7 +519,91 @@ const P = {
     z:[352,256,1.9],
     sum:`<p>One process understands and executes everything. The host's own window and every attached surface are thin clients — <strong>none of them contains a parser</strong>.</p>
     <p class="figs">15 actions · 109 endpoints · ~35,491 lines · a test suite</p>`,
-    more:`<p>One process holds the pipeline and two of the three models: the speech model and the grammar
+    more:`<h3>How one command becomes an answer</h3>
+    <p>The whole path, start to finish. Two named pieces do double duty &mdash; <strong>FastRule</strong>
+    and <strong>the judge</strong> each show up twice in the story below &mdash; so they're defined
+    once, under "the pieces it reuses," rather than re-explained at both places they run. Read the
+    numbered list straight through for the story; the rail below (or &larr;/&rarr;) still opens any
+    one step for its full mechanics.</p>
+    <ol>
+      <li><strong>Arrival.</strong> A command arrives &mdash; typed, or a spoken transcript &mdash;
+      from the Mac or the phone.</li>
+      <li><strong>Intake.</strong> If other commands are queued they're merged into this one; filler
+      and false starts are dropped, and never remembered.</li>
+      <li><strong>Ask FastRule</strong> &mdash; the deterministic front door (rail box&nbsp;3, "rules
+      first"). It either <em>commits</em> an answer or <em>defers</em>.</li>
+      <li><strong>If FastRule commits</strong> &mdash; the answer is executed and returned to you
+      immediately (milliseconds, no AI model). Then, quietly in the background, <strong>the
+      judge</strong> (below) re-checks it and fixes or flags anything wrong. Done.</li>
+      <li><strong>If FastRule defers</strong> &mdash; the command enters the <em>deep track</em>, the
+      careful multi-step pipeline (steps 6&ndash;13, rail boxes&nbsp;2 and&nbsp;5&ndash;11).</li>
+      <li><strong>Repair the transcript</strong> (rail box&nbsp;2, "fix words") &mdash; fix mis-heard
+      words against your personal vocabulary.</li>
+      <li><strong>Segment</strong> (rail box&nbsp;5) &mdash; split the command into its separate
+      things: events, tasks, a schedule question. When unsure it <em>under-splits</em> &mdash; safer
+      to keep "Tal and Sam" together than to shatter a name.</li>
+      <li><strong>Decompose</strong> (rail box&nbsp;6, "split again") &mdash; break each of those into
+      <em>atomic</em> pieces: two times &rarr; two events, "buy 5 apples" &rarr; one task of five, a
+      recurrence &rarr; its cadence.</li>
+      <li><strong>Validate, a first pass</strong> (rail box&nbsp;7, "clean text") &mdash; the named
+      rules run on the plain words, before anything is turned into an action: stray brackets and
+      quotes stripped, a stutter collapsed, one bounded rewrite only when the words are clearly
+      damaged.</li>
+      <li><strong>Generate</strong> (rail box&nbsp;8, "make") &mdash; turn each atomic piece into a
+      concrete event or task. For each piece, <strong>ask FastRule first</strong>; call the AI model
+      only for the pieces FastRule can't read. If a piece still looks like two requests, it was never
+      atomic &mdash; send it back to step&nbsp;8 to be split again.</li>
+      <li><strong>Validate, a second pass</strong> (rail box&nbsp;9, "15 rules") &mdash; now on the
+      finished objects: impossible dates, am/pm, "until" vs. "through," round a recurrence and
+      <em>say so</em>, and &mdash; only when observance is turned on in settings &mdash; the Shabbat /
+      holiday rules for anything the system itself created.</li>
+      <li><strong>The judge</strong> (rail box&nbsp;10) &mdash; the AI reads the <em>original
+      words</em> and lists what was asked; the code compares that to what was produced and finds
+      anything missing, extra, or wrong. On a problem it goes back to whichever step caused it and
+      re-runs (at most three times in total).</li>
+      <li><strong>Label &amp; commit</strong> (rail box&nbsp;11) &mdash; colour and categorise
+      events, tag tasks, write it all to the calendar / task list, and answer.</li>
+    </ol>
+
+    <h3>The pieces it reuses</h3>
+    <p><strong>FastRule</strong> &mdash; the rule-based parser (used at step&nbsp;3, and again at
+    step&nbsp;10). Deterministic, no AI: it normalizes shorthand, routes on verb+object tables
+    ("remove"+calendar &rarr; delete an event), fills in dates/times, and scores its own confidence.
+    It <em>commits</em> only when confident <strong>and</strong> the parse is clean; otherwise it
+    <em>abstains</em> and hands off. It runs in two instances with different confidence bars &mdash;
+    strict at the front door (it's the whole, possibly-complex command, and the deep track is its
+    safety net), lenient on atomic fragments (they're simple, and the judge is the net). Its abstain
+    also carries a <em>reason</em>, and one of those reasons &mdash; "this still looks like two
+    requests" &mdash; doubles as the "is this atomic?" check at step&nbsp;10. Full mechanics under
+    <em>3&nbsp;&middot;&nbsp;rules first</em> and <em>4&nbsp;&middot;&nbsp;fork</em> below.</p>
+    <p><strong>The judge</strong> &mdash; the LLM crosscheck (used at step&nbsp;12, and again in
+    step&nbsp;4's background check). The one place the AI <em>checks</em> instead of <em>guesses</em>:
+    it extracts what the raw words asked for, and deterministic code diffs that against what was
+    produced. It runs inline in the deep track before committing, and in the background after every
+    FastRule commit &mdash; the same piece, so improving it improves both. When it disagrees it
+    renames a placeholder title silently, and for bigger corrections either applies them (once proven
+    precise enough) or flags them for one-tap review. Full mechanics under
+    <em>10&nbsp;&middot;&nbsp;judge</em> below.</p>
+    <p><strong>Decompose &amp; atomicity</strong> (step&nbsp;8, re-entered from step&nbsp;10). Breaks
+    a thing into atomic pieces using free deterministic rules, one bounded pass. Step&nbsp;10's
+    FastRule is what <em>detects</em> an incomplete break: a fragment that still reads as two
+    requests is sent back here to split again, bounded so it can't loop forever <em>(landing with the
+    current integration &mdash; this worktree's generate step doesn't yet wire that send-back)</em>.
+    Full mechanics under <em>5&nbsp;&middot;&nbsp;segment</em> and
+    <em>6&nbsp;&middot;&nbsp;split again</em> below.</p>
+    <p><strong>The honest fallbacks</strong> (inside step&nbsp;10). When a piece can't be parsed
+    cleanly, the system never invents: a task-shaped piece becomes a task of its own words
+    (<code>task_fallback</code>); an event-shaped piece with a real time-word but no title becomes a
+    plainly-named event (<code>event_kind_retry</code>, then <code>event_fallback</code>); and an AI
+    title using words the command never said is dropped rather than committed &mdash; structurally on
+    the rule path, by instruction on the model's.</p>
+    <p><strong>The background verifier</strong> (step&nbsp;4). After a fast commit, the judge reviews
+    it behind the answer already sent. Today it mostly <em>advises</em> (a fix is surfaced for one
+    tap) because auto-applying them once did more harm than good; the plan is to measure the judge's
+    correction precision and, once it's safely high, let it auto-apply.</p>
+
+    <h3>The fifteen actions</h3>
+    <p>One process holds the pipeline and two of the three models: the speech model and the grammar
     tagger both load inside it. The language model runs beside it and answers when asked.</p>
 
     <p>An action is one verb the assistant knows, and the list is closed &mdash; fifteen of them.
@@ -517,7 +626,7 @@ const P = {
     table.</p>`
   },
   hear: {
-    tag:"step 1 of 9", name:"hear", title:"It hears locally",
+    tag:"step 1 of 12", name:"hear", title:"It hears locally",
     z:[357,485,2.6],
     sum:`<p>Speech becomes text on the laptop's own GPU, from a model already on disk.</p>
     <p class="figs">Whisper base · 74M parameters · no network</p>`,
@@ -533,7 +642,7 @@ const P = {
     and a run of false starts teaches it that false starts are normal.</p>`
   },
   correct: {
-    tag:"step 2 of 9", name:"correct", title:"374 words the dictionary doesn't know",
+    tag:"step 2 of 12", name:"correct", title:"374 words the dictionary doesn't know",
     z:[352,183,2.9],
     sum:`<p>A personal word list of 374 entries. Each can fix a mishearing, expand shorthand, or carry a label the rest of the system uses.</p>
     <p class="figs">a fixed mishearing is remembered &mdash; next time it is an exact hit</p>`,
@@ -548,11 +657,76 @@ const P = {
     correction is the fallback, not the plan.</p>`
   },
   parse: {
-    tag:"step 3 of 9", name:"parse", title:"Rules first",
+    tag:"step 3 of 12", name:"parse", title:"Rules first",
     z:[352,211,2.9],
-    sum:`<p>Keyword rules read the sentence first and score how well they understood it. This step is arithmetic on words, and takes about a tenth of a second.</p>
+    sum:`<p>A fixed pipeline reads the sentence first: normalize its shorthand, route the verb to an action, fill its slots, score how well it understood it. All arithmetic on words, about a tenth of a second.</p>
     <p class="figs">76 verbs &#183; 9 of the 15 actions reachable this way</p>`,
-    more:`<p>The score starts at the fraction of required slots filled, then pays for its
+    more:`<p>Four things happen before any score exists, in a fixed order, and every one of them
+    is arithmetic on the words themselves &mdash; nothing here calls the model:</p>
+    <svg viewBox="0 0 390 48" role="img" aria-label="The rule parser's four phases in order: normalize the transcript against a shorthand table, route the verb and domain to an action, score the filled slots against their doubts, then gate the result at fast_propose &mdash; the step covered next.">
+      <defs><marker id="pf" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker></defs>
+      <g font-size="8">
+        <rect x="0" y="4" width="84" height="40" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+        <text x="42" y="21" text-anchor="middle" font-weight="600">NORMALIZE</text>
+        <text x="42" y="35" text-anchor="middle" font-size="7" fill="var(--muted)">shorthand table</text>
+
+        <path d="M 88 24 L 100 24" stroke="var(--line)" stroke-width="1.2" marker-end="url(#pf)" color="var(--line)"/>
+
+        <rect x="104" y="4" width="84" height="40" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+        <text x="146" y="21" text-anchor="middle" font-weight="600">ROUTE</text>
+        <text x="146" y="35" text-anchor="middle" font-size="7" fill="var(--muted)">verb + domain</text>
+
+        <path d="M 192 24 L 204 24" stroke="var(--line)" stroke-width="1.2" marker-end="url(#pf)" color="var(--line)"/>
+
+        <rect x="208" y="4" width="84" height="40" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+        <text x="250" y="21" text-anchor="middle" font-weight="600">SCORE</text>
+        <text x="250" y="35" text-anchor="middle" font-size="7" fill="var(--muted)">slots, then doubts</text>
+
+        <path d="M 296 24 L 308 24" stroke="var(--line)" stroke-width="1.2" marker-end="url(#pf)" color="var(--line)"/>
+
+        <rect x="312" y="4" width="78" height="40" rx="4" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.3"/>
+        <text x="351" y="21" text-anchor="middle" font-weight="600" fill="var(--amber)">GATE</text>
+        <text x="351" y="35" text-anchor="middle" font-size="7" fill="var(--amber)">step 4, next</text>
+      </g>
+    </svg>
+    <figcaption>The first three boxes are this step, all inside <code>rule_parser.py</code>; the
+    fourth is <code>generate.py</code>'s <code>fast_propose</code> deciding whether to trust the
+    score &mdash; covered next.</figcaption>
+    <pre><code>"add meeting w/ sam tmrw at 3"
+  normalize &#8594; "add meeting with sam tomorrow at 3"
+  route     &#8594; ("add", "calendar") &#8594; create_event   ("meeting" names the domain)
+  slots     &#8594; title / date / start_time all filled &#8594; score 1.00
+  gate      &#8594; &ge; 0.8, nothing missing, no compound cue &#8594; commit now
+</code></pre>
+
+    <p><strong>Normalize.</strong> A short table of regex aliases expands dictation shorthand
+    before anything else runs: <code>mtg</code> becomes meeting, <code>w/</code> becomes with,
+    <code>tmrw</code> becomes tomorrow, a bare weekday abbreviation becomes the full day name. It
+    runs on the transcript itself, before spaCy ever tags it, so a mishearing fixed here is fixed
+    for every phase after it.</p>
+
+    <p><strong>Route.</strong> A 76-entry table keyed on <code>(verb, domain)</code> pairs picks
+    the action &mdash; a domain-specific entry wins when one exists, otherwise the verb falls back
+    to what it means everywhere:</p>
+    <pre><code>("remove", "calendar")  &#8594; delete_event
+("add",    "todo")      &#8594; create_todo
+("show",   "calendar")  &#8594; query_schedule
+("buy",    None)        &#8594; create_todo   # no domain entry: buying is always a task
+</code></pre>
+    <p>The domain itself &mdash; calendar or todo &mdash; comes from keywords already in the
+    sentence ("meeting", "task", "list"); only when neither side speaks up does it fall back to
+    whichever screen happens to be open, which is exactly the &times;0.85 doubt below.</p>
+
+    <p><strong>Fill slots.</strong> Dates and times go through a dedicated recognizer, with regex
+    fallbacks for what it misses ("noon", a bare "at 3"); a title is picked from the sentence's own
+    noun chunks &mdash; the direct object first, then the object of a preposition, then simply the
+    chunk closest to the verb &mdash; with every temporal word carved out first, so a time is never
+    mistaken for part of a title. Which slots count as "filled" depends on the action: creating an
+    event needs a title, a date and a start time, while updating or deleting one is satisfied by
+    naming the event <em>or</em> giving the time that pins it down &mdash; either is enough.</p>
+
+    <p>The score starts at the fraction of required slots filled, then pays for its
     doubts:</p>
     <div class="tblwrap"><table>
       <tr><th class="num">factor</th><th>doubt</th></tr>
@@ -564,30 +738,66 @@ const P = {
     </table></div>
     <p>These multipliers are hand-picked and have never been calibrated against outcomes. Worth
     saying plainly: the threshold works in practice — the next step has the measurements — but
-    nobody has verified that 0.80 is the right price for a pronoun.</p>`
+    nobody has verified that 0.80 is the right price for a pronoun.</p>
+
+    <p>What comes out is more than one number. A clause the verb table couldn't route at all is
+    counted as a <strong>dropped span</strong> and discounts the whole result by another &times;0.7
+    on top of its own doubts; any required field still empty is named outright as a
+    <strong>missing slot</strong> ("date", "match_title") rather than folded silently into a lower
+    score. Step 4 reads both of those, not just the score itself &mdash; what it is confident about,
+    and exactly what, if anything, it is still unsure of.</p>`
   },
   route: {
-    tag:"step 4 of 9", name:"route", title:"The fast lane — parallel, not instead",
+    tag:"step 4 of 12", name:"route", title:"The fork — parallel, not instead",
     z:[310,239,2.4],
-    sum:`<p>Two lanes in parallel. A confident rule parse (&ge; 0.85, nothing missing) answers <em>instantly</em>, and the deep pipeline runs behind that answer as its verifier. Anything uncertain takes the deep pipeline in front of you instead.</p>
+    sum:`<p>Two lanes in parallel. A confident rule parse (&ge; 0.8, nothing missing) answers <em>instantly</em>, and the deep pipeline runs behind that answer as its verifier. Anything uncertain takes the deep pipeline in front of you instead.</p>
     <p class="figs">fast: instant &#183; deep: seconds &mdash; every command gets the deep look either way</p>`,
-    more:`<p>Measured on the 94-command corpus (ASSISTANT_AUDIT_SUMMARY.md, runs 10&ndash;12):</p>
+    more:`<p>A perfect score is necessary but not sufficient. Three narrow checks run right after
+    it and can still send a confident, complete parse to the deep track instead &mdash; the fast
+    lane refuses rather than guesses, the same instinct that governs deleting anywhere in this
+    system:</p>
+    <div class="tblwrap"><table>
+      <tr><th>the check</th><th>what it catches</th></tr>
+      <tr><td>a strong-compound cue</td><td>wording that all but announces a second request
+      &mdash; "&#8230;at 9am, and then remind me&#8230;" &mdash; even when the rules themselves
+      read it as one</td></tr>
+      <tr><td>a generic-target veto</td><td>a mutation aimed at a bare noun: "delete the
+      reminder", "update this list" &mdash; neither names an actual event or task to act on</td></tr>
+      <tr><td>a mixed-mode compound</td><td>a confident multi-intent read that pairs a create
+      with an edit, delete or query on compound wording &mdash; "add milk, and then update the
+      workout list" reads as create_todo plus update_todo, and which half is really meant is a
+      judgment call, not a table lookup</td></tr>
+    </table></div>
+    <p>Each of the three is a regex or a name check against words already in hand, not a second
+    model call &mdash; the fast lane can only refuse in the same arithmetic register it committed
+    in. Fail any one and the command takes the deep track exactly as if the score itself had come
+    back low.</p>
+
+    <p>Measured on the 94-command corpus (ASSISTANT_AUDIT_SUMMARY.md, runs 10&ndash;12):</p>
     <div class="tblwrap"><table>
       <tr><th>track</th><th class="num">commands</th><th class="num">correct</th><th class="num">median</th></tr>
       <tr><td>fast &mdash; rules answer, pipeline checks behind</td><td class="num">39</td><td class="num">97%</td><td class="num">~0.1 s</td></tr>
       <tr><td>deep &mdash; pipeline in front of you</td><td class="num">55</td><td class="num">87%</td><td class="num">6.6 s</td></tr>
     </table></div>
     <p>The threshold buys speed, not autonomy: a fast answer is still compared against your words
-    afterwards (step&nbsp;8), and a patch it proposes is advisory &mdash; measured caution from the
-    days when an always-on checker proposed much and fixed nothing.</p>
+    afterwards, by the judge running behind it in the background (step&nbsp;10), and a patch it
+    proposes is advisory &mdash; measured caution from the days when an always-on checker proposed
+    much and fixed nothing.</p>
     <p>The score is stored with every command. Keeping it is what makes the line itself checkable:
     group judged commands by the score they were given and see how often each group turned out
-    right &mdash; the only way to know whether 0.85 sits in the right place.</p>`
+    right &mdash; the only way to know whether 0.8 sits in the right place.</p>
+
+    <p>Put together, the fast lane is not the deep pipeline's rough draft running faster on easy
+    inputs &mdash; it is a narrow specialist that only ever answers on shapes it is sure of (a
+    single query, a single remove, a single clean create) and hands over anything carrying a
+    second request or an unresolved target rather than take a guess at it. The 97% above is what
+    that selectivity buys: nothing here is graded on partial credit for a compound it chose to
+    walk away from instead of touching.</p>`
   },
   split: {
-    tag:"step 5 of 9", name:"split", title:"One sentence, several asks",
-    z:[352,267,2.9],
-    sum:`<p>The command is split into its independent items &mdash; and each item split again if it is really several. "Walk the dog at 9 and 2:30" is two events; "buy milk, eggs and bread" is one task per thing; "buy 5 apples" is one task, times five.</p>
+    tag:"step 5 of 12", name:"split", title:"One sentence, several asks",
+    z:[352,245,2.9],
+    sum:`<p>The transcript is split into its separate asks &mdash; an event, a task, a schedule question &mdash; each becoming its own item before anything is parsed. "Book a meeting tomorrow and remind me to call mom" becomes two items, an event and a task; what each item turns out to BE, several times over, is the next step.</p>
     <p class="figs">biased to under-split &mdash; a wrong merge is recoverable, a wrong split is not</p>`,
     more:`<p>Free separators go first &mdash; brackets from a queued phone backlog, the configured
     spoken separator. Only when the words themselves suggest a compound is the model asked, and
@@ -601,12 +811,55 @@ const P = {
     were the old brain's blind spot, and the measured gap is largest exactly there
     (ASSISTANT_AUDIT_SUMMARY.md, the full-3000 comparison).</p>`
   },
+  decompose: {
+    tag:"step 6 of 12", name:"decompose", title:"One thing, several occurrences",
+    z:[352,266,2.9],
+    sum:`<p>Each item is broken into its atomic pieces, in one bounded pass: "walk the dog at 9 and 2:30" is two events; "buy milk, eggs and bread" is one task per thing; "buy 5 apples" is one task, times five.</p>
+    <p class="figs">one pass only &mdash; an item can be split once, never split again from what it became</p>`,
+    more:`<p>Three deterministic readings, no model here yet:</p>
+    <ul>
+      <li><strong>Two spoken times.</strong> "at 9am and 2:30pm" for the same activity is
+      recognised only in that narrow shape &mdash; two clock times joined by "and", right after
+      "at" &mdash; because "with Tal and Sam" must never split.</li>
+      <li><strong>A task list.</strong> Rides the same string rules the "several things at once"
+      panel documents for titles: commas always separate, "and" separates unless a preposition
+      just before it already opened the phrase the conjunction is joining, and idioms are
+      protected.</li>
+      <li><strong>A quantity.</strong> "buy 5 apples" is read as one task carrying a count of
+      five, not five identical rows &mdash; a model with no way to say "five" would otherwise
+      write the task five times, and five identical rows make it impossible to tell which one you
+      ticked.</li>
+    </ul>
+    <p>Bounded to one pass: an item's id can go one level deep ("item_1-2") and no deeper. If a
+    piece the rules still can't finish reading looks like more than one thing once it reaches the
+    model, it is read as-is rather than sent back here for a second attempt &mdash; a bounded
+    re-split loop there is a proposed refinement, not something this build does.</p>`
+  },
+  cleantext: {
+    tag:"step 7 of 12", name:"cleantext", title:"Tidied before it's read",
+    z:[352,287,2.9],
+    sum:`<p>Before anything is turned into an action, the plain text gets a pass: stray brackets and quotes stripped, doubled whitespace collapsed, a stuttered word collapsed &mdash; "the the meeting" becomes "the meeting".</p>
+    <p class="figs">deterministic first &mdash; the model is asked only when the words look clearly damaged</p>`,
+    more:`<p>Four cheap, deterministic fixes run on every item's own text first: dictation brackets
+    and stray quotes around a single word are stripped &mdash; they carried no meaning your words
+    didn't already have ("add 'christmas' to calendar" once died on the quote marks alone) &mdash;
+    doubled whitespace collapses, and a repeated word collapses to one ("the the meeting"
+    &rarr; "the meeting").</p>
+    <p>Only when the text still matches a pattern for clearly garbled speech is one LLM rewrite
+    asked for at all &mdash; and even then it's checked before it's trusted: a rewrite that grew
+    the text invented content, one that shrank it ate the command, so either is rejected and the
+    original stands.</p>
+    <p>Nothing here calls the model unless that narrow gate fires. What still slips through is
+    caught later &mdash; by the same-shaped named rules running again after generate
+    (step&nbsp;9), and by the judge (step&nbsp;10) if it still doesn't match the words.</p>`
+  },
   check: {
-    tag:"step 6 of 9", name:"check", title:"Fifteen named rules",
-    z:[352,295,2.9],
-    sum:`<p>Fifteen deterministic rules, each with a name and its own test &mdash; a date already past, an end before its start, a question that must not create.</p>
+    tag:"step 9 of 12", name:"check", title:"Fifteen named rules",
+    z:[352,329,2.9],
+    sum:`<p>Fifteen deterministic rules, each with a name and its own test, run on the finished objects right after make &mdash; a date already past, an end before its start, a question that must not create.</p>
     <p class="figs">no model involved &#183; every applied fix is shown in the trace under its name</p>`,
-    more:`<p>Among them:</p>
+    more:`<p>These run on what make just produced, not on the raw words &mdash; the plain-text pass
+    (step&nbsp;7) already tidied the transcript; this pass fixes the fields. Among them:</p>
     <div class="tblwrap"><table>
       <tr><th>what it catches</th><th>the ruling</th></tr>
       <tr><td>a date in the past</td><td>"Monday", said on a Wednesday, means next Monday</td></tr>
@@ -627,9 +880,33 @@ const P = {
     produced 106 events &mdash; not one of them on a Sunday or a Tuesday.</p>`
   },
   write: {
-    tag:"step 7 of 9", name:"write", title:"Make it, write it, label it",
-    z:[300,323,2.3],
-    sum:`<p>Written to a file on the disk, and the answer comes straight back. Which table depends on which action the parse chose &mdash; an event and a task take the same route here.</p>
+    tag:"step 8 of 12", name:"write", title:"Make it — rules first, model for the rest",
+    z:[300,308,2.3],
+    sum:`<p>Each atomic piece becomes a concrete event or task. The rules read it first, free; the model is asked only about what the rules can't, grounded on that one piece's own words and never a neighbour's.</p>
+    <p class="figs">9 of the 15 actions reachable by rule alone &#183; the model for the rest</p>`,
+    more:`<p>Which table it becomes depends on which action was produced &mdash; and the choosing
+    happens per item: the rules read each item first (free, a tenth of a second) and the model
+    reads what they could not. An item the splitter judged a task that comes back unreadable
+    still becomes the task its words are; an item judged an event gets one re-read before it is
+    allowed to vanish.</p>
+
+    <p>When a piece still can't be read cleanly, the system does not invent one. A task-shaped
+    item that parses to nothing becomes a task titled with its own words; an event-shaped item
+    that literally asks to set an event, reminder or appointment, with a real time-word grounding
+    it, becomes a plainly-titled event &mdash; tried only after that one re-read has already
+    failed to find an event in it. And a collective title standing in for several items is
+    avoided structurally on the rule path (one shared verb, split by string rules) and by
+    instruction on the model's, which is told explicitly, in its own prompt, never to summarise
+    several asks into one invented title.</p>
+
+    <p>What comes out of this step is not yet written anywhere &mdash; the fifteen named rules
+    (step&nbsp;9) and the judge (step&nbsp;10) both still get a look at it before it is
+    committed, coloured and tagged at step&nbsp;11.</p>`
+  },
+  label: {
+    tag:"step 11 of 12", name:"label", title:"Written, coloured, tagged",
+    z:[352,371,2.3],
+    sum:`<p>Once the judge has nothing left to blame, everything is written to a file on the disk and the answer comes straight back. Which table depends on which action the parse chose &mdash; an event and a task take the same route here.</p>
     <p class="figs">one SQLite file &#183; yours, on your machine</p>`,
     more:`<p>One file, twenty-one tables. Events and tasks are two of them, alongside timers, counters, courses, assignments and training plans.</p>
     <svg viewBox="0 0 380 208" role="img" aria-label="The nineteen columns of one event row, grouped by what fills them: nine come from what you said, three the system decides, three are bookkeeping, and four exist only for syncing with a hosted calendar.">
@@ -671,23 +948,17 @@ series_id   NULL
     <p>The end time is a default and the two below it are the system classifying its own record so
     the calendar can colour it. A task is the same idea across sixteen columns, six of them yours.</p>
 
-    <p>Which table depends on which action was produced &mdash; and the choosing happens per
-    item: the rules read each item first (free, a tenth of a second) and the model reads what
-    they could not. An item the splitter judged a task that comes back unreadable still becomes
-    the task its words are; an item judged an event gets one re-read before it is allowed to
-    vanish. Labelling rides the same write &mdash; a category and colour for an event, a tag for
-    a task, adjacent events never coloured alike.</p>
+    <p>Labelling rides the same write &mdash; a category and colour for an event, a tag for a
+    task, adjacent events never coloured alike.</p>
 
     <p>A repeating event is stored as ordinary rows sharing a series id, so every query stays a
     plain date lookup and a day that should be skipped is simply never written.</p>
-    <p>A task also carries a count. Asked for five of something, a model with no way to say
-    "five" writes the task five times, and five identical rows make it impossible to tell which
-    one you ticked. Counts are read from the words instead &mdash; an explicit multiplier, or a
-    number after a verb that implies buying a quantity &mdash; and stored in one column.</p>`
+    <p>A task also carries the count decided back at step&nbsp;6, in one column &mdash; never as
+    several identical rows.</p>`
   },
   review: {
-    tag:"step 8 of 9", name:"review", title:"Compared against your words",
-    z:[352,351,2.9],
+    tag:"step 10 of 12", name:"review", title:"Compared against your words",
+    z:[352,350,2.9],
     sum:`<p>The model lists what your words asked for &mdash; it is never asked "were you right?". Code compares that list against what was produced; a miss re-runs the stage that lost it, at most three times, and the third strike is admitted in the reply.</p>
     <p class="figs">extraction, not self-grading &#183; a fixed map decides which stage re-runs</p>`,
     more:`<p>Small local models extract far more reliably than they judge, so the check is built
@@ -701,7 +972,7 @@ series_id   NULL
     <p class="figs">runs 10&ndash;12 of the 94-command corpus: findings on 4 commands &#183; loop-backs on 3 &#183; broke 0</p>`
   },
   learn: {
-    tag:"step 9 of 9", name:"learn", title:"Remembered, not retrained",
+    tag:"step 12 of 12", name:"learn", title:"Remembered, not retrained",
     z:[397,400,2.4],
     sum:`<p>Every command is remembered with what it produced and what you made of it. The model itself never changes &mdash; and right now the memory informs the person, not the prompt.</p>
     <p class="figs">retrieval ships off &mdash; measured, not assumed</p>`,
@@ -1065,7 +1336,8 @@ series_id   NULL
     it is here because a system that cannot be checked is only believed.</p>`
   }
 };
-const ORDER = ["brain","hear","correct","parse","route","check","write","review","learn",
+const ORDER = ["brain","hear","correct","parse","route","split","decompose","cleantext","write",
+               "check","review","label","learn",
                "models","window","hud","tracelog","batch","queue","link","phone","sun","cloud","offline","online","bench"];
 
 const stage = document.getElementById("stage");
