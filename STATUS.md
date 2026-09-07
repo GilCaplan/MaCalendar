@@ -102,7 +102,9 @@ own 6,000 (80–20 by family) + external corpora as train-side augmentation
 only. Three sources, three roles — A real pool = calibration, B generated =
 structure supervision (dual-gate rule: win on B-train AND no regress on A),
 C external = wording coverage after a conventions pass. Test results never
-drive improvement (tooling-enforced, aggregates only). Lane order: FS1
+drive improvement (tooling-enforced, aggregates only). **Every 10th cycle =
+a sealed-test milestone run on the main engine — pure eval, one aggregate
+line in RESULTS, first at era-2 cycle 10.** Lane order: FS1
 scorer → FS2 baseline → F6 gate-supervision → K1b/K2 → R2 → EXT1.
 
 **Era 2 opens with the joint confirmation run** (Gil, 2026-09-06): cycle

@@ -88,6 +88,20 @@ fresh FastRule baseline on B-train → gate-supervision batches (dual-gated)
 → K1 retrain + R2 calibration on A → external adoption as C sets clear
 their conventions pass.
 
+## The every-10-cycles milestone test (Gil, 2026-09-07)
+
+**Every 10th era cycle** (cycle 10, 20, 30…), run the sealed test on the
+main engine: `python -m scripts.engine_dataset_compare --limit 0 --test`.
+Pure evaluation — nothing else: no change rides the run, no hypothesis comes
+from it, the tooling emits aggregates only, and the result is recorded as a
+single MILESTONE line in RESULTS.md (all six metrics, labeled "milestone —
+sealed test") for Gil. It answers exactly one question — is the training
+progress real off the training pool? — and its slope across milestones is
+the honest generalization trajectory. If a milestone disappoints, the
+response is defined in advance: more training-pool mining, never a look at
+which test rows failed. First milestone: era-2 cycle 10 (currently at
+cycle 4).
+
 ## Eras — history kept, comparisons reset at big system changes (Gil, 2026-09-06)
 
 When the system undergoes a large structural change (the 2026-09-07 FastRule
