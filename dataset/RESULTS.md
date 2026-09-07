@@ -21,7 +21,22 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
-## Era-2 cycle 2 — REGISTERED PREDICTION 2026-09-07, before the run
+## Era-2 cycle 2 — ACTUAL (run 18, 2026-09-07)
+
+**Mechanism confirmed, aggregate flat — prediction half met.** The direct
+evidence is clean: the targeted rows are GONE from the misses (the party-in-
+NY/conversation-with-Greg compound completes; items created 217→218, when-
+coverage 71→73). But the predicted +1–2 aggregate rows didn't survive the
+noise: e+e stayed 67% (a different row jittered out this run) and raw stayed
+78.0. Adjusted 80.0 · F1 81.3 · routing identical 163/87 · p50 7.8s.
+
+**Verdict: KEEP** (real bug, unit-tested, row-level proof) — but scored
+honestly as board-neutral. Lesson re-learned: a 1–2 row hypothesis on
+dev-fast is AT the noise floor; the next hypothesis should target a fatter
+family (R1's coordination module, dev-full gate) or measure on the slice
+where the family is dense.
+
+### The registered prediction (kept for the record)
 
 **Change:** all-day-speak coercion in CalendarIntent (the LLM answers a
 dated-no-clock ask with the WORDS — start_time="all day" — and the HH:MM

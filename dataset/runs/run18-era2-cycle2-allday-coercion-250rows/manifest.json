@@ -1,0 +1,30 @@
+{
+ "loop_run": null,
+ "label": "auto-20260907T0045-250rows",
+ "source": "/var/folders/0f/nk3dnvrd54jbjz_qn40_ynwh0000gn/T/engine_compare_kupisaxp",
+ "source_mtime": "2026-09-07T00:45:03",
+ "archived_at": "2026-09-07T04:45:03+00:00",
+ "n_rows": 250,
+ "parse_paths": {
+  "fast": 87,
+  "deep": 163
+ },
+ "row_ts_range": [
+  1772903595.062312,
+  1774198010.973311
+ ],
+ "files": {
+  "engine_run.db": {
+   "md5": "cfba40507274091c52c8bd7c52da6bac",
+   "bytes": 159744
+  },
+  "calendar.db": {
+   "md5": "fcddcc0245c85c4ac92a7e36a20051f5",
+   "bytes": 344064
+  },
+  "trace_bus.jsonl": {
+   "md5": "44eb6089ead30127695e184d3f2429c2",
+   "bytes": 554083
+  }
+ }
+}
