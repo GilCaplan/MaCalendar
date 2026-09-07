@@ -1419,3 +1419,34 @@ is now FASTER than before the feature landed (the guard short-circuits the
 rules gate too), and the atomicity board and product-shape board are
 byte-identical after a refit. A cost worth measuring, and worth measuring
 again after removing it.
+
+## Pre-loop change #2 — "rules and models both vote" — NEGATIVE, reverted
+
+**Dataset:** FastRule 7,200 test half. **Change tested:** when the rules
+reach an answer, consult the trained router anyway; on a confident
+disagreement apply a confidence penalty so the parse defers instead of
+committing a coin-flip. The audit's rationale was sound — 100% of
+committed-but-wrong atomic rows are operation/kind errors made CONFIDENTLY
+by a rule, so the models are never consulted on exactly the rows they might
+save.
+
+**Result at three penalty weights, judged on correctly-handled overall
+(handle rate × correct-on-handled — what fraction of atomic items FastRule
+both acts on AND gets right):**
+
+| penalty | handle rate | correct-on-handled | correctly-handled |
+|---|---|---|---|
+| none (baseline) | 58.4% | 71.6% | **41.8%** |
+| ×0.90 | 50.4% | 71.3% | 35.9% |
+| ×0.70 | 46.3% | 76.8% | 35.6% |
+
+Every weight is a net LOSS. The reason is measurable and was in front of us:
+the routers' own test-half macro-F1 is 72.4 (operation) and 85.7 (kind) —
+**not better than a confident rule**, so their disagreement is noise more
+often than signal. A doubt signal is only worth having when the doubter is
+the better judge; for ATOMICITY the model demonstrably is (recall 87.9% vs
+the rules' ~36%), which is why that rewiring worked and this one does not.
+
+**Reverted.** The idea is not dead — it becomes viable if the operation and
+kind models reach the atomicity model's standard. Banked so no future cycle
+re-tries it blind.
