@@ -46,6 +46,19 @@ eval):** kind macro-F1 82.6 → 86+; operation macro-F1 73.4 → 78+ (query P
 57 → 70+, remove F1 62 → 70+); downstream test simple commit 72.0 → 73–75%
 at ≥92% correct; A-pool dual-gate within ±0.5 of 94.3.
 
+## F14 (model iteration 3 — the data lever) — REGISTERED PREDICTION 2026-09-07
+
+**Change:** training-data variety, features untouched. The fit ingests the
+A-pool's conventioned rows alongside B-train (sealed-300 texts excluded by
+load_test_split; train-side only): kind labels via the K1 derivation
+(calendar/set→event, lists/createoradd→task, e+e→event, t+t→task) and
+operation labels for the classes A can teach (set/createoradd→new,
+query→query, remove→remove — hundreds of REAL wordings for exactly the two
+starved classes). **Predict (B-test eval):** query F1 62 → 72+, remove F1
+62 → 70+, operation macro-F1 73.4 → 78+; kind macro-F1 82.6 → 85+;
+downstream test simple commit 72.0 → 73–76% at ≥92%; A-pool dual-gate
+IMPROVES or holds (the models now speak A's dialect).
+
 ## F13 — ACTUAL (2026-09-07): NEGATIVE on both fronts, banked
 
 (a) Kind on segment's "proven" regexes REGRESSED on test (82.6 → 80.5;
