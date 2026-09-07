@@ -24,6 +24,22 @@ needing one is marked **[Gil]** and is blocked until asked.
 
 ## The queue
 
+**NEXT UP (2026-09-07, after the stage-isolation phase):**
+- **[engine] A clean sealed-300 run** — the last one was partial and its
+  latency was inflated by a bug since fixed. This is the baseline the
+  resumed cycles are judged against.
+- **[fast] ACCURACY, not coverage** — correct-on-handled has been ~72%
+  through 13 batches while handle-rate climbed 8 points. The failures are
+  operation/kind misroutes made CONFIDENTLY by rules, so the models are
+  never consulted: wire rules-and-models-both-vote, and treat a confident
+  disagreement as a defer signal (the Q10 design, still unbuilt).
+- **[engine] Remove the retired brain's verifier** (~200 lines in
+  intent/parser.py, no callers — engine audit).
+- **[fast] Half-executed compounds 31 → 0** — the only non-atomic number
+  that matters per Q13.
+- **[engine] Answer the audit's 7 questions** (DOCUMENTATION/ENGINE_AUDIT.md
+  §4) — several are Gil calls.
+
 **LANE PRIORITY (Gil, 2026-09-07): SIMPLE FIRST.** FastRule focuses on
 single-request add/edit/remove/complete/query — the felt-latency surface —
 before any further complex-tier tuning. Working target: simple-tier commit

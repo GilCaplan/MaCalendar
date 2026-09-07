@@ -26,6 +26,13 @@
 | Background verify + patch tiers (`_background_verify`) | `engine/__init__.py` |
 | Gate learning (`learn_from_edit`, `confirm_unchanged`, confirms sidecar) | `engine/transcript.py` |
 | Shared LLM transport (`call_json`, MACALENDAR_LLM_DISABLED guard) | `engine/llm.py` |
+| FastRule — the atomic-item executor (Atomicity / Gatekeeper / Scorer) | `engine/fastrule.py` |
+| The three routing classifiers + one shared LogisticModel | `intent/classifier.py` |
+| Lead-time reader (shared by FastRule AND decompose — one copy) | `intent/lead_time.py` |
+| Recurrence as a SLOT (cadence, rounding, series anchor) | `intent/recurrence.py` |
+| NP- vs clause-coordination (a feature, and a gate) | `intent/coordination.py` |
+| FastRule's product-shape board / the atomicity board | `scripts/fastrule_shape.py`, `scripts/atomicity_board.py` |
+| Fit the routing models (train halves only, deterministic) | `scripts/fit_route_models.py` |
 | Per-stage live gates | `scripts/engine_stage_check.py` |
 | K1 kind scorer — fit + offline eval (16 explainable weights; wiring = K2) | `scripts/kind_classifier_experiment.py` |
 | Mac gate dialog (`ask_transcript_edit`, STATUS_EDIT) | `calendar_ui/window.py`, `pipeline.py` |

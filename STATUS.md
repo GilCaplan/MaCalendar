@@ -97,6 +97,18 @@ hand-written audit corpus is now only a regression floor.
 
 ## Plan of record
 
+**LOOP STATE (2026-09-07).** Stage isolation closed; whole-engine cycles
+resume. FastRule: 13 batches, atomic handle-rate 49.7 → 58.4% and
+half-executed compounds 40 → 31 on its own test half; the atomicity model
+now LEADS layer 0 (compound recall 68.8 → 87.9%). Engine: the deferral
+contract (REFUSAL / STRUCTURE / INCAPACITY) is live, FastRule's verdict
+travels forward to segment, background-verify no longer fires in
+measurement runs, 137 duplicated lines gone. Last engine read: a PARTIAL
+sealed-test eval (163 of 300 rows) at raw 85% / adjusted 83%, complex 69%,
+fast-path 94% — encouraging but partial, and its latency was inflated by
+the background-verify bug now fixed. **NEXT: a clean full run on the sealed
+300 for a trustworthy board, then cycles resume against it.**
+
 **STAGE ISOLATION (Gil, 2026-09-07) — see DOCUMENTATION/STAGE_ISOLATION_PLAN.md.**
 Engine cycles paused. Order: (1) FastRule dataset+metrics right — defers on
 non-atomic, creates otherwise; (2) every other stage tested in isolation

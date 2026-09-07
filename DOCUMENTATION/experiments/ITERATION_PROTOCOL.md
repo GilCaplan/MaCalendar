@@ -102,7 +102,29 @@ response is defined in advance: more training-pool mining, never a look at
 which test rows failed. First milestone: era-2 cycle 10 (currently at
 cycle 4).
 
-## PAUSED: whole-engine cycles (Gil, 2026-09-07)
+## Where the loop stands (2026-09-07, end of the stage-isolation phase)
+
+Stage isolation did its job: FastRule was given its own dataset, its own
+product-shape metric and 13 measured batches; the engine's architecture was
+audited and three real defects fixed (the deep track undoing FastRule's
+vetoes, background-verify ignoring the no-daemon flag, 137 duplicated
+lines). **Whole-engine cycles RESUME from here**, with two changes to how
+they are judged:
+
+1. **Two boards, not one.** A change to FastRule is judged on the FastRule
+   7,200's test half FIRST (`scripts/fastrule_shape.py` — atomic handle-rate
+   and correct-on-handled are primary; the non-atomic bucket is diagnostic
+   per Gil's Q13), and only then on an engine run.
+2. **The dual gate still binds**: no FastRule batch ships if it regresses
+   the real-usage pool, and no engine cycle counts until a full run prices
+   the routing shift it causes.
+
+**The standing weakness to aim at** (measured, FastRule 7,200 test half):
+correct-on-handled has sat at ~72% all through the batches — every gain has
+come from COVERAGE, none from accuracy on what it reads. One atomic item in
+four is still handled wrongly. That, not handle rate, is the next target.
+
+## Superseded: the pause on whole-engine cycles (Gil, 2026-09-07)
 
 Cycle running is suspended in favour of STAGE ISOLATION
 (`DOCUMENTATION/STAGE_ISOLATION_PLAN.md`). Everything in this protocol

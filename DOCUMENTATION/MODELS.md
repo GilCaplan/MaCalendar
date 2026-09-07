@@ -51,6 +51,26 @@ free-JSON call (`_call_ollama_verify`) and are parsed defensively.
 model than the parser — it is `null` today, meaning both jobs use 8B. If the
 harness ever shows the self-check is the weak link, that is the knob.
 
+## The three routing classifiers (`assistant/intent/classifier.py`)
+
+All three share one `LogisticModel` object — features, fit, predict-with-
+margin, per-class P/R/F1 — because the same regression previously existed in
+four copies. **Fitted** with scikit-learn (a DEV dependency only: L-BFGS, L2,
+class-balanced); **inference** is a hand-written dot product over JSON
+weights, so the shipped engine imports no ML stack and stays inside
+FastRule's ~50ms budget. Weights are fitted on TRAIN halves only and
+committed like any other constant.
+
+| model | decides | test-half macro-F1 | where it runs |
+|---|---|---|---|
+| **atomicity** | one item, or several? | 87.6 (compound recall 87.9%) | layer 0 — it LEADS, the rule gates override for their own catches |
+| operation | new / edit / remove / complete / query | 72.4 | the routing fallthrough, behind margin floors |
+| kind | event or task | 85.7 | the routing fallthrough, behind margin floors |
+
+Measured lesson: the atomicity model was wired as a last resort and the
+layer containing it scored WORSE than the model alone (compound recall 68.8%
+vs 83.4%) — good pieces wired timidly perform like bad pieces.
+
 ## The kind scorer — the stack's first TRAINED component (K1, status: experiment)
 
 A 16-weight logistic regression for the event-vs-task kind decision

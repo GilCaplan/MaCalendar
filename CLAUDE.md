@@ -167,6 +167,29 @@ features and cleanups happen in the `../MACalendar-app` worktree (branch
 never during a run. (Gil, 2026-09-06 — after two suites racing through a
 shared personal store surfaced exactly this class of accident.)
 
+## FastRule's verdict is a contract, not a suggestion
+
+`FastRule` is the ATOMIC-ITEM EXECUTOR (one event or task, ~50ms, no model);
+the deep system is the ATOMIZER (it splits until items are atomic, then
+hands each back). When FastRule declines, `fastrule.reason_class()` says
+what the deep track owes it:
+
+- **REFUSAL** (generic-target, rename-misroute, interrogative-create) — a
+  correct reading that must not execute as stated. The LLM may **resolve**
+  it (anaphora → a real title); it must never overturn it by handing back
+  the same empty target. **This was a real bug**: the per-item path
+  re-implemented the commit test with the gates omitted and re-committed
+  what the front door had vetoed.
+- **STRUCTURE** (the compound gates) — more than one item; split further.
+- **INCAPACITY** (below-threshold, missing-slots, skip) — the LLM takes over,
+  and receives FastRule's partial parse rather than starting cold.
+
+**A deferral never wastes the work** (Gil, 2026-09-07): `state.fastrule_
+verdict` carries the reason, its class and the confidence forward, and
+segment uses it as both evidence and prompt grounding. **And FastRule is
+DETERMINISTIC** — a loop-back on unchanged text cannot get a new answer, so
+`state.asked_fastrule` sends it straight to the model instead.
+
 ## Where we are working right now (2026-09-07)
 
 **STAGE ISOLATION mode — whole-engine cycles are PAUSED** (Gil). Each stage
