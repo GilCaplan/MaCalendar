@@ -21,6 +21,21 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## F7 (simple-first batch 1) — REGISTERED PREDICTION 2026-09-07, before implementation
+
+**Targets (train mining, simple-tier false-accepts):** (a) "rename X to Y"
+commits create_todo at 0.95 for BOTH event- and todo-renames — FastRule
+cannot know which store holds X, so correct behavior is a gate: abstain to
+deep, whose matcher searches both; (b) "set X as high/medium/low priority"
+commits create_todo at 1.00 — the phrase is fully structured, deterministic
+update_todo(match_title, priority).
+
+**Predict (train, SIMPLE tier):** correct-on-committed 89.7 → 91–93 (two
+false-accept families out: rename rows leave the committed pool, priority
+rows flip to correct commits); commit 66.2 → 65–67 (renames abstain,
+priorities stay); complex board flat (regression floor); dual-gate on the
+real pool flat.
+
 ## Era-2 cycle 4 — REGISTERED PREDICTION 2026-09-07: F6 joint confirmation
 
 **Change under test:** the F6 integration (encounter route-override,
