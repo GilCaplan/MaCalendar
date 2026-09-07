@@ -12,6 +12,13 @@ deterministic, ~50 ms, defers anything else); the DEEP SYSTEM is the ATOMIZER
 (break the command into atomic items, then create each one, then check the
 result against what was actually said).
 
+**Line numbers are as of `21d6133`** (plus, for `assistant/intent/rule_parser.py`
+and `assistant/intent/classifier.py`, whatever the F19 batch had in the working
+tree at the time — those two files were being edited concurrently, so refs
+below line ~168 in `rule_parser.py` may have shifted by ~18 lines. Every
+finding was verified by symbol, not by offset; grep the named symbol if a
+number looks wrong.)
+
 ---
 
 ## 0 · The headline
@@ -167,7 +174,7 @@ Not code, but it costs the same thing: the next agent trusts it.
 | `ENGINE.md:135-141` | the ordered named-rule list | omits `move_time_fill` (`validate.py:632`) and `create_from_remove_guard` (`validate.py:705`), both live and both firing before the listed rules |
 | `ENGINE.md:75` | `retries` read by orchestrator | write-only (§1.3) |
 | `SYSTEM.md:94` | "`_normalise_intents` in `assistant/api/server.py`" | that function no longer exists anywhere outside `retired/` |
-| `FASTRULE2_DESIGN.md:136-139` | "Retired: semantic rewrites in the normalization list" | still present at `rule_parser.py:179-209`, and **F16/F18 added more of them** |
+| `FASTRULE2_DESIGN.md:136-139` | "Retired: semantic rewrites in the normalization list" | still present at `rule_parser.py:179-209`, and **F16/F18 added more of them** — as did F19 *while this audit was being written* (`note to self, X` → `add X`; `put a marker on ‹date› for ‹X›` → `add X on ‹date›`; `i should ‹encounter›` → `i need to ‹encounter›`). These are semantic rewrites by the design doc's own definition, in the list the design doc says was retired |
 | `DEEPSYSTEM_DESIGN.md:182-188, 270-273` | `Generate.fragment = FastRule(0.60)`, atomicity re-entry to Decompose | not built (§0) |
 | `DEEPSYSTEM_DESIGN.md:254-258` | `Stage.can_skip` / `Stage.metric` | not in `component.py`; `grep -rn "can_skip\|def metric"` → no hits |
 | `TASKS.md:106-130` | "cycle 5 in flight 2026-09-06", branch `loop-cycle-1` | superseded by `STAGE_ISOLATION_PLAN.md` (cycles PAUSED) |
@@ -489,6 +496,36 @@ It is load-bearing: it decides `missing` (which triggers a 3× loop-back) and
 `extra` (which, with `self_check_apply` on, **deletes a committed row**).
 `STAGE_ISOLATION_PLAN.md` lists crosscheck's dataset as "not started"; when it
 is built, this constant is the first thing it should sweep.
+
+### P12 · Note on work in flight — domain-agnostic entries for ambiguous verbs
+
+Observation only, on the F19 batch landing while this audit was written (it
+has a registered prediction, so it is inside the protocol). Four of the new
+`INTENT_MAP` rows are `(lemma, None)` — domain-agnostic — for words that are
+also very common nouns or calendar verbs:
+
+```python
+("sort",   None): "create_todo",   ("review", None): "create_todo",
+("file",   None): "create_todo",   ("invite", None): "create_event",
+```
+
+`_route_intent`'s Pass 4 (`rule_parser.py:1070-1078`) matches **any token's
+lemma**, at any position and any POS. So a `(lemma, None)` entry is the
+strongest, least-guarded kind of routing rule in the table — `"move the design
+review to 4pm"` now has a `create_todo` lemma sitting inside an update
+command, and `domain_material=False` means the domain guess costs it no
+confidence penalty either. Whether Pass 4 reaches it depends on whether an
+earlier pass matched first, which is the "ORDER as load-bearing, undocumented
+structure" that `FASTRULE2_DESIGN.md:38-40` names as the thing v2 exists to
+fix.
+
+Not a claim that F19 is wrong — the mined evidence (19 `grab`, 15 `sort`,
+7 `review`…) is real, and the prediction is registered. The point is that the
+lane has no metric that would notice the *collateral* damage: `fastrule_shape`
+reports handle-rate and correct-on-handled for atomic rows, and a newly
+mis-routed mutation shows up there only if it happens to be in the sample.
+A per-family floor on mutation rows (the discipline `FASTRULE2_DESIGN.md:132`
+already lists as "kept") would catch it.
 
 ---
 
