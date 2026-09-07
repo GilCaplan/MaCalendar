@@ -158,7 +158,11 @@ _STT_EXPANSIONS: list[tuple[str, str]] = [
     # outright skips caused by leading filler/courtesy hiding the command
     # from ^-anchored routing. Strip them FIRST (list order applies).
     (r"^(?:um+|uh+|so|well|ok(?:ay)?|alright|hey|yeah)[,\s]+", ""),
-    (r"^(?:could|can)\s+you\s+tell\s+me\s+", ""),          # "…what's on my calendar" = query
+    (r"^(?:could|can)\s+you\s+tell\s+me\s+", ""),
+    # F18a: the general form — "can you remove X" was extracting the TARGET
+    # as "you" (then correctly vetoed as generic). The interrogative gate
+    # reads the RAW text, so stripping here cannot smuggle a question past it.
+    (r"^(?:can|could|would|will)\s+you\s+(?:please\s+)?", ""),          # "…what's on my calendar" = query
     (r"^(?:could|can|would)\s+you\s+(?=remind\b)", ""),     # "could you remind me to X"
     # "let's do/have/get X" is create-speak the verb map can't key on
     (r"^let'?s\s+(?:do|have|get)\s+", "book "),
@@ -451,7 +455,7 @@ def _preprocess(transcript: str) -> tuple[str, bool]:
     # the title — FastRule failed 100% of those rows because the strip only
     # existed in the deep track's decompose stage.
     from assistant.intent import lead_time as _lead_time
-    text, _minutes = _lead_time.split(text)
+    text, _minutes = _lead_time.split(text, restore_verb=True)
 
     # Complexity gate: content-word count (stop/filler words don't add complexity)
     _FILLER = frozenset({
