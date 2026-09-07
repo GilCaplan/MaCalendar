@@ -1,5 +1,11 @@
 # External datasets for training/eval data
 
+> **Standing conversion rule (Q9, 2026-09-07):** these corpora label
+> first-person create questions as creates; our ruling makes them PROPOSALS.
+> Every converter must run `segment.is_interrogative_create` on each row and
+> remap matches to `action: "propose"` — before the conventions-pass sample
+> goes to Gil, so he reviews residual disagreements, not ones already ruled.
+
 Research pass (2026-09-07) looking for **public** datasets that can be adapted into
 rows matching our schema:
 

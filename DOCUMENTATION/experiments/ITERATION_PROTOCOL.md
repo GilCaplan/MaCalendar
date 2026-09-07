@@ -74,7 +74,12 @@ ONLY, never a judge.** Adoption pipeline, per set: (1) converter script into
 our jsonl schema (intent-mapping table + slot renames), (2) STT-style
 normalization (lowercase, punctuation-strip, optional misheard variants),
 (3) a CONVENTIONS PASS — sample the disagreements between their labels and
-our rulings and take them to Gil (DEVQA) before any row trains anything,
+our rulings and take them to Gil (DEVQA) before any row trains anything.
+One mapping is already ruled and MANDATORY (Q9, 2026-09-07): an external row
+whose utterance is a first-person create QUESTION ("should i add…", "what if
+i booked…") converts to `action: "propose"` regardless of the source's own
+create label — run `segment.is_interrogative_create` on every converted row
+and remap the matches. External schedule QUERIES stay queries,
 (4) train-half use only. Imported label noise must never define correctness;
 our sealed sets remain the only judges.
 
