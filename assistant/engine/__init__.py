@@ -1,9 +1,11 @@
 """The assistant engine — the brain behind every surface.
 
-`run_transcript()` is the single entry point: the API server hands it text
-(from the phone, the Mac GUI, the audit, the pending-retry loop) and gets back
-the response dict every client already understands. Inside, the command runs
-the 7-step deep track (`DOCUMENTATION/ENGINE.md` is the canonical contract
+`run_transcript()` is the single entry point — a thin shim over the
+`Engine` object (Q7, Gil-approved 2026-09-06: object structure, identical
+logic). The API server hands it text (from the phone, the Mac GUI, the
+audit, the pending-retry loop) and gets back the response dict every client
+already understands. `Engine` holds the once-per-command stages and a
+`DeepSystem`, whose ordered Stage list is the 7-step deep track (`DOCUMENTATION/ENGINE.md` is the canonical contract
 reference):
 
     0 intake      (here)            queueing + coalescing
@@ -39,6 +41,7 @@ from assistant.engine import (
     transcript as _transcript,
     validate as _validate,
 )
+from assistant.engine.component import Component, Stage
 from assistant.engine.state import EngineState, ExecutedAction
 from assistant.exceptions import AssistantError, TargetNotFound
 
@@ -104,148 +107,209 @@ def _no_bg() -> bool:
     return os.environ.get("MACALENDAR_NO_WARMUP") == "1"
 
 
+class DeepSystem(Component):
+    """The deep track as an object (Q7): the re-runnable parse half is an
+    ordered Stage list; the judge and its loop-back live in run(). The logic
+    is the function orchestrator's, verbatim — this class only names it."""
+
+    def __init__(self) -> None:
+        # The re-runnable parse half (items rebuilt from scratch each pass —
+        # fresh intents, so no field rule can apply twice). Transcript repair
+        # is NOT here: it runs once, before track selection, in Engine.
+        self.stages: "list[Stage]" = [
+            Stage("segment", _segment),
+            Stage("decompose", _decompose),
+            Stage("validate", _validate),                          # text pass
+            Stage("generate", _generate),
+            Stage("validate_objects", _validate, attr="run_objects"),
+        ]
+        self.crosscheck = Stage("crosscheck", _crosscheck)
+
+    def parse(self, state: EngineState, cfg) -> None:
+        """Steps 2→5 + the field rules — re-runnable (fresh items each time;
+        loop-back mistakes are already on the state for the stages' prompts)."""
+        state.items = []
+        for stage in self.stages:
+            stage.run(state, cfg)
+
+    def run(self, state: EngineState, cfg) -> None:
+        """Foreground deep track: parse, then the judge BEFORE anything is
+        written — findings loop execution back (at most MAX_REENTRIES)."""
+        self.parse(state, cfg)
+        reentries = 0
+        while reentries < _crosscheck.MAX_REENTRIES:
+            self.crosscheck.run(state, cfg)
+            loop_to = _loop_target(state)
+            if loop_to is None:
+                break
+            reentries += 1
+            state.retries[loop_to] = state.retries.get(loop_to, 0) + 1
+            if state.trace:
+                from assistant.trace import VERIFY
+                state.trace.step(VERIFY, "Looping back",
+                                 f"re-running from {loop_to} "
+                                 f"({reentries}/{_crosscheck.MAX_REENTRIES})")
+            self.parse(state, cfg)
+        else:
+            # Budget spent with a MISSING ask still open — flag it.
+            # (Advisory extras alone don't merit alarming the speaker.)
+            if any(f.type == "missing" for f in state.findings):
+                state.messages.append(
+                    "I'm not sure I caught every part of that — worth a glance.")
+
+
+class Engine(Component):
+    """The brain as an object (Q7, Gil-approved 2026-09-06: "the logic
+    doesn't change at all nor should the results, should just be cleaner").
+
+    Members: `deep` (the 7-step track), `transcript`/`label` (the once-per-
+    command stages), and the fast front door reached through
+    `generate.fast_propose` (its FastRule instance and gates live there —
+    fast_sandbox drives the same entry). Config is loaded per run, exactly as
+    the function version did — an Engine never caches what the user can edit
+    between commands."""
+
+    def __init__(self) -> None:
+        self.transcript = Stage("transcript", _transcript)
+        self.label = Stage("label", _label)
+        self.deep = DeepSystem()
+
+    def run(self, text: str, trace: Any = None, source: str = "ios",
+            current_view: str = "month", trace_run: "str | None" = None,
+            supports_edit: bool = False) -> dict:
+        """Parse and execute one transcript; return the API response dict.
+
+        The response contract is frozen (clients depend on every key):
+        message / actions / refresh / parse / transcript / original_transcript /
+        corrections / trace / uncertain_words [+ memory_id, verify_token,
+        pending_id, needs_edit].
+        """
+        from assistant.trace import Trace
+
+        cfg = load_config()
+        trace = trace or Trace(source=source)
+        if trace_run:
+            from assistant import trace_bus as _tb
+            trace.on_step(lambda st: _tb.publish_step(trace_run, st.to_dict()))
+
+        with _run_lock:
+            return self._locked(text, trace, source, current_view, trace_run,
+                                supports_edit, cfg)
+
+    def _locked(self, text, trace, source, current_view, trace_run,
+                supports_edit, cfg) -> dict:
+        from assistant.trace import DONE
+
+        state = EngineState(raw_text=text, source=source, current_view=current_view,
+                            supports_edit=supports_edit, trace=trace)
+
+        # -- step 1: transcript repair --------------------------------------
+        self.transcript.run(state, cfg)
+        if state.ignored:
+            # Not parsed, not executed, and above all not remembered: a false
+            # start in the history teaches the model that junk is normal.
+            logger.info("Ignoring a transcript with nothing in it: %r", text[:40])
+            return {"message": "", "actions": [], "refresh": "", "parse": "ignored",
+                    "corrections": [], "trace": trace.to_list(), "memory_id": None,
+                    "brain": _brain_version()}
+        if state.needs_edit:
+            # The gate: the client shows an editor and resubmits; nothing
+            # executes on a transcript the vocabulary doubts.
+            trace.step(DONE, "Checking with you",
+                       "Some words look off — asking for an edit before acting.")
+            return {"message": "I want to be sure I heard you right — please check "
+                               "the transcription.",
+                    "actions": [], "refresh": "", "parse": "needs_edit",
+                    "needs_edit": state.needs_edit,
+                    "transcript": state.text, "original_transcript": state.raw_text,
+                    "corrections": state.corrections, "trace": trace.to_list(),
+                    "uncertain_words": state.needs_edit, "brain": _brain_version()}
+
+        # -- track selection ------------------------------------------------
+        try:
+            fast = cfg.engine.fast_track and _generate.fast_propose(state, cfg)
+            if fast:
+                _validate.run_objects(state, cfg)
+                _commit(state, cfg)
+                self.label.run(state, cfg)
+                # The deep track runs BEHIND the instant answer: extraction-
+                # based cross-check against what was just committed, patched
+                # through the verify-token contract the clients already speak.
+                _start_background_verify(state, cfg)
+            else:
+                self.deep.run(state, cfg)
+                _commit(state, cfg)
+                self.label.run(state, cfg)
+        except AssistantError as e:
+            return _parse_error_response(state, cfg, e)
+
+        # -- bookkeeping: reply, memory, logs, trace bus ------------------------
+        # A loop-back re-runs generate, and a per-item failure message from each
+        # attempt survives on the state — saying "I couldn't read this part"
+        # three times is one apology and two bugs. Consecutive duplicates fold.
+        deduped: list = []
+        for m in state.messages:
+            if m and (not deduped or m != deduped[-1]):
+                deduped.append(m)
+        response_msg = " ".join(deduped)
+        action_names = [ex.action for ex in state.executed if ex.ok]
+        logger.info("%s Response: %s | refresh=%s | parse=%s",
+                    "🖥️" if source == "mac" else "📱",
+                    response_msg, state.refresh or "none", state.parse_path)
+
+        _log_nlu(state, action_names)
+        if state.parse_path == "fast":
+            # The fast path has ANSWERED, but a background review still runs — so
+            # this is not "Done", it is "answered, reviewing". Saying Done here read
+            # as finished when it was not.
+            trace.step(DONE, "Fast answer",
+                       f"rules answered in {trace.total_ms / 1000:.1f} s · reviewing in the background",
+                       path=state.parse_path)
+        else:
+            trace.step(DONE, "Done",
+                       f"deep path · {trace.total_ms / 1000:.1f} s total",
+                       path=state.parse_path)
+        state.memory_id = _record_memory(state, cfg, response_msg)
+        _mine_reformulations(state, cfg)
+
+        resp: dict = {
+            "message": response_msg,
+            "actions": action_names,
+            "refresh": state.refresh,
+            "parse": state.parse_path,
+            "transcript": state.text,
+            "original_transcript": state.raw_text,
+            "corrections": state.corrections,
+            "trace": trace.to_list(),
+            "uncertain_words": _transcript.uncertain_words(state.text),
+            "brain": _brain_version(),
+        }
+        if state.memory_id is not None:
+            resp["memory_id"] = state.memory_id
+        if state.verify_token:
+            resp["verify_token"] = state.verify_token
+
+        _publish(state, resp, trace_run)
+        return resp
+
+
+# ---------------------------------------------------------------------------
+# The singleton + the compatibility shim (Q7: the server keeps its call)
+# ---------------------------------------------------------------------------
+
+_engine = Engine()
+
+
 def run_transcript(text: str, trace: Any = None, source: str = "ios",
                    current_view: str = "month", trace_run: "str | None" = None,
                    supports_edit: bool = False) -> dict:
-    """Parse and execute one transcript; return the API response dict.
+    """Thin shim over Engine.run — the entry point every caller already has.
+    Kept by design (Q7): the server, the audit and the pending-retry loop go
+    on calling this; the brain behind it is the Engine object."""
+    return _engine.run(text, trace=trace, source=source,
+                       current_view=current_view, trace_run=trace_run,
+                       supports_edit=supports_edit)
 
-    The response contract is frozen (clients depend on every key):
-    message / actions / refresh / parse / transcript / original_transcript /
-    corrections / trace / uncertain_words [+ memory_id, verify_token,
-    pending_id, needs_edit].
-    """
-    from assistant.trace import Trace
-
-    cfg = load_config()
-    trace = trace or Trace(source=source)
-    if trace_run:
-        from assistant import trace_bus as _tb
-        trace.on_step(lambda st: _tb.publish_step(trace_run, st.to_dict()))
-
-    with _run_lock:
-        return _run_locked(text, trace, source, current_view, trace_run,
-                           supports_edit, cfg)
-
-
-def _run_locked(text, trace, source, current_view, trace_run,
-                supports_edit, cfg) -> dict:
-    from assistant.trace import DONE
-
-    state = EngineState(raw_text=text, source=source, current_view=current_view,
-                        supports_edit=supports_edit, trace=trace)
-
-    # -- step 1: transcript repair ------------------------------------------
-    _transcript.run(state, cfg)
-    if state.ignored:
-        # Not parsed, not executed, and above all not remembered: a false
-        # start in the history teaches the model that junk is normal.
-        logger.info("Ignoring a transcript with nothing in it: %r", text[:40])
-        return {"message": "", "actions": [], "refresh": "", "parse": "ignored",
-                "corrections": [], "trace": trace.to_list(), "memory_id": None,
-                "brain": _brain_version()}
-    if state.needs_edit:
-        # The gate: the client shows an editor and resubmits; nothing executes
-        # on a transcript the vocabulary doubts.
-        trace.step(DONE, "Checking with you",
-                   "Some words look off — asking for an edit before acting.")
-        return {"message": "I want to be sure I heard you right — please check "
-                           "the transcription.",
-                "actions": [], "refresh": "", "parse": "needs_edit",
-                "needs_edit": state.needs_edit,
-                "transcript": state.text, "original_transcript": state.raw_text,
-                "corrections": state.corrections, "trace": trace.to_list(),
-                "uncertain_words": state.needs_edit, "brain": _brain_version()}
-
-    # -- fast track ---------------------------------------------------------
-    try:
-        fast = cfg.engine.fast_track and _generate.fast_propose(state, cfg)
-        if fast:
-            _validate.run_objects(state, cfg)
-            _commit(state, cfg)
-            _label.run(state, cfg)
-            # The deep track runs BEHIND the instant answer: extraction-based
-            # cross-check against what was just committed, patches through the
-            # verify-token contract the clients already speak.
-            _start_background_verify(state, cfg)
-        else:
-            # -- deep track, foreground -------------------------------------
-            _deep_parse(state, cfg)
-            # Step 6 runs BEFORE anything is written: findings loop execution
-            # back to the blamed stage (fresh intents each time, so the
-            # field rules cannot double-apply), at most MAX_REENTRIES total.
-            reentries = 0
-            while reentries < _crosscheck.MAX_REENTRIES:
-                _crosscheck.run(state, cfg)
-                loop_to = _loop_target(state)
-                if loop_to is None:
-                    break
-                reentries += 1
-                state.retries[loop_to] = state.retries.get(loop_to, 0) + 1
-                if state.trace:
-                    from assistant.trace import VERIFY
-                    state.trace.step(VERIFY, "Looping back",
-                                     f"re-running from {loop_to} "
-                                     f"({reentries}/{_crosscheck.MAX_REENTRIES})")
-                _deep_parse(state, cfg)
-            else:
-                # Budget spent with a MISSING ask still open — flag it.
-                # (Advisory extras alone don't merit alarming the speaker.)
-                if any(f.type == "missing" for f in state.findings):
-                    state.messages.append(
-                        "I'm not sure I caught every part of that — worth a glance.")
-            _commit(state, cfg)
-            _label.run(state, cfg)
-    except AssistantError as e:
-        return _parse_error_response(state, cfg, e)
-
-    # -- bookkeeping: reply, memory, logs, trace bus ------------------------
-    # A loop-back re-runs generate, and a per-item failure message from each
-    # attempt survives on the state — saying "I couldn't read this part"
-    # three times is one apology and two bugs. Consecutive duplicates fold.
-    deduped: list = []
-    for m in state.messages:
-        if m and (not deduped or m != deduped[-1]):
-            deduped.append(m)
-    response_msg = " ".join(deduped)
-    action_names = [ex.action for ex in state.executed if ex.ok]
-    logger.info("%s Response: %s | refresh=%s | parse=%s",
-                "🖥️" if source == "mac" else "📱",
-                response_msg, state.refresh or "none", state.parse_path)
-
-    _log_nlu(state, action_names)
-    if state.parse_path == "fast":
-        # The fast path has ANSWERED, but a background review still runs — so
-        # this is not "Done", it is "answered, reviewing". Saying Done here read
-        # as finished when it was not.
-        trace.step(DONE, "Fast answer",
-                   f"rules answered in {trace.total_ms / 1000:.1f} s · reviewing in the background",
-                   path=state.parse_path)
-    else:
-        trace.step(DONE, "Done",
-                   f"deep path · {trace.total_ms / 1000:.1f} s total",
-                   path=state.parse_path)
-    state.memory_id = _record_memory(state, cfg, response_msg)
-    _mine_reformulations(state, cfg)
-
-    resp: dict = {
-        "message": response_msg,
-        "actions": action_names,
-        "refresh": state.refresh,
-        "parse": state.parse_path,
-        "transcript": state.text,
-        "original_transcript": state.raw_text,
-        "corrections": state.corrections,
-        "trace": trace.to_list(),
-        "uncertain_words": _transcript.uncertain_words(state.text),
-        "brain": _brain_version(),
-    }
-    if state.memory_id is not None:
-        resp["memory_id"] = state.memory_id
-    if state.verify_token:
-        resp["verify_token"] = state.verify_token
-
-    _publish(state, resp, trace_run)
-    return resp
 
 
 # ---------------------------------------------------------------------------
@@ -345,19 +409,6 @@ def _commit(state: EngineState, cfg) -> None:
         state.refresh = "both"
     elif refresh_set:
         state.refresh = refresh_set.pop()
-
-
-def _deep_parse(state: EngineState, cfg) -> None:
-    """Steps 2→5 + the field rules — the deep track's parse half, re-runnable:
-    items are rebuilt from scratch each time (fresh intents, so no field rule
-    can apply twice), and any loop-back mistakes are already on the state for
-    the stages' prompts."""
-    state.items = []
-    _segment.run(state, cfg)
-    _decompose.run(state, cfg)
-    _validate.run(state, cfg)
-    _generate.run(state, cfg)
-    _validate.run_objects(state, cfg)
 
 
 def _loop_target(state: EngineState) -> "str | None":
