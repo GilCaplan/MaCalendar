@@ -55,9 +55,9 @@ def _fit_ovr(X, labels, classes, epochs=300, lr=0.5, balanced=True):
 
 
 def main() -> int:
-    rows = [json.loads(l) for l in
-            (ROOT / "dataset" / "fastrule" / "fastrule_6000.jsonl").open()
-            if '"train"' in l]
+    all_rows = [json.loads(l) for l in
+                (ROOT / "dataset" / "fastrule" / "fastrule_6000.jsonl").open()]
+    rows = [r for r in all_rows if r["split"] == "train"]
     op_X, op_y, k_X, k_y = [], [], [], []
     for r in rows:
         e = r["expect"]
@@ -97,8 +97,27 @@ def main() -> int:
             print(f"    {c:<9} P {P:.0%}  R {R:.0%}  F1 {F:.0%}  (n={tp+fn})")
         print(f"    macro-F1 {sum(f1s)/len(f1s):.1%}")
 
-    report("operation", out["operation"], op_X, op_y, OPS)
-    report("kind     ", out["kind"], k_X, k_y, ("event", "task"))
+    report("operation (train, working numbers)", out["operation"], op_X, op_y, OPS)
+    report("kind      (train, working numbers)", out["kind"], k_X, k_y, ("event", "task"))
+
+    # ---- TEST EVAL (the reported numbers — Gil 2026-09-07): eval-only,
+    # class-level rates, never row inspection, never a fit input ----------
+    t_op_X, t_op_y, t_k_X, t_k_y = [], [], [], []
+    for r in all_rows:
+        if r["split"] != "test":
+            continue
+        e = r["expect"]; a = e.get("action", "")
+        if a in ("mixed", "propose") or not e.get("atomic", True):
+            continue
+        op = _ACTION2OP.get(a) or ("query" if a == "query" else None)
+        if op:
+            t_op_X.append(op_features(r["text"])); t_op_y.append(op)
+        kind = _ACTION2KIND.get(a)
+        if kind:
+            t_k_X.append(kind_features(r["text"])); t_k_y.append(kind)
+    print("\n=== TEST EVAL (the reported numbers) ===")
+    report("operation (TEST)", out["operation"], t_op_X, t_op_y, OPS)
+    report("kind      (TEST)", out["kind"], t_k_X, t_k_y, ("event", "task"))
     return 0
 
 
