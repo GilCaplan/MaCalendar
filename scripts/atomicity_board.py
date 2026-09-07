@@ -154,9 +154,7 @@ def predictions(rows, floor: "float | None" = None):
                 intents = rp.analyze(text, current_view="month").intents
             except Exception:
                 intents = []
-            rules.append(atom.rule_verdict(text, intents) is not None
-                         if hasattr(atom, "rule_verdict")
-                         else atom.judge(text, intents) is not None)
+            rules.append(atom.rule_verdict(text, intents) is not None)
             lab, margin = ROUTER.atomicity.predict(text)
             model.append(lab == "compound" and margin >= fl)
             layer.append(atom.judge(text, intents) is not None)
