@@ -136,7 +136,7 @@ All endpoints are served by the Mac at `http://<tailscale-ip>:8080`; the iOS app
 | Method | Path | What it does |
 |---|---|---|
 | `GET` | `/todos` |  |
-| `POST` | `/todos` | Create a task. Idempotent on `client_token` — a repeat returns 200 + the existing id. |
+| `POST` | `/todos` |  |
 | `DELETE` | `/todos/<int:todo_id>` |  |
 | `PATCH` | `/todos/<int:todo_id>` |  |
 | `PATCH` | `/todos/<int:todo_id>/toggle` |  |

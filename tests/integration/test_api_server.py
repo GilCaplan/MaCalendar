@@ -319,10 +319,18 @@ def test_two_real_asks_are_two_tasks(app_client):
     client, db = app_client
     client.post("/todos", json={"title": "buy groceries", "client_token": "ask-a"})
     client.post("/todos", json={"title": "buy groceries", "client_token": "ask-b"})
-    # and a client that sends no token at all keeps the old behaviour
-    client.post("/todos", json={"title": "buy groceries"})
     assert len([t for t in db.get_todos(include_completed=True)
-                if t["title"] == "buy groceries"]) == 3
+                if t["title"] == "buy groceries"]) == 2
+    # A caller that sends no token gets the content fingerprint instead, and
+    # this repeat lands inside its window — so it folds into the newest open
+    # row rather than becoming a third copy. That is the 2026-09-07 change:
+    # token-less used to mean "always insert", which is how the suite's own
+    # HUD revert POST stacked 45 of these in the real Today list.
+    tokenless = client.post("/todos", json={"title": "buy groceries"})
+    assert tokenless.status_code == 200
+    assert tokenless.get_json()["reason"] == "recent-identical"
+    assert len([t for t in db.get_todos(include_completed=True)
+                if t["title"] == "buy groceries"]) == 2
 
 
 def test_todo_client_token_is_idempotent_at_the_db_layer(tmp_path):

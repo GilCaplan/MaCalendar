@@ -1412,6 +1412,42 @@ class CalendarDB:
                 "todos.client_token conflict with no matching row")
         return int(existing["id"])
 
+    def find_recent_open_todo(self, title: str, list_name: str,
+                              within_seconds: int) -> Optional[dict]:
+        """An OPEN todo in `list_name` spelled the same as `title` and created
+        less than `within_seconds` ago, or None.
+
+        The content fingerprint behind the token-less half of create
+        idempotency. `client_token` is the precise key and is preferred wherever
+        a client can mint one; this is the fallback for callers that send none,
+        where the only identity a replay carries is what it says. Comparison is
+        on case- and whitespace-normalised titles, so "Buy  Groceries" matches
+        "buy groceries". Completed rows never match: ticking a task off and
+        asking for it again is a new ask, not a replay.
+        """
+        if within_seconds <= 0:
+            return None
+        key = " ".join((title or "").split()).lower()
+        if not key:
+            return None
+        cutoff = (datetime.datetime.now()
+                  - datetime.timedelta(seconds=within_seconds)).isoformat()
+        with self._conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM todos
+                 WHERE list = ? AND completed = 0 AND created_at >= ?
+                 ORDER BY created_at DESC
+                """,
+                (list_name, cutoff),
+            ).fetchall()
+        # Normalising in Python, not SQL: `lower(trim(...))` would still call
+        # "buy  groceries" and "buy groceries" different tasks.
+        for row in rows:
+            if " ".join((row["title"] or "").split()).lower() == key:
+                return dict(row)
+        return None
+
     def get_todo_by_client_token(self, client_token: str) -> Optional[dict]:
         """The todo a client already created under this idempotency key, if any."""
         token = (client_token or "").strip()

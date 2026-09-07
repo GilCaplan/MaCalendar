@@ -77,6 +77,107 @@ from assistant.config import (
 
 
 # ---------------------------------------------------------------------------
+# The live API is off limits to the suite
+# ---------------------------------------------------------------------------
+#
+# The scratch-store overrides at the top of this file redirect what THIS
+# process opens. They cannot redirect an HTTP request: that is served by the
+# running `assistant.api` on this Mac, which is holding the real
+# ~/.assistant_tools/calendar.db — so a test that posts to localhost:8080
+# writes Gil's actual data, scratch dirs or no scratch dirs.
+#
+# It happened. `test_thinking_hud.py` clicks the HUD's Revert button for real
+# (as the UI-testing rule requires), the widget's own
+# `revert_requested -> _on_revert` connection is live in the fixture, and
+# `_on_revert` POSTs the captured body to `http://127.0.0.1:8080/todos` from a
+# daemon thread. Every `pytest tests/unit` run therefore added one more
+# "buy groceries" to the real Today list — 45 of them between 2026-08-31 and
+# 2026-09-07, arriving 30s-3min after the run as the thread got its turn.
+# `test_cli.py::check_engine`'s live probe was doing the same to the real
+# command memory and trace bus via POST /voice/text.
+#
+# So: refuse, loudly, at the one chokepoint every `requests` call passes
+# through. Only the MACalendar API port is blocked — Ollama on 11434 and the
+# rest of loopback still work, and test_offline.py still owns the
+# non-loopback rule.
+
+def _api_ports() -> set:
+    """Read at call time, so a test may point the guard at a stub's port."""
+    ports = {8080}
+    try:
+        ports.add(int(_os.environ.get("MACALENDAR_API_PORT") or 8080))
+    except (TypeError, ValueError):
+        pass
+    return ports
+
+
+class LiveAPIBlocked(RuntimeError):
+    """A test tried to reach the running assistant.api. See tests/conftest.py."""
+
+
+#: Every blocked attempt, as (method, url) — asserted on by the regression test.
+BLOCKED_LIVE_API_CALLS: list = []
+
+
+def _refuse_if_live_api(method: str, url: str) -> None:
+    """Raise if `url` points at the running assistant.api. Both transports the
+    codebase uses funnel through here — `requests` (the HUD, the phone-facing
+    helpers) and `urllib` (assistant.cli / `assistant doctor`)."""
+    from urllib.parse import urlsplit
+
+    try:
+        parts = urlsplit(str(url))
+        host, port = parts.hostname, parts.port
+    except Exception:
+        return
+    if host in ("127.0.0.1", "localhost", "::1") and port in _api_ports():
+        BLOCKED_LIVE_API_CALLS.append((str(method).upper(), str(url)))
+        raise LiveAPIBlocked(
+            f"{method} {url} would hit the RUNNING assistant.api, which owns "
+            "the real ~/.assistant_tools stores. Use the Flask test client "
+            "(`create_app().test_client()`) or monkeypatch the caller."
+        )
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _no_live_api_calls():
+    """Make a request to the live API raise instead of writing the real stores."""
+    import urllib.request as _urlreq
+
+    import requests.sessions as _sessions
+
+    original_request = _sessions.Session.request
+    original_urlopen = _urlreq.urlopen
+
+    def guarded_request(self, method, url, *args, **kwargs):
+        _refuse_if_live_api(method, url)
+        return original_request(self, method, url, *args, **kwargs)
+
+    def guarded_urlopen(url, *args, **kwargs):
+        # urlopen takes a str or a Request; a Request carries its own method.
+        target = getattr(url, "full_url", url)
+        method = getattr(url, "get_method", lambda: "GET")()
+        _refuse_if_live_api(method, target)
+        return original_urlopen(url, *args, **kwargs)
+
+    _sessions.Session.request = guarded_request
+    _urlreq.urlopen = guarded_urlopen
+    try:
+        yield
+    finally:
+        _sessions.Session.request = original_request
+        _urlreq.urlopen = original_urlopen
+
+
+@pytest.fixture
+def blocked_live_api_calls():
+    """The blocked-call log, emptied for this test."""
+    BLOCKED_LIVE_API_CALLS.clear()
+    yield BLOCKED_LIVE_API_CALLS
+    BLOCKED_LIVE_API_CALLS.clear()
+
+
+# ---------------------------------------------------------------------------
 # Context memory reset — clears anaphora state between tests
 # ---------------------------------------------------------------------------
 
