@@ -21,6 +21,54 @@ This page is the map. The working files it describes:
 | [`convention_overrides.json`](../dataset/inputs/convention_overrides.json) | the product-conventions layer behind the adjusted score (raw never changes) — see [`DATASET_AUDIT.md`](../dataset/DATASET_AUDIT.md) |
 | [`DEVQA.md`](../DEVQA.md) | async product questions for Gil, and the log of his rulings |
 
+## The workflow today (two lanes + the guards)
+
+Two independent improvement lanes run in parallel, plus the machinery that
+keeps them honest:
+
+**Lane 1 — the deep track (the LLM pipeline).** Full measurement cycles
+(~55 min each): run the engine on a dev slice, score the full metric board,
+read *which stage* failed and *why*, improve that one stage's implementation,
+rerun. Each cycle is a registered hypothesis (prediction written first). A
+cycle may pair one deep hypothesis with one fast one; a *routing* change
+(what commits vs. defers) rides alone.
+
+**Lane 2 — FastRule in its sandbox.** The deterministic rule parser
+(`FastRule`) is a *selective classifier* — it commits when confident and
+abstains otherwise. Because it needs no LLM, `scripts/fast_sandbox.py`
+replays the whole 3,000-row dataset in **~3 minutes** (vs. 55), so FastRule
+iterates in its own worktree at ~180× the rate. It's scored on its own terms:
+commit rate × correct-on-committed (an abstain is the deep track's job, not a
+failure) + **recoverable-abstain** (rows it could have gotten right). Batches
+(F1, F2, …) graduate in the sandbox, then **integrate** into the deep track —
+where one joint full-engine run confirms them on the main board before
+anything counts (a smarter FastRule shifts which rows reach the deep track,
+so only the joint run prices that in).
+
+**The thresholds are tuned, not guessed.** FastRule runs in two instances —
+`FastRule(0.80)` at the front door (conservative; the deep track is its net),
+`FastRule(0.60)` per fragment (aggressive; the crosscheck judge is its net) —
+each threshold set by a sweep experiment over the dataset.
+
+**Path B — verify-and-auto-update, safely.** The LLM crosscheck already
+audits every FastRule commit in the background; auto-*applying* its
+corrections stays off until a crosscheck-correction-precision metric proves
+it safe (the old auto-applier fixed 0 and broke 1). Then the flag flips.
+
+**The guards that keep it honest:**
+- *Design is frozen; implementation is free.* A change to the core algorithm
+  (stage relationships, rules-vs-LLM trust, step order) is Gil's call at a
+  boundary, labelled as a design change — never slipped into a routine cycle.
+- *Held-out is sealed.* Ranks 601–3000 are measured, never mined.
+- *The noise floor* is ~1.5 pt on dev-fast; cycles are judged by their
+  targeted slice, not the headline.
+- *The personalization layers* (vocab, command memory, tag/category learning)
+  are unsupervised — the dataset can't validate them, only protect them:
+  machine-generated records never feed them as the user's own, and the weekly
+  review's real-usage flag rate is the post-merge tripwire.
+- *Every run auto-archives* with an identity manifest, so any metric added or
+  fixed later is recomputed over the whole history.
+
 ## The framing: a classic ML problem, with a twist
 
 - **Ground truth** — utterances whose correct outcome is known *by
