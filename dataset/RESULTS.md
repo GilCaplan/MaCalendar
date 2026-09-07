@@ -21,6 +21,20 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## F8 — ACTUAL (2026-09-07): NEGATIVE, and decisive
+
+Sweep 0.85→0.55: simple commit moves only 62.4→66.0%, correctness flat.
+**Prediction falsified** — FastRule is not under-confident near the bar;
+confidence is bimodal (~0.95 or structural failure). The coverage lever is
+NOT the threshold: it's slot-filling failures and unparseable phrasings.
+Threshold stays 0.80 (no change ships). Coverage work redirects to abstain-
+reason mining (F9+). Banked per protocol: a falsified prediction that
+saves every future cycle from re-trying the obvious knob.
+
+**Standing instruction (Gil): run the lane to F15 before the next engine
+integration.**
+# F8 registered prediction (kept)
+
 ## F8 (simple-first batch 2) — REGISTERED PREDICTION 2026-09-07: threshold sweep
 
 **Experiment:** sweep the front-door bar over train with per-tier readout
