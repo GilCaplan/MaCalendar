@@ -100,7 +100,9 @@ def main(argv=None) -> int:
         return 2
     print(f"database: {path}")
 
-    conn = sqlite3.connect(path)
+    # Read-only for the survey, always: a dry run must not so much as touch the
+    # file it is reporting on (a plain connect would create -wal/-shm beside it).
+    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     try:
         clusters = _clusters(conn, args.title, args.include_completed)
     finally:
