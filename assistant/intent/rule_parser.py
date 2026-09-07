@@ -168,6 +168,12 @@ _STT_EXPANSIONS: list[tuple[str, str]] = [
     (r"^let'?s\s+(?:do|have|get)\s+", "book "),
     # STT misspellings the expansion table lacked (measured, not guessed)
     (r"\btommorow\b", "tomorrow"),
+    (r"\breshedule\b|\breschdule\b", "reschedule"),        # F19 (12 rows)
+    (r"\bgotta\b|\bgot to\b|\bhave got to\b", "need to"),  # F19 (15 rows)
+    (r"^i\s+should\s+(?=see|talk|speak|meet|catch up|call\b)", "i need to "),
+    (r"^note to self[,:]?\s+", "add "),                       # F19 (9 rows)
+    # "put a marker on <date> for <thing>" is the day-marking family
+    (r"\bput\s+a\s+marker\s+on\s+(.+?)\s+for\s+(.+)$", r"add \2 on \1"),
     (r"\bapointment\b", "appointment"),
     (r"\bremindar\b", "reminder"),
     # "mark <date> as <occasion>" marks a DAY, it does not tick a task off:
@@ -269,6 +275,7 @@ INTENT_MAP: dict[tuple[str, str | None], str] = {
     ("make", "calendar"): "create_event",
     ("set", "calendar"): "create_event",
     ("organize", None): "create_event",
+    ("invite", None): "create_event",     # F19: "invite Sam to the meeting"
     # --- Calendar update ---
     ("move", None): "update_event",
     ("reschedule", None): "update_event",
@@ -319,6 +326,14 @@ INTENT_MAP: dict[tuple[str, str | None], str] = {
     ("fix", "todo"): "create_todo",
     ("clean", "todo"): "create_todo",
     ("wash", None): "create_todo",
+    # F19: counted in the skip bucket — the router had no entry at all
+    ("grab", None): "create_todo",
+    ("sort", None): "create_todo",
+    ("review", None): "create_todo",
+    ("water", None): "create_todo",
+    ("pack", None): "create_todo",
+    ("file", None): "create_todo",
+    ("renew", None): "create_todo",
     ("cook", None): "create_todo",
     ("prepare", None): "create_todo",
     # --- Todo complete ---
@@ -966,6 +981,9 @@ _ROUTE_OVERRIDES = [
     (re.compile(r"^\s*(?:please\s+)?remind me\b"), "create_todo"),
     (re.compile(r"^\s*(?:please\s+)?add\s+(?:a\s+|\d+\s+|two\s+|three\s+)?(?:new\s+)?tasks?\b"), "create_todo"),
     (re.compile(r"^\s*(?:what|which|show|list|read)\b.*\b(?:tasks?|todos?|to-dos?)\b"), "query_todos"),
+    # F19: two very common spoken query shapes the router had no rule for
+    (re.compile(r"^\s*do\s+i\s+have\b"), "query_schedule"),
+    (re.compile(r"^\s*am\s+i\s+(?:free|busy|available)\b"), "query_schedule"),
 ]
 
 

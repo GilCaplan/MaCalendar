@@ -331,7 +331,11 @@ design changes, measured.
    identical, *then* cycle 10 — or fold cycle 10 in? _(Recommend: separate, so
    "did the refactor break something" never mixes with "did the new algorithm
    help".)_
+   ok sure as you recommend.
 2. **Name:** keep a thin `run_transcript` shim so `server.py`'s HTTP layer is
    untouched? _(Recommend: yes.)_
+   ok.
 3. **`Component`:** worth the shared `.run()` interface, or keep FastRule and
    Stage as separate shapes?
+   Stage is the parent class or inteface to all the different components of the systems architecture?
+

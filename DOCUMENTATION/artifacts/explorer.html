@@ -205,7 +205,7 @@
       <text x="352" y="182" text-anchor="middle" font-size="10">2 · fix words</text>
     </g>
     <line x1="352" y1="189" x2="352" y2="194" stroke="var(--muted)" marker-end="url(#mi)"/>
-    <g data-panel="parse" role="button" tabindex="0" aria-label="Step 3: rule parser, 76 verb mappings, scores its own confidence.">
+    <g data-panel="parse" role="button" tabindex="0" aria-label="Step 3: rule parser, 84 verb mappings, scores its own confidence.">
       <rect class="frame" x="262" y="194" width="181" height="16" rx="3" fill="var(--screen)" stroke="var(--line)"/>
       <text x="352" y="203" text-anchor="middle" font-size="10">3 · rules first</text>
     </g>
@@ -660,7 +660,7 @@ const P = {
     tag:"step 3 of 12", name:"parse", title:"Rules first",
     z:[352,211,2.9],
     sum:`<p>A fixed pipeline reads the sentence first: normalize its shorthand, route the verb to an action, fill its slots, score how well it understood it. All arithmetic on words, about a tenth of a second.</p>
-    <p class="figs">76 verbs &#183; 9 of the 15 actions reachable this way</p>`,
+    <p class="figs">84 verbs &#183; 9 of the 15 actions reachable this way</p>`,
     more:`<p>Four things happen before any score exists, in a fixed order, and every one of them
     is arithmetic on the words themselves &mdash; nothing here calls the model:</p>
     <svg viewBox="0 0 390 48" role="img" aria-label="The rule parser's four phases in order: normalize the transcript against a shorthand table, route the verb and domain to an action, score the filled slots against their doubts, then gate the result at fast_propose &mdash; the step covered next.">
