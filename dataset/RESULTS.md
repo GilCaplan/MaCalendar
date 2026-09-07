@@ -21,6 +21,16 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## F8 (simple-first batch 2) — REGISTERED PREDICTION 2026-09-07: threshold sweep
+
+**Experiment:** sweep the front-door bar over train with per-tier readout
+(one parse pass, bars applied analytically). **Predict:** FastRule is
+under-confident on simple commands (correct-on-committed 90.6% at the 0.80
+bar says the committed pool is far from the edge): a bar in 0.60–0.75
+raises simple commit 66 → 72–80% while holding ≥90% correct; complex
+false-accepts stay bounded because the compound GATES (not the bar) do that
+work. Dual-gate at any adopted bar: real-pool dev-600 must hold ≥92 raw.
+
 ## F7 (simple-first batch 1) — REGISTERED PREDICTION 2026-09-07, before implementation
 
 **Targets (train mining, simple-tier false-accepts):** (a) "rename X to Y"
