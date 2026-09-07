@@ -1,0 +1,68 @@
+{
+  "persona": {
+    "id": "retiree",
+    "label": "Retiree",
+    "role": "the most verbose and most polite register; medical and community rhythms",
+    "speech_habits": [
+      "long, fully grammatical sentences with an explanatory aside before the ask",
+      "elaborately polite ('would you be kind enough to', 'if it's not too much trouble')",
+      "first-person memory framing: 'I need to remember to ...' rather than 'remind me'",
+      "spelled-out clock times ('half past nine', 'quarter to four') more than digits"
+    ],
+    "action_bias": "balanced; a heavy medical-appointment calendar and a steady medication/admin list",
+    "leak_note": "All names, clubs and institutions are invented; none appears in the author's word list (gate-checked)."
+  },
+  "fillers": {
+    "names": ["Maureen", "Bernard", "Gwen", "Cyril", "Doreen", "Reginald", "Iris", "Stanley", "Enid", "Wilfred", "Marjorie", "Hugh", "Vera", "Clive", "Peggy", "Norman", "Sylvia", "Arthur"],
+    "event_titles": ["the cardiologist", "my physiotherapy session", "the blood test at the clinic", "the eye test", "the podiatry appointment", "bridge club", "the bowls match", "the coffee morning at the community centre", "the gardening club", "choir practice", "the memory clinic", "the hearing aid fitting", "lunch with Maureen", "the chiropodist", "the hospital transport", "the afternoon lecture at the community centre", "the pension review", "the flu jab", "my grandson's school play", "the ramblers walk", "the dental hygienist", "the volunteer shift at the charity shop"],
+    "task_titles": ["order my repeat prescription", "take the blood pressure tablets", "ring the surgery about the results", "post the birthday card to Gwen", "pay the council tax", "renew the bus pass", "water the greenhouse", "take the recycling out", "book the boiler service", "ring the pharmacy about the delivery", "fill in the pension form", "collect the dry cleaning", "write to the council about the hedge", "send the anniversary card", "book a taxi to the clinic", "top up the electricity meter", "return the library books", "put the washing on"],
+    "items": ["milk", "teabags", "digestives", "washing up liquid", "stamps", "denture tablets", "birdseed", "compost", "bin bags", "marmalade", "shortbread", "cough syrup", "hand cream", "hearing aid batteries", "tinned soup"],
+    "occasions": ["our wedding anniversary", "Bernard's birthday", "the village fete", "the remembrance service", "the clocks going back", "the outing to the coast", "the family lunch", "the garden open day", "my hospital review", "the winter fair"],
+    "quotable": ["the cardiologist", "bridge club", "the eye test", "choir practice", "the bowls match", "the flu jab", "the gardening club", "the memory clinic", "the pension review", "the chiropodist"],
+    "times": ["half past nine", "quarter past two", "eleven o'clock", "9:40am", "2:15pm", "half past two", "quarter to four", "3pm", "10am", "noon", "1:30pm", "midday", "8:30am", "twenty past three", "4:45pm", "7pm"],
+    "dates": ["tomorrow", "on tuesday", "on wednesday morning", "next thursday", "on the twelfth", "next week", "on friday", "this afternoon", "on monday", "the week after next", "in a fortnight", "on the second of next month", "today", "on sunday", "next tuesday", "the day after tomorrow"],
+    "recurrences": ["every wednesday", "every week", "every morning", "every other week", "monthly", "twice a week", "every day", "every monday", "every friday", "every month"],
+    "filler_words": ["well", "let me see", "oh", "now", "you know", "actually", "goodness", "right"]
+  },
+  "mix": {
+    "ce_datetime": 1.5, "ce_date_only": 1.4, "ce_attendee": 1.2, "ce_recurring": 1.4,
+    "ct_bare": 1.4, "ct_dated": 1.4, "polite_request": 1.8, "leadtime": 1.4,
+    "ramble_ce": 1.5, "q_schedule": 1.3, "ue_move": 1.2, "de_named": 1.2,
+    "three_ask": 0.6, "and_tt": 0.8, "generic_delete": 0.8
+  },
+  "templates": {
+    "ce_datetime": ["i have {event_title} {date} at {time}, please put that in the calendar", "would you put {event_title} in the diary for {date} at {time}"],
+    "ce_date_only": ["i have {event_title} {date}, do put that down", "please make a note that {event_title} is {date}"],
+    "ce_time_only": ["i have {event_title} at {time}, please put it in"],
+    "ce_attendee": ["i am seeing {name} for {event_title} {date}, put that in the diary"],
+    "ce_recurring": ["i have {event_title} {recurrence} at {time}, do put that in", "please put {event_title} in {recurrence} at {time}"],
+    "ce_allday": ["please mark {date} down as {occasion}"],
+    "ct_bare": ["i need to remember to {task_title}", "would you remind me to {task_title}"],
+    "ct_dated": ["i must remember to {task_title} {date}", "please remind me to {task_title} {date}"],
+    "ct_buy": ["i need to get {qty} {item} when i am out"],
+    "q_schedule": ["would you tell me what i have on {query_range}"],
+    "q_todos": ["what is it i still need to do {query_range}"],
+    "de_named": ["i shan't be going to {event_title} {date}, please cancel it"],
+    "dt_named": ["you can take {task_title} off my list now"],
+    "comp_todo": ["i have already done {task_title}, do cross it off"],
+    "ue_move": ["{event_title} has been moved to {time}, please change it"],
+    "ut_change": ["i shall {task_title} {date} instead"],
+    "npdecoy_attendees": ["i am meeting {name} and {name2} for {event_title} at {time}, put that in"],
+    "npdecoy_items": ["i need to get {item} and {item2} from the shop"],
+    "time_range": ["i have {event_title} {time_range}, please put that in the diary"],
+    "leadtime": ["put {event_title} in for {date} at {time} and do remind me {lead_time}"],
+    "polite_request": ["would you be kind enough to put {event_title} in for {date} at {time}", "if it is not too much trouble, please add {event_title} on {date} at {time}"],
+    "propose_q": ["do you think i ought to book {event_title} for {date}"],
+    "quoted_delete": ["please take '{quoted_item}' out of the diary"],
+    "generic_delete": ["you can delete {generic_target} now"],
+    "ramble_ce": ["{filler}, i had a letter about {event_title}, it is {date} at {time} {filler2}, please put it in"],
+    "and_ee": ["i have {event_title} {date} at {time} and {event_title2} at {time2}, please put both in", "put {event_title} in for {date} at {time} and {event_title2} at {time2}"],
+    "and_et": ["i have {event_title} {date} at {time} and i must remember to {task_title2}"],
+    "and_te": ["i need to remember to {task_title} and i have {event_title2} {date2}"],
+    "and_tt": ["i must remember to {task_title} and to {task_title2}"],
+    "joiner_then_et": ["put {event_title} in at {time}, and then remind me to {task_title2}"],
+    "also_ee": ["i have {event_title} {date} and also {event_title2} {date2}"],
+    "mixed_create_delete": ["please cancel {event_title2} and put {event_title} in for {date} instead"],
+    "three_ask": ["i have {event_title} at {time} and {event_title2} at {time2}, and i must remember to {task_title3}"]
+  }
+}

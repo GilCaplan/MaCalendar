@@ -19,8 +19,8 @@
     "recurrences": ["every day", "daily", "every week", "weekly", "every monday", "every tuesday and thursday", "every other week", "every other tuesday", "every weekday", "once a week", "twice a week", "every sunday", "monthly", "every month", "every wednesday"],
     "lead_times": ["30 minutes before", "an hour before", "15 minutes before", "a day before", "10 minutes before", "two hours before", "20 minutes before", "the night before"],
     "durations": ["by 30 minutes", "by an hour", "by 15 minutes", "to two hours", "by half an hour", "by 20 minutes", "by 45 minutes"],
-    "query_ranges": ["today", "tomorrow", "this week", "next week", "this month", "this weekend", "on friday", "the rest of the day", "next monday", "the next three days"],
-    "generic_targets": ["this event", "that appointment", "my reminder", "the task", "it", "this one", "that thing", "the last one", "that entry", "this booking"],
+    "query_ranges": ["today", "tomorrow", "this week", "next week", "this month", "this weekend", "on friday", "the rest of the day", "next monday", "the next three days", "on tuesday", "the rest of the week", "this evening", "next thursday"],
+    "generic_targets": ["this event", "that appointment", "my reminder", "the task", "it", "this one", "that thing", "the last one", "that entry", "this booking", "that reminder", "the one i just added", "that one", "this item"],
     "filler_words": ["um", "uh", "so", "like", "you know", "i mean", "erm", "right"]
   }
 }

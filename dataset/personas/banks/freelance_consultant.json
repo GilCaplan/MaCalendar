@@ -1,0 +1,68 @@
+{
+  "persona": {
+    "id": "freelance_consultant",
+    "label": "Freelance consultant",
+    "role": "the meeting-heavy professional register",
+    "speech_habits": [
+      "polished and verbose; full clauses, hedged politeness ('if you could', 'let's say')",
+      "business idiom for scheduling: 'block off', 'pencil in', 'put a hold on', 'get a slot in'",
+      "subordinate clauses and appositives before the actual ask",
+      "mixes 12-hour and 24-hour clock; names client organisations inside the title"
+    ],
+    "action_bias": "event-heavy, with a real update/reschedule tail (client calls move constantly)",
+    "leak_note": "Client organisations, colleagues and cities are invented composites; none appears in the author's word list (gate-checked)."
+  },
+  "fillers": {
+    "names": ["Halvard", "Ingrid", "Mateus", "Sofie", "Declan", "Yuki", "Anneke", "Rasmus", "Lucia", "Tomasz", "Bettina", "Emeka", "Camille", "Aurelio", "Freya", "Kwame"],
+    "event_titles": ["the discovery call with Northvale", "the Aldergate kickoff", "the retainer review", "the stakeholder workshop", "the scoping session", "the Calderwood steering committee", "the quarterly business review", "the Merion Partners debrief", "the site visit in Rotterdam", "the flight to Lisbon", "the onboarding walkthrough", "the pricing conversation", "the Vantell demo", "the contract negotiation", "the Brightwater retro", "the coworking desk booking", "the Petrichor Labs interview", "the client dinner", "the board readout", "the handover session", "the discovery workshop", "the escalation call"],
+    "task_titles": ["send the invoice to Aldergate", "chase the outstanding invoice", "draft the statement of work", "file the quarterly return", "update the capacity tracker", "write up the discovery notes", "renew the professional indemnity cover", "reconcile the expenses", "follow up on the Calderwood proposal", "book the flights to Lisbon", "reply to the Merion Partners tender", "update my rate card", "revoke the Northvale repository access", "prepare the deck for the steering committee", "submit the timesheet", "invoice for the workshop day", "confirm the visa paperwork", "back up the client files"],
+    "items": ["printer toner", "business cards", "a travel adapter", "notebooks", "whiteboard markers", "coffee pods", "a laptop stand", "memory cards", "a power bank", "postage stamps", "index cards", "an external drive", "presentation clickers", "charging cables", "sticky notes"],
+    "occasions": ["the conference in Lisbon", "the tax year end", "the Aldergate go live", "the retainer renewal", "the invoicing deadline", "the industry summit", "the client offsite", "the contract expiry", "my annual leave", "the quarter close"],
+    "quotable": ["the retainer review", "the Aldergate kickoff", "the scoping session", "the client dinner", "the Vantell demo", "the board readout", "the pricing conversation", "the handover session", "the escalation call", "the quarterly business review"],
+    "times": ["9am", "10:00", "2pm", "14:30", "half past eight", "11:15am", "4:30pm", "noon", "8:45am", "3pm", "5pm", "7:30am", "1pm", "midday", "6:15pm", "16:00"],
+    "dates": ["tomorrow", "on tuesday", "on wednesday", "next monday", "next week", "on the eleventh", "on thursday", "the week after next", "on friday", "this afternoon", "on the twenty second", "in two days", "next month", "on the fourth", "today", "on monday"],
+    "recurrences": ["every fortnight", "monthly", "every other week", "every tuesday", "weekly", "every month", "twice a week", "every thursday", "every other tuesday", "every week"],
+    "filler_words": ["so", "essentially", "if you could", "realistically", "look", "just", "ideally", "right"]
+  },
+  "mix": {
+    "ce_datetime": 1.8, "ce_attendee": 1.6, "ce_time_only": 1.3, "npdecoy_attendees": 1.6,
+    "ue_move": 1.8, "de_named": 1.4, "polite_request": 1.8, "leadtime": 1.4,
+    "time_range": 1.4, "and_ee": 1.4, "mixed_create_delete": 1.4, "q_schedule": 1.3,
+    "ct_buy": 0.5, "npdecoy_items": 0.5, "comp_todo": 0.7, "and_tt": 0.7
+  },
+  "templates": {
+    "ce_datetime": ["block off {event_title} {date} at {time}", "let's get {event_title} in the diary for {date} at {time}"],
+    "ce_date_only": ["pencil in {event_title} for {date}", "put a hold on {date} for {event_title}"],
+    "ce_time_only": ["block off {event_title} at {time}"],
+    "ce_attendee": ["set up {event_title} with {name} {date}", "book {event_title} with {name} for {date}"],
+    "ce_recurring": ["make {event_title} a standing slot {recurrence} at {time}"],
+    "ce_allday": ["block out {date} entirely for {occasion}"],
+    "ct_bare": ["add a reminder to {task_title}"],
+    "ct_dated": ["remind me to {task_title} {date}"],
+    "ct_buy": ["add {qty} {item} to the office order"],
+    "q_schedule": ["what does my diary look like {query_range}"],
+    "q_todos": ["what is still outstanding on my list for {query_range}"],
+    "de_named": ["cancel {event_title} on {date}", "drop {event_title} from {date}"],
+    "dt_named": ["take {task_title} off the list"],
+    "comp_todo": ["mark {task_title} as done"],
+    "ue_move": ["push {event_title} to {time}", "can we move {event_title} to {time}"],
+    "ut_change": ["move {task_title} to {date}"],
+    "npdecoy_attendees": ["set up {event_title} with {name} and {name2} at {time}", "book {event_title} with {name} and {name2} for {time}"],
+    "npdecoy_items": ["order {item} and {item2} for the office"],
+    "time_range": ["block off {event_title} {time_range}"],
+    "leadtime": ["book {event_title} {date} at {time} and give me a nudge {lead_time}"],
+    "polite_request": ["if you could put {event_title} in for {date} at {time} that would be great", "would you mind booking {event_title} for {date} at {time}"],
+    "propose_q": ["do you think i should book {event_title} for {date}"],
+    "quoted_delete": ["please cancel '{quoted_item}'"],
+    "generic_delete": ["cancel {generic_target}"],
+    "ramble_ce": ["{filler} we should probably get {event_title} in for {date} at {time}, {filler2}"],
+    "and_ee": ["block off {event_title} {date} at {time} and {event_title2} at {time2}", "book {event_title} {date} at {time} and then {event_title2} at {time2}"],
+    "and_et": ["set up {event_title} {date} at {time} and remind me to {task_title2}"],
+    "and_te": ["remind me to {task_title} and get {event_title2} in the diary for {date2}"],
+    "and_tt": ["remind me to {task_title} and to {task_title2}"],
+    "joiner_then_et": ["book {event_title} at {time}, then remind me to {task_title2}"],
+    "also_ee": ["pencil in {event_title} for {date} and also {event_title2} for {date2}"],
+    "mixed_create_delete": ["cancel {event_title2} and set up {event_title} for {date} instead"],
+    "three_ask": ["block off {event_title} at {time} and {event_title2} at {time2}, and remind me to {task_title3}"]
+  }
+}

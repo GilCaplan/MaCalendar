@@ -1,0 +1,68 @@
+{
+  "persona": {
+    "id": "esl_speaker",
+    "label": "Non-native English speaker",
+    "role": "the syntax stress test — the same asks in unidiomatic English",
+    "speech_habits": [
+      "article drops and article insertions ('add the meeting in calendar', 'I have meeting')",
+      "calqued prepositions of time ('in monday', 'at friday', 'on the next week')",
+      "infinitive-heavy modals ('I must to call', 'please to add')",
+      "24-hour clock throughout, and topic-fronting ('the doctor, I have at 15:00')"
+    ],
+    "action_bias": "balanced, admin-heavy (permits, forms, appointments)",
+    "leak_note": "All names and institutions are invented; none appears in the author's word list (gate-checked). The register is deliberately unidiomatic — the point is that the parser meets grammar it was never tuned on."
+  },
+  "fillers": {
+    "names": ["Duc", "Yelena", "Bogdan", "Mei", "Aigerim", "Hasan", "Kirill", "Chiara", "Andrei", "Nurlan", "Farida", "Renata", "Ruslan", "Ines", "Zhen", "Petra"],
+    "event_titles": ["the meeting with the manager", "the language course", "the visa appointment", "the doctor", "the interview", "the shift in the warehouse", "the driving lesson", "the residence permit office", "the bank appointment", "the parents meeting in school", "the football match", "the community meeting", "the dentist control", "the training in the office", "the video call with family", "the exam of the language school", "the apartment viewing", "the tax office appointment", "the medical control", "the meeting of the tenants"],
+    "task_titles": ["call the landlord", "make the translation of the documents", "pay the rent", "send money to family", "print the contract", "buy the ticket for the bus", "fill the form of the insurance", "book the appointment in the clinic", "ask the manager for the schedule", "renew the permit", "clean the apartment", "return the book in the library", "write the email to the teacher", "take the medicine", "charge the transport card", "make the photo for the documents", "pay the electricity", "confirm the address in the office"],
+    "items": ["rice", "bread", "onions", "cooking oil", "phone credit", "soap", "tea", "sugar", "chicken", "potatoes", "shampoo", "notebook", "sim card", "tomatoes", "milk"],
+    "occasions": ["the national holiday", "the birthday of my mother", "the visa expiry", "the school holiday", "the exam day", "the arrival of my brother", "the end of the contract", "the language test", "the moving day", "the family celebration"],
+    "quotable": ["the language course", "the visa appointment", "the driving lesson", "the interview", "the bank appointment", "the football match", "the medical control", "the apartment viewing", "the training in the office", "the tax office appointment"],
+    "times": ["15:00", "9:00", "18:30", "07:00", "12:00", "20:00", "13:45", "10:00", "16:15", "8:00", "19:00", "11:30", "14:00", "6:00", "17:30", "21:00"],
+    "dates": ["tomorrow", "in monday", "at friday", "on the next week", "today", "in the wednesday", "next week", "at thursday", "in tuesday", "the next monday", "in this saturday", "after tomorrow", "in the next month", "at sunday", "in ten october", "this evening"],
+    "recurrences": ["each week", "each monday", "every week", "every day", "each month", "two times in week", "every tuesday", "each friday", "every other week", "monthly"],
+    "filler_words": ["how to say", "eh", "please", "sorry", "yes", "and", "also", "so"]
+  },
+  "mix": {
+    "ce_datetime": 1.5, "ce_date_only": 1.3, "ct_bare": 1.3, "ct_dated": 1.3,
+    "polite_request": 1.4, "ce_attendee": 1.2, "ce_allday": 1.2, "ct_buy": 1.2,
+    "and_et": 1.2, "and_tt": 1.2, "q_schedule": 1.1, "ramble_ce": 1.2,
+    "quoted_delete": 0.7, "time_range": 0.8, "three_ask": 0.8
+  },
+  "templates": {
+    "ce_datetime": ["please to add {event_title} {date} at {time}", "i have {event_title} {date} at {time}, put in calendar"],
+    "ce_date_only": ["add {event_title} {date}", "{event_title} is {date}, please put in the calendar"],
+    "ce_time_only": ["make {event_title} at {time}"],
+    "ce_attendee": ["i have {event_title} with {name} {date}"],
+    "ce_recurring": ["i have {event_title} {recurrence} at {time}"],
+    "ce_allday": ["mark {date} like {occasion}"],
+    "ct_bare": ["i must to {task_title}", "remind me that i {task_title}"],
+    "ct_dated": ["i must to {task_title} {date}", "remind me {task_title} {date}"],
+    "ct_buy": ["i need to buy {qty} {item}"],
+    "q_schedule": ["what i have {query_range}"],
+    "q_todos": ["what is in my list {query_range}"],
+    "de_named": ["delete {event_title} {date}"],
+    "dt_named": ["remove {task_title} from the list"],
+    "comp_todo": ["{task_title} is finished already"],
+    "ue_move": ["change {event_title} to {time}"],
+    "ut_change": ["move {task_title} for {date}"],
+    "npdecoy_attendees": ["i have {event_title} with {name} and {name2} at {time}"],
+    "npdecoy_items": ["i need to buy {item} and {item2}"],
+    "time_range": ["i have {event_title} {time_range}"],
+    "leadtime": ["add {event_title} {date} at {time}, remind me {lead_time}"],
+    "polite_request": ["can you please to add {event_title} {date} at {time}", "please you add {event_title} in {date} at {time}"],
+    "propose_q": ["is good if i book {event_title} {date}"],
+    "quoted_delete": ["delete please '{quoted_item}'"],
+    "generic_delete": ["delete {generic_target} please"],
+    "ramble_ce": ["{filler}, i have {event_title} {date} at {time}, {filler2} put in calendar"],
+    "and_ee": ["i have {event_title} {date} at {time} and {event_title2} at {time2}"],
+    "and_et": ["add {event_title} {date} at {time} and remind me to {task_title2}"],
+    "and_te": ["i must to {task_title} and i have {event_title2} {date2}"],
+    "and_tt": ["i must to {task_title} and {task_title2}"],
+    "joiner_then_et": ["add {event_title} at {time}, after that remind me to {task_title2}"],
+    "also_ee": ["i have {event_title} {date} and also {event_title2} {date2}"],
+    "mixed_create_delete": ["delete {event_title2} and add {event_title} {date}"],
+    "three_ask": ["i have {event_title} at {time} and {event_title2} at {time2}, and remind me to {task_title3}"]
+  }
+}

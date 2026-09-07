@@ -1,0 +1,66 @@
+{
+  "persona": {
+    "id": "observant_student",
+    "label": "Religious Israeli student",
+    "role": "CONTROL — deliberately the register closest to the engine's author",
+    "speech_habits": [
+      "imperative, medium length, grammatically complete",
+      "code-switches transliterated Hebrew nouns into English frames ('book the chavruta', 'add the melava malka')",
+      "names days and learning sessions rather than clock times as often as not",
+      "polite but not effusive; occasional 'can you' framing"
+    ],
+    "action_bias": "balanced, slightly event-heavy (a timetable of fixed learning sessions plus errands)",
+    "leak_note": "Every proper noun is invented. The observance REGISTER is deliberately shared with the author (that is what makes this the control), but every specific term was chosen to avoid the author's own word list — verified by gen_personas.py's leak gate, not by eye."
+  },
+  "fillers": {
+    "names": ["Netanel", "Doron", "Refael", "Adina", "Nechama", "Batya", "Elisheva", "Menachem", "Shlomo", "Avigail", "Yehoshua", "Malka", "Tzofia", "Asher", "Rivka", "Devorah", "Naftali", "Chedva"],
+    "event_titles": ["chavruta", "night seder", "halacha class", "gemara review", "mussar circle", "megillah reading", "the siyum", "melava malka", "ulpan session", "the vaad meeting", "havdalah at the moadon", "sukkah building", "the linear algebra tutorial", "the signals lab", "the study group at Beit Nofim", "chesed shift at the food bank", "the bus to Nofei Tamar", "the yeshiva open evening", "orientation at Ilanot Institute", "the matzah bakery trip", "reserve duty briefing", "the meal at Batya's", "tzedakah committee", "the trip to Ramat Zohar"],
+    "task_titles": ["order the seforim", "pay the vaad bill", "return the library books", "book the sherut to Kfar Ilanot", "email the rosh kollel", "print the chavruta sheets", "renew the student card", "submit the ulpan form", "call Doron about the sukkah panels", "buy candles for the moadon", "send the tzedakah receipts", "finish the halacha write-up", "arrange a ride to Ramat Zohar", "sign up for the siyum", "hand in the lab report", "fix the bike before the trip", "collect the parcel from the makolet", "top up the transit card"],
+    "items": ["grape juice", "challah rolls", "olive oil", "paper cups", "candles", "soup mix", "tinned tuna", "pita", "hummus", "rice", "chickpeas", "batteries", "tea lights", "napkins", "cottage cheese", "flour", "dish soap", "instant coffee"],
+    "occasions": ["the yeshiva retreat", "my brother's bar mitzvah", "Adina's engagement", "the fast", "the tractate finish", "moving day at Beit Nofim", "the semester break", "the Ilanot open day", "reserve duty week", "the Nofei Tamar reunion"],
+    "quotable": ["chavruta", "night seder", "halacha class", "ulpan session", "vaad meeting", "sukkah building", "megillah reading", "gemara review", "mussar circle", "melava malka"],
+    "times": ["7am", "7:15am", "8pm", "half past ten", "midnight", "9:30pm", "6am", "quarter to eight", "noon", "1:30pm", "5pm", "10pm", "8:45am", "3:15pm", "11:30am", "4:30pm"],
+    "dates": ["today", "tomorrow", "tonight", "this evening", "on sunday", "on monday", "on tuesday", "on wednesday", "on thursday", "next sunday", "next week", "the day after tomorrow", "on the fourteenth", "this afternoon", "in two days", "next month", "on the third", "on saturday night"],
+    "recurrences": ["every day", "every week", "every sunday", "every monday", "every tuesday and thursday", "every other week", "twice a week", "once a week", "every wednesday", "monthly"]
+  },
+  "mix": {
+    "ce_datetime": 1.4, "ce_date_only": 1.2, "ce_recurring": 1.4, "ce_attendee": 1.0,
+    "ct_dated": 1.2, "ct_bare": 1.0, "q_schedule": 1.0, "q_todos": 0.8,
+    "and_ee": 1.2, "and_et": 1.2, "npdecoy_attendees": 1.0
+  },
+  "templates": {
+    "ce_datetime": ["book {event_title} {date} at {time}", "put {event_title} in for {date} at {time}"],
+    "ce_date_only": ["add {event_title} {date}", "put {event_title} on the calendar for {date}"],
+    "ce_time_only": ["schedule {event_title} at {time}"],
+    "ce_attendee": ["book {event_title} with {name} {date}"],
+    "ce_recurring": ["set up {event_title} {recurrence} at {time}", "put {event_title} in {recurrence} at {time}"],
+    "ce_allday": ["mark {date} as {occasion}"],
+    "ct_bare": ["remind me to {task_title}", "add {task_title} to my list"],
+    "ct_dated": ["remind me to {task_title} {date}"],
+    "ct_buy": ["remind me to pick up {qty} {item}"],
+    "q_schedule": ["what do i have {query_range}"],
+    "q_todos": ["what is still on my list for {query_range}"],
+    "de_named": ["cancel {event_title} {date}"],
+    "dt_named": ["take {task_title} off my list"],
+    "comp_todo": ["i already did {task_title}"],
+    "ue_move": ["move {event_title} to {time}"],
+    "ut_change": ["push {task_title} to {date}"],
+    "npdecoy_attendees": ["book {event_title} with {name} and {name2} at {time}"],
+    "npdecoy_items": ["remind me to buy {item} and {item2}"],
+    "time_range": ["book {event_title} {time_range}"],
+    "leadtime": ["book {event_title} {date} at {time} and remind me {lead_time}"],
+    "polite_request": ["can you put {event_title} in for {date} at {time} please"],
+    "propose_q": ["should i book {event_title} for {date}"],
+    "quoted_delete": ["remove '{quoted_item}' from my calendar"],
+    "generic_delete": ["delete {generic_target}"],
+    "ramble_ce": ["{filler} i think i need {event_title} {date} at {time} {filler2}"],
+    "and_ee": ["book {event_title} {date} at {time} and {event_title2} at {time2}", "put in {event_title} {date} at {time} and also {event_title2} at {time2}"],
+    "and_et": ["book {event_title} {date} at {time} and remind me to {task_title2}"],
+    "and_te": ["remind me to {task_title} and book {event_title2} {date2}"],
+    "and_tt": ["remind me to {task_title} and {task_title2}"],
+    "joiner_then_et": ["schedule {event_title} at {time}, then remind me to {task_title2}"],
+    "also_ee": ["add {event_title} {date} and also {event_title2} {date2}"],
+    "mixed_create_delete": ["cancel {event_title2} and book {event_title} {date}"],
+    "three_ask": ["book {event_title} at {time} and {event_title2} at {time2} and remind me to {task_title3}"]
+  }
+}

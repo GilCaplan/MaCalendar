@@ -45,6 +45,31 @@ class Featurizer:
         return len(self.names)
 
 
+def _user_says_event(text: str) -> bool:
+    """Does the user's own CATEGORY config recognise this as an occasion?
+
+    `categories.classify` reads the user's categories file (their scheme,
+    their keywords). A confident non-default category means the user has
+    already taught the app that these words describe something they put on
+    a calendar. Any failure is simply "no signal".
+    """
+    try:
+        from assistant.actions.calendar.categories import classify
+        cat = classify(text)
+        return bool(cat) and cat.lower() not in ("", "other", "personal")
+    except Exception:
+        return False
+
+
+def _user_says_task(text: str) -> bool:
+    """Does the user's own TAG scheme recognise this as a to-do?"""
+    try:
+        from assistant.actions.todo.tagging import suggest_tags
+        return bool(suggest_tags(text))
+    except Exception:
+        return False
+
+
 def _has(pattern: str, text: str) -> float:
     return 1.0 if re.search(pattern, text) else 0.0
 
@@ -208,11 +233,25 @@ class AtomicityFeatures(Featurizer):
 
 
 class KindFeatures(Featurizer):
-    """Signals for event vs task."""
+    """Signals for event vs task.
+
+    Two of these features read WORD LISTS (occasion nouns, activity nouns),
+    which is the one place a user's own vocabulary could matter: with a
+    strong structural signal the lists are irrelevant ("book shiur every
+    tuesday at 8pm" is decided by book/every-tuesday/8pm), but a bare
+    command with no verb and no time has only the noun to go on.
+
+    So the last two features are PERSONAL, read from the user's own config
+    at inference — no training, no refit, and correct for any user on day
+    one. The user has already told the app that "shiur" is a Prayer-type
+    thing; the model simply was not reading it (Gil's principle:
+    personalisation by lookup, not by training).
+    """
 
     names = ["bias", "clock", "dated", "remindish", "remind-to-verb", "occasion",
              "list-words", "buy-verbs", "calendar-words", "with-name", "recur",
-             "long", "activity-noun", "at-num", "chore-noun", "for-me"]
+             "long", "activity-noun", "at-num", "chore-noun", "for-me",
+             "user-category", "user-tag"]
 
     def extract(self, text: str) -> "list[float]":
         low = text.lower()
@@ -234,6 +273,9 @@ class KindFeatures(Featurizer):
             h(r"\bat\s+\d{1,2}\b"),
             h(r"\b(?:errand|chore|homework|assignment|laundry|dishes|email|form|bill|report)\b"),
             h(r"\bfor\s+(?:me|us)\b|\bmy\s+(?:place|house|office)\b"),
+            # the user's OWN configuration, read at inference
+            1.0 if _user_says_event(text) else 0.0,
+            1.0 if _user_says_task(text) else 0.0,
         ]
 
 

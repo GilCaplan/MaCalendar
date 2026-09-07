@@ -1,0 +1,68 @@
+{
+  "persona": {
+    "id": "household_parent",
+    "label": "Parent running a household",
+    "role": "the high-volume task user — logistics for other people",
+    "speech_habits": [
+      "rushed and run-on: asks chain with 'and', 'also', 'oh and' rather than stopping",
+      "drops the subject and often the verb ('swimming kit tomorrow')",
+      "mid-utterance self-correction and afterthoughts",
+      "school/childcare register; days-of-the-week and 'after school' more often than clock times"
+    ],
+    "action_bias": "task-heavy — the calendar is other people's fixtures, the list is everything else",
+    "leak_note": "Every child, adult and place name is invented; none appears in the author's word list (gate-checked)."
+  },
+  "fillers": {
+    "names": ["Otis", "Wren", "Clemmie", "Bram", "Marisol", "Kofi", "Sunita", "Theo", "Mabel", "Zadie", "Hugo", "Noor", "Elsie", "Nadia", "Rafi", "Bea"],
+    "event_titles": ["the school run", "parents evening", "Otis's swimming lesson", "soccer practice", "the pediatrician", "the dentist for Wren", "ballet class", "the class trip meeting", "the playdate at Marisol's", "the school assembly", "the orthodontist", "the vaccination clinic", "the PTA meeting", "the nursery open morning", "the swimming gala", "the childminder handover", "cub scouts", "the piano lesson", "the party at the trampoline place", "school photo day", "the paediatric physio", "the car service", "the parent teacher call", "pickup from after school club"],
+    "task_titles": ["pack the swimming kit", "sign the permission slip", "email the class teacher", "book the childminder", "wash the football kit", "top up the lunch money", "buy a present for Clemmie", "label the school jumpers", "refill the inhaler prescription", "return Otis's library book", "sort out the school shoes", "put the bins out", "defrost the chicken", "make the packed lunches", "chase the nursery invoice", "reply to the class group chat", "book the MOT", "order more nappies", "cancel the newspaper", "sew the name tapes on"],
+    "items": ["milk", "bread", "nappies", "washing powder", "bananas", "yoghurts", "juice boxes", "cereal", "chicken nuggets", "plasters", "kitchen roll", "toothpaste", "fish fingers", "pasta", "sun cream", "school socks", "birthday candles", "wet wipes"],
+    "occasions": ["sports day", "half term", "Otis's birthday", "the school holiday", "the nativity play", "an inset day", "the class assembly", "grandparents day", "the swimming gala", "the summer fair"],
+    "quotable": ["swimming lesson", "soccer practice", "ballet class", "the school run", "parents evening", "cub scouts", "the piano lesson", "school photo day", "the orthodontist", "the PTA meeting"],
+    "times": ["8:15am", "3:15pm", "half past three", "quarter past four", "5:45pm", "7pm", "6:30am", "midday", "4pm", "9am", "1:45pm", "10:30am", "5pm", "8am", "2:30pm", "bedtime"],
+    "dates": ["tomorrow", "today", "on thursday", "on friday", "after school", "on the fifteenth", "next tuesday", "next week", "on monday", "tonight", "this afternoon", "on saturday", "in the morning", "the day after tomorrow", "on wednesday", "next thursday"],
+    "recurrences": ["every school day", "every wednesday", "every other saturday", "every week", "every monday", "twice a week", "every tuesday and thursday", "daily", "every weekday", "monthly"],
+    "filler_words": ["oh", "um", "actually", "wait", "sorry", "hang on", "also", "right"]
+  },
+  "mix": {
+    "ct_bare": 2.0, "ct_dated": 2.0, "ct_buy": 1.8, "npdecoy_items": 1.5,
+    "comp_todo": 1.5, "dt_named": 1.2, "and_tt": 1.6, "and_te": 1.5, "and_et": 1.5,
+    "three_ask": 1.3, "ce_recurring": 1.2, "q_todos": 1.3,
+    "polite_request": 0.5, "propose_q": 0.6, "time_range": 0.6, "quoted_delete": 0.6
+  },
+  "templates": {
+    "ce_datetime": ["{event_title} {date} at {time}", "stick {event_title} in {date} at {time}"],
+    "ce_date_only": ["{event_title} {date}", "we've got {event_title} {date}, put it in"],
+    "ce_time_only": ["{event_title} at {time}"],
+    "ce_attendee": ["{event_title} with {name} {date}"],
+    "ce_recurring": ["{event_title} {recurrence} at {time}", "{recurrence} at {time} it's {event_title}"],
+    "ce_allday": ["{date} is {occasion}"],
+    "ct_bare": ["remind me to {task_title}", "i need to {task_title}", "don't let me forget to {task_title}"],
+    "ct_dated": ["remind me to {task_title} {date}", "{task_title} {date}"],
+    "ct_buy": ["we need {qty} {item}", "get {qty} {item}"],
+    "q_schedule": ["what have we got on {query_range}"],
+    "q_todos": ["what's left on my list {query_range}"],
+    "de_named": ["cancel {event_title} {date}"],
+    "dt_named": ["scrap {task_title}"],
+    "comp_todo": ["{task_title} is done", "did {task_title} already"],
+    "ue_move": ["move {event_title} to {time}"],
+    "ut_change": ["{task_title} can wait till {date}"],
+    "npdecoy_attendees": ["{event_title} with {name} and {name2} at {time}"],
+    "npdecoy_items": ["get {item} and {item2}"],
+    "time_range": ["{event_title} {time_range}"],
+    "leadtime": ["{event_title} {date} at {time}, remind me {lead_time}"],
+    "polite_request": ["could you put {event_title} in for {date} at {time}"],
+    "propose_q": ["should i put {event_title} in for {date}"],
+    "quoted_delete": ["get rid of '{quoted_item}'"],
+    "generic_delete": ["scrap {generic_target}"],
+    "ramble_ce": ["{filler} {event_title} is {date}, {filler2} at {time} i think, put it in"],
+    "and_ee": ["{event_title} {date} at {time} and {event_title2} at {time2}", "{event_title} {date} at {time} and then {event_title2} at {time2}"],
+    "and_et": ["{event_title} {date} at {time} and remind me to {task_title2}", "{event_title} {date} at {time}, oh and i need to {task_title2}"],
+    "and_te": ["i need to {task_title} and {event_title2} is {date2}", "remind me to {task_title} and put {event_title2} in for {date2}"],
+    "and_tt": ["i need to {task_title} and {task_title2}", "remind me to {task_title} and also {task_title2}"],
+    "joiner_then_et": ["{event_title} at {time}, then i need to {task_title2}"],
+    "also_ee": ["{event_title} {date} and also {event_title2} {date2}"],
+    "mixed_create_delete": ["cancel {event_title2} and put {event_title} in {date}"],
+    "three_ask": ["{event_title} at {time} and {event_title2} at {time2} and i need to {task_title3}"]
+  }
+}

@@ -1,0 +1,6 @@
+# Words that appear in the author's personal vocabulary but are ordinary
+# general English, so their presence in a persona row is not a leak.
+# Same idea as DOCUMENTATION/artifacts/public_words.txt: a word is a leak
+# UNLESS declared here, with a reason.
+
+tomorrow      # a date word every English speaker uses; unavoidable in a calendar dataset

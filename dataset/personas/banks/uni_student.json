@@ -1,0 +1,68 @@
+{
+  "persona": {
+    "id": "uni_student",
+    "label": "University student",
+    "role": "the terse end of the spectrum — the shortest utterances in the set",
+    "speech_habits": [
+      "fragments with no verb at all: 'gym 6am tuesday', 'lecture 9am'",
+      "no politeness markers, no punctuation, lowercase register",
+      "slang verbs ('chuck', 'stick', 'bin', 'sesh') and clipped nouns",
+      "time-first and title-first orderings that other personas never use"
+    ],
+    "action_bias": "create-heavy and delete-heavy (plans churn); very few polite or proposal forms",
+    "leak_note": "All names, modules and venues are invented; none appears in the author's word list (gate-checked)."
+  },
+  "fillers": {
+    "names": ["Kez", "Dev", "Marnie", "Ollie", "Sanne", "Bo", "Tariq", "Lena", "Jonty", "Rhys", "Immy", "Kaya", "Zeke", "Bex", "Milo", "Suki"],
+    "event_titles": ["the 9am lecture", "signals tutorial", "the lab session", "office hours", "group project meeting", "the exam", "the resit", "flat viewing", "society social", "the careers fair", "gym", "the seminar", "poster session", "demo day", "the pub quiz", "house meeting", "the induction talk", "library sesh", "the coding workshop", "the guest lecture", "football", "the module briefing"],
+    "task_titles": ["finish the problem set", "submit the lab report", "read the chapter for the seminar", "email the module lead", "print the poster", "do the laundry", "return the borrowed charger", "pay the flat bills", "sign up for the exam slot", "book a study room", "fix the bibliography", "back up the dissertation", "renew the railcard", "cancel the gym membership", "reply to the supervisor", "sort out the housing contract", "clear the fridge", "top up the printer credit"],
+    "items": ["instant noodles", "energy drinks", "highlighters", "frozen pizza", "oat milk", "cereal bars", "washing pods", "a phone charger", "biros", "coffee", "toilet roll", "a usb stick", "rice", "beans", "bin bags"],
+    "occasions": ["deadline day", "reading week", "the exam period", "results day", "moving out", "freshers week", "the ball", "the last seminar", "the deposit deadline", "the field trip"],
+    "quotable": ["signals tutorial", "the lab session", "office hours", "gym", "the seminar", "poster session", "demo day", "the pub quiz", "house meeting", "library sesh"],
+    "times": ["9am", "6am", "half 6", "2pm", "11pm", "midnight", "8:30", "1am", "3pm", "10:15", "noon", "7pm", "half 9", "4:45pm", "12:30", "5pm"],
+    "dates": ["tomorrow", "tuesday", "friday", "tonight", "next week", "monday", "the weekend", "thursday", "sunday", "today", "wednesday", "later", "saturday", "next monday", "in the morning", "next friday"],
+    "recurrences": ["every week", "every tuesday", "weekly", "every monday", "every day", "twice a week", "every wednesday", "every other week", "every thursday", "daily"],
+    "filler_words": ["yeah", "erm", "like", "basically", "uh", "dunno", "ok so", "right"]
+  },
+  "mix": {
+    "ce_datetime": 1.8, "ce_time_only": 1.6, "ce_date_only": 1.5, "ct_bare": 1.4,
+    "de_named": 1.5, "dt_named": 1.3, "comp_todo": 1.3, "and_ee": 1.3, "and_et": 1.3,
+    "q_schedule": 1.2, "q_todos": 1.2, "generic_delete": 1.3,
+    "polite_request": 0.4, "propose_q": 0.5, "ramble_ce": 0.8, "leadtime": 0.7, "ce_allday": 0.7
+  },
+  "templates": {
+    "ce_datetime": ["{event_title} {time} {date}", "{event_title} {date} {time}"],
+    "ce_date_only": ["{event_title} {date}", "chuck {event_title} in {date}"],
+    "ce_time_only": ["{event_title} {time}", "stick {event_title} at {time}"],
+    "ce_attendee": ["{event_title} with {name} {date}"],
+    "ce_recurring": ["{event_title} {recurrence} {time}"],
+    "ce_allday": ["{date} is {occasion}"],
+    "ct_bare": ["remind me {task_title}", "todo {task_title}"],
+    "ct_dated": ["{task_title} {date}"],
+    "ct_buy": ["need {qty} {item}"],
+    "q_schedule": ["what's on {query_range}"],
+    "q_todos": ["todo list {query_range}"],
+    "de_named": ["bin {event_title} {date}", "cancel {event_title} {date}"],
+    "dt_named": ["bin {task_title}"],
+    "comp_todo": ["{task_title} done"],
+    "ue_move": ["move {event_title} to {time}"],
+    "ut_change": ["{task_title} pushed to {date}"],
+    "npdecoy_attendees": ["{event_title} with {name} and {name2} {time}"],
+    "npdecoy_items": ["need {item} and {item2}"],
+    "time_range": ["{event_title} {time_range}"],
+    "leadtime": ["{event_title} {date} {time} ping me {lead_time}"],
+    "polite_request": ["can you add {event_title} {date} {time}"],
+    "propose_q": ["should i book {event_title} {date}"],
+    "quoted_delete": ["bin '{quoted_item}'"],
+    "generic_delete": ["bin {generic_target}"],
+    "ramble_ce": ["{filler} {event_title} {date} {time} {filler2}"],
+    "and_ee": ["{event_title} {date} {time} and {event_title2} {time2}", "{event_title} {time} {date} plus {event_title2} {time2}"],
+    "and_et": ["{event_title} {date} {time} and remind me {task_title2}"],
+    "and_te": ["remind me {task_title} and {event_title2} {date2}"],
+    "and_tt": ["remind me {task_title} and {task_title2}"],
+    "joiner_then_et": ["{event_title} {time} then remind me {task_title2}"],
+    "also_ee": ["{event_title} {date} also {event_title2} {date2}"],
+    "mixed_create_delete": ["bin {event_title2} and {event_title} {date}"],
+    "three_ask": ["{event_title} {time} and {event_title2} {time2} and remind me {task_title3}"]
+  }
+}
