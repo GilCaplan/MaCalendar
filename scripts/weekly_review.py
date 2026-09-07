@@ -81,10 +81,23 @@ def main() -> None:
     mem = get_memory(); vocab = get_vocab()
     since = time.time() - args.days * 86400
     rows = [r for r in mem.recent(5000) if r["ts"] >= since]
+    # THIS REPORT IS THE ONLY INSTRUMENT POINTED AT REAL USAGE — the flag rate
+    # here is the tripwire that catches the improvement loop making the
+    # benchmarks better while making the assistant worse. Counting the loop's
+    # OWN test traffic in it defeats the purpose: a recent week ran 66 test
+    # commands against 20 real ones, so the headline was four-fifths harness.
+    # `source: "test"` is the same label the review feed already filters.
+    test_rows = [r for r in rows if r["source"] == "test"]
+    rows = [r for r in rows if r["source"] != "test"]
     L = []
     L.append(f"# Assistant weekly review — last {args.days} days (to {dt.date.today()})\n")
+    if test_rows:
+        L.append(f"_({len(test_rows)} test commands excluded — this report is "
+                 f"real usage only.)_\n")
     if not rows:
-        L.append("No commands recorded in this window. Use the assistant for a few days, then re-run.")
+        L.append("No REAL commands recorded in this window"
+                 + (f" ({len(test_rows)} test commands excluded)" if test_rows else "")
+                 + ". Use the assistant for a few days, then re-run.")
     else:
         n = len(rows)
         by_src = collections.Counter(r["source"] for r in rows)

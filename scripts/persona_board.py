@@ -39,6 +39,7 @@ import argparse
 import collections
 import json
 import pathlib
+import re
 import statistics
 import sys
 
@@ -57,6 +58,29 @@ PERSONAS = ["observant_student", "household_parent", "freelance_consultant",
 SHORT = {p: p[:13] for p in PERSONAS}
 
 
+_AMPM = re.compile(r"\b(?:am|pm)\b|\bnoon\b|\bmidnight\b|\bmidday\b", re.I)
+_CLOCK24 = re.compile(r"^(?:at\s+)?(\d{1,2}):(\d{2})$")
+
+
+def time_is_unambiguous(phrase: str) -> bool:
+    """Does the speaker's own phrase FIX the half of the day?
+
+    This split matters because the scorer's `_phrase_to_hhmm` resolves a
+    spelled-out hour ('quarter past four') to AM, while the engine applies an
+    afternoon preference — so a mismatch there is a CONVENTION disagreement,
+    not a parse error, and it lands entirely on the personas who spell times
+    out. Only the unambiguous half ('7pm', '07:00', 'noon') is evidence of a
+    real defect, so the board reports the two separately and never mixes them.
+    """
+    s = (phrase or "").strip().lower()
+    if _AMPM.search(s):
+        return True
+    m = _CLOCK24.match(s)
+    if m:
+        return int(m.group(1)) >= 13 or m.group(1).startswith("0")
+    return False
+
+
 class Bucket:
     """Counters for one (persona, structure) cell — or one whole persona."""
 
@@ -65,6 +89,8 @@ class Bucket:
         self.n_defer = self.n_defer_knew = self.n_commit = self.n_commit_ok = 0
         self.p_defer = self.p_commit = 0
         self.t_ok = self.t_n = 0
+        self.t_ok_u = self.t_n_u = 0      # speaker fixed am/pm — real errors
+        self.t_ok_a = self.t_n_a = 0      # spelled-out — convention-confounded
         self.invent = self.invent_n = 0
 
     def add(self, o: "Bucket") -> "Bucket":
@@ -120,6 +146,14 @@ class Bucket:
         return self.t_ok / self.t_n if self.t_n else None
 
     @property
+    def time_right_unambiguous(self):
+        return self.t_ok_u / self.t_n_u if self.t_n_u else None
+
+    @property
+    def time_right_ambiguous(self):
+        return self.t_ok_a / self.t_n_a if self.t_n_a else None
+
+    @property
     def invent_rate(self):
         return self.invent / self.invent_n if self.invent_n else None
 
@@ -130,6 +164,7 @@ METRICS = [
     ("correct_on_handled", "correct-on-handled", +1),
     ("deferred", "atomic deferred", -1),
     ("time_right", "explicit time right", +1),
+    ("time_right_unambiguous", "  time right (am/pm said)", +1),
     ("invent_rate", "INVENTED a time", -1),
     ("defer_rate", "non-atomic deferred", +1),
     ("covered", "non-atomic covered", +1),
@@ -222,8 +257,20 @@ def score(rows, examples: int):
                     want = FS._phrase_to_hhmm(phrase)
                     if want and FS._HHMM.match(got_t):
                         b.t_n += 1
+                        sure = time_is_unambiguous(phrase)
+                        if sure:
+                            b.t_n_u += 1
+                        else:
+                            b.t_n_a += 1
                         if got_t == want:
                             b.t_ok += 1
+                            if sure:
+                                b.t_ok_u += 1
+                            else:
+                                b.t_ok_a += 1
+                        elif sure and len(fails[(p, "wrong-time-UNAMBIGUOUS")]) < examples:
+                            fails[(p, "wrong-time-UNAMBIGUOUS")].append(
+                                f"[{st}] said {phrase!r} -> want {want}, got {got_t}  {r['text']}")
                         elif len(fails[(p, "wrong-time")]) < examples:
                             fails[(p, "wrong-time")].append(
                                 f"[{st}] said {phrase!r} -> want {want}, got {got_t}  {r['text']}")
@@ -276,6 +323,18 @@ def classifier_board(preds):
                       if y == "atomic" and router.looks_compound(t))
         row["compound_recall_at_floor"] = comp_hit / comp_tot if comp_tot else None
         row["atomic_fp_at_floor"] = atom_fp / atom_tot if atom_tot else None
+
+        # WHY a classifier does worse for one persona: how much EVIDENCE its
+        # featurizer even sees. Every feature but the bias is a regex over the
+        # words; a row that fires none of them can only receive the class
+        # prior, whatever the weights are. This is the mechanism behind any
+        # spread above, stated in the classifier's own terms.
+        for key, fz in (("operation", router.operation.featurizer),
+                        ("kind", router.kind.featurizer),
+                        ("atomicity", router.atomicity.featurizer)):
+            fired = [sum(fz.extract(t)[1:]) for t in d["text"]]
+            row[key + "_fired"] = statistics.fmean(fired)
+            row[key + "_blind"] = sum(1 for f in fired if f == 0) / len(fired)
         out[p] = row
     return out, router
 
@@ -335,6 +394,15 @@ def main() -> int:
     line("explicit time right", lambda b: b.time_right)
     print(" " * 2 + f"{'  n scored':28s}"
           + "".join(f"{totals[p].t_n:>15d}" for p in PERSONAS))
+    line("  ...speaker fixed am/pm", lambda b: b.time_right_unambiguous)
+    print(" " * 2 + f"{'     n':28s}"
+          + "".join(f"{totals[p].t_n_u:>15d}" for p in PERSONAS))
+    line("  ...spelled out (see note)", lambda b: b.time_right_ambiguous)
+    print(" " * 2 + f"{'     n':28s}"
+          + "".join(f"{totals[p].t_n_a:>15d}" for p in PERSONAS))
+    print("     (the spelled-out row is CONVENTION-CONFOUNDED: this scorer resolves "
+          "'quarter past four'\n      to 04:15, the engine prefers the afternoon. "
+          "Only the am/pm row is evidence of a defect.)")
     line("INVENTED a time", lambda b: b.invent_rate)
     print(" " * 2 + f"{'  n (no time said)':28s}"
           + "".join(f"{totals[p].invent_n:>15d}" for p in PERSONAS))
@@ -365,6 +433,14 @@ def main() -> int:
               + "".join(f"{pc(cb[p]['compound_recall_at_floor']):>15s}" for p in PERSONAS))
         print(f"  {'atomic false-compound @floor':28s}"
               + "".join(f"{pc(cb[p]['atomic_fp_at_floor']):>15s}" for p in PERSONAS))
+        print("\n  HOW MUCH EVIDENCE THE FEATURIZERS SEE (mean non-bias features fired "
+              "per row,\n  and the share of rows that fire NONE — those can only get the "
+              "class prior):")
+        for key in ("operation", "kind", "atomicity"):
+            print(f"    {key + ' features fired':26s}"
+                  + "".join(f"{cb[p][key + '_fired']:>15.2f}" for p in PERSONAS))
+            print(f"    {'  rows firing none':26s}"
+                  + "".join(f"{pc(cb[p][key + '_blind']):>15s}" for p in PERSONAS))
     else:
         print("\n(no route_model_weights.json loaded — classifier board skipped)")
 
@@ -443,7 +519,8 @@ def main() -> int:
                 print("  atomic rows deferred, by reason: "
                       + ", ".join(f"{k}={v}" for k, v in reasons[p].most_common(6)))
             for bucket in ("atomic-wrong", "atomic-deferred", "half-executed",
-                           "wrong-time", "invented-time", "propose-commit"):
+                           "wrong-time-UNAMBIGUOUS", "wrong-time", "invented-time",
+                           "propose-commit"):
                 got = fails.get((p, bucket), [])[:a.examples]
                 if got:
                     print(f"  {bucket}:")
