@@ -143,6 +143,16 @@ protocol's Paired-track section.)*
 
 ## Standing process items (not hypotheses)
 
+- **Research-backed experiments (Gil, 2026-09-06):** ideas from the parsing/
+  segmentation research sweep (`DOCUMENTATION/experiments/FASTRULE_RESEARCH.md`)
+  convert into queue entries and RUN IN UPCOMING CYCLES, prioritized by
+  evidence strength — **research-paper-backed first**, then
+  proven-in-production systems, then blog-grade. Every one still enters as a
+  registered prediction on its named metric+slice; implementation-level ideas
+  are the loop's initiative, anything touching the frozen design goes to Gil
+  first, as always. An idea we try cites its source in RESULTS.md so the
+  outcome feeds back to the evidence.
+
 - **Dev-full confirm** (`--limit 0 --max-rank 600`): after every couple of
   graduated wins, to confirm off the tuning slice.
 - **Merge the loop branch into `main` every few graduated cycles** (Gil,
