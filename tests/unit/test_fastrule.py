@@ -31,3 +31,13 @@ def test_f4b_marking_a_date_never_completes_a_task(fastrule):
     assert not r.committed
     r = fastrule.run("mark groceries as done")
     assert r.committed and r.intents[0][0] == "complete_todo"
+
+
+def test_f5_plain_and_clause_coordination_abstains(fastrule):
+    """F5: a plain "and" joining two asks (no cue words) must defer — the
+    regex gate only knows announced joiners. Names and lists never trip it."""
+    r = fastrule.run("book the gym for tomorrow at 6 and remind me to buy milk")
+    assert not r.committed and r.reason == "clause-coordination"
+    r = fastrule.run("schedule meeting with Tal and Sam tomorrow at 3pm")
+    assert r.reason != "clause-coordination"  # NP-coordination: one event,
+    # two guests - whatever else the parser decides, the F5 gate stays out

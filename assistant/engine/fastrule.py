@@ -88,6 +88,16 @@ class FastRule:
         if len(intents) <= 1 and _STRONG_COMPOUND_RE.search(text):
             # not atomic — decompose (or the caller) should split further
             return FastRuleResult(False, intents, conf, "strong-compound")
+        if len(intents) <= 1 and " and " in text.lower():
+            # F5 (research-backed): the cue-word regex only knows announced
+            # joiners ("and then/also/plus…"); a plain "and" joining two
+            # CLAUSES swallows a second ask silently. The dependency parse
+            # tells clause- from NP-coordination ("Tal and Sam" never
+            # splits) — see intent/coordination.py for the rule and its
+            # measured limits.
+            from assistant.intent.coordination import has_clause_coordination
+            if has_clause_coordination(text):
+                return FastRuleResult(False, intents, conf, "clause-coordination")
         if (len(intents) >= 2 and _STRONG_COMPOUND_RE.search(text)
                 and any(n.startswith("create_") for n, _ in intents)
                 and any(n.startswith(("update_", "delete_", "complete_", "query_"))
