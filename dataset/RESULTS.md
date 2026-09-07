@@ -1042,3 +1042,23 @@ the F6b rewrite; (c) "clear/take ‹X› off my calendar|list" capture;
 71.8 → 76–80%; non-atomic defer rate holds ≥82% with the "knew" share up
 (the serial-verb guard removes false compounds, not true ones); propose
 defer unchanged.
+
+## F19 (FastRule, stage isolation) — REGISTERED PREDICTION 2026-09-07
+
+**Dataset:** FastRule 7,200, mined on train (atomic rows), reported on test.
+The "skip" bucket — no action matched at all — is 253 of 1,088 remaining
+atomic deferrals (24%), and the model tier rescues only 1 of them (its
+margin floors are tuned for safety, not for rescuing verbless rows). The
+counted causes are plain vocabulary gaps: invite (28), grab (19), do-i-have
+queries (19), gotta (15), sort (15), reshedule misspelling (12), note-to-self
+(9), am-i-free queries (8), review (7), water (5), put-a-marker (7).
+
+**Fix:** verb-table additions (invite→event; grab/sort/review/water/pack/
+file/renew→task), informal normalizations (gotta→need to, "i should
+‹encounter›"→the encounter route, reshedule→reschedule), "note to self, X"
+→ add X, "put a marker on ‹date› for ‹X›" → the day-marking family, and
+query routes for "do i have…" / "am i free…".
+
+**Predict (test half):** atomic handle rate 55.0% → 59–62%;
+correct-on-handled 73.9% → 74–76% (these rows are unambiguous once routed);
+non-atomic defer rate unchanged (no gate touched).
