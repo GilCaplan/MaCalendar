@@ -8,6 +8,14 @@ to the log below so decisions stay findable.
 
 ## Open
 
+**Q7 — [DESIGN · blocks cycle 10] The DeepSystem object structure** — your
+checkpoint. The proposal + its three open questions (first-move scope;
+`run_transcript` shim; the shared Component interface) are in
+`DOCUMENTATION/DEEPSYSTEM_DESIGN.md` §8; §1 is the plain-language walkthrough.
+Rule going forward: every design-change ask registers a row HERE, with the
+detail in its design doc — this file is the one inbox.
+
+
 **Q1 — Dated "I need to \<meet/talk\>…": event or task?**
 "on Monday, the 20th, I need to have a conversation with Greg" — today this
 becomes a task; the dataset's ground truth calls it a calendar event. Same
