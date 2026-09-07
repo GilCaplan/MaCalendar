@@ -5,6 +5,23 @@ _2026-09-07. Design only — nothing builds until approved. Prompted by Gil:
 (especially the ML model classification routing on operation and kind) but
 see what general structure would be helpful."_
 
+## The product shape (Gil's ruling, 2026-09-07 — what v2 exists to serve)
+
+**"Simple — one create/edit/remove of one event/task — must work at a very
+high commit AND success rate. Complex defers, unless easy enough to
+complete."** In numbers (working targets, Gil-adjustable, measured on
+B-test):
+
+- **Simple tier: the star metric.** North star ≥90% commit at ≥95%
+  correct-on-committed; the standing milestone on the way is 80% at ≥90%
+  (today: 72.0% at 92.4%). Every v2 decision optimizes this first.
+- **Complex tier: NO commit-rate target at all.** Deferring is correct
+  behavior, not failure. The only complex numbers that matter: whatever
+  DOES commit stays ≥90% correct (today's 71% on committed-complex is the
+  real complex problem — v2's split-and-recurse commits only all-clear
+  splits, which fixes it by construction), and the gates' atomicity
+  precision stays high so simple traffic is never mistaken for complex.
+
 ## Why (the convolution, named)
 
 Fourteen F-batches accreted onto a structure designed before we knew what
