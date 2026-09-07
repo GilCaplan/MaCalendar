@@ -21,6 +21,21 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## Era-2 cycle 2 — REGISTERED PREDICTION 2026-09-07, before the run
+
+**Change:** all-day-speak coercion in CalendarIntent (the LLM answers a
+dated-no-clock ask with the WORDS — start_time="all day" — and the HH:MM
+rule threw the whole event away). "all day"-family → a 00:00–23:59 block;
+vague non-times ("any time", "tbd") → missing, taking the normal defaults.
+Field-aware (start→00:00, end→23:59). Found by cycle 1's Q1 row + F4b's
+mark-date family hitting the same wall.
+
+**Predict (dev-fast 250 vs run 17):** the dated-no-clock family completes
+instead of apologizing — event+event +1–2 rows (67→70±), overall raw
++0.4–0.8; recall up a touch (dropped items return); everything else flat
+within noise; routing unchanged (163/87 — intent-model change, no routing
+input).
+
 ## Q7 object refactor — CONFIRMED behavior-identical (2026-09-07, merged)
 
 Confirmation run on the refactored Engine/DeepSystem objects, dev-fast 250:

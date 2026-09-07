@@ -25,3 +25,4 @@ cycle,date,component,kind,description,commit
 6,2026-09-06,engine/generate,improvement,fast-gate veto: mutation targeting a bare ask-noun (reminder/event/...) routes deep,13edcce
 7,2026-09-06,engine/generate,improvement,invention guard: LLM event titles must be grounded in the item's words (prefix-stem); fabrications dropped,160e9a4
 2026-09-06,convention,segment,"Q1: dated I-need-to-<encounter> => event (Gil ruling, DEVQA)",loop
+2026-09-07,bugfix,intent-model,"all-day-speak coercion: start_time=all day no longer kills the event",loop

@@ -71,6 +71,25 @@ class CalendarIntent(BaseIntent):
             return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
         return None
 
+    @field_validator("start_time", "end_time", mode="before")
+    @classmethod
+    def coerce_all_day_speak(cls, v: Any, info) -> Any:
+        """The model answers a dated-no-clock ask with the WORDS, not a time —
+        'all day' / 'whole day' / 'any time' — and the HH:MM rule then threw
+        the whole event away (era-2 cycle 2; "party in NY city for this
+        saturday" died on start_time='all day'). An explicit all-day is a
+        00:00–23:59 block, which fill_defaults completes; vaguer non-times
+        ('any time', 'tbd') fall back to missing, same as 'null'."""
+        if isinstance(v, str):
+            s = v.strip().lower()
+            if s in ("all day", "all-day", "allday", "whole day", "the whole day",
+                     "entire day", "full day"):
+                return "23:59" if info.field_name == "end_time" else "00:00"
+            if s in ("any time", "anytime", "tbd", "unknown", "unspecified",
+                     "no time", "not specified"):
+                return None
+        return v
+
     @field_validator("start_time", "end_time", mode="after")
     @classmethod
     def time_must_be_hhmm(cls, v: Any) -> Any:
