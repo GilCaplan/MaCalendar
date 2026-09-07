@@ -21,6 +21,29 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## F6 (FastRule-6000 lane) — REGISTERED PREDICTION 2026-09-07, before implementation
+
+**FS2 baseline (the new set is deliberately harder):** train 42.0% commit ·
+74.7% correct-on-committed · atomicity gates P 87.2 / R 45.1 · title 82.8 ·
+category 74.3. Test aggregates consistent (77.5% correct). Train mining →
+three SYSTEMATIC false-accept families (whole families 16/16 wrong):
+(a) encounters "i need to talk to Quinn friday" → create_todo;
+(b) date-marking variants "mark next tuesday as / note christmas day as" →
+complete_todo/update_event (F4b's regex only knew explicit month-days);
+(c) completion speak "check off X → query_schedule(!), i'm done with X /
+already did X → create_todo, complete X → update_event".
+
+**Fix shape: rewrite-to-known-good-form normalizations** (the F2/F4b
+pattern): encounters → "meeting with …" (routes event); date-marking →
+"add ‹label› on ‹date›" with broadened verbs (mark|note) + date alternation
+(relative/weekday/named-day) + optional "on my calendar" infix; completions
+→ "mark ‹X› as done" (the one completion phrasing verified to route right).
+
+**Predict (train 4,800):** correct-on-committed 74.7 → 82–86% (~200–250
+wrong commits flip to correct or to abstain); commit 42% → 40–43%
+(date-markings abstain to deep like F4b); atomicity metrics unchanged
+(atomic-row fixes). Test half: aggregate reported after, never mined.
+
 ## K1 (Q8) — ACTUAL (2026-09-07): direction right, magnitude 6× the prediction
 
 **Kind-accuracy on labeled create rows (1495: calendar/set=event,
