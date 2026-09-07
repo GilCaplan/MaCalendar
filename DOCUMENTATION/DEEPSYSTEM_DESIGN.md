@@ -10,17 +10,101 @@ preserved exactly; this wraps them in classes, it never reshapes them.
 
 ## Contents
 
-1. Overview — the shape
-2. End-to-end flow (pseudo-code)
-3. The object model
-4. The novel ideas, as structure
-5. Preserved vs. changed
-6. Migration plan
-7. Open questions for Gil
+1. The algorithm in plain language ← start here
+2. Overview — the shape
+3. End-to-end flow (pseudo-code)
+4. The object model
+5. The novel ideas, as structure
+6. Preserved vs. changed
+7. Migration plan
+8. Open questions for Gil
 
 ---
 
-## 1 · Overview — the shape
+## 1 · The algorithm in plain language
+
+The bare-bones flow, start to finish. Named pieces (**FastRule**, **the
+judge**, …) are defined once in "Reusable pieces" below — the main flow just
+refers to them, so you can read straight through and only drill into a piece
+if you want to know how it works.
+
+### Main flow — one command, arrival to answer
+
+1. A command arrives — typed, or a spoken transcript — from the Mac or the
+   phone.
+2. **Intake.** If other commands are queued they're merged into this one;
+   filler and false-starts are dropped (and never remembered).
+3. **Ask FastRule** — the deterministic front door. It either *commits* an
+   answer or *defers*.
+4. **If FastRule commits →** the answer is executed and returned to the user
+   immediately (milliseconds, no AI model). Then, quietly in the background,
+   **the judge** re-checks it and fixes or flags anything wrong. Done.
+5. **If FastRule defers →** the command enters the *deep track*, the careful
+   multi-step pipeline (steps 6–11).
+6. **Repair the transcript** — fix mis-heard words against the user's personal
+   vocabulary.
+7. **Segment** — split the command into its separate things: events, tasks, a
+   schedule question. When unsure it *under-splits* (safer to keep "Tal and
+   Ravid" together than to shatter a name).
+8. **Decompose** — break each of those into *atomic* pieces: two times → two
+   events, "buy 5 apples" → one task of five, a recurrence → its cadence.
+9. **Generate** — turn each atomic piece into a concrete event or task. For
+   each piece, **ask FastRule first**; call the AI model only for the pieces
+   FastRule can't read. If a piece still looks like two requests, it was never
+   atomic — send it back to step 8 to be split again.
+10. **Validate** — run the ordered correctness rules: impossible dates, am/pm,
+    until vs. through, round a recurrence and *say so*, and the Shabbat / holiday
+    rules for anything the AI itself created.
+11. **The judge** — the AI reads the *original words* and lists what was asked;
+    the code compares that to what was produced and finds anything missing,
+    extra, or wrong. On a problem it goes back to whichever step caused it and
+    re-runs (a few times at most).
+12. **Label & commit** — colour and categorise events, tag tasks, write it all
+    to the calendar / task list, and answer the user.
+
+### Reusable pieces (read only if you want the detail)
+
+**FastRule — the rule-based parser (used at step 3 and again at step 9).**
+Deterministic, no AI: it normalizes shorthand, routes on verb+object tables
+("remove"+calendar → delete an event), fills in dates/times, and scores its
+own confidence. It *commits* only when confident **and** the parse is clean;
+otherwise it *abstains* and hands off. It runs in two instances with different
+confidence bars — strict at the front door (it's the whole, possibly-complex
+command, and the deep track is its safety net), lenient on atomic fragments
+(they're simple, and the judge is the net). Its abstain also carries a
+*reason*, and one of those reasons — "this still looks like two requests" —
+doubles as the "is this atomic?" check at step 9.
+
+**The judge — the LLM crosscheck (used at step 11 and again in step 4's
+background check).** The one place the AI *checks* instead of *guesses*: it
+extracts what the raw words asked for, and deterministic code diffs that
+against what was produced. It runs inline in the deep track before committing,
+and in the background after every FastRule commit — the same piece, so
+improving it improves both. When it disagrees it renames a placeholder title
+silently, and for bigger corrections either applies them (once it's proven
+precise enough — see path B) or flags them for one-tap review.
+
+**Decompose & atomicity (step 8, re-entered from step 9).** Breaks a thing
+into atomic pieces using free deterministic rules, one bounded pass. Step 9's
+FastRule is what *detects* an incomplete break: a "fragment" that still reads
+as two requests is sent back here to split again (bounded, so it can't loop
+forever).
+
+**The honest fallbacks (inside step 9).** When a piece can't be parsed
+cleanly, the system never invents: a task-shaped piece becomes a task of its
+own words; an event-shaped piece with a real time-word but no title becomes a
+plainly-named event; and an AI title using words the command never said is
+dropped rather than committed.
+
+**The background verifier & path B (step 4).** After a fast commit, the judge
+reviews it behind the answer. Today it mostly *advises* (fixes are surfaced
+for one tap) because auto-applying them once did more harm than good; the plan
+(path B) is to measure the judge's correction precision and, once it's safely
+high, let it auto-apply.
+
+---
+
+## 2 · Overview — the shape
 
 One brain, two tracks, every worker an object:
 
@@ -39,7 +123,7 @@ that were never atomic, and one LLM crosscheck judges the result.**
 
 ---
 
-## 2 · End-to-end flow (pseudo-code)
+## 3 · End-to-end flow (pseudo-code)
 
 ### 2.1 Entry — track selection
 
@@ -124,7 +208,7 @@ Verifier.review(state):                # same Crosscheck object as the deep trac
 
 ---
 
-## 3 · The object model
+## 4 · The object model
 
 ### 3.1 Component — the shared interface
 
@@ -176,7 +260,7 @@ stage's exact I/O.
 
 ---
 
-## 4 · The novel ideas, as structure
+## 5 · The novel ideas, as structure
 
 1. **Rules-first-per-fragment + atomicity** — `Generate` holds `FastRule(0.60)`;
    a fragment that still trips the compound gate is one Decompose didn't
@@ -194,7 +278,7 @@ stage's exact I/O.
 
 ---
 
-## 5 · Preserved vs. changed
+## 6 · Preserved vs. changed
 
 **Preserved exactly (sacred):** the 7 stage I/O contracts · `EngineState` (the
 single inter-stage object) · `BRAIN_VERSION` / `CHAINS` / the trace contract ·
@@ -214,7 +298,7 @@ memory_id/verify_token) · the offline + pending rules.
 
 ---
 
-## 6 · Migration plan (behaviour-preserving first)
+## 7 · Migration plan (behaviour-preserving first)
 
 1. **Refactor, no behaviour change:** add `Component`/`Stage`, wrap the 7 stage
    functions as classes (pure delegation), wrap `run_transcript` as
@@ -228,7 +312,7 @@ design changes, measured.
 
 ---
 
-## 7 · Open questions for Gil
+## 8 · Open questions for Gil
 
 1. **First move:** the pure object refactor alone (steps 1), verified
    identical, *then* cycle 10 — or fold cycle 10 in? _(Recommend: separate, so
