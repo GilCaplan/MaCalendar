@@ -41,3 +41,46 @@ def test_f5_plain_and_clause_coordination_abstains(fastrule):
     r = fastrule.run("schedule meeting with Tal and Sam tomorrow at 3pm")
     assert r.reason != "clause-coordination"  # NP-coordination: one event,
     # two guests - whatever else the parser decides, the F5 gate stays out
+
+
+def test_f7_rename_never_commits_a_create(fastrule):
+    """"rename flu shot to sales call" fast-committed create_todo at 0.95 —
+    and FastRule can't know which store holds the old title anyway. Renames
+    abstain; deep's matcher searches both stores."""
+    r = fastrule.run("rename flu shot to sales call")
+    assert not r.committed and r.reason == "rename-misroute"
+
+
+def test_f7_priority_setting_is_an_update(fastrule):
+    """"set X as high priority" read as create at 1.00 — it's a structured
+    update: match_title + priority, phrase-delimited."""
+    r = fastrule.run("set pick up the dry cleaning as high priority")
+    assert r.committed and r.intents[0][0] == "update_todo"
+    it = r.intents[0][1]
+    assert getattr(it, "new_priority", None) == "high"
+    assert "dry cleaning" in (getattr(it, "match_title", "") or "")
+    # the rename extractor must not read "as high priority" as a new name
+    assert not getattr(it, "new_title", None)
+
+
+def test_f10_mutation_phrases_delimit_multiword_titles(fastrule):
+    """Noun-chunking drops multi-word titles in mutations; the phrase itself
+    delimits them. Generic targets still abstain (the veto judges captures)."""
+    assert fastrule.run("delete wedding rehearsal from my calendar").committed
+    assert fastrule.run("reschedule haircut to this weekend").committed
+    assert fastrule.run("mark walk the dog complete").intents[0][0] == "complete_todo"
+    assert not fastrule.run("delete this event").committed
+
+
+def test_f11_model_tier_fires_only_where_rules_found_nothing(fastrule):
+    """Q10: verbless/unseen phrasings route via the model tier at the
+    inference-billed confidence; rule-covered commands are byte-identical."""
+    # verbless remind-speak + occasion + date: rules find no verb to route,
+    # both model margins clear the SAFE floors (2.5/1.5 — the dual-gate
+    # tightening), so the model tier composes new×event
+    r = fastrule.run("don't forget the parent teacher conference wednesday 5pm")
+    assert r.committed and r.intents[0][0] == "create_event"
+    # a low-margin verbless phrase stays a graceful skip (floors hold)
+    assert not fastrule.run("gym session friday 6pm").committed
+    r = fastrule.run("book gym tomorrow at 7am")   # rules tier, unchanged
+    assert r.committed and r.confidence > 0.9

@@ -542,3 +542,15 @@ def test_create_todo_someday_goes_to_general(parser):
     assert "create_todo" in result.raw_slots
     slots = result.raw_slots["create_todo"]
     assert slots.get("list_name") == "general"
+
+
+def test_f9_filler_and_courtesy_never_hide_the_command(parser):
+    """209 of 540 simple-tier abstains were leading filler/courtesy blocking
+    the ^-anchored routing (measured, F9). The command behind them parses."""
+    p = parser
+    assert p.analyze("um i need to return the rental car").intents
+    assert p.analyze("could you tell me what's on my calendar next week"
+                     ).intents[0][0] == "query_schedule"
+    assert p.analyze("let's do birthday dinner next monday at 7pm"
+                     ).intents[0][0] == "create_event"
+    assert p.analyze("book piano lesson for tommorow at 8pm").intents

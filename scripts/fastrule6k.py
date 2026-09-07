@@ -30,6 +30,13 @@ import pathlib
 import sys
 import tempfile
 
+# Lane scripts run BESIDE live engine measurements by design (Gil: FastRule
+# iteration never waits on the deep track). The BLAS single-thread pin is the
+# guard that makes two model-loading processes safe together — structural
+# here, not left to the caller.
+for _blas in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_blas, "1")
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 _FIXTURE = ROOT / "dataset" / "fastrule" / "banks" / "categories_fixture.json"
 

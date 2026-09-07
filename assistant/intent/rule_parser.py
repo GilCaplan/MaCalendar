@@ -154,6 +154,18 @@ _STT_EXPANSIONS: list[tuple[str, str]] = [
     # normalize so ("remove", …) routing applies and a generic target like
     # "this list" hits the fast gate's veto (sandbox batch F2).
     (r"\bget rid of\b", "remove"),
+    # --- F9 (simple-first abstain mining): 209 of 540 simple abstains were
+    # outright skips caused by leading filler/courtesy hiding the command
+    # from ^-anchored routing. Strip them FIRST (list order applies).
+    (r"^(?:um+|uh+|so|well|ok(?:ay)?|alright|hey|yeah)[,\s]+", ""),
+    (r"^(?:could|can)\s+you\s+tell\s+me\s+", ""),          # "…what's on my calendar" = query
+    (r"^(?:could|can|would)\s+you\s+(?=remind\b)", ""),     # "could you remind me to X"
+    # "let's do/have/get X" is create-speak the verb map can't key on
+    (r"^let'?s\s+(?:do|have|get)\s+", "book "),
+    # STT misspellings the expansion table lacked (measured, not guessed)
+    (r"\btommorow\b", "tomorrow"),
+    (r"\bapointment\b", "appointment"),
+    (r"\bremindar\b", "reminder"),
     # "mark <date> as <occasion>" marks a DAY, it does not tick a task off:
     # "mark 13 october of this year as my birthday" fast-committed a wrong
     # complete_todo (F4b). Rewritten to the create shape the parser already
@@ -863,6 +875,11 @@ _ROUTE_OVERRIDES = [
     # done" → create_todo). Rewrites funnel done-with/already-did/check-off
     # into this shape; the override then routes them all.
     (re.compile(r"^\s*(?:please\s+)?mark\s+.+\s+as\s+done\b"), "complete_todo"),
+    # F7b: "set X as high priority" is a fully-structured UPDATE — the verb
+    # heuristics read it as a create ("set" → create at 1.00, the worst kind
+    # of confident wrong).
+    (re.compile(r"^\s*(?:please\s+)?(?:set|make)\s+.+\s+as\s+"
+                r"(?:high|medium|low)\s+priority\b"), "update_todo"),
     (re.compile(r"^\s*(?:please\s+)?(?:i\s+)?(?:need|have|want|got)\s+to\s+"), "create_todo"),
     (re.compile(r"^\s*(?:please\s+)?remind me\b"), "create_todo"),
     (re.compile(r"^\s*(?:please\s+)?add\s+(?:a\s+|\d+\s+|two\s+|three\s+)?(?:new\s+)?tasks?\b"), "create_todo"),
@@ -1002,6 +1019,16 @@ def _route_intent(span, current_view: str) -> tuple[str | None, str, bool, bool]
         if re.match(r"\b(what|when|how many|which|show|list|read)\b", span_text):
             action_fallback = "query_schedule" if domain == "calendar" else "query_todos"
             return action_fallback, domain, domain_inferred, True
+        # Q10 model tier (F11): where the rules found NOTHING, the two
+        # logistic subsystems may compose an action — only when both margins
+        # clear their floors, else the old skip stands. Model-routed =
+        # inference, billed through the domain-inferred ×0.85 channel so the
+        # front-door threshold still guards the commit.
+        from assistant.intent import route_models as _rm
+        guessed = _rm.route(span_text)
+        if guessed:
+            gdomain = "todo" if "todo" in guessed else "calendar"
+            return guessed, gdomain, True, True
         return None, domain, domain_inferred, True
 
     return action, domain, domain_inferred, domain_material
@@ -1169,6 +1196,15 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
                 slots["title"] = f"{slots['title'].replace('set ', '')} with {' and '.join(attendees)}"
 
     elif action_name == "update_event":
+        # F10: the mutation phrase delimits multi-word titles noun-chunking
+        # drops ("reschedule HAIRCUT to this weekend"); the generic-target
+        # veto still judges whatever is captured.
+        m10 = re.search(r"\b(?:reschedule|move|push|shift|postpone)\s+(.+?)\s+"
+                        r"(?:to|until|for)\b", span.text, re.IGNORECASE)
+        if m10:
+            cand = _clean_title(m10.group(1))
+            if cand and cand.lower() not in _CALENDAR_SIGNALS:
+                slots.setdefault("match_title", cand)
         # Detect whether this is an extend/shorten action (vs. a move/reschedule)
         is_extend = any(tok.lemma_.lower() in _EXTEND_VERBS for tok in span)
 
@@ -1270,6 +1306,16 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
         titled, names_a_person = _title_with_person(span.text, title)
         if titled and (names_a_person or titled.lower() not in _CALENDAR_SIGNALS):
             slots["match_title"] = titled
+        # F10: "delete WEDDING REHEARSAL from my calendar" — the phrase
+        # delimits what chunking dropped; the veto judges the capture.
+        if not slots.get("match_title"):
+            m10 = re.search(r"\b(?:delete|remove|cancel|drop)\s+(.+?)\s+"
+                            r"from\s+(?:my|the)\s+(?:calendar|schedule)\b",
+                            span.text, re.IGNORECASE)
+            if m10:
+                cand = _clean_title(m10.group(1))
+                if cand and cand.lower() not in _CALENDAR_SIGNALS:
+                    slots["match_title"] = cand
         if temporal.get("date"):
             slots["match_date"] = temporal["date"]
         if temporal.get("start_time"):
@@ -1344,9 +1390,28 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
         # F6c: the completion funnel "mark X as done" delimits X by the
         # phrase itself — noun-chunk extraction returns nothing when X is
         # verb-led ("mark WALK THE DOG as done"), so capture it directly.
-        m6 = re.search(r"\bmark\s+(.+?)\s+as\s+done\b", span.text, re.IGNORECASE)
+        m6 = re.search(r"\bmark\s+(.+?)\s+(?:as\s+)?(?:done|complete[d]?|finished)\b",
+                       span.text, re.IGNORECASE)
         if m6 and not slots.get("match_title"):
             slots["match_title"] = _clean_title(m6.group(1))
+        # F10: mutation phrases delimit multi-word titles noun-chunking
+        # drops ("remove BUY SOCKS from my list", "delete WALK THE DOG").
+        if not slots.get("match_title"):
+            m10 = re.search(r"\b(?:delete|remove|cancel|drop)\s+(.+?)\s+"
+                            r"from\s+(?:my|the)\s+(?:\w+\s+)?(?:list|tasks?|to-?dos?)\b",
+                            span.text, re.IGNORECASE)
+            if m10:
+                slots["match_title"] = _clean_title(m10.group(1))
+        # F7b: "set X as <level> priority" — phrase-delimited, like m6
+        m7 = re.search(r"\b(?:set|make)\s+(.+?)\s+as\s+(high|medium|low)\s+priority\b",
+                       span.text, re.IGNORECASE)
+        if m7:
+            if not slots.get("match_title"):
+                slots["match_title"] = _clean_title(m7.group(1))
+            slots["priority"] = m7.group(2).lower()
+            # the rename extractor reads "as high priority" as a new NAME —
+            # a priority change must never retitle the task
+            slots.pop("new_title", None)
         # For complete/update/delete, also try extracting the subject noun
         # (e.g. "mark groceries as done" → subject "groceries", not "mark groceries")
         subject_chunks = [
@@ -1371,7 +1436,11 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
                         if c.root.head == tok and not any(_in_temporal(t, temporal_spans) for t in c)
                     ]
                     if pobj_chunks:
-                        slots["new_title"] = _clean_title(pobj_chunks[0].text)
+                        cand = _clean_title(pobj_chunks[0].text)
+                        # F7b: "set X as HIGH PRIORITY" — the priority phrase
+                        # is a level, never the task's new name
+                        if not re.match(r"^(?:high|medium|low)\s+priority$", cand, re.I):
+                            slots["new_title"] = cand
                         break
             # "set priority to high/medium/low" or "make it high priority"
             # Only match explicit priority-level words to avoid false hits like "grocery priority"
