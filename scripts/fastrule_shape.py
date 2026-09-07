@@ -31,6 +31,7 @@ import datetime as _dt
 import json
 import os
 import pathlib
+import re
 import sys
 import tempfile
 
@@ -48,6 +49,46 @@ _CLOCK = _dt.datetime(2026, 9, 9, 10, 0)
 #: the layer-0 verdicts — a defer carrying one of these means FastRule
 #: RECOGNISED the compound, rather than tripping over it by luck
 _ATOMICITY_REASONS = {"strong-compound", "clause-coordination", "mixed-mode-compound", "model-compound"}
+
+#: An EXPLICIT spoken time — a digit or a named hour. These are the ones a
+#: parse can get objectively wrong, so they are scored against the produced
+#: start_time. Vague dayparts ("late afternoon") are deliberately excluded:
+#: the engine maps them by a documented convention, and scoring our own
+#: convention against itself would prove nothing.
+_EXPLICIT_TIME_RE = re.compile(
+    r"\b\d{1,2}\s*(?::\d{2})?\s*(?:am|pm)\b|\b\d{1,2}:\d{2}\b"
+    r"|\bnoon\b|\bmidnight\b|\bquarter (?:to|past)\b|\bhalf past\b", re.I)
+
+_HHMM = re.compile(r"^\d{2}:\d{2}$")
+
+
+def _phrase_to_hhmm(phrase: str) -> "str | None":
+    """Resolve an explicit spoken time to HH:MM, or None if it isn't one."""
+    s = (phrase or "").strip().lower()
+    words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+             "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
+             "twelve": 12}
+    m = re.match(r"quarter to (\w+)$", s)
+    if m and (m.group(1) in words or m.group(1).isdigit()):
+        h = (words.get(m.group(1)) or int(m.group(1))) - 1
+        return f"{(12 if h == 0 else h):02d}:45"
+    m = re.match(r"(?:quarter past|half past) (\w+)$", s)
+    if m and (m.group(1) in words or m.group(1).isdigit()):
+        h = words.get(m.group(1)) or int(m.group(1))
+        return f"{h:02d}:{'15' if s.startswith('quarter') else '30'}"
+    if s in ("noon", "midday"):
+        return "12:00"
+    if s == "midnight":
+        return "00:00"
+    m = re.match(r"(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$", s)
+    if m:
+        h = int(m.group(1)); mins = m.group(2) or "00"; ap = m.group(3)
+        if ap == "pm" and h < 12:
+            h += 12
+        if ap == "am" and h == 12:
+            h = 0
+        return f"{h:02d}:{mins}"
+    return None
 
 
 def main() -> int:
@@ -72,6 +113,8 @@ def main() -> int:
     N_DEFER = N_COMMIT = N_COMMIT_OK = 0  # non-atomic: deferred / committed (violation)
     N_DEFER_KNEW = 0                      # ...deferred BECAUSE it saw the compound
     P_DEFER = P_COMMIT = 0                # propose rows
+    T_OK = T_N = 0                        # explicit times: right / scored
+    INVENT = INVENT_N = 0                 # a time produced where none was said
     viol: collections.Counter = collections.Counter()
     miss_reason: collections.Counter = collections.Counter()
     samples: dict = collections.defaultdict(list)
@@ -126,6 +169,26 @@ def main() -> int:
                 ok = (ev + td) == 0 and any(n.startswith("query") for n in names)
             else:
                 ok = (ev + td) == 0 and any(n.startswith(act.split("_")[0]) for n in names)
+            # --- TIME CORRECTNESS (added 2026-09-07): neither scorer looked
+            # at the time before, so a parser that invents plausible times
+            # could only ever LOOK better. An autonomous loop must not be
+            # blind to the field users care most about.
+            if act == "create_event":
+                first = next((i for n, i in res.intents
+                              if n == "create_event"), None)
+                got_t = str(getattr(first, "start_time", "") or "")
+                phrase = (e.get("slots", {}) or {}).get("time_phrase") or ""
+                if phrase and _EXPLICIT_TIME_RE.search(phrase):
+                    want = _phrase_to_hhmm(phrase)
+                    if want and _HHMM.match(got_t):
+                        T_N += 1
+                        T_OK += 1 if got_t == want else 0
+                elif not phrase:
+                    # nothing was said about a time: 00:00 (all-day) is the
+                    # honest answer, anything else is an invention
+                    INVENT_N += 1
+                    if _HHMM.match(got_t) and got_t != "00:00":
+                        INVENT += 1
             if ok:
                 A_OK += 1
             else:
@@ -142,6 +205,11 @@ def main() -> int:
     print(f"   handled (committed)      {pc(A_OK + A_WRONG, A_N)}")
     print(f"   correct-on-handled       {pc(A_OK, A_OK + A_WRONG)}")
     print(f"   deferred (missed work)   {pc(A_MISS, A_N)}")
+    if T_N or INVENT_N:
+        print(f"\nTIME CORRECTNESS (on committed events)")
+        print(f"   explicit time right      {pc(T_OK, T_N)}  (n={T_N})")
+        print(f"   INVENTED a time          {pc(INVENT, INVENT_N)}  "
+              f"(n={INVENT_N} events where the speaker named no time)")
     print(f"\nNON-ATOMIC rows ({N_N}) — diagnostic; the engine decides")
     print(f"   deferred, handed up      {pc(N_DEFER, N_N)}")
     print(f"     ...knew it was compound {pc(N_DEFER_KNEW, N_N)}  (layer 0 said so)")
