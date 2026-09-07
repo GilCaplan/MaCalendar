@@ -46,6 +46,26 @@ eval):** kind macro-F1 82.6 → 86+; operation macro-F1 73.4 → 78+ (query P
 57 → 70+, remove F1 62 → 70+); downstream test simple commit 72.0 → 73–75%
 at ≥92% correct; A-pool dual-gate within ±0.5 of 94.3.
 
+## F14 — ACTUAL + MODEL CAMPAIGN CLOSED (2026-09-07)
+
+**F14 negative:** A-pool mixing cost B-test operation macro-F1 73.4 → 69.3
+(query 62→50, remove 62→56) — A phrases those classes in its own dialect
+and one linear boundary can't serve both; kind +0.2 (noise). Reverted;
+machinery kept behind F14_MIX_A_POOL=False.
+
+**Campaign verdict — CONVERGED at the F12 state.** Four levers tried under
+registered predictions: class-balanced fit (KEPT — fixed the imbalance),
+F12 features (kept — mixed but net-positive on recall), F13 feature swaps
+(NEGATIVE ×2, reverted), F14 data mixing (NEGATIVE, reverted). Final model
+state, B-test: **operation macro-F1 73.4 · kind macro-F1 82.6**; blended
+router on test: **simple 72.0% commit at 92.4% correct**, A-pool dual-gate
+94.3 adjusted. The models are at the ceiling of 16-feature linear capacity
+on B-train alone. The two levers that could move them further are both
+gated: EXTERNAL corpora variety (EXT1 — deferred as complex-tier work) and
+model capacity (a design question for Gil). Re-eval lands on the enlarged
+test half when the dataset agent delivers it.
+# registered prediction (kept)
+
 ## F14 (model iteration 3 — the data lever) — REGISTERED PREDICTION 2026-09-07
 
 **Change:** training-data variety, features untouched. The fit ingests the
