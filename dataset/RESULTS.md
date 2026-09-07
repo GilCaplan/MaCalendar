@@ -21,7 +21,24 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
-## Era-2 cycle 1 — REGISTERED PREDICTION 2026-09-06, run launched
+## Era-2 cycle 1 — ACTUAL (run 17, 2026-09-06)
+
+**Prediction met:** board flat within noise vs the era-2 baseline (raw
+77.0→78.0 · adjusted 80.0 flat · F1 81.1→81.5 · fieldq 84.5→83.8 · routing
+identical at 163 deep / 87 fast · fast correct 90% · garbage 0%). Tier
+jitter (e+e +4, t+t −5) is single-row noise.
+
+**The finding that matters:** the Q1 rule FIRED CORRECTLY — "on Monday, the
+20th, I need to have a conversation with Greg" now parses its half as
+create_event (was a task) — but a **dated-no-clock event fails validation
+(no start_time) and is dropped** with an honest apology. The kind decision
+is fixed; the family needs a default-time/all-day path in event
+construction. This is the same gap F4b hit ("mark 〈date〉 as X" abstains for
+the same reason). **Cycle 2 hypothesis: dated-no-clock events get a default
+time (or all-day), in generate's event construction — expect the Q1/F4b
+family (~2-3 dev rows) to complete instead of apologize; e+e +1-2 rows.**
+
+### The registered prediction (kept for the record)
 
 **Change under test:** Q1 convention (Gil's DEVQA ruling, committed 3235f48):
 a dated "I need to <meet/talk/have a conversation>" is an event —
