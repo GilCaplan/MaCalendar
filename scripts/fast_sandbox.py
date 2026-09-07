@@ -39,7 +39,9 @@ os.environ["MACALENDAR_NO_WARMUP"] = "1"
 os.environ["MACALENDAR_OBSERVANCE"] = "0"
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "DOCUMENTATION" / "experiments" / "memory_scaling" / "output" / "dummy_3000.db"
+_S = "DOCUMENTATION/experiments/memory_scaling/output/dummy_3000.db"
+SOURCE = ROOT / _S if (ROOT / _S).exists() else \
+    pathlib.Path("/Users/USER/Desktop/Personal_Projects/MACalendar") / _S
 
 
 def main() -> int:
@@ -51,6 +53,7 @@ def main() -> int:
     from freezegun import freeze_time
 
     from assistant.config import load_config
+    from assistant.intent.rule_parser import RULE_THRESHOLD
     from assistant.engine import generate
     from assistant.engine.state import EngineState
     from scripts.score_dataset_run import load_overrides, load_provenance
@@ -59,9 +62,10 @@ def main() -> int:
     prov = load_provenance()
     overrides = load_overrides()
 
+    rp = generate._get_rule_parser()
     # Warm the recognizer's lazy first-analyze OUTSIDE any frozen clock —
     # the metaclass lesson from the main harness (epoch reset).
-    rp = generate._get_rule_parser()
+
     if rp is not None:
         with contextlib.suppress(Exception):
             rp.analyze("book gym tomorrow at 7am", current_view="month")
@@ -78,6 +82,7 @@ def main() -> int:
 
     n = len(rows)
     committed = correct = 0
+    recov = abst_scored = gate_recov = 0
     split = {"dev": [0, 0, 0], "held-out": [0, 0, 0]}   # committed, raw-ok, adj-ok
     by_kind: Counter = Counter()
     adj_correct = [0]
@@ -94,6 +99,32 @@ def main() -> int:
             with contextlib.suppress(Exception):
                 ok_commit = generate.fast_propose(st, cfg)
         if not ok_commit:
+            # RECOVERABLE-ABSTAIN: would FastRule's raw parse have been right?
+            # (the selective classifier's second error type — headroom +
+            # wasted deep-track latency; dev+held-out counted, dev-only mined)
+            try:
+                rr = rp.analyze(text, current_view="month")
+            except Exception:
+                rr = None
+            if rr and rr.intents:
+                gate_ok = rr.confidence >= RULE_THRESHOLD and not rr.missing_slots
+                ev = sum(1 for n, _ in rr.intents if n == "create_event")
+                td = sum(1 for n, _ in rr.intents if n == "create_todo")
+                pp = prov.get(text) or {}
+                ii = pp.get("intent", ""); kk = pp.get("intent") if pp.get("scenario") == "compound" else None
+                ex2 = {"event+event": (2, 0), "task+task": (0, 2), "event+task": (1, 1)}
+                if kk in ex2: rok = ev >= ex2[kk][0] and td >= ex2[kk][1]
+                elif ii in ("set", "createoradd"): rok = (ev + td) >= 1
+                elif ii in ("query", "remove"): rok = (ev + td) == 0
+                else: rok = None
+                if rok is not None:
+                    abst_scored += 1
+                    if rok:
+                        recov += 1
+                        if gate_ok:
+                            gate_recov += 1     # a GATE blocked a correct parse
+                            if (rank or 0) <= 600:
+                                misses.append(("GATE-OVERBLOCK", text[:70]))
             continue
         committed += 1
         n_ev = sum(1 for it in st.items if it.action == "create_event")
@@ -145,7 +176,11 @@ def main() -> int:
     for seg, (c_, r_, a_) in split.items():
         if c_:
             print(f"  {seg:<9} committed {c_:>4} · raw {r_/c_:.1%} · adjusted {a_/c_:.1%}")
-    print("misses below are ADJUSTED misses from DEV ONLY (held-out is never mined)")
+    if abst_scored:
+        print(f"  RECOVERABLE-ABSTAIN {recov}/{abst_scored} ({recov/abst_scored:.1%}) "
+              f"— abstained rows the raw parse would nail (of which {gate_recov} "
+              f"blocked by a GATE = over-abstention headroom)")
+    print("misses below are ADJUSTED misses + GATE-OVERBLOCKs from DEV ONLY (held-out never mined)")
     for k in sorted(by_kind):
         print(f"  {k:<14} {by_kind_ok[k]:>3}/{by_kind[k]:<3} "
               f"({by_kind_ok[k]/by_kind[k]:.0%})")

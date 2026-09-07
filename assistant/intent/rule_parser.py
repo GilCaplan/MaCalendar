@@ -100,7 +100,7 @@ if TYPE_CHECKING:
 # Public constants
 # ---------------------------------------------------------------------------
 
-RULE_THRESHOLD = 0.85
+RULE_THRESHOLD = 0.80   # tuned 2026-09-07: whole-command sweep, +2pp coverage at flat 87% precision (sub-item bar is 0.60)
 
 
 # ---------------------------------------------------------------------------
@@ -150,6 +150,10 @@ _STT_EXPANSIONS: list[tuple[str, str]] = [
     (r"\bfri\b(?=\s)", "friday"),
     (r"\bsat\b(?=\s)", "saturday"),
     (r"\bsun\b(?=\s)", "sunday"),
+    # "get rid of X" is removal-speak the verb map can't key on (multi-word):
+    # normalize so ("remove", …) routing applies and a generic target like
+    # "this list" hits the fast gate's veto (sandbox batch F2).
+    (r"\bget rid of\b", "remove"),
 ]
 
 # ---------------------------------------------------------------------------

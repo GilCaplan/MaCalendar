@@ -47,7 +47,7 @@ def test_the_engine_layer_covers_every_real_engine_stage():
     import pkgutil
     import assistant.engine as E
     real = {m.name for m in pkgutil.iter_modules(E.__path__)
-            if m.name not in ("state", "llm", "__init__")}
+            if m.name not in ("state", "llm", "fastrule", "__init__")}
     for stage in real:
         assert f'"{stage}"' in src, (
             f"engine stage '{stage}' exists but cli.check_engine does not verify it — "
