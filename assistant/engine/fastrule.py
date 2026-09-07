@@ -39,6 +39,13 @@ _GENERIC_TARGET_RE = re.compile(
     r"|^(?:you|it|me|this|that|them)$",
     re.I)
 
+# "Can you create/add/make …" is a polite imperative, not a question —
+# the speaker wants the thing made (F4a; "Can you create a new list in my
+# podcast?" was gate-blocked despite a correct create parse).
+_POLITE_IMPERATIVE_RE = re.compile(
+    r"^\s*(?:hey\s+\w+,?\s*)?(?:can|could|would|will)\s+you\s+(?:please\s+)?"
+    r"(?:create|add|make|set|put|start|book|schedule|remind)\b", re.I)
+
 _INTERROGATIVE_RE = re.compile(
     r"^\s*(?:hey\s+\w+,?\s*)?(?:who|what|when|where|which|whose|how|do|does|did|is|are|am|can|could|would|will|should)\b"
     r"|\bcould you (?:tell|let me know|check)\b|\bdo i have\b|\?\s*$",
@@ -81,12 +88,23 @@ class FastRule:
         if len(intents) <= 1 and _STRONG_COMPOUND_RE.search(text):
             # not atomic — decompose (or the caller) should split further
             return FastRuleResult(False, intents, conf, "strong-compound")
+        if len(intents) <= 1 and " and " in text.lower():
+            # F5 (research-backed): the cue-word regex only knows announced
+            # joiners ("and then/also/plus…"); a plain "and" joining two
+            # CLAUSES swallows a second ask silently. The dependency parse
+            # tells clause- from NP-coordination ("Tal and Sam" never
+            # splits) — see intent/coordination.py for the rule and its
+            # measured limits.
+            from assistant.intent.coordination import has_clause_coordination
+            if has_clause_coordination(text):
+                return FastRuleResult(False, intents, conf, "clause-coordination")
         if (len(intents) >= 2 and _STRONG_COMPOUND_RE.search(text)
                 and any(n.startswith("create_") for n, _ in intents)
                 and any(n.startswith(("update_", "delete_", "complete_", "query_"))
                         for n, _ in intents)):
             return FastRuleResult(False, intents, conf, "mixed-mode-compound")
         if (_INTERROGATIVE_RE.search(text)
+                and not _POLITE_IMPERATIVE_RE.search(text)
                 and any(n.startswith("create_") for n, _ in intents)):
             return FastRuleResult(False, intents, conf, "interrogative-create")
         for name, intent in intents:
