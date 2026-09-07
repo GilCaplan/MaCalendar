@@ -52,6 +52,37 @@ FastRule-specific evaluation a fresh 6,000-prompt set is being built
 (2,000 simple / 4,000 complex, ground truth by construction, 80–20
 train–test) under `dataset/fastrule/`.
 
+## FastRule's three data sources, and what each may tune (Gil, 2026-09-07)
+
+**A — the real pool (2,699 train rows): the CALIBRATION source.** Already in
+our schema, our conventions. Powers the fits that were data-starved: K1
+kind-scorer retrains, R2's reliability diagram → multiplier calibration,
+threshold re-sweeps. Real usage-shaped text; judged by our ground truth.
+
+**B — the generated 6,000 (`dataset/fastrule/`): the STRUCTURE-SUPERVISION
+source.** Ground truth by construction (atomic flag, action, slots) gives
+FastRule supervision it never had: per-gate precision/recall by family,
+slot-level (title/date/time) scoring, per-family regression floors (a regex
+change that breaks a family names itself), and two-tier threshold sweeps
+(simple vs complex = the two instances' operating points). Template-expanded,
+so the **dual-gate rule** binds every batch: a change must win on B-train
+AND not regress A. Its test 20% (family-split) is sealed under the leakage
+rule like everything else.
+
+**C — external corpora (`EXTERNAL_DATASETS.md`): TRAIN-SIDE AUGMENTATION
+ONLY, never a judge.** Adoption pipeline, per set: (1) converter script into
+our jsonl schema (intent-mapping table + slot renames), (2) STT-style
+normalization (lowercase, punctuation-strip, optional misheard variants),
+(3) a CONVENTIONS PASS — sample the disagreements between their labels and
+our rulings and take them to Gil (DEVQA) before any row trains anything,
+(4) train-half use only. Imported label noise must never define correctness;
+our sealed sets remain the only judges.
+
+The lane's loop order with all three live: field-level scorer for B →
+fresh FastRule baseline on B-train → gate-supervision batches (dual-gated)
+→ K1 retrain + R2 calibration on A → external adoption as C sets clear
+their conventions pass.
+
 ## Eras — history kept, comparisons reset at big system changes (Gil, 2026-09-06)
 
 When the system undergoes a large structural change (the 2026-09-07 FastRule

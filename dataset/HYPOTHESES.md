@@ -24,6 +24,26 @@ needing one is marked **[Gil]** and is blocked until asked.
 
 ## The queue
 
+*(FS-entries 2026-09-07 — the FastRule data plan, Gil-approved; protocol
+§three-data-sources has the doctrine.)*
+
+- **[infra] FS1 — field-level scorer for the generated 6000**: fast_sandbox
+  (or a sibling) reads `dataset/fastrule/fastrule_6000.jsonl`; scores counts,
+  action, ATOMIC flag per gate, and slots; per-family lines; test half
+  aggregates-only by default. Prereq for everything below.
+- **[fast] FS2 — fresh FastRule baseline on B-train** (4,800): the lane's
+  new reference board; also run A-pool sandbox beside it (dual-gate anchor).
+- **[fast] F6 — gate supervision, batch 1**: fix F5's two over-blocks using
+  B's atomic flags (per-gate precision/recall by family — the first direct
+  gate supervision). Dual-gated: win on B-train, no regress on A.
+- **[fast] K1b — retrain the kind scorer on A's 2,699** (~4× data), refresh
+  weights; feeds K2's wiring cycle.
+- **[measure] R2 on A — reliability diagram** of the confidence multipliers
+  over the full train pool; calibration refit only if it shows miscalibration.
+- **[blocked] EXT1 — external-corpus adoption** per the C-pipeline (converter
+  → normalization → conventions pass to Gil → train-only), starts when the
+  research report lands and per-set effort is known.
+
 *(R-entries added 2026-09-06 from the research sweep —
 `DOCUMENTATION/experiments/FASTRULE_RESEARCH.md`, all URL-cited; evidence
 grade in brackets: paper > production-system > pattern.)*

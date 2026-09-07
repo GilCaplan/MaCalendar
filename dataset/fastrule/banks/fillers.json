@@ -1,0 +1,116 @@
+{
+  "_comment": "Slot-filler banks for scripts/gen_fastrule_dataset.py. Generic values only — no personal names/places from the project vocabulary. Dates/times are PHRASES; resolving them to absolute dates is the parser's job, not this dataset's.",
+
+  "names": [
+    "Alex", "Jordan", "Sam", "Taylor", "Morgan", "Casey", "Riley", "Jamie",
+    "Drew", "Reese", "Avery", "Quinn", "Skyler", "Rowan", "Dana", "Charlie",
+    "Jesse", "Cameron", "Harper", "Emerson", "Finley", "Blake", "Sage", "Robin",
+    "Parker", "Devon"
+  ],
+
+  "event_titles": [
+    "dentist appointment", "doctor's appointment", "team meeting", "project sync",
+    "client call", "yoga class", "haircut", "job interview", "flight to Chicago",
+    "parent-teacher conference", "dinner reservation", "physical therapy",
+    "car service appointment", "vet appointment", "piano lesson", "book club",
+    "staff meeting", "budget review", "performance review", "therapy session",
+    "oil change", "eye exam", "blood test", "workout session",
+    "coffee with a friend", "networking event", "conference call", "product demo",
+    "sales call", "onboarding session", "standup", "retrospective", "town hall",
+    "graduation ceremony", "wedding rehearsal", "open house", "orientation",
+    "training session", "webinar", "workshop", "annual checkup", "tennis lesson",
+    "school play", "birthday dinner", "moving day", "flu shot", "haircut appointment"
+  ],
+
+  "task_titles": [
+    "buy groceries", "call the plumber", "pay the electricity bill", "walk the dog",
+    "water the plants", "submit the report", "clean the kitchen", "do the laundry",
+    "return the library books", "renew the passport", "file the taxes",
+    "pick up the dry cleaning", "book a flight", "order new office supplies",
+    "update the resume", "back up the laptop", "schedule a haircut",
+    "fix the leaky faucet", "mail the package", "review the contract",
+    "prepare the presentation", "organize the garage", "change the air filter",
+    "refill the prescription", "cancel the subscription", "wash the car",
+    "take out the trash", "feed the cat", "charge the scooter",
+    "print the boarding pass", "confirm the reservation", "pack for the trip",
+    "email the landlord", "return the rental car", "sign the permission slip",
+    "restock the pantry", "vacuum the living room", "water the garden"
+  ],
+
+  "items": [
+    "apples", "eggs", "milk", "notebooks", "folders", "light bulbs", "batteries",
+    "printer paper", "coffee filters", "trash bags", "paper towels", "stamps",
+    "envelopes", "index cards", "pens", "water bottles", "protein bars",
+    "sticky notes", "bananas", "onions", "dish soap", "shampoo"
+  ],
+
+  "quantities": [
+    "two", "three", "four", "five", "six", "a dozen", "a couple of", "a few",
+    "2", "3", "5", "10", "half a dozen", "eight", "twelve"
+  ],
+
+  "dates": [
+    "today", "tomorrow", "tonight", "this evening", "this afternoon",
+    "this morning", "next monday", "next tuesday", "this friday", "this weekend",
+    "next week", "in two days", "in three weeks", "the 3rd", "the 21st",
+    "march 5th", "on the 15th", "a week from today", "next month",
+    "the day after tomorrow", "this coming saturday", "two weeks from now",
+    "at the end of the month", "new year's eve", "christmas day", "this sunday",
+    "next wednesday", "in five days", "the 30th", "next friday"
+  ],
+
+  "times": [
+    "7am", "7:30am", "noon", "midnight", "half past six", "quarter to nine",
+    "9 in the morning", "5 pm", "14:00", "6:45", "8 o'clock",
+    "first thing in the morning", "around lunchtime", "late afternoon",
+    "9:15", "ten thirty", "6 in the evening", "8:30pm", "11am", "3:45pm"
+  ],
+
+  "time_ranges": [
+    "from 6 to 8", "between 2 and 4", "from 9 to 2:30", "from noon to 1",
+    "from 10am to 11:30am", "between 5 and 6:30", "from 3 to 4pm"
+  ],
+
+  "recurrences": [
+    "every day", "daily", "every week", "weekly", "every monday",
+    "every tuesday and thursday", "every other week", "every other tuesday",
+    "every weekday", "every weekend", "monthly", "every month",
+    "once a week", "twice a week", "every sunday"
+  ],
+
+  "occasions": [
+    "my birthday", "our anniversary", "the project deadline", "the school holiday",
+    "the tax deadline", "the renewal date", "the moving day", "the interview date",
+    "the big game", "the release date"
+  ],
+
+  "lead_times": [
+    "30 minutes before", "an hour before", "15 minutes before", "a day before",
+    "10 minutes before", "two hours before", "5 minutes before", "a week before"
+  ],
+
+  "durations": [
+    "by 30 minutes", "by an hour", "by 15 minutes", "to two hours",
+    "by half an hour", "by 20 minutes", "to 90 minutes"
+  ],
+
+  "quotable": [
+    "dentist", "team meeting", "buy groceries", "yoga class", "call the plumber",
+    "haircut", "grocery run", "book club", "staff meeting", "dentist appointment",
+    "vet appointment", "oil change"
+  ],
+
+  "generic_targets": [
+    "this event", "that appointment", "my reminder", "the task", "it", "this",
+    "my list", "that one", "the event", "this reminder", "that task"
+  ],
+
+  "query_ranges": [
+    "today", "tomorrow", "this week", "next week", "this month", "this weekend",
+    "the rest of the day", "this afternoon", "the next few days", "this friday"
+  ],
+
+  "filler_words": [
+    "um", "so", "like", "uh", "you know", "i mean", "okay so", "hold on"
+  ]
+}
