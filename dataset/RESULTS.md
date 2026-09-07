@@ -1,5 +1,18 @@
 # Results log
 
+---
+
+# ═══ ERA 2 — post-integration (opens with the joint confirmation run) ═══
+
+*2026-09-06 (Gil): big changes landed — FastRule object + F1/F2/F3 gates +
+tuned 0.80/0.60 thresholds integrated into the engine (`effebeb`). History
+above/below this line is kept and re-scorable, but era-2 boards are compared
+to the era-2 baseline (the joint confirmation run) and to each other — never
+cycle-vs-cycle against era 1. Era 1 = cycles 1–9.*
+
+---
+
+
 ## Epoch baseline (2026-09-05, code @ 76cfd4f, banked @ d343a7c) — the anchor all cycles now compare to
 
 Frozen row-timestamps + observance off + fast path alive (103/250 fast).

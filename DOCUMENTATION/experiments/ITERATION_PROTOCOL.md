@@ -24,6 +24,42 @@ that is rich enough to show the failure you're chasing (dev-fast, ranks 1–250,
 ~80 min, naturally stratified across simple/medium/complex), and upsize only as
 gains slow. The full set is an occasional generalisation check — never a cycle.
 
+## Eras — history kept, comparisons reset at big system changes (Gil, 2026-09-06)
+
+When the system undergoes a large structural change (the 2026-09-07 FastRule
+integration; a future object-refactor or cycle-10 landing), the *history* of
+cycles is kept — every run stays archived and re-scorable — but the
+**comparison baseline resets**: it is not fair to read a post-change board
+against pre-change cycles as if they measured the same machine.
+
+- **Era 1**: cycles 1–9, the pre-integration engine. Closed at cycle 9.
+- **Era 2**: opens with the joint confirmation run of the integrated engine
+  (FastRule object + F1/F2/F3 + 0.80/0.60). That run's board is era 2's
+  baseline; era-2 cycles are judged against it and each other, never
+  one-to-one against era-1 rows.
+
+Cross-era reads are allowed only as *trend lines* ("the trajectory since
+cycle 1"), clearly labelled, never as cycle-vs-cycle deltas. RESULTS.md
+carries an era divider; loop_log.csv rows before the divider's run number are
+era 1. A future era 3 opens the same way, by a one-line ruling here.
+
+## The FastRule lane cadence — pinned in cycles, integrated every 2–3 (Gil, 2026-09-06)
+
+The FastRule sandbox lane runs **continuously in parallel** with deep cycles,
+in its own worktree (`../MACalendar-fastlane`), on the **full 3000** (it is
+deterministic and LLM-free, so full-dataset replays are allowed and take ~3
+min). Meanwhile the loop tree's cycles run against a **pinned FastRule** —
+whatever version its checkout has committed — so a mid-cycle FastRule edit
+can never change a measurement in flight (versioning is by git: the sandbox
+edits its tree, the loop tree's is frozen at its commit).
+
+**Integration cadence: every 2–3 cycles**, at a cycle boundary, the sandbox's
+graduated batches merge into the loop tree and the next full-engine run
+doubles as the joint confirmation (a smarter FastRule shifts which rows reach
+deep; only a joint run prices that). After each integration the fastlane
+worktree fast-forwards onto the integrated state, so the two trees never
+drift apart for long.
+
 ## The subset ladder — reused fixed slices, so deltas compare across cycles
 
 | Rung | ranks | n | ~wall-clock (8B, serial) | one flipped prompt = | use it for |

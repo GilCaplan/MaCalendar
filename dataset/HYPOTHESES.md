@@ -24,6 +24,17 @@ needing one is marked **[Gil]** and is blocked until asked.
 
 ## The queue
 
+*(Re-ranked 2026-09-06 for the POST-INTEGRATION system: FastRule object +
+F1/F2/F3 + 0.80/0.60 are IN the engine now — any entry below citing "0.85"
+or "not yet integrated" predates that. Era 2: new baseline = the joint
+confirmation run. The FastRule lane keeps iterating in parallel on full-3000
+in its worktree; graduates integrate every 2–3 cycles. Order of play:
+(1) joint confirmation lands → era-2 baseline; (2) Gil reviews the
+DeepSystem structure [his checkpoint — cycle 10 blocked on it]; (3) cycle 10
+full rules-first-per-fragment [DESIGN CHANGE, Gil-authorized if step 1 paid,
+which cycle 9 confirmed]; (4) path-B crosscheck precision; (5) F4+ sandbox
+batches ride alongside throughout.)*
+
 - **[deep] Crosscheck-correction precision → then auto-apply** (Gil chose
   path B, 2026-09-07). The LLM verify runs on every fast commit already;
   auto-applying its fix is off because the old auto-applier fixed 0 / broke

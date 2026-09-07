@@ -94,7 +94,19 @@ hand-written audit corpus is now only a regression floor.
    once integrated, thresholds per FastRule instance/command class.
 7. Queued hypotheses (dentist bug, list-op, fieldq anomaly) reopen last.
 
-## Plan of record (Gil, 2026-09-07) — this order, before ANY new hypotheses
+## Plan of record
+
+**Era 2 opens with the joint confirmation run** (Gil, 2026-09-06): cycle
+history kept, but boards compare within-era only — the integration changed
+too much for cycle-vs-cycle reads against era 1. **FastRule lane cadence**:
+sandbox keeps iterating on full-3000 in ../MACalendar-fastlane while cycles
+run the loop tree's pinned FastRule; graduates integrate every 2–3 cycles at
+a boundary, joint-confirmed. **Design choices stay frozen** — implementation
+improvements are the loop's initiative, algorithm changes are Gil's call,
+asked at boundaries. **Slice growth**: dev-fast 250 is the working slice;
+climb to dev-full 600 when target-slice gains near the ~1.5-pt noise floor
+(or the target slice is too thin in 250); held-out 601–3000 only to seal
+milestones — never mined. (Gil, 2026-09-07) — this order, before ANY new hypotheses
 
 1. **Track 1 — improve the rule system in its sandbox** (fast-lane worktree,
    full-3000 measurable). Batch F3, F4… until abstention + parse quality
