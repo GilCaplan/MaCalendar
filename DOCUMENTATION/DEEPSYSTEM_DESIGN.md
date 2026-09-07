@@ -125,7 +125,7 @@ that were never atomic, and one LLM crosscheck judges the result.**
 
 ## 3 · End-to-end flow (pseudo-code)
 
-### 2.1 Entry — track selection
+### 3.1 Entry — track selection
 
 ```
 Engine.run(prompt, source, trace, view):
@@ -146,7 +146,7 @@ Engine.run(prompt, source, trace, view):
     return self.deep.run(state)
 ```
 
-### 2.2 The deep pipeline — ordered stages + loop-back
+### 3.2 The deep pipeline — ordered stages + loop-back
 
 ```
 DeepSystem.run(state):
@@ -167,7 +167,7 @@ DeepSystem.run(state):
     return respond(state)
 ```
 
-### 2.3 The stages that matter (the rest are the frozen contracts unchanged)
+### 3.3 The stages that matter (the rest are the frozen contracts unchanged)
 
 ```
 Segment.run(state):                    # brackets/markers free; else 1 schema-LLM call
@@ -195,7 +195,7 @@ Crosscheck.run(state):                 # the LLM extracts, code judges
     state.findings = diff(said, state.items)          # missing / extra / wrong_field
 ```
 
-### 2.4 Background verify on a fast commit (path B)
+### 3.4 Background verify on a fast commit (path B)
 
 ```
 Verifier.review(state):                # same Crosscheck object as the deep track
