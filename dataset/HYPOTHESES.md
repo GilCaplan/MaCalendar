@@ -24,6 +24,46 @@ needing one is marked **[Gil]** and is blocked until asked.
 
 ## The queue
 
+*(R-entries added 2026-09-06 from the research sweep —
+`DOCUMENTATION/experiments/FASTRULE_RESEARCH.md`, all URL-cited; evidence
+grade in brackets: paper > production-system > pattern.)*
+
+- **[fast+deep] R1 — coordination-type module: NP- vs clause-coordination by
+  dependency parse** [paper: multi-intent boundary-classification literature;
+  spaCy-documented mechanism]. ONE module, three call sites: (a) FastRule's
+  strong-compound gate stops being a cue-word regex and asks the parse
+  whether "and" joins noun phrases ("Tal and Sam" — don't split) or clauses
+  ("book X and remind me Y" — split); (b) segment gets it as a free
+  deterministic pre-split in front of the LLM; (c) the compound-hint filter
+  reuses it. *Expected:* gate-overblock recoverable-abstain down + event+task
+  missing-half down. *Effort:* M. Sandbox-first (the gate side = F5), segment
+  call-site rides a deep cycle.
+- **[measure] R2 — reliability-diagram audit of FastRule confidence** [paper:
+  calibration literature; Chow's rule for abstention]. We already log
+  confidence + correctness per command; bucket and plot before touching the
+  hand-chosen multipliers. *Effort:* S — the diagnostic precedes any
+  calibration fit (R2b: logistic calibration, only if the diagram shows
+  miscalibration). *Expected:* evidence, not a board move.
+- **[deep] R3 — span-offset segmentation: the LLM returns character offsets
+  into the raw transcript, code slices the text** [extraction-vs-generation;
+  kills regeneration loss at the root]. Targets missing-half on event+task
+  (46%). *Effort:* S–M. Schema change is internal to segment (contract
+  output unchanged).
+- **[fast] R4 — fuzzy + phonetic target matching for quoted/misspelled
+  targets** [production-standard: token-set ratio + Double Metaphone
+  fallback; vocab.py already documents the phonetic blind spot]. Targets
+  "remove 'father's day' from calender"-class fast misses. *Effort:* S–M.
+- **[deep] R5 — same-call segment retry via the dormant `state.mistakes`
+  hook** [code already exists; control-flow only]. A segment output failing
+  a deterministic sanity check (clause-count anchor, R1) retries once with
+  the mistake named, instead of waiting for the downstream judge. *Effort:* S.
+- **[ASK GIL] R6 — small logistic-regression kind classifier (event-vs-task)
+  over hand features** [paper-grade technique; replaces the growing regex
+  family that Q1 just extended]. Deterministic at inference, but introduces
+  a trained component + fit script into a rules-only layer — design-adjacent,
+  so queued behind a DEVQA yes/no.
+
+
 *(Re-ranked 2026-09-06 for the POST-INTEGRATION system: FastRule object +
 F1/F2/F3 + 0.80/0.60 are IN the engine now — any entry below citing "0.85"
 or "not yet integrated" predates that. Era 2: new baseline = the joint
