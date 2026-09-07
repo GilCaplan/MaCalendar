@@ -60,6 +60,12 @@ def op_features(text: str) -> "list[float]":
         has(r"\binstead of\b|\bcall it\b|\brename\b"),
         has(r"\bevery\b|\bdaily\b|\bweekly\b"),
         has(r"^\s*(?:buy|get|pick up|grab|order)\b"),
+        # F12/K3b: class-targeted features for the starved operations
+        has(r"\boff\s+(?:my|the)\b|\bget rid of\b|\bno longer\b|\bwipe\b|\bstrike\b"),   # remove-speak
+        has(r"^\s*(?:am i free|is there|any(?:thing)?\b|do i\b|have i\b)"),                     # query openers 2
+        has(r"\bfree\b|\bbusy\b|\bavailable\b|\bcoming up\b|\bplanned\b"),               # availability speak
+        has(r"^\s*(?:cross|take)\s+.+\s+off\b"),                                                # "cross X off"
+        has(r"\bdid i\b|\bhave i\s+(?:done|finished)\b"),                                      # done-query guard
     ]
 
 
@@ -79,6 +85,11 @@ def kind_features(text: str) -> "list[float]":
         has(r"\bwith\s+[a-z]+\b"),
         has(r"\bevery\b"),
         1.0 if len(text.split()) > 9 else 0.0,
+        # F12: parity with K1's proven feature set
+        has(r"\b(?:shiur|recital|ceremony|festival|get-?together|funeral|checkup|check-?up|haircut|workout|gym|run|practice)\b"),
+        has(r"\bat\s+\d{1,2}\b"),
+        has(r"\b(?:errand|chore|homework|assignment|laundry|dishes|email|form|bill|report)\b"),
+        has(r"\bfor\s+(?:me|us)\b|\bmy\s+(?:place|house|office)\b"),
     ]
 
 

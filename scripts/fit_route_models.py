@@ -80,10 +80,25 @@ def main() -> int:
     print(f"fit: operation on {len(op_y)} rows · kind on {len(k_y)} rows -> {dest.name}")
     # train-side sanity (never test here)
     from assistant.intent.route_models import _scores, _top2
-    ok = sum(1 for x, y in zip(op_X, op_y) if _top2(_scores(out["operation"], x))[0] == y)
-    print(f"operation train-acc (balanced fit): {ok/len(op_y):.1%}")
-    ok = sum(1 for x, y in zip(k_X, k_y) if _top2(_scores(out["kind"], x))[0] == y)
-    print(f"kind      train-acc: {ok/len(k_y):.1%}")
+
+    def report(name, W, X, y, classes):
+        preds = [_top2(_scores(W, x))[0] for x in X]
+        acc = sum(p == t for p, t in zip(preds, y)) / len(y)
+        print(f"{name} train-acc: {acc:.1%} · per-class P/R/F1:")
+        f1s = []
+        for c in classes:
+            tp = sum(1 for p, t in zip(preds, y) if p == c and t == c)
+            fp = sum(1 for p, t in zip(preds, y) if p == c and t != c)
+            fn = sum(1 for p, t in zip(preds, y) if p != c and t == c)
+            P = tp / (tp + fp) if tp + fp else 0.0
+            R = tp / (tp + fn) if tp + fn else 0.0
+            F = 2 * P * R / (P + R) if P + R else 0.0
+            f1s.append(F)
+            print(f"    {c:<9} P {P:.0%}  R {R:.0%}  F1 {F:.0%}  (n={tp+fn})")
+        print(f"    macro-F1 {sum(f1s)/len(f1s):.1%}")
+
+    report("operation", out["operation"], op_X, op_y, OPS)
+    report("kind     ", out["kind"], k_X, k_y, ("event", "task"))
     return 0
 
 
