@@ -33,6 +33,18 @@ floors 2.5/1.5. **Predict:** operation train-acc 90.9 → 93+ with query/
 remove ≥75% each; kind train-acc 86.4 → 92+; downstream, simple commit
 72.5 → 74–77% at ≥91% correct; A-pool dual-gate within ±0.5 of 94.5.
 
+## F12 — ACTUAL (2026-09-07): partial — P/R/F1 lens now standard (Gil's ask)
+
+Models: operation train-acc 90.9 → 92.0 (predicted 93+, under), macro-F1
+87.1; query recall fixed (61→87) but precision fell to 61 (over-firing
+features); kind barely moved (86.4 → 86.8 vs predicted 92+ — parity
+features didn't close it; the gap to K1's 99 is likely K1's segment-regex
+features, F13 target). Downstream: **simple 72.5 → 73.1% at 91.6%** ·
+A-pool adjusted 94.3 (+9 commits; in bound but −0.4 cumulative from the
+94.7 baseline — the model tier's running tab, watched every batch).
+Per-class P/R/F1 + macro-F1 now prints at every fit (metric discipline
+extended to the model layer).
+
 ## F11 — ACTUAL (2026-09-07): Q10 router wired; dual-gate did its job
 
 First cut: simple 74.7% commit but the A-pool dual-gate CAUGHT a violation
