@@ -1042,3 +1042,111 @@ the F6b rewrite; (c) "clear/take ‹X› off my calendar|list" capture;
 71.8 → 76–80%; non-atomic defer rate holds ≥82% with the "knew" share up
 (the serial-verb guard removes false compounds, not true ones); propose
 defer unchanged.
+
+## F16 (layer 0 — the WIRING) — REGISTERED PREDICTION 2026-09-07
+
+**The instrument first.** `scripts/atomicity_board.py` scores layer 0's own
+binary question — one atomic item or several — as three separate predictors
+(rules alone / model alone / the wired layer) on two datasets: **B** (the
+FastRule 7,200, `expect.atomic` by construction, family-split) and **A**
+(the verification pool minus the sealed 300, `scenario == "compound"` as
+ground truth, deterministic sha1 75/25 split). Error counts are reported
+un-aggregated because the cost is asymmetric: an FN ("said atomic, was
+compound") half-executes a two-ask command and reaches the user; an FP
+("said compound, was atomic") costs one slow-path row.
+
+**Baseline it exposes — the layer scores WORSE than the model it contains,
+on both datasets:**
+
+| dataset · slice | predictor | acc | compound P | R | F1 | FP cheap | FN expensive |
+|---|---|---|---|---|---|---|---|
+| B-test (2,400: 626 c / 1,774 a) | rules only | 84.3% | 87.8% | 46.2% | 60.5% | 40 | 337 |
+| B-test | model only (floor 1.5) | 91.9% | 85.3% | 83.4% | 84.3% | 90 | **104** |
+| B-test | LAYER as shipped | 88.0% | 82.1% | 68.8% | 74.9% | 94 | **195** |
+| A-test (672: 227 c / 445 a) | rules only | 93.6% | 96.9% | 83.7% | 89.8% | 6 | 37 |
+| A-test | model only (floor 1.5) | 98.2% | 95.4% | 99.6% | 97.4% | 11 | **1** |
+| A-test | LAYER as shipped | 93.3% | 94.6% | 85.0% | 89.6% | 11 | **34** |
+
+**Diagnosis (train-side mining only).** `judge()` consults the model only
+behind `len(intents) <= 1`. In B-test **110 rows parse to ≥2 intents and
+every one of them is compound**, and the layer calls all 110 atomic without
+ever asking the model: 110 of its 195 misses are one guard clause. The
+guard exists for a real reason (v1: "buy milk and buy bread" parses as two
+intents and rightly commits) — but that is an EXECUTION judgement, not an
+ATOMICITY judgement, and it was smuggled into the atomicity answer.
+
+**Change:** the model LEADS and the rule gates become overrides for their
+own catches — `judge()` becomes rules-OR-model, with the model's
+`len(intents) <= 1` guard removed. No feature or weight change; wiring only.
+
+**Predict (B-test):** layer recall 68.8 → 82–84% (it should land on the
+model's own line), FN 195 → ~105, accuracy 88.0 → 91–92%, precision
+82.1 → 84–86%. **(A-test):** layer recall 85.0 → 98–100%, FN 34 → ≤3,
+accuracy 93.3 → 97–98%. **Downstream (`fastrule_shape`, B-test):**
+non-atomic DEFER RATE 77.1 → 85–90% with the "knew it was compound" share
+51.2 → 68–75%; routing violations 129 → 55–70. Atomic handle rate 53.5%
+should fall by ≤1.5pp (no B-test atomic row parses to ≥2 intents, so the
+only new defers there are model FPs already counted above);
+correct-on-handled 73.1% flat or up.
+
+## F16 — ACTUAL (2026-09-07): the wiring WAS the bug; the routing was a second, separate bug
+
+**The atomicity board — predicted band beaten on B, met on A.**
+
+| dataset · slice | predictor | acc | compound P | R | F1 | FP cheap | FN expensive |
+|---|---|---|---|---|---|---|---|
+| B-test | LAYER before | 88.0% | 82.1% | 68.8% | 74.9% | 94 | 195 |
+| B-test | LAYER after | **92.5%** | **85.2%** | **86.4%** | **85.8%** | 94 | **85** |
+| B-test | (model alone, for reference) | 91.9% | 85.3% | 83.4% | 84.3% | 90 | 104 |
+| A-test | LAYER before | 93.3% | 94.6% | 85.0% | 89.6% | 11 | 34 |
+| A-test | LAYER after | **98.1%** | **95.0%** | **99.6%** | **97.2%** | 12 | **1** |
+
+Predicted B-test recall 82–84% (i.e. "it should land on the model's own
+line"); **actual 86.4%, above the model alone**. The reason is the finding:
+rules-OR-model is a genuine union — the gates catch compounds the classifier
+is not decisive about, and the classifier catches the quiet ones the gates
+have no cue for — so the wired layer now beats BOTH its parts (F1 85.8 vs
+84.3 model / 60.5 rules). B-test half-executions 195 → 85, at zero
+precision cost (FP 94 → 94). A-test met the band exactly: 34 → **1**
+missed compound in 227.
+
+**NOVEL EFFECT — and it changed the design.** Feeding the honest atomicity
+verdict straight into ROUTING (defer on any compound) gave a much better
+product-shape board — non-atomic defer 77.1 → **95.6%**, violations 129 →
+25 — and was still WRONG. Two measurements said so:
+
+1. Of the 104 rows it stopped committing, **96 had been producing the RIGHT
+   counts** on the fast track (shape board's "of which produced right counts
+   anyway": 103 → 7). Those are not half-executions; they are complete
+   answers being thrown away.
+2. With the LLM unreachable — CI, or Ollama down — "book gym on tuesday at
+   7am and remind me to buy milk" routed to the deep track produces
+   **nothing at all** (verified by raising from `engine.llm.call_json`),
+   where the fast track produced both records. `test_a_two_intent_parse_
+   keeps_fast_despite_a_joiner` and `test_a_mixed_command_is_answered_by_
+   the_rules_alone` were red for exactly this reason, and they were right.
+
+So the answer and the decision were split. `Atomicity.judge()` reports the
+truth ("several items"); `_parse_covers_the_compound()` — in routing, where
+it belongs — lets FastRule commit anyway when the parse already covers the
+ask. **"Covers" is not "≥2 intents".** B-train mining: of 381 compound rows
+committed on a ≥2-intent parse, 105 did NOT cover the ask and **80% of those
+were three-ask families** ("book flu shot this morning, training session the
+3rd, and remind me to …" → two intents, one ask lost). Requiring
+`len(intents) ≥ 1 + ask-joiners` cuts that pile 105 → 14 on B-train, and the
+14 survivors are KIND errors (event parsed as task), not lost asks.
+
+**Downstream (`fastrule_shape`, B-test), with the split in place:** atomic
+handle rate **53.5% → 53.5%** and correct-on-handled **73.1% → 73.1%** (the
+brief's guard rail: untouched); non-atomic defer rate 77.1 → **77.8%**, the
+"knew it was compound" share 51.2 → **52.0%**, routing violations 129 →
+**125** — of which the half-executions (wrong counts) are **26 → 22** and
+the complete-answer commits are 103 → 103. Propose defer 70.6% unchanged.
+A modest downstream move is the honest price of not throwing away 96 correct
+answers; the big number is the atomicity board's, which is what layer 0 is.
+
+**Open product question for Gil (DEVQA):** `fastrule_shape` scores ANY
+commit on a non-atomic row as a routing violation, including the 103 that
+produce exactly the right records. If the ruling is "violation regardless",
+delete `_parse_covers_the_compound` and the board jumps to 95.6% defer —
+but the LLM-free path loses those commands entirely.

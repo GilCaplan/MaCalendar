@@ -8,6 +8,23 @@ to the log below so decisions stay findable.
 
 ## Open
 
+**Q13 — Is a fast commit on a compound a violation when it produces exactly
+the right records?** (F16, 2026-09-07.) `fastrule_shape` scores ANY commit
+on a non-atomic row as a routing violation. On B-test 129 such commits
+exist and **103 of them produce the right events/tasks** — the rule parser
+read both asks and executed both. Deferring all of them lifts the
+non-atomic defer rate 77.1 → **95.6%** and cuts violations to 25, but (a)
+throws away 96 complete correct answers into a ~35 s deep pass, and (b)
+**loses them entirely when Ollama is down** — measured: "book gym on
+tuesday at 7am and remind me to buy milk" produces NOTHING on the deep
+track with the LLM unreachable, where fast produced both records. Shipped
+for now: layer 0 reports "compound" honestly (its board is what improved),
+and routing commits anyway when the parse covers every ask
+(`_parse_covers_the_compound`, gated on intent-count ≥ ask-joiners + 1).
+**Question: is that carve-out right, or is "FastRule never commits a
+compound, full stop" the ruling?** If the latter, delete the function —
+one line — and the shape board jumps, at the cost above.
+
 **Q11 — [DESIGN] FastRule v2 restructure** (Gil proposed 2026-09-07; the
 draft is `DOCUMENTATION/FASTRULE2_DESIGN.md`): five single-responsibility
 components (Normalizer=lexical-only / Router=the Q10 two-subsystem center /

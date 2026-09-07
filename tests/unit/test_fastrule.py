@@ -92,3 +92,47 @@ def test_f11_model_tier_fires_only_where_rules_found_nothing(fastrule):
         assert r2.intents[0][0] == "create_event" and r2.confidence <= 0.9
     r = fastrule.run("book gym tomorrow at 7am")   # rules tier, unchanged
     assert r.committed and r.confidence > 0.9
+
+
+def test_f16_the_model_tier_is_consulted_on_a_multi_intent_parse(fastrule):
+    """Layer 0 answers "one item or several", and a ≥2-intent parse is not
+    an answer to that question.
+
+    Until F16 the model tier sat behind `len(intents) <= 1`, so a compound
+    the parser had split was reported ATOMIC — 110 of the layer's 195
+    B-test misses. `judge` must now say compound there; what routing DOES
+    about it is the next test's business.
+    """
+    from types import SimpleNamespace
+    from assistant.engine.fastrule import Atomicity
+    two = [("create_event", SimpleNamespace()), ("create_todo", SimpleNamespace())]
+    text = "book gym on tuesday at 7am and remind me to buy milk"
+    assert Atomicity().judge(text, two) == "model-compound"
+
+
+def test_f16_routing_commits_a_compound_the_parse_fully_covers(fastrule):
+    """The atomicity ANSWER and the routing DECISION are separate (F16).
+
+    A compound whose every ask the parser recovered is not half-executed by
+    committing it — and deferring it loses the command outright when the
+    LLM is unreachable. But "covers" means intent count ≥ asks: a three-ask
+    sentence read as two intents drops one, which is the real harm.
+    """
+    from types import SimpleNamespace
+    from assistant.engine.fastrule import _parse_covers_the_compound
+    two = [("create_event", SimpleNamespace()), ("create_todo", SimpleNamespace())]
+    one = [("create_event", SimpleNamespace())]
+    assert _parse_covers_the_compound(
+        "model-compound", "book gym at 7. Also, add milk to my list", two)
+    # three asks, two intents -> one ask lost -> defer
+    assert not _parse_covers_the_compound(
+        "model-compound",
+        "book flu shot this morning, training session the 3rd, "
+        "and remind me to call the plumber", two)
+    # a single-intent parse never covers a compound
+    assert not _parse_covers_the_compound(
+        "model-compound", "book gym at 7 and remind me to buy milk", one)
+    # the RULE verdicts are never carved out — they name a structure the
+    # gates recognised, not a classifier's opinion
+    assert not _parse_covers_the_compound(
+        "strong-compound", "book gym at 7. Also, add milk to my list", two)
