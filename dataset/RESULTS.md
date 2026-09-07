@@ -21,6 +21,16 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## Era-2 cycle 3 — REGISTERED PREDICTION 2026-09-07: F4+F5 joint confirmation
+
+**Change under test:** the boundary integration (fast-lane merge). Routing
+changes: F5's clause-coordination gate defers plain-"and" compounds the
+regex missed; F4a commits polite imperatives; F4b removes the mark-a-date
+false-accept. **Predict (dev-fast 250 vs run 18):** fast n 87 → 83–86 (F5
+defers a few compound swallows; F4a adds ~1 back); fast correct-on-committed
+90% → 91–93%; the deferred compounds land in deep where splitting can save
+them — complex/e+t flat-to-up; overall raw flat ± noise; garbage stays 0%.
+
 ## F5 (sandbox) — ACTUAL (2026-09-07, fastlane 88c736b)
 
 **Two of three predictions met.** Dev-full 600 vs F4: committed 230→225
