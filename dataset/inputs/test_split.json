@@ -1,0 +1,2408 @@
+{
+ "created": "2026-09-07",
+ "seed": 42,
+ "n": 300,
+ "rule": "SEALED TEST - never mined, never trained on, never tuned against; milestone evaluation only (Gil, 2026-09-07). Drawn from ranks 601-3000, which were never mined pre-split.",
+ "rows": [
+  [
+   "Add Bob to my list of contacts \u2014 and add juice to my grocery list",
+   {
+    "rank": 1630,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Add Bubbles birthday to March 15 \u2014 and add Paav Bhaji in Menu card",
+   {
+    "rank": 2355,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "Add a meeting at the office with Brian for 3:00PM on Tuesday \u2014 and add Moong daal in grocery list",
+   {
+    "rank": 2963,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "Add a meeting at the office with Brian for 3:00PM on Tuesday. Also, make a new list for me",
+   {
+    "rank": 1978,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "Add a movie name to the wish list and also please open grocery list and add bananas to list.",
+   {
+    "rank": 2312,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Add an event labeled Dan's Graduation party May 5th in Goshen.",
+   {
+    "rank": 2107,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Add build my resume to my to-do list and please add sugar to my grocery list.",
+   {
+    "rank": 2928,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Add buy groceries to my to-do list for today, and then Can you create a new list?",
+   {
+    "rank": 1044,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Add car service to my list of things to do today",
+   {
+    "rank": 2171,
+    "scenario": "lists",
+    "intent": "createoradd"
+   }
+  ],
+  [
+   "Add event for meeting with James \u2014 and i need a list of my clients today, make one",
+   {
+    "rank": 1059,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "Add event: Baseball practice, 5pm tonight, and then I need to organize a meeting with sarah, tomorrow alexa",
+   {
+    "rank": 1789,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Add girls night out to my calendar",
+   {
+    "rank": 1960,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Add ketchup to the list and pls add list of friends to invite for the party",
+   {
+    "rank": 2467,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Add milk to grocery list and put milk on the shopping list.",
+   {
+    "rank": 909,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Add mow lawn to things to do list \u2014 and please add this item to the list",
+   {
+    "rank": 689,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Add my meeting in Google office tomorrow, 10 AM",
+   {
+    "rank": 965,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Add new item to list \u2014 and can you add Gloria to my list of clients?",
+   {
+    "rank": 1179,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Add soup to my shopping list.",
+   {
+    "rank": 2720,
+    "scenario": "lists",
+    "intent": "createoradd"
+   }
+  ],
+  [
+   "Add this item to the list",
+   {
+    "rank": 1565,
+    "scenario": "lists",
+    "intent": "createoradd"
+   }
+  ],
+  [
+   "Add wash jeans to laundry list",
+   {
+    "rank": 1120,
+    "scenario": "lists",
+    "intent": "createoradd"
+   }
+  ],
+  [
+   "Alexa add bananas to my shopping list and also put hamburger on my grocery list.",
+   {
+    "rank": 2358,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Alexa, delete the events from the calendar on 28th march",
+   {
+    "rank": 1009,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "All March events in RCCG is to be added to my calender",
+   {
+    "rank": 1368,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Am I having brunch with Sarah today?",
+   {
+    "rank": 993,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Can you add Name/Location to calendar and add a movie name to the wish list",
+   {
+    "rank": 966,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "Can you add cups to my grocery list and i need oranges added to my grocery list.",
+   {
+    "rank": 2985,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Can you delete the doctors appoitment i had tuesday.",
+   {
+    "rank": 2946,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Can you find my lists?",
+   {
+    "rank": 901,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "Can you please add an item to my grocery list?",
+   {
+    "rank": 2960,
+    "scenario": "lists",
+    "intent": "createoradd"
+   }
+  ],
+  [
+   "Can you put in Lee's birthday on the 22nd of June and also please feed that I have meeting at 5 PM.",
+   {
+    "rank": 620,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Can you remove that on my calendar",
+   {
+    "rank": 2868,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Can you set a reminder for me to go to my kid's basketball practice every friday night?",
+   {
+    "rank": 1326,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Cancel all events for today and mark me busy",
+   {
+    "rank": 1123,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Check my to do list",
+   {
+    "rank": 1546,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "Clear my day on the 29th.",
+   {
+    "rank": 1231,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Could you open my list app and check for groceries, please",
+   {
+    "rank": 1944,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "Create a list of monthly groceries to be bought",
+   {
+    "rank": 888,
+    "scenario": "lists",
+    "intent": "createoradd"
+   }
+  ],
+  [
+   "Create a meeting event in my calendar.",
+   {
+    "rank": 1952,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Create a new event every friday at noon, and then I am unavailable from 4 to 6 in the evening tomorrow. Mark my calendar.",
+   {
+    "rank": 1093,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Create a new list for me",
+   {
+    "rank": 1289,
+    "scenario": "lists",
+    "intent": "createoradd"
+   }
+  ],
+  [
+   "Create a new list, please",
+   {
+    "rank": 2017,
+    "scenario": "lists",
+    "intent": "createoradd"
+   }
+  ],
+  [
+   "Create an event for a John's birthday and also please Find all name start with alphabetic of 'A' and create a list.",
+   {
+    "rank": 1450,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "Create an event for me at 3:30 pm \u2014 and add ketchup to the list",
+   {
+    "rank": 2530,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "Delete Mike Stein from Contacts list",
+   {
+    "rank": 1439,
+    "scenario": "lists",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Delete all appointments for tomorrow",
+   {
+    "rank": 2235,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Delete event from calendar",
+   {
+    "rank": 2178,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Delete from playlist my Old English Songs list",
+   {
+    "rank": 788,
+    "scenario": "lists",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Delete my Christmas Holiday list.",
+   {
+    "rank": 2685,
+    "scenario": "lists",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Delete that item from the list",
+   {
+    "rank": 682,
+    "scenario": "lists",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Delete the To Do list on March 18, 2017.",
+   {
+    "rank": 1046,
+    "scenario": "lists",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Do I have any appointments tomorrow afternoon.",
+   {
+    "rank": 2547,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Do I have any events scheduled today?",
+   {
+    "rank": 1945,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Do I have any lists?",
+   {
+    "rank": 2198,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "Do I have any pending reminder",
+   {
+    "rank": 806,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Do I have anything lists made for christmas shopping?",
+   {
+    "rank": 1314,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "Do I need to be reminded of any meetings on Monday and also schedule meeting with manager tomorrow at 2 pm",
+   {
+    "rank": 2746,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Do I work on the 24th?",
+   {
+    "rank": 1587,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Don't forget about meeting Reveca todat at 6:00pm",
+   {
+    "rank": 2673,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Don't forget about meeting Reveca todat at 6:00pm, and then Notify me about birthdays of all my facebook friends.",
+   {
+    "rank": 1357,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Don't let me forget I have a Parent-Teacher conference this Monday at 4:00 pm and create a meeting thursday afternoon for budget review",
+   {
+    "rank": 1000,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Echo was my afernoon meeting cancelled?",
+   {
+    "rank": 1922,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Erase all events on the calendar.",
+   {
+    "rank": 957,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Get rid of the Wednesday list",
+   {
+    "rank": 2968,
+    "scenario": "lists",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Give an entry to this list and creat a new to-do list",
+   {
+    "rank": 1660,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Give the time of clasical music concert today in the city",
+   {
+    "rank": 1263,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Google is my Thursday appointment with my dentist?",
+   {
+    "rank": 774,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Grocery list add eggs",
+   {
+    "rank": 1027,
+    "scenario": "lists",
+    "intent": "createoradd"
+   }
+  ],
+  [
+   "Grocery list add eggs and also the list should contain this item.",
+   {
+    "rank": 744,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Hey, add dentist appointment on Tuesday 4pm",
+   {
+    "rank": 2440,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "How long will my lunch meeting be on Tuesday?",
+   {
+    "rank": 769,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "How many things do I have planned tonight?",
+   {
+    "rank": 1218,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "How much time do I have left until the pta meeting?",
+   {
+    "rank": 2580,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "I HAVE ALL DETAILS ABOUT PDA'S",
+   {
+    "rank": 2028,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "I have a dentist appointment on Monday morning, true or false?",
+   {
+    "rank": 1024,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "I have a meeting tomorrow morning at 10:00, please remind me \u2014 and pls add list of things to buy for pary",
+   {
+    "rank": 2150,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "I need to add an event on May 5th 2017 location Goshen for Danny's Graduation Party.",
+   {
+    "rank": 2206,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "I need to add bananas to my grocery list and also create a new list of ....",
+   {
+    "rank": 1534,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "I need to add water to my Kroger list, and then Add cereal to my shopping list.",
+   {
+    "rank": 618,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "I need to calendar a meeting with Nathan on Monday at 9am and generate a new inventory",
+   {
+    "rank": 2233,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "I need to let my small group know the location has changed and also add new items in the alarm list",
+   {
+    "rank": 2725,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "I want a reminder that repeats every week.",
+   {
+    "rank": 1675,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "I want to know could an extra item be added to my grocery list?",
+   {
+    "rank": 870,
+    "scenario": "lists",
+    "intent": "createoradd"
+   }
+  ],
+  [
+   "I want to remove the grocery list from my other lists.",
+   {
+    "rank": 1918,
+    "scenario": "lists",
+    "intent": "remove"
+   }
+  ],
+  [
+   "I want to start a new list of power tools on sale at True Value, and then Please add sugar to my grocery list.",
+   {
+    "rank": 1776,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "I want you to delete my shopping list from last month",
+   {
+    "rank": 1887,
+    "scenario": "lists",
+    "intent": "remove"
+   }
+  ],
+  [
+   "I want you to remind me the next meeting with my girlfriend, it will be at 8 pm next sunday, and then set event in calandar.  repeat event every day",
+   {
+    "rank": 2496,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "I want you to schedule a meeting with Bryce, Jessie, and Carol for tomorrow at 9 am.",
+   {
+    "rank": 2992,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "I will need a reminder of the 3:00pm teachers meeting on Thursday, and then I need to arrange a meeting with Jack.",
+   {
+    "rank": 2460,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "I would like to attend church every Sunday at 11am, and then Olly, please add my meeting with Clara to my calender for this thursday afternoon.",
+   {
+    "rank": 1855,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "In March what meetings are available?",
+   {
+    "rank": 2427,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Inform my group that the new meeting date is tomorrow \u2014 and set a meeting with Tom on Tuesday at 9am.",
+   {
+    "rank": 615,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Is Wyatt's birthday party at 10pm?",
+   {
+    "rank": 1496,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Is the birthday event on 15th of this month true",
+   {
+    "rank": 2677,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Is there room on my grocery list for an extra item, and then start a new list",
+   {
+    "rank": 1143,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Is tomorrow's appointment in the Middletown office?",
+   {
+    "rank": 2278,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Just let me know the important appointments with dealers over the week. Also, Start a list of dog names.",
+   {
+    "rank": 2248,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "List things on my list.",
+   {
+    "rank": 1319,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "Make a list about selena gomez concert schedule and my new health check up new list",
+   {
+    "rank": 2540,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Make a new list for me, please. Also, Put milk on the shopping list.",
+   {
+    "rank": 1041,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Make a new shopping list. Also, Add red wine to my shopping list.",
+   {
+    "rank": 1579,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "March 1 is Susan's birthday, right?",
+   {
+    "rank": 846,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Mark April 20 as my brother's birthday.",
+   {
+    "rank": 2464,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Mark the event monthly. Also, Make new playlist from recent songs",
+   {
+    "rank": 1331,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "Meet James at Mill Creek Cinema in McKinleyville California at 9pm. Also, put a repeating event on the calendar",
+   {
+    "rank": 2903,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "My new health check up new list \u2014 and please Find all name start with alphabetic of 'A' and create a list.",
+   {
+    "rank": 844,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Next Thursday I need to be reminded to call the bank",
+   {
+    "rank": 1844,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Next event is canceled",
+   {
+    "rank": 2076,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Notify me the day before the horse race at Santa Anita on March 7th, and then open a new list for me",
+   {
+    "rank": 1958,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "Notify me the day before the horse race at Santa Anita on March 7th. Also, recall me wedding anniversary day",
+   {
+    "rank": 749,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Notify me when I have a meeting, and then Add practice to calendar on Feb 4 at King's Park at 2 p.m..",
+   {
+    "rank": 662,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Notify me when I have a meeting.",
+   {
+    "rank": 2434,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Notify me when the event is going to take place",
+   {
+    "rank": 830,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Olly, I have a doctor's appointment at 2pm today.",
+   {
+    "rank": 1472,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Olly, create a repeating event on Mondays at 7 pm",
+   {
+    "rank": 1391,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Olly, create a repeating event on Mondays at 7 pm. Also, Add lunch with Laura for Thursday at 1:00",
+   {
+    "rank": 1873,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Olly, notifiy me two hours before my meeting.",
+   {
+    "rank": 2044,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Olly, set generic calendar event for next Saturday at 10 a.m.",
+   {
+    "rank": 1099,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Olly, what do I have next to do",
+   {
+    "rank": 2930,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Open Tasks, delete future events",
+   {
+    "rank": 1697,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Open calendar.  Set event, and then Add yoga to my calendar for friday.",
+   {
+    "rank": 2214,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Open me a new list \u2014 and add new songs to playlist",
+   {
+    "rank": 1677,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Open my grocery list and add bananas to it. Also, Add this one also.",
+   {
+    "rank": 1553,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "PDA can you give me a 10 minute timer.",
+   {
+    "rank": 1487,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "PDA can you remind me to check my clothes in a hour.",
+   {
+    "rank": 2679,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "PDA please delete this calendar event",
+   {
+    "rank": 1777,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "PDA please set this date to repeat and remind me of the meeting with my Teacher today by 5pm.",
+   {
+    "rank": 745,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "PDA please set this date to repeat, and then Create a list for today's tasks",
+   {
+    "rank": 2977,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "PDA please set this event on repeat this date, and then Add milk to grocery list",
+   {
+    "rank": 2429,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "PDA what's on the calendar today?",
+   {
+    "rank": 1094,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "PDA, add event to calender.",
+   {
+    "rank": 2827,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "PDA, please add an item in my calendar and also remember to put carrots in there.",
+   {
+    "rank": 866,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Please Find all name start with alphabetic of 'G' and create a list. Also, Please add deodorant to my shopping list.",
+   {
+    "rank": 916,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Please add haricut to March 27th at 3 pm.",
+   {
+    "rank": 2936,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Please add supervision to my calendar and also please set a reminder for me to 'something' in 'sometime'",
+   {
+    "rank": 2883,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Please give me an update on the election every 30 minutes. Also, Please put meeting with <insert name> at <insert time> on <insert date> on my calendar",
+   {
+    "rank": 2753,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Please invite Kim, Marc, and Julian to a meeting on thursday at 3pm",
+   {
+    "rank": 1894,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Please mark my calendar for therapy every Tuesday at 11 AM.",
+   {
+    "rank": 1701,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Please put bread on the grocery list and also pls add list of friends to invite for the party",
+   {
+    "rank": 2090,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Please put the following event in my calendar on this date, and then place it in the calendar every week thereafter. Also, I need a reminder at 2:00 every day to check on my mother.",
+   {
+    "rank": 2241,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Please relocate all dates to the trash",
+   {
+    "rank": 1395,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Please remind me about this tomorrow",
+   {
+    "rank": 1865,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Please remind me to go to the post office. Also, create a new list of my pending bills",
+   {
+    "rank": 2515,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "Please remove the following list",
+   {
+    "rank": 1694,
+    "scenario": "lists",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Please schedule a hair cutting appointment for 1:00 pm on Saturday.",
+   {
+    "rank": 2377,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Please set recurring calendar event. Also, Adding meetings on particaur dates of calender",
+   {
+    "rank": 2353,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Please set repeating reminder for my friends birthday on April 5 and also alert me about birthday of wife in advance.",
+   {
+    "rank": 696,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Please set up a meeting with Becky at 3 pm on Tuesday",
+   {
+    "rank": 1113,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Please tell me what lists I have made.",
+   {
+    "rank": 1236,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "Please tell me what's on the list",
+   {
+    "rank": 1752,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "Please update the status of pending reminders.",
+   {
+    "rank": 771,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Please, clean my calendar",
+   {
+    "rank": 2164,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Read most recent reminder",
+   {
+    "rank": 2658,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Remind me about my meeting at 2pm, and then Add grocery shopping to today's to-do list.",
+   {
+    "rank": 1523,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "Remind me at 2 pm Tuesday for the 3 pm meeting with the boss.",
+   {
+    "rank": 2734,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Remind me every Monday to take out the trash",
+   {
+    "rank": 2286,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Remind me everyday at 2 PM for lunch. Also, olly make sure to remind about tomorrows afternoon meeting",
+   {
+    "rank": 2414,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Remind me if anything else happens",
+   {
+    "rank": 1359,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Remind me in the morning to call my mother.",
+   {
+    "rank": 2240,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Remind me of Sarah's birthday three days ahead of time \u2014 and begin new list of lottery numbers",
+   {
+    "rank": 2867,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "Remind me of my sister's birthday party tomorrow an hour before it starts and i need to create a new to do list.",
+   {
+    "rank": 2456,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "Remind me of the meeting on tuesday and can you remind my next meeting with my boss, one hour before it will happen?",
+   {
+    "rank": 1149,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Remind me of this meeting soon. Also, PDA can you create a list for me.",
+   {
+    "rank": 903,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "Remind me that I have a birthday party on the thirtieth.",
+   {
+    "rank": 1410,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Remind me the reminders I have set",
+   {
+    "rank": 2864,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Remind me to 'something' in 'sometime'",
+   {
+    "rank": 2652,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Remind me to buy a gift once in morning and once in evening",
+   {
+    "rank": 711,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Remind me to fill college's application form every two days from now",
+   {
+    "rank": 1492,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Remind me to have launch with boss today at 1 pm.",
+   {
+    "rank": 893,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Remind me to tweet at this company, and then create a list that is available",
+   {
+    "rank": 1089,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "Remind me tomorrow at 2 pm.",
+   {
+    "rank": 1102,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Reming me tonight to pick up my dry cleaning at 8pm.",
+   {
+    "rank": 1964,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Remove Mike Stein from Contacts list",
+   {
+    "rank": 2500,
+    "scenario": "lists",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Remove birthday event from my calendar",
+   {
+    "rank": 1623,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Remove fruits from the list",
+   {
+    "rank": 1801,
+    "scenario": "lists",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Remove the board meeting and reschedule for next Wednesday",
+   {
+    "rank": 1824,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Remove the fundraiser for dolphines in April.",
+   {
+    "rank": 2124,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Remove the list called Party Time",
+   {
+    "rank": 2615,
+    "scenario": "lists",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Remove tonights dinner with Shelly.",
+   {
+    "rank": 1723,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Repeat reminder for Christmas, and then Notify me when the event is going to take place",
+   {
+    "rank": 2745,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Repeat this event every Friday on my calendar and please add this item to the list",
+   {
+    "rank": 1624,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "Replace the furniture with electronics on the list. Also, The list should contain this item.",
+   {
+    "rank": 2564,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "Research the clients that will attend the meeting and remind upcoming meeting with eminem",
+   {
+    "rank": 1345,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Schedule a lunch meeting with Brent on Wednesday at noon.",
+   {
+    "rank": 2127,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Schedule a meeting with the accounting department on 2:30pm on Friday.",
+   {
+    "rank": 1095,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Scheduled events. more info",
+   {
+    "rank": 2788,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Scratch that one from the list",
+   {
+    "rank": 2005,
+    "scenario": "lists",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Set Reminder to go workout at the gym every Friday at 8:00 am.",
+   {
+    "rank": 1151,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Set a meeting with Bill",
+   {
+    "rank": 1999,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Set a reminder alert for Saturday 9:00 a.m. towards payment of electricity bill and also olly, please set work meeting at 12pm for every Thursday in February.",
+   {
+    "rank": 1481,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Set a reminder every day at noon to take medciation. Also, remind me at the time of the event",
+   {
+    "rank": 2824,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Set a reminder for 5pm tomorrow.",
+   {
+    "rank": 2308,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Set an aniversary event for Tuesday",
+   {
+    "rank": 634,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Set an event for this Sunday and the next two Sundays that I have Yoga at 12:00 pm",
+   {
+    "rank": 2835,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Set event as meeting notification",
+   {
+    "rank": 813,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Set event in the calendar and also remind me of the meeting on tuesday",
+   {
+    "rank": 1422,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Set event on repeat",
+   {
+    "rank": 2841,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Set my calendar to remind me to buy groceries every Friday \u2014 and refresh the list with new one.",
+   {
+    "rank": 1261,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "Set reminder for tomorrow morning about  my meeting",
+   {
+    "rank": 2605,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Set the event to recur every week",
+   {
+    "rank": 2519,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Set the event to recur on the first Monday of the month",
+   {
+    "rank": 1477,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Set up a meeting with Peter Francis for Monday at 2 pm, and then When is my meeting?",
+   {
+    "rank": 2784,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Show the list that are available with numbers",
+   {
+    "rank": 1683,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "Start a grocery list. Also, Please create a new list for me",
+   {
+    "rank": 1963,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "THIS IS IMPORTANT EVENT, PLZ NOTE ON MY CALENDAR.",
+   {
+    "rank": 2843,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Take lunch meeting off my calendar.",
+   {
+    "rank": 885,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "Tell me something to remind this week",
+   {
+    "rank": 2701,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "Tell me what lists I have.",
+   {
+    "rank": 631,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "Tell me what's happening next Thursday.",
+   {
+    "rank": 1299,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Tell more about this event",
+   {
+    "rank": 1728,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "The next even to do today is",
+   {
+    "rank": 2482,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Thirteen minutes from now, remind me to drive to the park \u2014 and set a reminder to pick up food this Friday.",
+   {
+    "rank": 2676,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "Was my meeting today rescheduled?",
+   {
+    "rank": 1645,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Was there an appointment set up for Saturday?",
+   {
+    "rank": 1285,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "What are the pending reminders?",
+   {
+    "rank": 982,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "What day is payday?",
+   {
+    "rank": 2768,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "What do I have today?",
+   {
+    "rank": 1271,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "What is going on on December fourth?",
+   {
+    "rank": 1232,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "What is my list?",
+   {
+    "rank": 2199,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "What is my schedule for 12pm to 4 pm?",
+   {
+    "rank": 2346,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "What is on my shopping list today?",
+   {
+    "rank": 721,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "What is planned today?",
+   {
+    "rank": 2066,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "What is up in my schedule today?",
+   {
+    "rank": 980,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "What items did I plan to buy?",
+   {
+    "rank": 2857,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "What list is available for food products online?",
+   {
+    "rank": 2568,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "What time is the function of the play Joy in broadway teather today?",
+   {
+    "rank": 2168,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "What time is the party tonight",
+   {
+    "rank": 1088,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "What to-do lists do I have?",
+   {
+    "rank": 2521,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "What's coming up this week?",
+   {
+    "rank": 1501,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "What's my schedule like today?",
+   {
+    "rank": 2948,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "What's on my calendar this month?",
+   {
+    "rank": 2438,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Whats my schedule like",
+   {
+    "rank": 2117,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "When and where is June's birthday party?",
+   {
+    "rank": 1014,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "When is my next work day?",
+   {
+    "rank": 801,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "When will my dinner with Max scheduled to happen?",
+   {
+    "rank": 1254,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Where is my meeting?",
+   {
+    "rank": 1497,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "Who is scheduled for tomorrow's meeting?",
+   {
+    "rank": 2909,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "add milk to the grocery list. Also, include an item to a list",
+   {
+    "rank": 2339,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "add new items in the remainder list",
+   {
+    "rank": 2872,
+    "scenario": "lists",
+    "intent": "createoradd"
+   }
+  ],
+  [
+   "add the song the new playlist and also new item for list",
+   {
+    "rank": 1527,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "add to calendar and repeat",
+   {
+    "rank": 2875,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "add wine to list",
+   {
+    "rank": 2326,
+    "scenario": "lists",
+    "intent": "createoradd"
+   }
+  ],
+  [
+   "alexa put shoes on my list",
+   {
+    "rank": 2357,
+    "scenario": "lists",
+    "intent": "createoradd"
+   }
+  ],
+  [
+   "alexa set a meeting event reminder with mona on tuesday \u2014 and i think I ran out of this can you add it to my list?",
+   {
+    "rank": 1924,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "are all programs in line",
+   {
+    "rank": 2667,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "attend party with Love this friday",
+   {
+    "rank": 939,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "cancel  the breakfast at tiffany's",
+   {
+    "rank": 778,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "cancel all meetings for today",
+   {
+    "rank": 1621,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "clear calendar events all",
+   {
+    "rank": 835,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "crate event 'swimming day' on thursday and set it to repeat",
+   {
+    "rank": 1344,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "date with Love the next day and also add carrots to the list.",
+   {
+    "rank": 1917,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "delete the birthday party tomorrow at 2pm",
+   {
+    "rank": 2497,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "delete {item} from list",
+   {
+    "rank": 1406,
+    "scenario": "lists",
+    "intent": "remove"
+   }
+  ],
+  [
+   "enter this to a list \u2014 and open grocery list and add milk",
+   {
+    "rank": 2804,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "erase my appointment with ted",
+   {
+    "rank": 1517,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "find list in my pda",
+   {
+    "rank": 2931,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "google calendar. add event for march 21st and add a Tab to the shopping list",
+   {
+    "rank": 919,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "have John join me on the 10th at the 5th floor meeting. Also, add eggs to list",
+   {
+    "rank": 2966,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "how long its take \u2014 and create a list for the following...",
+   {
+    "rank": 1740,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "its depend pon the seen",
+   {
+    "rank": 2190,
+    "scenario": "lists",
+    "intent": "remove"
+   }
+  ],
+  [
+   "make a new list for me and add new item to list.",
+   {
+    "rank": 2302,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "make a note of this on the list",
+   {
+    "rank": 2942,
+    "scenario": "lists",
+    "intent": "createoradd"
+   }
+  ],
+  [
+   "mention the thing in the list",
+   {
+    "rank": 784,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "new item for list. Also, On my grocery list, please add oranges.",
+   {
+    "rank": 876,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "olly add tomorrows dinner date to the calendar",
+   {
+    "rank": 2387,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "olly later tonight remind me about tomorrows meeting, and then Add Diapers in cosmetic list",
+   {
+    "rank": 2324,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "open a new list for me",
+   {
+    "rank": 1274,
+    "scenario": "lists",
+    "intent": "createoradd"
+   }
+  ],
+  [
+   "please add my pay days",
+   {
+    "rank": 2317,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "please remind me at 5pm today that i have an event at 8 am in the morning",
+   {
+    "rank": 1507,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "please remind me my doctor appointment on 13th July and also add eggs to the list",
+   {
+    "rank": 2523,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "please remind me of going to gym every Monday morning on Sunday night",
+   {
+    "rank": 1164,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "please remove sporty event from list.",
+   {
+    "rank": 1839,
+    "scenario": "lists",
+    "intent": "remove"
+   }
+  ],
+  [
+   "please remove the name starts with A",
+   {
+    "rank": 1213,
+    "scenario": "lists",
+    "intent": "remove"
+   }
+  ],
+  [
+   "put xxx on the list, and then PDA, I want to make a list and this should be automatically saved as a text file with the title, list.",
+   {
+    "rank": 1994,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "recollect nextweek GM's meeting",
+   {
+    "rank": 1137,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "remind me about shopping 30 minutes later.",
+   {
+    "rank": 2510,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "remind me about the meeting, and then Can you add Gloria to my list of clients?",
+   {
+    "rank": 2897,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "remind me after 10mins",
+   {
+    "rank": 1338,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "remind me for tomorrow meeting",
+   {
+    "rank": 2172,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "remind meeting with sara on monday",
+   {
+    "rank": 1783,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "remove 'pencil' from stationary",
+   {
+    "rank": 2755,
+    "scenario": "lists",
+    "intent": "remove"
+   }
+  ],
+  [
+   "remove all from calendar",
+   {
+    "rank": 2619,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "save appointment to list and also create a new list of ....",
+   {
+    "rank": 2798,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "save the new list",
+   {
+    "rank": 2912,
+    "scenario": "lists",
+    "intent": "createoradd"
+   }
+  ],
+  [
+   "set a daily meeting for 8am. Also, Create an event for me at 3:30 pm",
+   {
+    "rank": 2061,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "set a notification on 3rd march about company meeting \u2014 and meet James at Mill Creek Cinema in McKinleyville California at 9pm",
+   {
+    "rank": 1316,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "set a remainder at 3pm to pick jo, and then Can you please set 12 noon prayer for every friday",
+   {
+    "rank": 2790,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "set a reminder for 12:30:  Meeting with the boss. Also, what are the events coming up soon?",
+   {
+    "rank": 2604,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "set repeat event in calendar",
+   {
+    "rank": 2478,
+    "scenario": "calendar",
+    "intent": "set"
+   }
+  ],
+  [
+   "set repeat event in calendar and also i need a list of my clients today, make one",
+   {
+    "rank": 1597,
+    "scenario": "compound",
+    "intent": "event+task"
+   }
+  ],
+  [
+   "set the event name to ____ and rEMIND TO AT 8 P.M. TO TAKE MY MEDICINE.",
+   {
+    "rank": 2216,
+    "scenario": "compound",
+    "intent": "event+event"
+   }
+  ],
+  [
+   "start a new list and please update my grocery list with1 gallon of 2% milk.",
+   {
+    "rank": 2614,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "start a new list \u2014 and create a new list for me please",
+   {
+    "rank": 1421,
+    "scenario": "compound",
+    "intent": "task+task"
+   }
+  ],
+  [
+   "state the list i have",
+   {
+    "rank": 882,
+    "scenario": "lists",
+    "intent": "query"
+   }
+  ],
+  [
+   "take birthday party off of calendar for May",
+   {
+    "rank": 2006,
+    "scenario": "calendar",
+    "intent": "remove"
+   }
+  ],
+  [
+   "what are meeting scheduled for today",
+   {
+    "rank": 1482,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "what is on my schedule for 9 to 11am tomorrow?",
+   {
+    "rank": 2477,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "what is the date for the event scheduled on the 20th of february alexa",
+   {
+    "rank": 1066,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "what is the event agenda",
+   {
+    "rank": 1646,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "what is the skedule on",
+   {
+    "rank": 950,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ],
+  [
+   "when is the bill cycle",
+   {
+    "rank": 608,
+    "scenario": "calendar",
+    "intent": "query"
+   }
+  ]
+ ]
+}

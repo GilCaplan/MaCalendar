@@ -107,18 +107,24 @@ def _load_scorer():
 
 
 def _source_rows(source: pathlib.Path, limit: int,
-                 min_rank: int = 0, max_rank: int = 0) -> list[tuple[str, int]]:
+                 min_rank: int = 0, max_rank: int = 0,
+                 test_only: bool = False) -> list[tuple[str, int]]:
     where = "tier_rank IS NOT NULL"
     if min_rank:
         where += f" AND tier_rank >= {int(min_rank)}"
     if max_rank:
         where += f" AND tier_rank <= {int(max_rank)}"
     with sqlite3.connect(f"file:{source}?mode=ro", uri=True) as c:
-        return c.execute(
+        rows = c.execute(
             f"SELECT {RAW_KEY}, tier_rank, ts FROM examples WHERE {where} "
             "ORDER BY tier_rank"
-            + (f" LIMIT {int(limit)}" if limit else "")
         ).fetchall()
+    # The SEALED test split (Gil, 2026-09-07): excluded from every run by
+    # default; --test runs ONLY those 300, for milestone evaluation.
+    from scripts.score_dataset_run import load_test_split
+    test = load_test_split()
+    rows = [r for r in rows if (r[0] in test) == test_only]
+    return rows[: int(limit)] if limit else rows
 
 
 def _reset_calendar() -> None:
@@ -198,6 +204,8 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=150)
     ap.add_argument("--min-rank", type=int, default=0)
     ap.add_argument("--max-rank", type=int, default=0)
+    ap.add_argument("--test", action="store_true",
+                    help="run ONLY the sealed 300-row test split (milestone runs)")
     ap.add_argument("--out-dir", type=pathlib.Path,
                     default=WORKTREE / "DOCUMENTATION" / "experiments" / "engine_compare")
     ap.add_argument("--llm", default="",
@@ -293,7 +301,8 @@ def main() -> int:
 
     scorer = _load_scorer()
     prov = scorer.load_provenance(args.fixture)
-    rows = _source_rows(args.source, args.limit, args.min_rank, args.max_rank)
+    rows = _source_rows(args.source, args.limit, args.min_rank, args.max_rank,
+                        test_only=args.test)
     print(f"Replaying {len(rows)} rows from {args.source.name} through engine-v2 "
           f"(scratch: {_TMP})")
 

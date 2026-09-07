@@ -173,7 +173,11 @@ the full 3000 as the working loop:**
 
     python -m scripts.engine_dataset_compare --limit 0 --max-rank 250   # dev-fast (~80 min)
     python -m scripts.engine_dataset_compare --limit 0 --max-rank 600   # dev-full
-    python -m scripts.engine_dataset_compare --limit 0 --min-rank 601   # held-out (sealed)
+    python -m scripts.engine_dataset_compare --limit 0 --test           # SEALED 300 (milestone only)
+
+Since 2026-09-07 the sealed set is the stratified 300 in
+`dataset/inputs/test_split.json` (excluded from every run by default); the
+other 2,699 rows are free for mining and training.
 
 The deterministic FAST track has its own lane: `python -m
 scripts.fast_sandbox` (seconds, full-3000 allowed, selective-classifier

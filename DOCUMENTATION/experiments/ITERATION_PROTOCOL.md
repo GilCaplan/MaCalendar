@@ -24,6 +24,25 @@ that is rich enough to show the failure you're chasing (dev-fast, ranks 1–250,
 ~80 min, naturally stratified across simple/medium/complex), and upsize only as
 gains slow. The full set is an occasional generalisation check — never a cycle.
 
+## The train–test split (Gil, 2026-09-07) — supersedes the 601–3000 seal
+
+**300 sealed test rows** (`dataset/inputs/test_split.json`, stratified over
+scenario×intent×complexity, seed 42, drawn from ranks 601–3000 — the range
+that was never mined pre-split, so the seal starts clean). They are excluded
+from EVERY run by default (both runners filter by text; a duplicated text
+seals both copies) and are never mined, trained on, or tuned against.
+`engine_dataset_compare --test` runs only them — milestone evaluations, rare
+by design. **The other 2,699 rows are the training pool**: mine them, train
+on them, tune against them freely. dev-fast 250 / dev-full 600 remain the
+working slices inside that pool. The old "held-out 601–3000, aggregates
+only" rule is retired — the sealed 300 replace it.
+
+**FastRule gets its own dataset** (Gil, same ruling): the 3000-pool's
+aggregate replays and threshold sweeps had touched all ranks, so for
+FastRule-specific evaluation a fresh 6,000-prompt set is being built
+(2,000 simple / 4,000 complex, ground truth by construction, 80–20
+train–test) under `dataset/fastrule/`.
+
 ## Eras — history kept, comparisons reset at big system changes (Gil, 2026-09-06)
 
 When the system undergoes a large structural change (the 2026-09-07 FastRule

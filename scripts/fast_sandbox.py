@@ -79,6 +79,11 @@ def main() -> int:
         rows = c.execute(
             "SELECT COALESCE(NULLIF(raw_transcript,''), transcript), ts, tier_rank "
             f"FROM examples WHERE {where} ORDER BY tier_rank").fetchall()
+    # SEALED test split excluded always (fast_sandbox mines dev rows; a
+    # --test milestone for FastRule uses its own dataset's test half).
+    from scripts.score_dataset_run import load_test_split
+    _test = load_test_split()
+    rows = [r for r in rows if r[0] not in _test]
 
     n = len(rows)
     committed = correct = 0
