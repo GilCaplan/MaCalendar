@@ -168,6 +168,24 @@ _STT_EXPANSIONS: list[tuple[str, str]] = [
      r"|today|tomorrow|next\s+\w+day)\s+as\s+"
      r"(?!done\b|complete\b|completed\b|finished\b)(.+)$",
      r"add \2 on \1"),
+    # (b, F6) date-marking beyond explicit month-days: weekdays, relatives,
+    #     named days ("christmas day"), "note" as the verb, an optional
+    #     "on my calendar" infix. Same rewrite target as F4b.
+    (r"\b(?:mark|note)\s+((?:next|this|coming)\s+\w+|today|tomorrow|"
+     r"the\s+day\s+after\s+tomorrow|\w+(?:'s)?\s+day|\w+\s+eve)\s+"
+     r"(?:on\s+my\s+calendar\s+)?as\s+"
+     r"(?!done\b|complete\b|completed\b|finished\b)(.+)$",
+     r"add \2 on \1"),
+    # --- F6 (FastRule-6000 train mining, 2026-09-07): three systematic
+    # false-accept families, each rewritten to a form the router already
+    # handles correctly (the F2/F4b pattern: normalize, don't special-case).
+    # (b) completion speak: "check off X" hit query_schedule, "i'm done with
+    #     X" created a todo. "mark X as done" is the completion phrasing the
+    #     router provably handles — rewrite everything completion-shaped to it.
+    (r"^(?:yeah,?\s+|ok,?\s+|okay,?\s+)?(?:i(?:'m| am)\s+done\s+with|"
+     r"i\s+already\s+did|i\s+finished)\s+(.+)$", r"mark \1 as done"),
+    (r"^check\s+off\s+(.+)$", r"mark \1 as done"),
+    (r"^complete\s+(?!the\s*$)(.+)$", r"mark \1 as done"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -835,6 +853,16 @@ def _extract_temporal(span_text: str, today: datetime.date) -> dict:
 
 _ROUTE_OVERRIDES = [
     (re.compile(r"^\s*(?:please\s+)?(?:add|put)\s+.+\s+(?:on|to)\s+(?:my|the)\s+(?:\w+\s+)?list\b"), "create_todo"),
+    # F6a: an encounter being ARRANGED is an event — must outrank the
+    # need-to→todo row below ("i need to talk to Quinn friday" was a todo).
+    # "see my …" excluded: that's query-speak ("i need to see my lists").
+    (re.compile(r"^\s*(?:please\s+)?(?:i\s+)?(?:need|want)\s+to\s+(?:talk|speak|"
+                r"meet|catch\s+up|touch\s+base|sit\s+down|see\s+(?!my\b))"), "create_event"),
+    # F6c: completion-speak routes by PHRASE — the inner title's own verbs
+    # ("buy", "change") were hijacking verb-routing ("mark buy groceries as
+    # done" → create_todo). Rewrites funnel done-with/already-did/check-off
+    # into this shape; the override then routes them all.
+    (re.compile(r"^\s*(?:please\s+)?mark\s+.+\s+as\s+done\b"), "complete_todo"),
     (re.compile(r"^\s*(?:please\s+)?(?:i\s+)?(?:need|have|want|got)\s+to\s+"), "create_todo"),
     (re.compile(r"^\s*(?:please\s+)?remind me\b"), "create_todo"),
     (re.compile(r"^\s*(?:please\s+)?add\s+(?:a\s+|\d+\s+|two\s+|three\s+)?(?:new\s+)?tasks?\b"), "create_todo"),
@@ -1313,6 +1341,12 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
             slots["tags"] = tags
 
     elif action_name in ("delete_todo", "complete_todo", "update_todo"):
+        # F6c: the completion funnel "mark X as done" delimits X by the
+        # phrase itself — noun-chunk extraction returns nothing when X is
+        # verb-led ("mark WALK THE DOG as done"), so capture it directly.
+        m6 = re.search(r"\bmark\s+(.+?)\s+as\s+done\b", span.text, re.IGNORECASE)
+        if m6 and not slots.get("match_title"):
+            slots["match_title"] = _clean_title(m6.group(1))
         # For complete/update/delete, also try extracting the subject noun
         # (e.g. "mark groceries as done" → subject "groceries", not "mark groceries")
         subject_chunks = [
