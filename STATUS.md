@@ -97,6 +97,10 @@ hand-written audit corpus is now only a regression floor.
 
 ## Plan of record
 
+**ENGINE CYCLES PAUSED (Gil, 2026-09-07, until further notice).** Lane-only
+work: FastRule F-batches toward F15 + K-model iteration. No engine runs, no
+integration (even at F15) without Gil's go.
+
 **Data plan (Gil, 2026-09-07):** sealed 300 on the real pool + FastRule's
 own 6,000 (80–20 by family) + external corpora as train-side augmentation
 only. Three sources, three roles — A real pool = calibration, B generated =

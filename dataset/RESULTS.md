@@ -21,6 +21,18 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## F11 — ACTUAL (2026-09-07): Q10 router wired; dual-gate did its job
+
+First cut: simple 74.7% commit but the A-pool dual-gate CAUGHT a violation
+(26 model commits at ~77% → adjusted −1.0). Floors tightened 2.5/1.5:
+**simple 71.5 → 72.5% at 91.6% correct · A-pool adjusted 94.5 (−0.2, in
+bound) with +12 commits**. Prediction partially met (commit under the 75–80
+range at the safe floors; correctness above the 89 floor). The ceiling now
+belongs to F12+: improve the MODELS (features, K3b class fixes) so margins
+rise on correct cases — commits then climb through unchanged floors.
+ENGINE CYCLES PAUSED (Gil) — lane-only until further notice.
+# registered prediction (kept)
+
 ## F11 (Q10 router wiring) — REGISTERED PREDICTION 2026-09-07
 
 **Change:** the two-subsystem router lands in the lane. Rules tier
