@@ -21,6 +21,23 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## F5 (sandbox, era 2) — REGISTERED PREDICTION 2026-09-07, before implementation
+
+**Change:** R1's coordination-type module (research-backed: multi-intent
+boundary literature; spaCy conj/cc mechanism). New `coordination.py`:
+classify each and/comma join as NP-coordination ("Tal and Sam" — one thing)
+vs clause-coordination ("book X and remind me Y" — two asks) from the
+dependency parse. FastRule's strong-compound gate extends to fire on
+clause-coordination even without cue words (the regex only knows "and
+then/also/plus…"-style joiners).
+
+**Predict (dev-full 600):** committed-wrong compound rows −2–4 (correct-on-
+committed +0.5–1.5pp raw); commit count −2–5 (those rows now abstain to
+deep, which is the net); recoverable-abstain roughly flat (NP-coordination
+awareness avoids new over-blocks); full-3000 held-out aggregate reported.
+Risk named: parse quality on lowercase STT text — if spaCy mis-tags, the
+gate could over-fire; the NP-check is the guard.
+
 ## Era-2 cycle 2 — ACTUAL (run 18, 2026-09-07)
 
 **Mechanism confirmed, aggregate flat — prediction half met.** The direct
