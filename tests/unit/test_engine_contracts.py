@@ -49,7 +49,7 @@ def test_engine_state_fields():
         # commit
         "executed", "messages", "refresh",
         # step 6
-        "findings", "retries", "mistakes",
+        "findings", "retries", "mistakes", "asked_fastrule",
         # bookkeeping
         "fixes", "trace", "parse_path", "llm_ms", "rule_confidence",
         "ignored", "memory_id", "verify_token", "pending_id",

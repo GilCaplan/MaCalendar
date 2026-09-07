@@ -163,3 +163,13 @@ def test_non_event_actions_never_guarded():
     item = Item(id="item_1", kind="task", text="whatever garble")
     got = [("create_todo", SimpleNamespace(titles=["Unrelated Words"]))]
     assert generate._guard_inventions(got, item, st) == got
+
+
+def test_the_deep_track_does_not_undo_a_refusal(monkeypatch, cfg):
+    """The engine audit's headline: the per-item path re-implemented the
+    commit test with BOTH gate layers omitted, so an item the front door had
+    vetoed was re-committed here. A generic target must survive the deep
+    track as an honest "I couldn't find it", not a guess."""
+    from assistant.engine import run_transcript
+    out = run_transcript("remove my reminder", source="test")
+    assert out["actions"] == [], out

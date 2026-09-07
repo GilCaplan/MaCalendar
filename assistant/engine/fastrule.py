@@ -73,6 +73,9 @@ class FastRuleResult:
     confidence: float
     reason: str | None = None      # None when committed; else the abstain cause
     missing_slots: list | None = None
+    #: the raw RuleParseResult, so a caller handing off to the LLM can pass
+    #: what the rules DID manage to read instead of starting from zero
+    rule_result: object | None = None
 
 
 #: The Scorer's signal registry — every confidence penalty, named. The
@@ -85,6 +88,41 @@ CONFIDENCE_SIGNALS = {
     "anaphora": 0.80,          # resolved "it"/"that one" to a past record
     "two_clock_times": 0.70,   # two times in one span — probably two events
 }
+
+
+#: What a deferral MEANS — the contract the deep track branches on.
+#: Before this, every reason read the same downstream ("you deal with it"),
+#: so the deep track re-read the raw text with the gates off and re-committed
+#: things the front door had refused. The three classes want three different
+#: handoffs.
+REFUSAL = "refusal"        # correct reading, must not execute as stated:
+                           # the deep track may RESOLVE the objection
+                           # (anaphora → a real target) but never ignore it
+INCAPACITY = "incapacity"  # "I couldn't read this" — the LLM should take over
+STRUCTURE = "structure"    # "this is more than one item" — atomize, then
+                           # hand each atom back to FastRule
+
+_REASON_CLASS = {
+    "generic-target": REFUSAL,
+    "rename-misroute": REFUSAL,
+    "interrogative-create": REFUSAL,
+    "strong-compound": STRUCTURE,
+    "clause-coordination": STRUCTURE,
+    "mixed-mode-compound": STRUCTURE,
+    "model-compound": STRUCTURE,
+    "below-threshold": INCAPACITY,
+    "missing-slots": INCAPACITY,
+    "skip": INCAPACITY,
+    "error": INCAPACITY,
+    "no-parser": INCAPACITY,
+}
+
+
+def reason_class(reason: "str | None") -> "str | None":
+    """The class of a deferral reason — None when it committed."""
+    if not reason:
+        return None
+    return _REASON_CLASS.get(reason.split(":")[0], INCAPACITY)
 
 
 class Atomicity:
@@ -174,17 +212,22 @@ class FastRule:
 
         reason = self.atomicity.judge(text, rr.intents)
         if reason:
-            return FastRuleResult(False, rr.intents, float(rr.confidence), reason)
+            return FastRuleResult(False, rr.intents, float(rr.confidence), reason,
+                                  rule_result=rr)
         reason = self.gatekeeper.judge(text, rr.intents)
         if reason:
-            return FastRuleResult(False, rr.intents, float(rr.confidence), reason)
+            return FastRuleResult(False, rr.intents, float(rr.confidence), reason,
+                                  rule_result=rr)
         if self.scorer.commits(rr):
-            return FastRuleResult(True, rr.intents, float(rr.confidence), None)
+            return FastRuleResult(True, rr.intents, float(rr.confidence), None,
+                                  rule_result=rr)
         # v1's reason precedence: below-threshold outranks missing-slots
         if rr.confidence < self.threshold:
             return FastRuleResult(False, rr.intents, float(rr.confidence),
                                   "below-threshold",
-                                  missing_slots=list(rr.missing_slots) or None)
+                                  missing_slots=list(rr.missing_slots) or None,
+                                  rule_result=rr)
         return FastRuleResult(False, rr.intents, float(rr.confidence),
                               "missing-slots",
-                              missing_slots=list(rr.missing_slots) or None)
+                              missing_slots=list(rr.missing_slots) or None,
+                              rule_result=rr)

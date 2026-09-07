@@ -148,35 +148,116 @@ def _llm_trace(state: EngineState, parser, cfg, title: str) -> None:
                          examples=parser.last_examples_used)
 
 
+def _honour_refusal(got, res, item: Item, state: EngineState):
+    """FastRule REFUSED this reading — the LLM may resolve the objection, but
+    a bare re-read must not overturn it.
+
+    The distinction that matters: for a generic-target veto ("delete this
+    event" names nothing), the LLM legitimately fixes it by RESOLVING the
+    reference to a real title — anaphora memory is exactly that job. What it
+    must not do is hand back the same empty target and have it executed,
+    which is what happened before the audit found this path. Empty slots
+    surfacing as "I couldn't find…" is the right answer; guessing is not.
+    """
+    from assistant.trace import RULE
+
+    if not got:
+        return got
+    if not (res.reason or "").startswith("generic-target"):
+        return got          # the other refusals stand as parsed
+    from assistant.engine.fastrule import _GENERIC_TARGET_RE
+    kept = []
+    for name, intent in got:
+        if name.startswith(("update_", "delete_", "complete_")):
+            target = str(getattr(intent, "match_title", "") or "").strip()
+            if not target or _GENERIC_TARGET_RE.match(target):
+                # unresolved: the model gave back the same bare noun
+                state.messages.append(
+                    "I wasn't sure which one you meant, so I left it alone.")
+                if state.trace:
+                    state.trace.step(RULE, f"Held back {_friendly(item.id)}",
+                                     f"“{target or 'no target'}” names nothing "
+                                     "specific — refusing rather than guessing",
+                                     ok=False)
+                continue
+        kept.append((name, intent))
+    return kept
+
+
 def _parse_item(item: Item, state: EngineState, cfg) -> "list | None":
-    """One item's text → intents. Rules first, LLM for the gaps."""
+    """One atomic item → intents. FastRule first, the LLM for what it can't
+    read — and the deep track HONOURS what FastRule refuses.
+
+    This used to re-implement FastRule's commit test inline, at the
+    whole-command bar, with BOTH gate layers omitted — so an item the front
+    door had vetoed (a mutation aimed at a bare noun, say) was re-committed
+    here with no safety check. The engine audit named it: the rail only
+    guarded the front door. Now the real object runs, at the fragment bar,
+    gates on, and its REASON CLASS decides the handoff:
+
+      STRUCTURE  → still more than one item; the caller must split further
+      REFUSAL    → the LLM may RESOLVE the objection (anaphora → a real
+                   target) but a bare re-read must not overturn it
+      INCAPACITY → "I couldn't read this": the LLM takes over, as designed
+    """
+    from assistant.engine.fastrule import (FastRule, REFUSAL, STRUCTURE,
+                                           reason_class)
     from assistant.intent.rule_parser import RULE_THRESHOLD, RuleParserSkip
 
     parser = _get_parser(cfg)
     rule_parser = _get_rule_parser()
     if rule_parser is not None:
         try:
-            rr = rule_parser.analyze(item.text, current_view=state.current_view)
-            # Cycle 9 (Gil): a FRAGMENT of a split command is a simple shape -
-            # the sandbox measured the rule system >=95% on those - so
-            # sub-items trust rules at a relaxed bar; crosscheck (the LLM
-            # extract-and-verify stage) remains the net.
+            # A fragment of a split command is a simple shape (the sandbox
+            # measured the rules high on those), so it trusts them at a
+            # relaxed bar; crosscheck remains the net. The whole command
+            # keeps the front door's bar.
             is_fragment = item.text.strip() != state.text.strip()
             bar = SUBITEM_RULE_THRESHOLD if is_fragment else RULE_THRESHOLD
-            if rr.confidence >= bar and not rr.missing_slots and rr.intents:
+            # Q12 (Gil): FastRule is DETERMINISTIC — asking it the same text
+            # twice cannot produce a different verdict, so a loop-back that
+            # did not change this item's words must skip straight to the LLM
+            # rather than burn a re-parse that is guaranteed to fail again.
+            seen = state.asked_fastrule
+            asked_before = item.text in seen
+            seen.add(item.text)
+            res = None if asked_before else FastRule(bar).run(item.text, state.current_view)
+            if res is None:
                 if state.trace:
                     from assistant.trace import RULE
                     state.trace.step(RULE, f"Read {_friendly(item.id)}",
-                                     f"{rr.confidence:.2f}"
-                                     + (" (fragment bar)" if is_fragment and rr.confidence < RULE_THRESHOLD else "")
-                                     + ": " + ", ".join(n for n, _ in rr.intents))
-                return rr.intents
-            try:
-                got = parser.parse_with_context(item.text, rr)
+                                     "unchanged since the last attempt — "
+                                     "straight to the model", ok=True)
+                got = parser.parse(item.text)
                 _llm_trace(state, parser, cfg, f"Read {_friendly(item.id)}")
                 return _guard_inventions(got, item, state)
-            except Exception:
-                pass
+            if res.committed:
+                if state.trace:
+                    from assistant.trace import RULE
+                    state.trace.step(RULE, f"Read {_friendly(item.id)}",
+                                     f"{res.confidence:.2f}"
+                                     + (" (fragment bar)" if is_fragment
+                                        and res.confidence < RULE_THRESHOLD else "")
+                                     + ": " + ", ".join(n for n, _ in res.intents))
+                return res.intents
+
+            cls = reason_class(res.reason)
+            if cls == STRUCTURE:
+                # Not one atomic item — say so and let the caller split it
+                # again rather than asking the model to read a compound.
+                item.slots["needs_breakdown"] = res.reason
+                if state.trace:
+                    from assistant.trace import RULE
+                    state.trace.step(RULE, f"Read {_friendly(item.id)}",
+                                     f"still more than one item ({res.reason})")
+            rr = res.rule_result
+            got = parser.parse_with_context(item.text, rr) if rr is not None \
+                else parser.parse(item.text)
+            _llm_trace(state, parser, cfg, f"Read {_friendly(item.id)}")
+            got = _guard_inventions(got, item, state)
+            if cls == REFUSAL:
+                got = _honour_refusal(got, res, item, state)
+            return got
         except RuleParserSkip:
             pass
         except Exception:

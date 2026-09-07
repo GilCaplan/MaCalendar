@@ -126,6 +126,10 @@ class EngineState:
     findings: list = field(default_factory=list)      # list[CheckFinding]
     retries: dict = field(default_factory=dict)       # stage name → re-entries
     mistakes: list = field(default_factory=list)      # carried into retried
+    #: texts FastRule has already judged this command (Q12): it is
+    #: deterministic, so re-asking the same words wastes a retry that
+    #: cannot change its mind.
+    asked_fastrule: set = field(default_factory=set)
                                                       # stages' prompts
 
     # -- bookkeeping (orchestrator-owned) -----------------------------------
