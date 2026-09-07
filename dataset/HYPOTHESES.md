@@ -50,6 +50,16 @@ may worsen the complex board.
 - **[fast] F6 — gate supervision, batch 1**: fix F5's two over-blocks using
   B's atomic flags (per-gate precision/recall by family — the first direct
   gate supervision). Dual-gated: win on B-train, no regress on A.
+- **[fast] K3 — OPERATION scorer (Gil's proposal, 2026-09-07): the K1
+  recipe for add/edit/remove/complete/query.** Dataset B carries the action
+  label by construction, so a small multiclass logistic over hand features
+  (verb-inventory hits, "as done"/"from my X"/"to ‹when›" phrase shapes,
+  question form…) trains for free. Use exactly as K1: the verb table and
+  Gil's rulings stay authoritative; the scorer arbitrates the fallthrough —
+  and a table-vs-scorer DISAGREEMENT is a cheap abstain signal aimed at our
+  worst failure mode (confident wrong-action commits: rename→create at
+  0.95, set-priority→create at 1.00 were exactly this). Offline experiment
+  first (K1 pattern), wire only on a measured win.
 - **[fast] K1b — retrain the kind scorer on A's 2,699** (~4× data), refresh
   weights; feeds K2's wiring cycle.
 - **[measure] R2 on A — reliability diagram** of the confidence multipliers

@@ -21,6 +21,18 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## F9+F10 — ACTUAL (2026-09-07, fastlane 364b714 + f10)
+
+**F9 (filler/courtesy strip, let's-do, measured misspellings):** simple
+commit 65.7 → 69.6% AND correct 90.6 → 91.2 — both dials up (predicted
+70–74 commit: met at the threshold). **F10 (mutation-phrase title
+captures):** simple commit → **71.5% at 91.4%** (predicted 72–75: just
+under). Full train correct-on-committed 81.9 → 83.1; dual-gate on the real
+pool flat-to-up (92.5 raw / 94.7 adj). Simple-first scoreboard: commit
+65.7 → 71.5 (+5.8pp today), correctness ≥90 held throughout. Remaining
+simple abstain mass: missing-date family (misspellings/end-of-month
+phrases), all-day shapes, missing-titles residue — F11+ targets.
+
 ## F10 (simple-first batch 4) — REGISTERED PREDICTION 2026-09-07
 
 **Target: the 62-row missing:match_title bucket.** Noun-chunk extraction
