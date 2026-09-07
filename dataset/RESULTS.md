@@ -21,6 +21,21 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## K3 — ACTUAL (2026-09-07): direction confirmed, both predictions off in instructive ways
+
+**Train operation-accuracy: router 51.7% · classifier 91.7%. Test (aggregate
+only): router 60.2% · classifier 85.0%.** Predictions missed both ways: the
+router baseline came in far BELOW 80–88 — because scored coverage-honestly,
+its abstains count as misses, and on atomic single-op rows it abstains a
+lot (that IS the Q10 case: a routing subsystem's job is to name the
+operation). The classifier landed just under 92–96 with a real 6.7pp
+train→test drop and weak classes under imbalance (new 100% of 2,411 rows;
+query 61%, remove 67%). **Graduates into the Q10 router build as the
+FALLTHROUGH tier only** — rules keep every confident answer they give
+today; the model fires where rules abstain; per-class features + a
+class-weighted fit are the K3b to-do before wiring. B-test never mined.
+# registered prediction (kept)
+
 ## K3 (operation scorer, Q10 subsystem) — REGISTERED PREDICTION 2026-09-07
 
 **Experiment (offline, K1's script pattern):** multiclass logistic
