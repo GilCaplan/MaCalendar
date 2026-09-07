@@ -126,6 +126,14 @@ Set them in any script that exercises the engine. If you are unsure whether
 something wrote to the real files, check: `md5 ~/.assistant_tools/vocab.json`
 before and after.
 
+**An HTTP request to the live API ignores all of them.** The overrides redirect
+what *this* process opens; a POST to `127.0.0.1:8080` is served by the running
+`assistant.api`, which holds the real stores. That is how a HUD test's
+`QTest.mouseClick` on Revert put 45 "buy groceries" rows in the real Today list
+— the widget's own handler re-POSTs from a daemon thread. `tests/conftest.py`
+now refuses loopback:API-port on both `requests` and `urllib`; use the Flask
+test client instead.
+
 **`MACALENDAR_TRACE_BUS` is the fifth**, and it was missed for a long time.
 `trace_bus.jsonl` is the durable log the thinking card's History reads back,
 so a script that leaves it alone publishes its commands into the record of

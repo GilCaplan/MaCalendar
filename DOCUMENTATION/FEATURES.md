@@ -144,6 +144,36 @@ unique index over non-empty values; in-process creators (voice, calendar sync,
 the Mac tasks pane) leave it empty because they never cross the wire. Added
 2026-09-06 after 32 copies of one task accumulated in Today, one per repeated
 `POST /todos`.
+**A content fingerprint is the second net**, because that index only referees
+*non-empty* tokens — a caller that sends none was still an unconditional
+insert. A token-less `POST /todos` naming a task that is already open, spelled
+the same (case- and spacing-insensitive), in the same list, created less than
+`todo.duplicate_window_seconds` ago (default 120, 0 = off) returns that row
+(200, `{"id": …, "duplicate": true, "reason": "recent-identical"}`).
+Completed rows never match, so re-adding a task you ticked off still works, and
+an explicit token always wins — two genuinely separate asks that say the same
+thing are told apart by their tokens. Added 2026-09-07: the token-less caller
+turned out to be the unit suite itself (see below), and by then the list held
+45 copies.
+
+### The test suite cannot write through the live API
+**What:** No test may reach the `assistant.api` running on this Mac.
+**Where:** `tests/conftest.py` (`_no_live_api_calls`, `LiveAPIBlocked`);
+regression tests in `tests/unit/test_no_live_api_writes.py`.
+**How:** The `MACALENDAR_*` scratch overrides redirect what the *test process*
+opens; they cannot redirect an HTTP request, which is served by the live API
+process holding the real `~/.assistant_tools` stores. An autouse session
+fixture wraps both transports the codebase uses — `requests.Session.request`
+and `urllib.request.urlopen` — and raises on any call to loopback at the API
+port (Ollama's 11434 and the rest of loopback are untouched). Found 2026-09-07:
+`test_thinking_hud.py` clicks the HUD's Revert button for real, the widget's
+own `revert_requested → _on_revert` wiring is live in the fixture, and
+`_on_revert` re-POSTs the captured body to `127.0.0.1:8080/todos` from a daemon
+thread — so every `pytest tests/unit` run added one more "buy groceries" to the
+real Today list, arriving 30 s–3 min after the run.
+`cli.check_engine()`'s live probe was doing the same to the real command memory
+and trace bus via `POST /voice/text`. `scripts/dedup_todos.py` cleans up rows
+already made (dry-run by default; `--apply` backs the file up first).
 
 ### Tag discovery — the class set grows with consent
 **What:** When ≥5 distinct untagged tasks share a theme no existing class

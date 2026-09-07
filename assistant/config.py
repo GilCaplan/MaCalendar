@@ -128,6 +128,14 @@ class TodoConfig(BaseModel):
     # When no tag was said and tag mode is off, infer one from the title
     # ("buy chicken" → Groceries). Only tags already in the palette are used.
     auto_tag_infer: bool = True
+    # Second net under `client_token` for callers that send no token at all.
+    # A token-less POST /todos naming a task that is ALREADY open, spelled the
+    # same, in the same list, and created less than this many seconds ago is
+    # treated as a replay of that create rather than a new ask. The partial
+    # unique index only referees non-empty tokens, so without this a token-less
+    # client could still stack copies — which is exactly how 45 "buy groceries"
+    # rows accumulated (2026-08-31..09-07). 0 disables the net.
+    duplicate_window_seconds: int = 120
 
 
 class UIConfig(BaseModel):

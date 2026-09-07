@@ -1134,11 +1134,29 @@ def create_app() -> Flask:
             quantity = max(1, int(data.get("quantity") or parsed_qty))
         except (TypeError, ValueError):
             quantity = parsed_qty
+        list_name = data.get("list_name", "today")
+        todo_cfg = load_config().todo
+        # Second net, for callers that send no token at all. `client_token` is
+        # the precise key, but the partial unique index only referees non-empty
+        # tokens — so a token-less client (the HUD's revert POST, a curl, a
+        # script) could still stack copies of one task. When the same open task,
+        # spelled the same, in the same list, was created seconds ago, read the
+        # repeat as a replay of that create and hand back the row it made.
+        # Completed rows never match, so re-adding a task you ticked off still
+        # works; the window is config'd (todo.duplicate_window_seconds, 0=off).
+        if not token:
+            recent = db.find_recent_open_todo(
+                title, list_name, int(getattr(todo_cfg, "duplicate_window_seconds", 120)))
+            if recent is not None:
+                logger.info("POST /todos: token-less repeat of open todo %s (%r) "
+                            "inside the duplicate window — returning it",
+                            recent["id"], title)
+                return jsonify({"id": recent["id"], "duplicate": True,
+                                "reason": "recent-identical"}), 200
         tags = data.get("tags") or []
         if not tags:
             # Client didn't say — server-side "tag mode", else infer from the
             # title, the same order of precedence voice creation uses.
-            todo_cfg = load_config().todo
             if todo_cfg.auto_tag:
                 tags = [todo_cfg.auto_tag]
             elif getattr(todo_cfg, "auto_tag_infer", True):
@@ -1146,7 +1164,7 @@ def create_app() -> Flask:
                 tags = suggest_tags(title, [r["name"] for r in db.get_tags()])
         todo_id = db.create_todo(
             title=title,
-            list_name=data.get("list_name", "today"),
+            list_name=list_name,
             priority=data.get("priority", "none"),
             due_date=data.get("due_date", ""),
             notes=data.get("notes", ""),
