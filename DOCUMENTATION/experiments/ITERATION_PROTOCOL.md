@@ -32,7 +32,16 @@ that was never mined pre-split, so the seal starts clean). They are excluded
 from EVERY run by default (both runners filter by text; a duplicated text
 seals both copies) and are never mined, trained on, or tuned against.
 `engine_dataset_compare --test` runs only them — milestone evaluations, rare
-by design. **The other 2,699 rows are the training pool**: mine them, train
+by design, and **aggregates only, enforced by the tooling**: in --test mode
+the scorer suppresses every row-level section (misses, got-worse/got-better,
+example transcripts), so a sealed transcript never reaches a report where it
+could be read and mined. **The leakage rule, in full: no test result — not a
+number, not a slice, not a surprising delta — is ever used to decide what to
+improve.** Hypotheses come from the training pool's failures only. A test
+score may be REPORTED (to Gil, in RESULTS.md as a milestone line) but never
+ANALYZED for direction; if a test run disappoints, the response is more
+training-pool mining, never a peek at which test rows failed. The same rule
+binds the FastRule 6000 set's test half (SPLIT.md there). **The other 2,699 rows are the training pool**: mine them, train
 on them, tune against them freely. dev-fast 250 / dev-full 600 remain the
 working slices inside that pool. The old "held-out 601–3000, aggregates
 only" rule is retired — the sealed 300 replace it.

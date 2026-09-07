@@ -177,7 +177,11 @@ the full 3000 as the working loop:**
 
 Since 2026-09-07 the sealed set is the stratified 300 in
 `dataset/inputs/test_split.json` (excluded from every run by default); the
-other 2,699 rows are free for mining and training.
+other 2,699 rows are free for mining and training. **Test results are never
+used to improve the engine** — a --test run reports aggregates only (the
+tooling suppresses row detail) and never spawns a hypothesis; direction
+comes from training-pool failures alone. Same rule for the FastRule 6000
+set's test half.
 
 The deterministic FAST track has its own lane: `python -m
 scripts.fast_sandbox` (seconds, full-3000 allowed, selective-classifier

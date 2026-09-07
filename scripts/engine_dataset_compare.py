@@ -215,6 +215,10 @@ def main() -> int:
                          "stays offline; this is a harness-only simulation "
                          "(Gil, 2026-09-06).")
     args = ap.parse_args()
+    if args.test:
+        # sealed-test leakage guard: the scorer suppresses every row-level
+        # section; only the aggregate board comes back from a milestone run
+        os.environ["MACALENDAR_TEST_AGGREGATES"] = "1"
 
     if args.llm.startswith("queue:"):
         # Persistent-worker bridge (Gil, 2026-09-06): ONE long-lived Claude

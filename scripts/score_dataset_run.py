@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import re
 import sqlite3
@@ -290,7 +291,15 @@ def _fmt_pct(x) -> str:
 
 
 def write_report(result: dict, comparison: dict | None, out_path: pathlib.Path) -> None:
+    # SEALED-TEST GUARD (Gil, 2026-09-07): a milestone --test run must never
+    # put a sealed transcript where it can be read and mined — aggregates
+    # only. The runner sets the env var; every row-level section is gated.
+    aggregates_only = os.environ.get("MACALENDAR_TEST_AGGREGATES") == "1"
     lines = [f"# Dataset run score — `{result['db']}`", ""]
+    if aggregates_only:
+        lines += ["**SEALED TEST RUN — aggregates only. Row-level detail is",
+                  "suppressed by design: test results are never mined, and a",
+                  "test score never spawns a hypothesis (leakage guard).**", ""]
     ov = result["aggregate"]["overall"]
     lines += [f"- product-adjusted count-correct **{_fmt_pct(ov.get('count_ok_adj_rate'))}** "
               f"({ov.get('n_overridden', 0)} overridden rows; raw below is the comparable number)"]
@@ -323,6 +332,8 @@ def write_report(result: dict, comparison: dict | None, out_path: pathlib.Path) 
     fails = [r for r in result["per_prompt"] if not r["count_ok"]]
     lines += ["", f"## Count-mismatch failures ({len(fails)})", ""]
     for r in fails[:30]:
+        if aggregates_only:
+            break
         lines.append(f"- **{r['transcript'][:90]}** — {r['compound_kind'] or r['complexity']}: "
                      f"got {r['n_events']} events, {r['n_tasks']} tasks "
                      f"(wanted ≥{r['expected_min_events'] or 0}/≥{r['expected_min_tasks'] or 0})")
@@ -337,9 +348,11 @@ def write_report(result: dict, comparison: dict | None, out_path: pathlib.Path) 
                   f"**{len(comparison['flipped_better'])} got better**, "
                   f"{comparison['n_unchanged_pass']} still pass, {comparison['n_unchanged_fail']} still fail"]
         if comparison["flipped_worse"]:
-            lines += ["", "### Got worse", ""] + [f"- {t[:100]}" for t in comparison["flipped_worse"][:20]]
+            if not aggregates_only:
+                lines += ["", "### Got worse", ""] + [f"- {t[:100]}" for t in comparison["flipped_worse"][:20]]
         if comparison["flipped_better"]:
-            lines += ["", "### Got better", ""] + [f"- {t[:100]}" for t in comparison["flipped_better"][:20]]
+            if not aggregates_only:
+                lines += ["", "### Got better", ""] + [f"- {t[:100]}" for t in comparison["flipped_better"][:20]]
 
     out_path.write_text("\n".join(lines))
     print(f"wrote {out_path}")
