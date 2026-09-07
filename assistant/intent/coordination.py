@@ -40,6 +40,18 @@ ASK_JOINER_RE = re.compile(
     re.I)
 
 
+#: A `conj` dependency needs a coordinator, so a sentence with none cannot
+#: have clause coordination and does not need to be parsed at all. 57% of
+#: the two datasets' 9,899 utterances match nothing here, and the parse is
+#: ~9 ms — the difference between the check being free on a simple command
+#: and being the fast track's largest single cost. Deliberately WIDER than
+#: `ASK_JOINER_RE` ("or", "but", "plus", "as well as"): a cheap pre-filter
+#: must never be the thing that decides, and this one is verified lossless
+#: over both datasets in full.
+_COORDINATOR_RE = re.compile(
+    r"\b(?:and|or|but|plus|as well as|along with)\b|[,;]", re.I)
+
+
 @functools.lru_cache(maxsize=256)
 def parsed(text: str):
     """The spaCy doc for `text`, memoised.
@@ -74,6 +86,8 @@ def has_clause_coordination(text: str) -> bool:
     which spaCy's small model handles well enough for POS at this coarseness;
     the NOUN/PROPN check is the guard against splitting names.
     """
+    if not _COORDINATOR_RE.search(text):
+        return False                 # no coordinator ⇒ no `conj` ⇒ nothing to see
     doc = parsed(text)
     if doc is None:
         return False

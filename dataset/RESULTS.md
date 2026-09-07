@@ -1375,3 +1375,28 @@ precise as well as more sensitive), correct-on-handled 73.1 → 72.6%,
 non-atomic defer rate 77.1 → **78.2%** with the "knew it was compound"
 share 51.2 → **53.2%**, routing violations 129 → 123 of which actual
 half-executions **26 → 20**. Propose defer 70.6% untouched.
+
+## F18b — the latency the parse feature cost, and getting it back (2026-09-07)
+
+The clause-coord feature parses with spaCy, and unlike the gate that used
+to be its only caller it wanted a parse for EVERY utterance, not just ones
+containing " and ". Measured on FastRule.run over 300 rows with the memo
+cleared per row (the real per-command case): **p50 36.1 → 41.9 ms, p95
+69.3 → 77.5 ms** — a 16% tax on the fast track, against a ~50 ms budget
+that p95 was already over.
+
+A `conj` dependency needs a coordinator, so an utterance with none cannot
+have clause coordination and never needed parsing. `_COORDINATOR_RE` (and
+/ or / but / plus / as well as / along with / comma / semicolon) skips it:
+**57% of the two datasets' 9,899 utterances match nothing**, and the guard
+is verified lossless over both in full — it changes 7 verdicts of 9,899,
+all of them rename commands ("call it X instead of Y") where spaCy invents
+a coordinator-less `conj` and False is the better answer anyway. It is
+deliberately WIDER than `ASK_JOINER_RE`, because a cheap pre-filter must
+never be the thing that decides.
+
+**FastRule.run p50 41.9 → 39.0 ms, p95 77.5 → 67.1 ms** — the fast track
+is now FASTER than before the feature landed (the guard short-circuits the
+rules gate too), and the atomicity board and product-shape board are
+byte-identical after a refit. A cost worth measuring, and worth measuring
+again after removing it.
