@@ -92,3 +92,34 @@ def test_f11_model_tier_fires_only_where_rules_found_nothing(fastrule):
         assert r2.intents[0][0] == "create_event" and r2.confidence <= 0.9
     r = fastrule.run("book gym tomorrow at 7am")   # rules tier, unchanged
     assert r.committed and r.confidence > 0.9
+
+
+def test_f16_lead_time_no_longer_eats_the_title(fastrule):
+    """The lead-time strip lived only in decompose (a deep-track stage), so
+    FastRule failed 100% of lead-time rows: "remind me 5 minutes before
+    about X" routed a titleless todo. Shared now (intent/lead_time.py), and
+    the pinned convention applies — a clock-timed reminder is an EVENT."""
+    r = fastrule.run("remind me 5 minutes before about product demo tonight at 7pm")
+    assert r.committed and r.intents[0][0] == "create_event"
+    assert fastrule.run("remind me to buy milk").intents[0][0] == "create_todo"
+    # "remind me in 5 minutes" IS the request, not a lead time on something else
+    assert not fastrule.run("remind me in 5 minutes").committed
+
+
+def test_f16_marking_a_day_is_a_calendar_create(fastrule):
+    """"mark/label ‹when› … as ‹occasion›" was 36% of committed-but-wrong
+    atomic rows (routed complete_todo / update_event / query_schedule).
+    Completions must be unaffected."""
+    assert fastrule.run("mark march 5th on my calendar as the tax deadline"
+                        ).intents[0][0] == "create_event"
+    assert fastrule.run("mark groceries as done").intents[0][0] == "complete_todo"
+
+
+def test_f16_sentence_initial_calendar_verb_wins(fastrule):
+    """"book sales call…" routed create_todo because the NOUN "call" was read
+    as the verb. An imperative opening with book/schedule is a calendar
+    create; reschedule stays an update (regression caught in F16)."""
+    assert fastrule.run("book sales call this friday all day"
+                        ).intents[0][0] == "create_event"
+    assert fastrule.run("reschedule haircut to this weekend"
+                        ).intents[0][0] == "update_event"

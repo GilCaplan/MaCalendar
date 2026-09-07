@@ -184,7 +184,7 @@ _STT_EXPANSIONS: list[tuple[str, str]] = [
     #     named days ("christmas day"), "note" as the verb, an optional
     #     "on my calendar" infix. Same rewrite target as F4b.
     (r"\b(?:mark|note|put)\s+((?:next|this|coming)\s+\w+|today|tomorrow|"
-     r"the\s+day\s+after\s+tomorrow|\w+(?:'s)?\s+day|\w+\s+eve|"
+     r"the\s+day\s+after\s+tomorrow|tonight|\w+(?:'s)?\s+day|\w+\s+eve|"
      r"(?:the\s+)?\d{1,2}(?:st|nd|rd|th)?)\s+down\s+as\s+"
      r"(?!done\b|complete\b|completed\b|finished\b)(.+)$",
      r"add \2 on \1"),
@@ -447,6 +447,11 @@ def _preprocess(transcript: str) -> tuple[str, bool]:
         text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
     for pattern, replacement in _SPOKEN_TIMES:      # F15
         text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    # F16: the lead-time clause ("remind me 5 minutes before about X") ate
+    # the title — FastRule failed 100% of those rows because the strip only
+    # existed in the deep track's decompose stage.
+    from assistant.intent import lead_time as _lead_time
+    text, _minutes = _lead_time.split(text)
 
     # Complexity gate: content-word count (stop/filler words don't add complexity)
     _FILLER = frozenset({
@@ -918,6 +923,8 @@ _ROUTE_OVERRIDES = [
     # F6a: an encounter being ARRANGED is an event — must outrank the
     # need-to→todo row below ("i need to talk to Quinn friday" was a todo).
     # "see my …" excluded: that's query-speak ("i need to see my lists").
+    (re.compile(r"^\s*(?:please\s+)?(?:book|schedule)\s+(?!.*\b(?:off|from)\s+(?:my|the)\b)"),
+     "create_event"),
     (re.compile(r"^\s*(?:please\s+)?(?:i\s+)?(?:need|want)\s+to\s+(?:talk|speak|"
                 r"meet|catch\s+up|touch\s+base|sit\s+down|see\s+(?!my\b))"), "create_event"),
     # F6c: completion-speak routes by PHRASE — the inner title's own verbs
@@ -925,6 +932,17 @@ _ROUTE_OVERRIDES = [
     # done" → create_todo). Rewrites funnel done-with/already-did/check-off
     # into this shape; the override then routes them all.
     (re.compile(r"^\s*(?:please\s+)?mark\s+.+\s+as\s+done\b"), "complete_todo"),
+    # F16b: "mark/label/note/put ‹something› on my calendar as ‹occasion›"
+    # and "label ‹when› as ‹occasion›" — marking a DAY, i.e. creating a
+    # calendar entry. Routed complete_todo/update_event/query_schedule
+    # before (36% of all committed-but-wrong atomic rows). The done-forms
+    # above are matched first, so completions are unaffected.
+    (re.compile(r"^\s*(?:please\s+)?(?:mark|label|note|put)\s+.+"
+                r"\bon\s+my\s+calendar\b(?:\s+(?:as|for)\b|\s*$)"), "create_event"),
+    (re.compile(r"^\s*(?:please\s+)?(?:mark|label|note)\s+"
+                r"(?:the\s+)?(?:\d{1,2}(?:st|nd|rd|th)?|today|tonight|tomorrow|"
+                r"(?:next|this|coming)\s+\w+|\w+day|\w+\s+eve)\b.*\bas\b"
+                r"(?!\s+(?:done|complete|completed|finished)\b)"), "create_event"),
     # F15: "call it X instead of Y" / "rename X to Y" is renaming, never a
     # create (14 rows committed create_todo at high confidence).
     (re.compile(r"^\s*(?:please\s+)?call\s+it\s+.+\s+instead\s+of\b"), "update_todo"),
@@ -934,6 +952,13 @@ _ROUTE_OVERRIDES = [
     (re.compile(r"^\s*(?:please\s+)?(?:set|make)\s+.+\s+as\s+"
                 r"(?:high|medium|low)\s+priority\b"), "update_todo"),
     (re.compile(r"^\s*(?:please\s+)?(?:i\s+)?(?:need|have|want|got)\s+to\s+"), "create_todo"),
+    # The pinned reminder convention (project rule): "remind me to call Gil"
+    # is a task, but "remind me about the dentist tomorrow at 9am" is a
+    # CALENDAR entry. The clock time is the tell, and this must outrank the
+    # bare remind-me→todo row below.
+    (re.compile(r"^\s*(?:please\s+)?remind me\s+(?!to\b).*"
+                r"(?:\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b|\bat\s+\d{1,2}\b"
+                r"|\b(?:noon|midnight)\b)"), "create_event"),
     (re.compile(r"^\s*(?:please\s+)?remind me\b"), "create_todo"),
     (re.compile(r"^\s*(?:please\s+)?add\s+(?:a\s+|\d+\s+|two\s+|three\s+)?(?:new\s+)?tasks?\b"), "create_todo"),
     (re.compile(r"^\s*(?:what|which|show|list|read)\b.*\b(?:tasks?|todos?|to-dos?)\b"), "query_todos"),
