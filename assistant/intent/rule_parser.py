@@ -154,6 +154,18 @@ _STT_EXPANSIONS: list[tuple[str, str]] = [
     # normalize so ("remove", …) routing applies and a generic target like
     # "this list" hits the fast gate's veto (sandbox batch F2).
     (r"\bget rid of\b", "remove"),
+    # --- F9 (simple-first abstain mining): 209 of 540 simple abstains were
+    # outright skips caused by leading filler/courtesy hiding the command
+    # from ^-anchored routing. Strip them FIRST (list order applies).
+    (r"^(?:um+|uh+|so|well|ok(?:ay)?|alright|hey|yeah)[,\s]+", ""),
+    (r"^(?:could|can)\s+you\s+tell\s+me\s+", ""),          # "…what's on my calendar" = query
+    (r"^(?:could|can|would)\s+you\s+(?=remind\b)", ""),     # "could you remind me to X"
+    # "let's do/have/get X" is create-speak the verb map can't key on
+    (r"^let'?s\s+(?:do|have|get)\s+", "book "),
+    # STT misspellings the expansion table lacked (measured, not guessed)
+    (r"\btommorow\b", "tomorrow"),
+    (r"\bapointment\b", "appointment"),
+    (r"\bremindar\b", "reminder"),
     # "mark <date> as <occasion>" marks a DAY, it does not tick a task off:
     # "mark 13 october of this year as my birthday" fast-committed a wrong
     # complete_todo (F4b). Rewritten to the create shape the parser already
