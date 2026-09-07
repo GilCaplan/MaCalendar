@@ -145,10 +145,17 @@ class DeepSystem(Component):
         wasted work and can loop-back for no reason)."""
         reentries = 0
         while reentries < _crosscheck.MAX_REENTRIES:
+            # Fresh findings each round. Carrying earlier rounds' lists
+            # forward tells the re-run's prompt not to repeat things it
+            # already FIXED — noise that grows with every retry. Cleared
+            # HERE (before the check that repopulates it) rather than before
+            # the re-parse, which would throw away the mistake the re-parse
+            # is supposed to learn from.
+            state.mistakes = []
             self.crosscheck.run(state, cfg)
             loop_to = _loop_target(state)
             if loop_to is None:
-                break
+                return                      # judged and clean — commit it
             reentries += 1
             state.retries[loop_to] = state.retries.get(loop_to, 0) + 1
             if state.trace:
@@ -157,12 +164,16 @@ class DeepSystem(Component):
                                  f"re-running from {loop_to} "
                                  f"({reentries}/{_crosscheck.MAX_REENTRIES})")
             self.parse(state, cfg)
-        else:
-            # Budget spent with a MISSING ask still open — flag it.
-            # (Advisory extras alone don't merit alarming the speaker.)
-            if any(f.type == "missing" for f in state.findings):
-                state.messages.append(
-                    "I'm not sure I caught every part of that — worth a glance.")
+
+        # Budget spent. The parse that will actually be committed is the one
+        # from the LAST re-run, and until now it was never judged: the loop
+        # exited straight into this message, which was written from findings
+        # describing objects that no longer existed. Judge what we are about
+        # to commit, then speak from THAT.
+        self.crosscheck.run(state, cfg)
+        if any(f.type == "missing" for f in state.findings):
+            state.messages.append(
+                "I'm not sure I caught every part of that — worth a glance.")
 
 
 class Engine(Component):

@@ -485,8 +485,16 @@ def _preprocess(transcript: str) -> tuple[str, bool]:
         "what", "when", "where", "which", "who", "how", "let", "execute",
     })
     content_words = [w for w in text.split() if w.rstrip(".,!?;:") not in _FILLER]
-    if len(content_words) > 12:
-        return text, True
+    # REMOVED 2026-09-07 (Gil, pre-loop change #3): a >12-content-word gate
+    # was a crude proxy for "this is probably compound", written before
+    # layer 0 existed. It now fires BEFORE the real atomicity layer can
+    # speak, so a long-but-single booking ("book the quarterly planning
+    # workshop with Sam and Jordan next tuesday at half past nine in the
+    # big conference room") is refused by the executor whose entire job is
+    # single items — and lands in the "skip" bucket the loop mines, next to
+    # genuinely unroutable text that needs the opposite fix. Length is not
+    # evidence of multiplicity; the atomicity model reads the actual shape.
+    _ = content_words
 
     # Clause-count gate via spaCy
     doc = _NLP(text)

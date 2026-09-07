@@ -175,16 +175,23 @@ def test_reschedule_meeting_with_time_range(parser):
 # Complexity gate
 # ---------------------------------------------------------------------------
 
-def test_complexity_gate_long_sentence(parser):
-    """More than 12 content words (stop/filler words excluded) → RuleParserSkip."""
+def test_a_four_way_compound_is_refused(parser):
+    """Was "more than 12 content words → skip". That word-count gate was
+    REMOVED (2026-09-07): length is not evidence of multiplicity, and it
+    fired before the atomicity layer could speak. This sentence is still
+    refused — but now because it genuinely IS four requests, which is the
+    reason that generalises.
+    """
     # 13+ distinct semantic words: schedule, meeting, John, remind, buy, milk,
     # call, dentist, add, gym, session, tomorrow, noon
     long = (
         "I want to schedule a meeting with John and also remind me to buy milk "
         "and then call the dentist and furthermore please add a gym session tomorrow at noon"
     )
-    with pytest.raises(RuleParserSkip):
-        parser.analyze(long)
+    from assistant.engine.fastrule import FastRule
+    from assistant.intent.rule_parser import RULE_THRESHOLD
+    res = FastRule(RULE_THRESHOLD).run(long)
+    assert not res.committed, "a four-part command must not fast-commit"
 
 
 # ---------------------------------------------------------------------------
