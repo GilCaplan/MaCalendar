@@ -102,6 +102,31 @@ response is defined in advance: more training-pool mining, never a look at
 which test rows failed. First milestone: era-2 cycle 10 (currently at
 cycle 4).
 
+## PAUSED: whole-engine cycles (Gil, 2026-09-07)
+
+Cycle running is suspended in favour of STAGE ISOLATION
+(`DOCUMENTATION/STAGE_ISOLATION_PLAN.md`). Everything in this protocol
+stays true and resumes unchanged when the parts are proven — eras,
+registered predictions, the six metrics, the sealed test, the every-10
+milestone. What changes meanwhile: **the unit of work is a stage, not a
+cycle**, and each stage is judged on its own dataset's test half rather
+than the engine board.
+
+**Per-stage rules (same discipline, smaller scope):** its dataset lives in
+`dataset/stages/<stage>/` and is never mutated to suit another stage; it
+carries its own train–test split, sealed under the leakage rule (aggregates
+only, never mined, never fitted on); it has its own scorer reporting its own
+named metrics; and every change still registers a prediction first. A stage
+graduates when its metric stops being the binding constraint on the stage
+below it.
+
+**FastRule's shape metric (the model for the others):** it is scored by what
+it is FOR — `scripts/fastrule_shape.py` reports handled-rate and
+correct-on-handled for ATOMIC rows, defer-rate for NON-ATOMIC rows (a commit
+there is a routing violation, and the defer is split into "knew it was
+compound" vs "deferred by accident"), and defer-rate for Q9 propose rows.
+A low commit rate on compounds is CORRECT behaviour, not a miss.
+
 ## Eras — history kept, comparisons reset at big system changes (Gil, 2026-09-06)
 
 When the system undergoes a large structural change (the 2026-09-07 FastRule

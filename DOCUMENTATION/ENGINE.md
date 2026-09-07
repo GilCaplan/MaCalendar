@@ -1,5 +1,14 @@
 # The Engine — stage contracts
 
+> **Stage isolation (2026-09-07):** each stage is being proven on its own
+> dataset before the system is measured end-to-end — see
+> `DOCUMENTATION/STAGE_ISOLATION_PLAN.md`. The contracts below are unchanged;
+> what changed is that a stage is now judged by its OWN metric first.
+> FastRule v1 retired the same day (`retired/fastrule-v1/`, tag
+> `fastrule-v1`); `engine/fastrule.py` is now the Q11 structure — Atomicity
+> (layer 0), Gatekeeper, Scorer as objects — behaviour proven identical
+> across 7,200 rows before the switch.
+
 > **Object layer (Q7, merged 2026-09-07, behavior-identical confirmed):**
 > the orchestrator is now classes — `Engine` (entry; transcript gate, track
 > selection, commit, bookkeeping; `run_transcript()` is a thin shim over it),

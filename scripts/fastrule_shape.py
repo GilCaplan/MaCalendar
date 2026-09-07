@@ -35,6 +35,9 @@ for _b in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DATA = ROOT / "dataset" / "fastrule" / "fastrule_7200.jsonl"
 _CLOCK = _dt.datetime(2026, 9, 9, 10, 0)
+#: the layer-0 verdicts — a defer carrying one of these means FastRule
+#: RECOGNISED the compound, rather than tripping over it by luck
+_ATOMICITY_REASONS = {"strong-compound", "clause-coordination", "mixed-mode-compound"}
 
 
 def main() -> int:
@@ -57,6 +60,7 @@ def main() -> int:
     # gets its own bucket rather than polluting either side
     A_OK = A_MISS = A_WRONG = 0          # atomic: committed-right / deferred / committed-wrong
     N_DEFER = N_COMMIT = N_COMMIT_OK = 0  # non-atomic: deferred / committed (violation)
+    N_DEFER_KNEW = 0                      # ...deferred BECAUSE it saw the compound
     P_DEFER = P_COMMIT = 0                # propose rows
     viol: collections.Counter = collections.Counter()
     miss_reason: collections.Counter = collections.Counter()
@@ -89,6 +93,11 @@ def main() -> int:
                             f"[{'ok' if ok else 'WRONG'}] {r['text'][:56]}")
                 else:
                     N_DEFER += 1
+                    # deferred for the RIGHT reason (the atomicity layer saw
+                    # the compound) vs by accident (low confidence, missing
+                    # slot) — only the former survives as FastRule improves
+                    if (res.reason or "").split(":")[0] in _ATOMICITY_REASONS:
+                        N_DEFER_KNEW += 1
                 continue
             # atomic row
             if not committed:
@@ -125,6 +134,8 @@ def main() -> int:
     print(f"   deferred (missed work)   {pc(A_MISS, A_N)}")
     print(f"\nNON-ATOMIC rows ({N_N}) — should DEFER")
     print(f"   DEFER RATE               {pc(N_DEFER, N_N)}   <- the metric")
+    print(f"     ...because it KNEW      {pc(N_DEFER_KNEW, N_N)}  (atomicity layer saw the compound)")
+    print(f"     ...by accident          {pc(N_DEFER - N_DEFER_KNEW, N_N)}  (low confidence / missing slot)")
     print(f"   routing violations       {N_COMMIT} ({pc(N_COMMIT, N_N)}), "
           f"of which produced right counts anyway: {N_COMMIT_OK}")
     print(f"\nPROPOSE rows ({P_N}) — should DEFER (Q9)")

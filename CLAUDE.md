@@ -167,6 +167,18 @@ features and cleanups happen in the `../MACalendar-app` worktree (branch
 never during a run. (Gil, 2026-09-06 — after two suites racing through a
 shared personal store surfaced exactly this class of accident.)
 
+## Where we are working right now (2026-09-07)
+
+**STAGE ISOLATION mode — whole-engine cycles are PAUSED** (Gil). Each stage
+is proven on its OWN dataset before the system is reconnected:
+`DOCUMENTATION/STAGE_ISOLATION_PLAN.md` is the plan; per-stage data lives in
+`dataset/stages/<stage>/`, never edited to suit another stage, each with its
+own train–test split under the usual leakage rules. FastRule's is
+`dataset/fastrule/` (7,200 rows) scored by `scripts/fastrule_shape.py`
+against its product shape: **defer on non-atomic items, create the right
+event/task otherwise**. The whole-system improvement loop below is intact
+and resumes once the parts are proven.
+
 ## Measuring a change to the assistant
 
 **The verification dataset is the primary evaluation** — `dataset/DATASET.md`
