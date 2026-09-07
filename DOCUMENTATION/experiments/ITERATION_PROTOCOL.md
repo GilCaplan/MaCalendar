@@ -134,6 +134,18 @@ config never leaks in) — so label lines appear on FS-scorer boards first;
 the real pool stays unscored on labels until/unless a labeled subset is
 ruled worth hand-making. FS1 implements it.
 
+## Lane reporting: TEST-set metrics are the numbers (Gil, 2026-09-07)
+
+Train is for fitting and tuning — freely, as hard as we like. **The
+REPORTED metrics for every F batch are the B-test evaluations** (the full
+1,200-row test half): commit rate, correct-on-committed, atomicity P/R,
+title/labels, and the routing models' per-class P/R/F1 + macro-F1 —
+EVAL-ONLY, aggregates and class-level rates, never row inspection.
+Hypotheses still come exclusively from train-row mining; a test number may
+be reported and tracked, never mined. Train-side numbers may appear as
+working notes, clearly labeled. (The real pool's sealed 300 is unchanged:
+engine milestones every 10 cycles only.)
+
 ## The FastRule lane cadence — pinned in cycles, integrated every 2–3 (Gil, 2026-09-06)
 
 The FastRule sandbox lane runs **continuously in parallel** with deep cycles,
