@@ -70,3 +70,12 @@ def test_f10_mutation_phrases_delimit_multiword_titles(fastrule):
     assert fastrule.run("reschedule haircut to this weekend").committed
     assert fastrule.run("mark walk the dog complete").intents[0][0] == "complete_todo"
     assert not fastrule.run("delete this event").committed
+
+
+def test_f11_model_tier_fires_only_where_rules_found_nothing(fastrule):
+    """Q10: verbless/unseen phrasings route via the model tier at the
+    inference-billed confidence; rule-covered commands are byte-identical."""
+    r = fastrule.run("gym session friday 6pm")     # no verb at all
+    assert r.committed and r.intents[0][0] == "create_event"
+    r = fastrule.run("book gym tomorrow at 7am")   # rules tier, unchanged
+    assert r.committed and r.confidence > 0.9

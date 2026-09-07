@@ -1019,6 +1019,16 @@ def _route_intent(span, current_view: str) -> tuple[str | None, str, bool, bool]
         if re.match(r"\b(what|when|how many|which|show|list|read)\b", span_text):
             action_fallback = "query_schedule" if domain == "calendar" else "query_todos"
             return action_fallback, domain, domain_inferred, True
+        # Q10 model tier (F11): where the rules found NOTHING, the two
+        # logistic subsystems may compose an action — only when both margins
+        # clear their floors, else the old skip stands. Model-routed =
+        # inference, billed through the domain-inferred ×0.85 channel so the
+        # front-door threshold still guards the commit.
+        from assistant.intent import route_models as _rm
+        guessed = _rm.route(span_text)
+        if guessed:
+            gdomain = "todo" if "todo" in guessed else "calendar"
+            return guessed, gdomain, True, True
         return None, domain, domain_inferred, True
 
     return action, domain, domain_inferred, domain_material
