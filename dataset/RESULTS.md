@@ -21,6 +21,22 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## F11 (Q10 router wiring) — REGISTERED PREDICTION 2026-09-07
+
+**Change:** the two-subsystem router lands in the lane. Rules tier
+unchanged (every currently-confident route stays byte-identical); where
+routing today finds NOTHING (the "skip"/no-action fallthrough), the two
+models fire: K3-operation × K1-kind compose the action
+(new×event=create_event … complete×task=complete_todo, query→query_*), the
+parse proceeds through the normal slot machinery, and a model-routed parse
+carries a confidence penalty (×0.85) so the 0.80 bar still guards. Weights
+fit from TRAIN DATA ONLY (B-train; emitted to a versioned constants file by
+a deterministic fit script). No disagreement-veto yet (F12 decides on train
+evidence). **Predict (B-train simple):** commit 71.5 → 75–80% at ≥89%
+correct (model-routed commits are less precise than rule-routed — the
+penalty + bar keep the blend above the floor); dual-gate on A: flat ±0.5;
+complex board flat (gates unchanged).
+
 ## K3 — ACTUAL (2026-09-07): direction confirmed, both predictions off in instructive ways
 
 **Train operation-accuracy: router 51.7% · classifier 91.7%. Test (aggregate
