@@ -21,6 +21,17 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## Q7 object refactor — CONFIRMED behavior-identical (2026-09-07, merged)
+
+Confirmation run on the refactored Engine/DeepSystem objects, dev-fast 250:
+**routing fingerprint identical** (163 deep / 87 fast — the deterministic
+path decided every row the same way), board within noise of run 17 (raw
+77.0 · adjusted 80.0 · F1 81.2 · fieldq 85.9 · fast 90% · garbage 0%). Not
+logged as a cycle row — it changed nothing by design; the era-2 baseline
+stands. One real lesson banked in component.py's docstring: Stage must
+late-bind through its module (eager function capture silently broke
+monkeypatched stages — caught by test_engine_flow before it could ship).
+
 ## Era-2 cycle 1 — ACTUAL (run 17, 2026-09-06)
 
 **Prediction met:** board flat within noise vs the era-2 baseline (raw
