@@ -40,9 +40,21 @@ needing one is marked **[Gil]** and is blocked until asked.
   weights; feeds K2's wiring cycle.
 - **[measure] R2 on A — reliability diagram** of the confidence multipliers
   over the full train pool; calibration refit only if it shows miscalibration.
-- **[blocked] EXT1 — external-corpus adoption** per the C-pipeline (converter
-  → normalization → conventions pass to Gil → train-only), starts when the
-  research report lands and per-set effort is known.
+- **[data] EXT0 — the MixSNIPS recipe on OUR OWN rows** (report's sleeper
+  insight): manufacture labeled compounds by gluing pairs of our already-
+  conventioned single-intent train rows ("<set row> and <createoradd row>" →
+  e+t, atomic=false, counts by construction). ZERO conventions-pass needed,
+  zero external label noise — our rulings ride in with the source rows.
+  Cheapest new compound data available; feeds the coordination gate + segment.
+- **[data] EXT1 — external-corpus adoption, UNBLOCKED (report:
+  `EXTERNAL_DATASETS.md`).** Ranked: (1) **TOPv2** — 87k alarm/reminder/event
+  rows with REAL nested multi-intent, CC-BY-SA, direct download; (2)
+  **MASSIVE en-US** — 4.3k calendar/lists rows, near-1:1 action mapping,
+  CC-BY; (3) NLU-Evaluation-Data (+2.9k calendar after dedup); (4) CLINC150
+  (kind-decision + out-of-scope rows). Each per the C-pipeline: converter →
+  STT normalization → conventions pass to Gil → train-only. Dead ends
+  confirmed: MultiWOZ/Taskmaster (no calendar), ThingTalk (toolchain),
+  ATIS-family (license murk).
 
 *(R-entries added 2026-09-06 from the research sweep —
 `DOCUMENTATION/experiments/FASTRULE_RESEARCH.md`, all URL-cited; evidence
