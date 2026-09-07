@@ -1018,3 +1018,27 @@ The invention-guard cycles (remove-echo, question-creates-nothing, quote-shed)
 did not move count-correctness — they fix *invention* (precision), which this
 metric barely sees. Right fix, wrong ruler: a precision-class change needs a
 precision metric. This is why every entry names its metric.
+
+## F15 (stage-isolation, FastRule) — REGISTERED PREDICTION 2026-09-07
+
+**Mined from B-train atomic rows.** Handle-rate leak is dominated by
+TIME/DATE VOCABULARY: 807 of ~1,430 atomic defers are missing date and/or
+start_time — "quarter to nine", "late afternoon", "first thing", "all day",
+named holidays, "every weekday at 3:45pm". Correctness leak is dominated by
+"mark X **down** as Y" (69 rows: F6b's rewrite knows "mark ‹date› as Y" but
+not the "down as" form) plus rename-speak ("call it X instead of Y" → create).
+Secondary: "clear X off my calendar" (45 defers, unhandled mutation phrase),
+serial-verb false compounds (88: "wash and fold the laundry"), lead-time
+clauses eating titles (75).
+
+**Fixes:** (a) spoken-time vocabulary — "quarter to/past N", "half past N",
+vague dayparts (late morning / first thing / midday), "all day" as a
+time-slot filler; (b) "mark|note|put ‹date› **down** as ‹label›" folded into
+the F6b rewrite; (c) "clear/take ‹X› off my calendar|list" capture;
+(d) serial-verb guard in the coordination check (shared object ⇒ one ask);
+(e) "call it X instead of Y" → update route.
+
+**Predict (B-test):** atomic handled 49.7 → 58–64%; correct-on-handled
+71.8 → 76–80%; non-atomic defer rate holds ≥82% with the "knew" share up
+(the serial-verb guard removes false compounds, not true ones); propose
+defer unchanged.
