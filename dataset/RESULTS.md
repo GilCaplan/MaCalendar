@@ -95,6 +95,17 @@ rows flip to correct commits); commit 66.2 → 65–67 (renames abstain,
 priorities stay); complex board flat (regression floor); dual-gate on the
 real pool flat.
 
+## Era-2 cycle 4 — ACTUAL (run 20): F6 CONFIRMED, new era-2 best
+
+**Adjusted count-correct 81.0 → 82.0** (era-2 best; era started at 80.0) ·
+raw 79.0 flat · F1 82.1 · routing 164 deep / 86 fast (predicted 82–86 ✓) ·
+fast correct 91% (predicted 91–94 ✓) · e+e 67 → 70 · medium 90 → 91 · deep
+73% holding while absorbing F6's deferrals · garbage 0% · p50 7.8s. The Q9
+confirm gate rode along inert, exactly as the pool audit said it would.
+**F6 now counts on the main board.** Era-2 running total: adjusted
+80.0 → 82.0 in four cycles.
+# registered prediction (kept)
+
 ## Era-2 cycle 4 — REGISTERED PREDICTION 2026-09-07: F6 joint confirmation
 
 **Change under test:** the F6 integration (encounter route-override,
