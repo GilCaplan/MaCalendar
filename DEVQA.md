@@ -62,6 +62,20 @@ digest banner?** Lifestyle call, not engineering.
 
 ## Answered log
 
+**Q12 (2026-09-07, Gil design ruling): the retry loop must CHANGE the input,
+and the LLM is the last resort.** Two parts. (a) **Determinism rule:** when
+the crosscheck loop-back re-enters an atomic item, FastRule must not be
+asked the same question twice — identical text gives an identical verdict by
+construction, so a re-run on unchanged text is wasted work. On re-entry,
+either the item's text differs from the attempt that failed (the LLM stages
+rewrote it) or FastRule is SKIPPED for that item. (b) **Escalation rule:**
+after the retry budget (3) is spent on an atomic item, the final attempt
+belongs to the LLM — it creates the event/task directly rather than
+deferring to a deterministic parser that has already failed on that exact
+text. Implementation: per-item attempt fingerprints on EngineState;
+generate consults them before calling FastRule. Deferred until the in-flight
+sealed run finishes (engine files are read-only during a measurement).
+
 **Q10 (2026-09-07, Gil design ruling): Stage-2 routing becomes TWO tiered
 subsystems.** (1) KIND — event vs task; (2) OPERATION — new/edit/remove/
 complete/query. Each is rules-first (regex/tables/pinned conventions answer

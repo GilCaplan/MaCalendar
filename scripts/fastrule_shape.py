@@ -40,15 +40,11 @@ _CLOCK = _dt.datetime(2026, 9, 9, 10, 0)
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--split", choices=("train", "test"), default="test")
-    ap.add_argument("--v2", action="store_true", help="score fastrule2")
     a = ap.parse_args()
     mining = a.split == "train"
 
     from freezegun import freeze_time
-    if a.v2:
-        from assistant.engine.fastrule2 import FastRule
-    else:
-        from assistant.engine.fastrule import FastRule
+    from assistant.engine.fastrule import FastRule
     from assistant.intent.rule_parser import RULE_THRESHOLD
 
     fr = FastRule(RULE_THRESHOLD)
@@ -122,7 +118,7 @@ def main() -> int:
     N_N = N_DEFER + N_COMMIT
     P_N = P_DEFER + P_COMMIT
     def pc(x, n): return f"{x/n:.1%}" if n else "—"
-    print(f"[{a.split}] FastRule product-shape board ({'v2' if a.v2 else 'v1'})\n")
+    print(f"[{a.split}] FastRule product-shape board\n")
     print(f"ATOMIC rows ({A_N}) — should HANDLE")
     print(f"   handled (committed)      {pc(A_OK + A_WRONG, A_N)}")
     print(f"   correct-on-handled       {pc(A_OK, A_OK + A_WRONG)}")

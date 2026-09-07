@@ -1,32 +1,44 @@
-"""FastRule — the deterministic rule parser as a self-contained, thresholded
-SELECTIVE CLASSIFIER: instantiate with a confidence bar and (optionally) a
-reduced gate set; `.run(prompt)` returns a commit-or-abstain verdict.
+"""FastRule v2 — the Q11 restructure (Gil-approved 2026-09-07).
 
-Two live instances, tuned for their populations (see generate.py):
-  FastRule(0.80)                      the whole-command fast track —
-                                      conservative; the deep track is its net.
-  FastRule(0.60)                      per-fragment inside the deep track —
-                                      aggressive; crosscheck is its net.
+The organizing idea: every judgment is the same tiered decision — rules
+when confident, a tiny model when they can't, DEFER when neither is sure —
+applied three times (atomic? which operation? which kind?). FastRule is the
+ATOMIC-ITEM EXECUTOR; the deep system is the ATOMIZER (Gil's framing:
+"the deep system's main idea is breaking down to atomic items so the
+FastRule can then create the right event/task per item").
 
-The abstention gates ALWAYS run — on a fragment they double as the atomicity
-check: a fragment that still trips the compound gate is one decompose did
-NOT fully break down, so FastRule abstains with reason "strong-compound" /
-"mixed-mode-compound" and the caller routes it for further breakdown (or the
-LLM). Safe on real fragments because the strong-compound regex keys on true
-joiners ("and then", ". also", "— and"), never a bare conjunction. The two
-instances differ ONLY in their confidence threshold.
+This file IS FastRule now. v1 is retired (2026-09-07, Gil) — its code is
+kept at `retired/fastrule-v1/` and the last commit that ran it is tagged
+`fastrule-v1`. The switch was an IDENTICAL-BEHAVIOR port (the Q7 lesson):
+every regex and check came over unchanged and a diff harness proved 7,200 /
+7,200 verdicts identical before v1 was stood down. The deltas the
+structure is FOR — pre-parse atomicity, split-and-recurse, calibrated
+Scorer signals, slot-specs-as-data — land as later measured batches.
 
-All abstention gates live here in ONE place, so both instances behave
-identically and the sandbox can iterate the class directly instead of
-threading an EngineState. Behaviour is exactly the old fast_propose — this
-is an encapsulation refactor, verified by identical sandbox numbers.
+    FastRule(threshold).run(text) -> FastRuleResult      # unchanged contract
+
+    parse       — Normalizer+Router+SlotFiller, currently the composite
+                  inside rule_parser.analyze() (extraction into separate
+                  components is v2.x; the ROUTER's two-subsystem tier —
+                  rules then models — already lives at rule_parser's
+                  route fallthrough per Q10)
+    Atomicity   — layer 0 (Gil): the compound gates. Runs post-parse in
+                  v2.0 because v1's gates read the intent count ("buy milk
+                  and buy bread" parses as TWO intents and rightly
+                  commits; only a single-intent parse of compound wording
+                  defers).
+    Gatekeeper  — the intent-level vetoes (interrogative→defer,
+                  rename-misroute, generic-target), v1 order preserved.
+    Scorer      — the commit predicate (threshold + missing slots) and the
+                  named-signal registry (documented here; refitting them is
+                  R2's one-place job once calibration runs).
 """
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
 
-# Gate regexes live with the class now (moved from generate.py).
+# The gate patterns and the verdict type (carried from v1 at retirement).
 _STRONG_COMPOUND_RE = re.compile(
     r"\band\s+(?:then|also)\b"
     r"|[.;!?]\s+(?:also|then|plus|and)\b"
@@ -63,65 +75,106 @@ class FastRuleResult:
     missing_slots: list | None = None
 
 
-class FastRule:
-    def __init__(self, threshold: float):
-        self.threshold = float(threshold)
+#: The Scorer's signal registry — every confidence penalty, named. The
+#: VALUES still live where they always did (rule_parser applies them during
+#: parsing); this table is the single place that lists them, and the target
+#: of R2's calibration refit. Keep in sync with rule_parser (test-pinned).
+CONFIDENCE_SIGNALS = {
+    "regex_date": 0.95,        # date came from regex, not the recognizer
+    "domain_guessed": 0.85,    # domain inferred from the open view / model-routed
+    "anaphora": 0.80,          # resolved "it"/"that one" to a past record
+    "two_clock_times": 0.70,   # two times in one span — probably two events
+}
 
-    def run(self, text: str, current_view: str = "month") -> FastRuleResult:
-        from assistant.engine.generate import _get_rule_parser
-        from assistant.intent.rule_parser import RuleParserSkip
-        parser = _get_rule_parser()
-        if parser is None:
-            return FastRuleResult(False, [], 0.0, "no-parser")
-        try:
-            rr = parser.analyze(text, current_view=current_view)
-        except RuleParserSkip as e:
-            return FastRuleResult(False, [], 0.0, f"skip:{e}")
-        except Exception as e:                      # a fast-path bug loses no command
-            return FastRuleResult(False, [], 0.0, f"error:{e}")
 
-        conf = float(rr.confidence)
-        intents = rr.intents
+class Atomicity:
+    """Layer 0 (Gil): is this ONE atomic item? Rules tier = the compound
+    gates, verbatim v1 semantics. Model tier (the atomicity logistic on
+    dataset B's atomic flags) is a later measured batch."""
 
-        # --- abstention gates (always on; on a fragment they double as the
-        # "is this atomic, or does it need more breakdown?" check) ---
+    def judge(self, text: str, intents) -> "str | None":
         if len(intents) <= 1 and _STRONG_COMPOUND_RE.search(text):
-            # not atomic — decompose (or the caller) should split further
-            return FastRuleResult(False, intents, conf, "strong-compound")
+            return "strong-compound"
         if len(intents) <= 1 and " and " in text.lower():
-            # F5 (research-backed): the cue-word regex only knows announced
-            # joiners ("and then/also/plus…"); a plain "and" joining two
-            # CLAUSES swallows a second ask silently. The dependency parse
-            # tells clause- from NP-coordination ("Tal and Sam" never
-            # splits) — see intent/coordination.py for the rule and its
-            # measured limits.
             from assistant.intent.coordination import has_clause_coordination
             if has_clause_coordination(text):
-                return FastRuleResult(False, intents, conf, "clause-coordination")
+                return "clause-coordination"
         if (len(intents) >= 2 and _STRONG_COMPOUND_RE.search(text)
                 and any(n.startswith("create_") for n, _ in intents)
                 and any(n.startswith(("update_", "delete_", "complete_", "query_"))
                         for n, _ in intents)):
-            return FastRuleResult(False, intents, conf, "mixed-mode-compound")
+            return "mixed-mode-compound"
+        return None
+
+
+class Gatekeeper:
+    """Intent-level vetoes, v1 order: interrogative (with the polite
+    exemption), rename-misroute, generic-target."""
+
+    def judge(self, text: str, intents) -> "str | None":
         if (_INTERROGATIVE_RE.search(text)
                 and not _POLITE_IMPERATIVE_RE.search(text)
                 and any(n.startswith("create_") for n, _ in intents)):
-            return FastRuleResult(False, intents, conf, "interrogative-create")
+            return "interrogative-create"
         if (re.match(r"^\s*(?:please\s+)?rename\b", text, re.I)
                 and any(n.startswith("create_") for n, _ in intents)):
-            # F7a: a rename that parsed as a CREATE is a misroute — and even a
-            # correctly-routed rename can't know which store (event vs todo)
-            # holds the old title; deep's matcher searches both. Abstain.
-            return FastRuleResult(False, intents, conf, "rename-misroute")
+            return "rename-misroute"
         for name, intent in intents:
             if name.startswith(("update_", "delete_", "complete_")):
                 target = str(getattr(intent, "match_title", "") or "").strip()
                 if _GENERIC_TARGET_RE.match(target):
-                    return FastRuleResult(False, intents, conf, f"generic-target:{target}")
+                    return f"generic-target:{target}"
+        return None
 
-        if conf >= self.threshold and not rr.missing_slots and intents:
-            return FastRuleResult(True, intents, conf, None)
-        return FastRuleResult(
-            False, intents, conf,
-            "below-threshold" if conf < self.threshold else "missing-slots",
-            missing_slots=list(rr.missing_slots) or None)
+
+class Scorer:
+    """The commit predicate: confident AND clean. (Signal VALUES are applied
+    during parsing; see CONFIDENCE_SIGNALS for the registry.)"""
+
+    def __init__(self, threshold: float) -> None:
+        self.threshold = threshold
+
+    def commits(self, rr) -> bool:
+        return (rr.confidence >= self.threshold
+                and not rr.missing_slots and bool(rr.intents))
+
+
+class FastRule:
+    """The atomic-item executor, v2 structure — v1 behavior."""
+
+    def __init__(self, threshold: float) -> None:
+        self.threshold = threshold
+        self.atomicity = Atomicity()
+        self.gatekeeper = Gatekeeper()
+        self.scorer = Scorer(threshold)
+
+    def run(self, text: str, current_view: str = "month") -> FastRuleResult:
+        from assistant.engine import generate as _generate
+        from assistant.intent.rule_parser import RuleParserSkip
+
+        rp = _generate._get_rule_parser()
+        if rp is None:
+            return FastRuleResult(False, [], 0.0, "no-parser")
+        try:
+            rr = rp.analyze(text, current_view=current_view)
+        except RuleParserSkip as e:
+            return FastRuleResult(False, [], 0.0, f"skip:{e}")
+        except Exception as e:
+            return FastRuleResult(False, [], 0.0, f"error:{e}")
+
+        reason = self.atomicity.judge(text, rr.intents)
+        if reason:
+            return FastRuleResult(False, rr.intents, float(rr.confidence), reason)
+        reason = self.gatekeeper.judge(text, rr.intents)
+        if reason:
+            return FastRuleResult(False, rr.intents, float(rr.confidence), reason)
+        if self.scorer.commits(rr):
+            return FastRuleResult(True, rr.intents, float(rr.confidence), None)
+        # v1's reason precedence: below-threshold outranks missing-slots
+        if rr.confidence < self.threshold:
+            return FastRuleResult(False, rr.intents, float(rr.confidence),
+                                  "below-threshold",
+                                  missing_slots=list(rr.missing_slots) or None)
+        return FastRuleResult(False, rr.intents, float(rr.confidence),
+                              "missing-slots",
+                              missing_slots=list(rr.missing_slots) or None)

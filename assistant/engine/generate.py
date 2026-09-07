@@ -93,7 +93,7 @@ def fast_propose(state: EngineState, cfg) -> bool:
     front-door instance; the deep track is its net). A thin adapter — the
     parser + gates + threshold live in assistant/engine/fastrule.FastRule."""
     from assistant.intent.rule_parser import RULE_THRESHOLD
-    from assistant.engine.fastrule2 import FastRule   # v2 structure, v1 behavior (diff-gated 7200/7200)
+    from assistant.engine.fastrule import FastRule   # v2 structure, v1 behavior (diff-gated 7200/7200)
     from assistant.trace import RULE
 
     res = FastRule(RULE_THRESHOLD).run(state.text, state.current_view)
