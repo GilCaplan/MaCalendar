@@ -29,7 +29,9 @@ needing one is marked **[Gil]** and is blocked until asked.
 
 - **[infra] FS1 — field-level scorer for the generated 6000**: fast_sandbox
   (or a sibling) reads `dataset/fastrule/fastrule_6000.jsonl`; scores counts,
-  action, ATOMIC flag per gate, and slots; per-family lines; test half
+  action, ATOMIC flag per gate, slots, AND label-correctness (category
+  acc + macro-PRF on events, tag micro-PRF on tasks, canonical fixture via
+  MACALENDAR_CATEGORIES — Gil, 2026-09-07); per-family lines; test half
   aggregates-only by default. Prereq for everything below.
 - **[fast] FS2 — fresh FastRule baseline on B-train** (4,800): the lane's
   new reference board; also run A-pool sandbox beside it (dual-gate anchor).

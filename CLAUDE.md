@@ -197,9 +197,11 @@ read the breakdown and the failing rows to understand what it *means*, never
 just the number. Full protocol: `DOCUMENTATION/experiments/ITERATION_PROTOCOL.md`.
 
 **Always name the metric with the number.** "70→72" is meaningless in a vacuum;
-"count-correct 73.5%→75% on event+task" is a result. There are five metrics
+"count-correct 73.5%→75% on event+task" is a result. There are six metrics
 (count-correctness, missing-half, date-collapse, garbage-titles,
-parse-path/latency), each with slices — never report a score without saying
+parse-path/latency, and — since 2026-09-07 — label-correctness: category
+accuracy + macro P/R/F1 on events, tag micro-P/R/F1 on tasks, matched items
+only, against the dataset's canonical category fixture), each with slices — never report a score without saying
 which metric and which slice, in chat and in the md files alike.
 
 The hand-written corpus (`scripts/audit_assistant.py` →

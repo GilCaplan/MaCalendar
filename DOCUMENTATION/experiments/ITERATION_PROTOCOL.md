@@ -102,6 +102,19 @@ cycle 1"), clearly labelled, never as cycle-vs-cycle deltas. RESULTS.md
 carries an era divider; loop_log.csv rows before the divider's run number are
 era 1. A future era 3 opens the same way, by a one-line ruling here.
 
+## Label-correctness — the sixth metric (Gil, 2026-09-07)
+
+Tags and categories were the unscored layer (the label stage ran downstream
+of every metric). Now: on MATCHED items only (same rule as field quality) —
+**events: category accuracy + macro precision/recall/F1** over classes
+(single-label); **tasks: micro precision/recall/F1 over tag sets**
+(multi-label; empty-set counts). Ground truth exists only where labels are
+by construction — the FastRule 6,000 (against its canonical
+`categories_fixture.json`, loaded via MACALENDAR_CATEGORIES so personal
+config never leaks in) — so label lines appear on FS-scorer boards first;
+the real pool stays unscored on labels until/unless a labeled subset is
+ruled worth hand-making. FS1 implements it.
+
 ## The FastRule lane cadence — pinned in cycles, integrated every 2–3 (Gil, 2026-09-06)
 
 The FastRule sandbox lane runs **continuously in parallel** with deep cycles,
