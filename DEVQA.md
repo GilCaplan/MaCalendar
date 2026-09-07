@@ -8,6 +8,15 @@ to the log below so decisions stay findable.
 
 ## Open
 
+**Q11 — [DESIGN] FastRule v2 restructure** (Gil proposed 2026-09-07; the
+draft is `DOCUMENTATION/FASTRULE2_DESIGN.md`): five single-responsibility
+components (Normalizer=lexical-only / Router=the Q10 two-subsystem center /
+SlotFiller=specs-as-data / Scorer=named signals / Gatekeeper=the gates),
+semantic rewrites retired, models kept at the F12 state, parallel build +
+diff-gated switch. Three sub-questions at the doc's end (identical-first
+port?; calibration before or after?; slot-spec extensions in or out?).
+
+
 **Q6 — Reminders for events INSIDE Shabbat/yom tov (e.g. Shabbat lunch):
 suppress entirely (shipped default) or roll into one pre-candle-lighting
 digest banner?** Lifestyle call, not engineering.

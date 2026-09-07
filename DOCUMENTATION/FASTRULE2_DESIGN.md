@@ -1,0 +1,109 @@
+# FastRule v2 — restructure proposal (for Gil's review)
+
+_2026-09-07. Design only — nothing builds until approved. Prompted by Gil:
+"restructure from scratch… use the ideas/stages/components that worked well
+(especially the ML model classification routing on operation and kind) but
+see what general structure would be helpful."_
+
+## Why (the convolution, named)
+
+Fourteen F-batches accreted onto a structure designed before we knew what
+FastRule had to be. The specific rot:
+
+- **The normalization list became a junk drawer.** Lexical cleanup ("tmrw"→
+  tomorrow) sits beside SEMANTIC decisions disguised as string rewrites
+  ("mark ‹date› as X" → "add X on ‹date›", completions → "mark X as done").
+  Rewrites destroy information and lie to downstream stages — the
+  "set X as high priority" bug where the task got RETITLED "high priority"
+  came from exactly this.
+- **Routing is four accreted tiers** (phrase overrides → verb table → WH
+  fallback → model tier), each added where the previous one leaked, with
+  ORDER as load-bearing, undocumented structure.
+- **Slot extraction is per-action branches with patches at various depths.**
+  One F10 capture landed inside the wrong sub-branch and silently did
+  nothing until a probe caught it. There is no way to see, per action, what
+  extractors exist and in what order.
+- **Confidence is uncalibrated folklore** — hand-chosen multipliers scattered
+  in code (F8 measured the distribution is bimodal; R2 never ran).
+- **The gates are the one part that aged well** — named reasons, direct
+  supervision, measured precision/recall. v2 keeps their shape and gives
+  the rest of the system the same discipline.
+
+## The v2 shape: five components, one contract each
+
+    FastRule(threshold)                    # unchanged public face:
+      .run(text) -> FastRuleResult         # committed | reason, intents,
+                                           # confidence, missing_slots
+
+    1. Normalizer   — LEXICAL ONLY: expansions, misspellings, filler/
+                      courtesy strip. Semantic rewrites are RETIRED; their
+                      jobs move to where the meaning lives (Router routes
+                      "mark X as done" AS a phrase; SlotFiller captures the
+                      date in "mark ‹date› as X" AS a slot).
+    2. Router       — Gil's Q10 two-subsystem design PROMOTED from bolt-on
+                      to center:
+                        OperationClassifier: rules tier → model tier (K3)
+                        KindClassifier:      rules tier → model tier (K1)
+                      Each answers (label, source: rule|model, margin).
+                      action = compose(operation, kind). Both provenances
+                      ride the result — the Scorer bills them, the trace
+                      explains them, a rules-vs-model disagreement is a
+                      first-class signal the Gatekeeper may use.
+    3. SlotFiller   — per-action slot SPECS AS DATA: required/optional
+                      slots + an ORDERED extractor list per slot
+                      (phrase-captures first — they are the precise ones —
+                      then noun-chunking, then the temporal recognizer).
+                      Every F6c/F7b/F10 patch becomes a visible, testable
+                      table entry instead of a buried branch edit.
+    4. Scorer       — every confidence penalty is a NAMED signal in one
+                      table (model-routed, domain-guessed, anaphora,
+                      two-times, …), so R2's calibration finally has one
+                      place to refit, and the bimodality F8 found is
+                      inspectable per signal.
+    5. Gatekeeper   — the gates as they are (compound/coordination,
+                      interrogative→propose, generic-target, misroute),
+                      one module, each gate a named object with its own
+                      test and its own supervision metric.
+
+## Kept exactly (the things that worked)
+
+- The **selective-classifier contract** and both instances (0.80 front door /
+  0.60 fragment) — thresholds as constructor args.
+- The **two ML models at the F12 state** (weights, floors 2.5/1.5, balanced
+  fit, train-only fitting, test-eval reporting) — now the Router's model
+  tier rather than a None-return patch.
+- The **gates** — semantics, names, supervision metrics.
+- The **verb table and phrase overrides** — as the Router's rules tier,
+  with tier order made explicit and documented.
+- The **measurement discipline** — registered predictions, B-test reported,
+  A-pool dual-gate, per-family floors, leakage guards.
+
+## Retired
+
+- Semantic rewrites in the normalization list (each one's job reassigned:
+  routing meaning → Router rules tier; slot meaning → SlotFiller captures).
+- The four-tier routing sprawl (collapsed into the two named tiers).
+- Buried per-branch slot patches (become spec-table entries).
+
+## Migration — parallel build, diff-gated switch
+
+1. Build `fastrule2.py` beside v1 in the lane; v1 stays live everywhere.
+2. A **diff harness** runs both on B-train, B-test (aggregate) and A-dev:
+   same-verdict rate reported; every divergence classified (v2-better /
+   v1-better / neutral) from TRAIN rows only.
+3. Switch when v2 ≥ v1 on every board (test simple commit/correct, full
+   board, dual-gate) — then v1 retires per the retirement convention
+   (folder + tag, never deleted).
+4. The engine never notices: same FastRuleResult, same call sites.
+
+## Open questions for Gil
+
+1. **Scope of the first build:** straight port into the new structure
+   (behavior-identical, boring, safe) and only then improve — or allow the
+   port to fix known warts as it goes? (Recommend: identical-first, the Q7
+   lesson.)
+2. **The Scorer's calibration:** run R2 as part of v2 (one table makes it
+   cheap) or keep hand values until after the switch? (Recommend: after.)
+3. **Slot specs as data** opens the door to per-family extractor tests and
+   the R8 title work — in scope for v2, or a follow-up lane batch?
+   (Recommend: follow-up.)
