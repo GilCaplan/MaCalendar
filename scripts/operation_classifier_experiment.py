@@ -97,7 +97,7 @@ def main() -> int:
 
     FastRule(RULE_THRESHOLD).run("warm gym tomorrow at 7am")
 
-    rows = [json.loads(l) for l in (ROOT / "dataset" / "fastrule" / "fastrule_6000.jsonl").open()]
+    rows = [json.loads(l) for l in (ROOT / "dataset" / "fastrule" / "fastrule_7200.jsonl").open()]
     def op_of(r):
         a = r["expect"].get("action", "")
         if a in ("mixed", "propose") or not r["expect"].get("atomic", True):

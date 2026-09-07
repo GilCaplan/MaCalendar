@@ -56,7 +56,7 @@ def _fit_ovr(X, labels, classes, epochs=300, lr=0.5, balanced=True):
 
 def main() -> int:
     all_rows = [json.loads(l) for l in
-                (ROOT / "dataset" / "fastrule" / "fastrule_6000.jsonl").open()]
+                (ROOT / "dataset" / "fastrule" / "fastrule_7200.jsonl").open()]
     rows = [r for r in all_rows if r["split"] == "train"]
 
     # F14: the A-pool's real-usage wordings join the TRAINING text (never the

@@ -90,7 +90,7 @@ def main() -> int:
                           if any(k in low for k in d.get("keywords", ())))
 
         rows = [json.loads(l) for l in
-                (ROOT / "dataset" / "fastrule" / "fastrule_6000.jsonl").open()]
+                (ROOT / "dataset" / "fastrule" / "fastrule_7200.jsonl").open()]
         rows = [r for r in rows if r["split"] == a.split
                 and (not a.tier or r["tier"] == a.tier)]
 
