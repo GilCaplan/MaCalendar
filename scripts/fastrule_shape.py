@@ -60,6 +60,68 @@ _EXPLICIT_TIME_RE = re.compile(
     r"|\bnoon\b|\bmidnight\b|\bquarter (?:to|past)\b|\bhalf past\b", re.I)
 
 _HHMM = re.compile(r"^\d{2}:\d{2}$")
+_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+_WEEKDAY = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+            "friday": 4, "saturday": 5, "sunday": 6}
+_MONTH = {m: i for i, m in enumerate(
+    ["january", "february", "march", "april", "may", "june", "july", "august",
+     "september", "october", "november", "december"], start=1)}
+
+
+def _phrase_to_date(phrase: str, today: "_dt.date") -> "str | None":
+    """Resolve a ground-truth date phrase to an ISO date, or None when the
+    phrase is inherently a RANGE ("next week", "this weekend") — those have
+    no single right answer, so they are excluded from scoring rather than
+    guessed at. Dates had NO metric at all until now (Gil, 2026-09-07);
+    times were added the same day and immediately exposed a live defect.
+    """
+    s = (phrase or "").strip().lower()
+    if s in ("today", "this afternoon", "this evening", "this morning", "tonight"):
+        return today.isoformat()
+    if s in ("tomorrow", "tomorrow morning", "tomorrow afternoon", "tomorrow evening"):
+        return (today + _dt.timedelta(days=1)).isoformat()
+    if s in ("the day after tomorrow",):
+        return (today + _dt.timedelta(days=2)).isoformat()
+    m = re.match(r"in (\d+|a|two|three|four|five|six|seven) days?$", s)
+    if m:
+        n = {"a": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+             "six": 6, "seven": 7}.get(m.group(1))
+        n = n if n else int(m.group(1))
+        return (today + _dt.timedelta(days=n)).isoformat()
+    m = re.match(r"(?:this|next|coming|on)\s+(\w+day)$", s)
+    if m and m.group(1) in _WEEKDAY:
+        delta = (_WEEKDAY[m.group(1)] - today.weekday()) % 7
+        if s.startswith("next"):
+            delta = delta or 7
+        return (today + _dt.timedelta(days=delta or 7 if s.startswith("next") else delta)).isoformat()
+    m = re.match(r"(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?$", s)
+    if m:                                   # "the 21st" — this month or next
+        day = int(m.group(1))
+        cand = today.replace(day=day) if day >= today.day else None
+        if cand is None:
+            nm = (today.replace(day=28) + _dt.timedelta(days=4)).replace(day=1)
+            cand = nm.replace(day=day)
+        return cand.isoformat()
+    m = re.match(r"(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?$", s)
+    if m and m.group(1) in _MONTH:          # "march 5th"
+        mo, day = _MONTH[m.group(1)], int(m.group(2))
+        yr = today.year + (1 if (mo, day) < (today.month, today.day) else 0)
+        return _dt.date(yr, mo, day).isoformat()
+    return None                             # ranges and anything unresolved
+
+
+#: How much a wrong commit COSTS the user (Gil, 2026-09-07). A wrong title is
+#: an annoyance; a wrong DELETE destroys something they may not get back. The
+#: project already rules that "deleting is destructive" — the metric should
+#: say so too, or the loop has no reason to prefer failing safely.
+_SEVERITY = {
+    "delete_event": 4, "delete_todo": 4,     # irreversible-ish loss
+    "update_event": 2, "update_todo": 2,     # overwrote something real
+    "complete_todo": 2,                      # marked the wrong thing done
+    "create_event": 1, "create_todo": 1,     # a spurious row, easily removed
+    "query": 0, "query_schedule": 0, "query_todos": 0,   # read-only
+}
 
 
 def _phrase_to_hhmm(phrase: str) -> "str | None":
@@ -115,6 +177,9 @@ def main() -> int:
     P_DEFER = P_COMMIT = 0                # propose rows
     T_OK = T_N = 0                        # explicit times: right / scored
     INVENT = INVENT_N = 0                 # a time produced where none was said
+    D_OK = D_N = 0                        # resolvable dates: right / scored
+    HARM = 0                              # severity-weighted cost of wrong commits
+    HARM_BY: collections.Counter = collections.Counter()
     viol: collections.Counter = collections.Counter()
     miss_reason: collections.Counter = collections.Counter()
     samples: dict = collections.defaultdict(list)
@@ -173,6 +238,19 @@ def main() -> int:
             # at the time before, so a parser that invents plausible times
             # could only ever LOOK better. An autonomous loop must not be
             # blind to the field users care most about.
+            # --- DATE CORRECTNESS: times were scored first and immediately
+            # found a defect; dates had the same exposure and no metric.
+            if act in ("create_event", "create_todo"):
+                firstc = next((i for n, i in res.intents
+                               if n.startswith("create")), None)
+                got_d = str(getattr(firstc, "date", "")
+                            or getattr(firstc, "due_date", "") or "")
+                dphrase = (e.get("slots", {}) or {}).get("date_phrase") or ""
+                if dphrase and _ISO.match(got_d):
+                    want_d = _phrase_to_date(dphrase, _CLOCK.date())
+                    if want_d:              # ranges resolve to None: not scored
+                        D_N += 1
+                        D_OK += 1 if got_d == want_d else 0
             if act == "create_event":
                 first = next((i for n, i in res.intents
                               if n == "create_event"), None)
@@ -193,6 +271,12 @@ def main() -> int:
                 A_OK += 1
             else:
                 A_WRONG += 1
+                # what did this wrong commit COST? (severity, not just count)
+                for nm, _ in res.intents:
+                    w = _SEVERITY.get(nm, 1)
+                    HARM += w
+                    if w >= 2:
+                        HARM_BY[nm] += 1
                 if mining and len(samples["atomic-wrong"]) < 8:
                     samples["atomic-wrong"].append(f"[{act}→{names}] {r['text'][:48]}")
 
@@ -205,6 +289,20 @@ def main() -> int:
     print(f"   handled (committed)      {pc(A_OK + A_WRONG, A_N)}")
     print(f"   correct-on-handled       {pc(A_OK, A_OK + A_WRONG)}")
     print(f"   deferred (missed work)   {pc(A_MISS, A_N)}")
+    if D_N:
+        print(f"\nDATE CORRECTNESS (on committed creates)")
+        print(f"   resolvable date right    {pc(D_OK, D_N)}  (n={D_N}; "
+              f"range phrases like 'next week' excluded, no single right answer)")
+    if A_WRONG:
+        print(f"\nHARM (severity-weighted cost of wrong commits)")
+        print(f"   harm score               {HARM}  over {A_WRONG} wrong commits "
+              f"(delete=4 · update/complete=2 · create=1 · query=0)")
+        if HARM_BY:
+            print(f"   DESTRUCTIVE errors       "
+                  + " · ".join(f"{k} {v}" for k, v in HARM_BY.most_common(4)))
+        else:
+            print(f"   DESTRUCTIVE errors       none — every wrong commit was "
+                  f"a spurious row, not a loss")
     if T_N or INVENT_N:
         print(f"\nTIME CORRECTNESS (on committed events)")
         print(f"   explicit time right      {pc(T_OK, T_N)}  (n={T_N})")
