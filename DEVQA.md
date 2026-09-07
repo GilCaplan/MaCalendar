@@ -62,6 +62,18 @@ digest banner?** Lifestyle call, not engineering.
 
 ## Answered log
 
+**Q13 (2026-09-07, Gil): non-atomic behaviour is DIAGNOSTIC, not a target.**
+"I just want to see that it succeeds on recognising and executing well on
+atomic items, and we can decide what to do with non-atomic which is run
+through anyway and pass that to the next stage and let the engine decide."
+So: the PRIMARY metrics are atomic handle-rate and correct-on-handled;
+FastRule's atomicity call is information handed upward (the REFUSAL /
+STRUCTURE / INCAPACITY contract), not a verdict it must get right alone.
+The non-atomic bucket is reported as three outcomes — covered (acceptable,
+and the only path that survives the LLM being down), half-executed (the real
+defect), deferred — with no single "violation" number. `_parse_covers_the_
+compound` stays.
+
 **Q12 (2026-09-07, Gil design ruling): the retry loop must CHANGE the input,
 and the LLM is the last resort.** Two parts. (a) **Determinism rule:** when
 the crosscheck loop-back re-enters an atomic item, FastRule must not be

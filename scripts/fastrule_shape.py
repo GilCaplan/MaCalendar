@@ -2,13 +2,23 @@
 
 FastRule is the atomic-item executor. So the only two questions that matter:
 
-    ATOMIC rows      → did it HANDLE them?  (commit rate, and correctness)
-    NON-ATOMIC rows  → did it DEFER them?   (defer rate; a commit here is a
-                                             ROUTING VIOLATION — it tried to
-                                             do a job that isn't its own)
+PRIMARY (Gil, 2026-09-07 — "I just want to see that it succeeds on
+recognising and executing well on atomic items"):
 
-That reframes the old "commit rate" metric: a low commit rate on compounds
-is CORRECT behavior, not a miss, so it is scored as defer-rate instead.
+    ATOMIC rows  → did it HANDLE them, and was it RIGHT?
+
+NON-ATOMIC rows are DIAGNOSTIC, not a target. Gil's ruling: a compound runs
+through FastRule anyway, and whatever it finds is PASSED TO THE NEXT STAGE
+for the engine to decide (that is what the REFUSAL / STRUCTURE / INCAPACITY
+deferral contract carries). So the three outcomes are reported without one
+being "the metric":
+
+    covered       committed, and every ask is present — the "easy enough to
+                  complete" case Gil's product shape explicitly allows, and
+                  the only path that still works with the LLM unreachable
+    half-executed committed but an ask is MISSING — the real defect, and the
+                  only one worth driving to zero
+    deferred      handed up with a reason — also correct
 
     python -m scripts.fastrule_shape                # test split (reported)
     python -m scripts.fastrule_shape --split train  # mining
@@ -132,12 +142,13 @@ def main() -> int:
     print(f"   handled (committed)      {pc(A_OK + A_WRONG, A_N)}")
     print(f"   correct-on-handled       {pc(A_OK, A_OK + A_WRONG)}")
     print(f"   deferred (missed work)   {pc(A_MISS, A_N)}")
-    print(f"\nNON-ATOMIC rows ({N_N}) — should DEFER")
-    print(f"   DEFER RATE               {pc(N_DEFER, N_N)}   <- the metric")
-    print(f"     ...because it KNEW      {pc(N_DEFER_KNEW, N_N)}  (atomicity layer saw the compound)")
+    print(f"\nNON-ATOMIC rows ({N_N}) — diagnostic; the engine decides")
+    print(f"   deferred, handed up      {pc(N_DEFER, N_N)}")
+    print(f"     ...knew it was compound {pc(N_DEFER_KNEW, N_N)}  (layer 0 said so)")
     print(f"     ...by accident          {pc(N_DEFER - N_DEFER_KNEW, N_N)}  (low confidence / missing slot)")
-    print(f"   routing violations       {N_COMMIT} ({pc(N_COMMIT, N_N)}), "
-          f"of which produced right counts anyway: {N_COMMIT_OK}")
+    print(f"   covered (all asks present) {N_COMMIT_OK} ({pc(N_COMMIT_OK, N_N)})  — acceptable")
+    print(f"   HALF-EXECUTED             {N_COMMIT - N_COMMIT_OK} "
+          f"({pc(N_COMMIT - N_COMMIT_OK, N_N)})  <- the defect that matters")
     print(f"\nPROPOSE rows ({P_N}) — should DEFER (Q9)")
     print(f"   defer rate               {pc(P_DEFER, P_N)}  · violations {P_COMMIT}")
     if not mining:
