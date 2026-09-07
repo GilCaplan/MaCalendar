@@ -1150,3 +1150,103 @@ commit on a non-atomic row as a routing violation, including the 103 that
 produce exactly the right records. If the ruling is "violation regardless",
 delete `_parse_covers_the_compound` and the board jumps to 95.6% defer —
 but the LLM-free path loses those commands entirely.
+
+## F17 (layer 0 — the MODEL) — REGISTERED PREDICTION 2026-09-07
+
+**Selection method (no test rows touched).** Candidate features were judged
+by a **5-fold GroupKFold over B-train's pattern families** — the same unit
+the real split uses, so a feature that only memorises a wording family
+shows up as a fold loss — plus a fit on all of B-train scored against
+**A-train**, a differently-shaped dataset. Because the cost is asymmetric,
+they are compared at MATCHED RECALL (how many atomic rows must be wrongly
+deferred to reach 90/95/98% compound recall) rather than at argmax, where
+a precision-heavy feature can look good while losing the rows that matter.
+
+**Banked negative, first: the syntactic block as a whole LOSES.** 15
+dependency/structural features (clause coordination, conj counts, verb
+counts, joiner counts and position, temporal subordinators, comma counts,
+"to <verb>" counts) added together move B-train CV FP@R98 373 → **534** and
+A-train FP@R99 54 → **67** — worse on both, at the operating point the cost
+model actually selects. It is F13's lesson again: features that sharpen the
+boundary on seen families blur it on unseen ones. Per-feature ablation
+found only two that help, and only these two survive combination:
+
+| feature set | B-train CV FP@R90 | FP@R95 | FP@R98 | A-train FP@R95 | FP@R99 |
+|---|---|---|---|---|---|
+| base 18 (shipped) | 210 | 327 | 373 | 19 | 54 |
+| + all 15 syntactic | 179 | 286 | **534** | **29** | **67** |
+| + joiner-mid | 220 | 294 | 334 | 16 | 56 |
+| + clause-coord | 141 | 309 | 402 | 19 | 29 |
+| **+ joiner-mid + clause-coord** | **138** | **290** | **347** | **16** | **29** |
+
+**Change:** `AtomicityFeatures` gains exactly two signals, 18 → 20.
+(a) **joiner-mid** — an ask-joiner falls in the middle 20–80% of the
+sentence, i.e. the utterance has two HALVES rather than a trailing tag;
+this is the "connective position" idea, and position is what separates
+"meeting with Tal and Sam at 5" from "book the gym and remind me to call".
+(b) **clause-coord** — `coordination.has_clause_coordination` as a FEATURE
+rather than a gate, so the model can WEIGH the dependency parse's verdict
+alongside the rest of the shape instead of it being an all-or-nothing veto.
+The parse it needs is memoised so the gate and the feature share one spaCy
+call.
+
+**Predict.** *B-test, model tier alone at the shipped floor 1.5:* compound
+recall 83.4 → 85–88%, said-atomic-but-COMPOUND 104 → 75–95, precision held
+≥84% (FP 90 → ≤105). *B-test, the LAYER:* FN 85 → 70–80, accuracy 92.5 →
+92.8–93.5%. *A-test:* recall stays ≥99% (it is already 99.6) with FP 12 →
+≤10 — the A gain in CV was at the far-recall end, which A-test already
+sits at, so I expect A to be FLAT and would read a drop as overfitting to
+B. *Downstream (`fastrule_shape` B-test):* atomic handle rate within −1pp
+of 53.5%, non-atomic defer rate 77.8 → 78–80%.
+
+## F17 — ACTUAL (2026-09-07): the model improved on BOTH error kinds; the LAYER banked it as precision
+
+**B-test, MODEL TIER alone at floor 1.5 — prediction met on every line:**
+accuracy 91.9 → **93.1%**, compound P 85.3 → **87.4%**, R 83.4 → **86.1%**
+(predicted 85–88), said-atomic-but-COMPOUND 104 → **87** (predicted 75–95),
+said-compound-but-atomic 90 → **78**. Both error kinds fell — unusual, and
+the sign that two features added information rather than moving the
+boundary.
+
+**B-test, the LAYER: accuracy 92.5 → 93.0%, P 85.2 → 87.0%, R 86.4 → 86.3%,
+FP 94 → 81, FN 85 → 86.** Prediction MISSED on the expensive side: I said
+FN 85 → 70–80 and it is flat. The reason is worth keeping: the compounds
+the improved model newly catches were **already being caught by the rule
+gates** — the union had them. What the better model bought is PRECISION,
+so the gain shows up as 13 fewer atomic rows wrongly deferred, not as
+fewer half-executions. Layer recall is now rules-limited, not model-limited.
+
+**A-test: exactly flat** — accuracy 98.1%, R 99.6%, FN 1, FP 12 (predicted
+flat; FP predicted ≤10, so a hair outside). A was already at ceiling: its
+compounds are two real utterances joined by an announced connective (82%
+carry "and", 36% "also", 22% "then"), so A measures "did you see the
+joiner" and B measures the quiet compounds. Reporting them separately is
+what makes that visible — a single blended number would have hidden it.
+
+**Downstream (`fastrule_shape`, B-test):** atomic handle rate 53.5 →
+**54.0%** (predicted "within −1pp"; it went UP, which is the precision gain
+landing), correct-on-handled 73.1 → 72.7%, non-atomic defer rate 77.8%
+FLAT (predicted 78–80 — missed, same reason as the layer FN), "knew" 51.8%,
+violations 125, propose defer 70.6%.
+
+**Two negatives banked.** (1) The 15-feature syntactic block, added
+wholesale, is worse than no syntactic features at all at the recall the
+cost model selects (B-train CV FP@R98 373 → 534, A-train FP@R99 54 → 67).
+(2) Dropping `class_weight="balanced"` for atomicity — tested because the
+balanced intercept was suspected of pushing featureless utterances to
+"compound" — is a wash on B (CV FP@R98 348 vs 347) and clearly WORSE on A
+(FP@R99 42 vs 29). Balanced stays.
+
+**The margin floor is now justified, not assumed** (B-train sweep, printed
+by `fit_route_models`). The sweep is a cliff, and the cliff is ONE
+ambiguity bucket: 235 B-train rows share a single feature vector —
+`{bias, and, joiner-mid}`, i.e. "there is an 'and' in the middle and
+nothing else fires" — all at margin 0.64, and they are **160 atomic / 75
+compound**. Floor 1.5 rejects the whole bucket; floor 0.5 accepts the whole
+bucket. Priced on the product board (B-train): 1.5 → 0.5 buys 32 fewer
+half-executions and 81 fewer layer FNs, and costs **97 correct fast
+handles** (handle rate 59.7 → 56.6%) — roughly three lost fast-correct
+answers per half-execution prevented, where the lost ones still get a
+correct (slow) answer from deep and the half-executions are wrong in front
+of the user. **Floor stays 1.5**: the bucket should be SPLIT, not bought
+wholesale, which is F18.

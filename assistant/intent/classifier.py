@@ -93,12 +93,26 @@ class AtomicityFeatures(Featurizer):
     reads the shape of the whole utterance, which is what catches the
     compounds those miss — counts of verbs, times, list-words and
     connectives, not any single cue.
+
+    The last two are F17's, and they were the ONLY two of fifteen candidate
+    syntactic/structural signals that earned their place: selection was a
+    5-fold GroupKFold over B-train's pattern families plus an A-train check,
+    compared at MATCHED RECALL because the cost is asymmetric. The block as
+    a whole was a clear negative (B-train CV FP@R98 373 → 534) — see F17 in
+    dataset/RESULTS.md for the table and the banked negative.
     """
 
     names = ["bias", "and", "and-then", "comma-then", "semicolon", "two-times",
              "three-times", "two-dates", "plus-also", "both-domains",
              "len>12", "len>18", "two-create-verbs", "verb-after-and",
-             "list-and-cal", "second-remind", "and-count2", "to-my-list-mid"]
+             "list-and-cal", "second-remind", "and-count2", "to-my-list-mid",
+             "joiner-mid", "clause-coord"]
+
+    #: An ask-joiner in the MIDDLE of the sentence means two halves; one at
+    #: the edge is a trailing tag or a leading address. Position, not
+    #: presence, is what separates "meeting with Tal and Sam at 5" (one ask)
+    #: from "book the gym and remind me to call the plumber" (two).
+    _MID_LO, _MID_HI = 0.2, 0.8
 
     def extract(self, text: str) -> "list[float]":
         low = text.lower()
@@ -130,7 +144,32 @@ class AtomicityFeatures(Featurizer):
             1.0 if len(re.findall(r"\bremind\b", low)) >= 1 and ands else 0.0,
             1.0 if ands >= 2 else 0.0,
             1.0 if re.search(r"\bto my (?:\w+\s+)?list\b.{6,}", low) else 0.0,
+            self._joiner_mid(text),
+            self._clause_coord(text),
         ]
+
+    @classmethod
+    def _joiner_mid(cls, text: str) -> float:
+        from assistant.intent.coordination import ASK_JOINER_RE
+        m = ASK_JOINER_RE.search(text)
+        words = len(text.split())
+        if not m or not words:
+            return 0.0
+        pos = len(text[:m.start()].split()) / words
+        return 1.0 if cls._MID_LO <= pos <= cls._MID_HI else 0.0
+
+    @staticmethod
+    def _clause_coord(text: str) -> float:
+        """The dependency parse's verdict as a WEIGHTED signal, not a veto.
+
+        The same check is layer 0's second gate; here the model gets to
+        weigh it against the rest of the shape, which is what turns it from
+        a source of false compounds ("wash and fold the laundry") into
+        evidence. The parse is memoised in `coordination.parsed`, so the
+        gate and this feature share one spaCy call per utterance.
+        """
+        from assistant.intent.coordination import has_clause_coordination
+        return 1.0 if has_clause_coordination(text) else 0.0
 
 
 class KindFeatures(Featurizer):
@@ -277,7 +316,20 @@ class LogisticModel:
         return {"classes": list(self.classes), "weights": self.weights}
 
     def load(self, blob: dict) -> "LogisticModel":
-        self.weights = {k: list(v) for k, v in blob.get("weights", blob).items()}
+        """Load weights, REFUSING a vector that does not match the featurizer.
+
+        `scores` dots with `zip`, which truncates silently: a weights file
+        fitted before a feature was added would keep working and quietly
+        ignore the new signals — a wrong answer with no error anywhere. So
+        a length mismatch loads NOTHING, and the caller's no-weights path
+        (defer / no opinion) stands until the file is refitted.
+        """
+        w = {k: list(v) for k, v in blob.get("weights", blob).items()}
+        d = len(self.featurizer)
+        if any(len(v) != d for v in w.values()):
+            self.weights = {}
+            return self
+        self.weights = w
         return self
 
 

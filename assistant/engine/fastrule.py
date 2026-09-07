@@ -38,6 +38,11 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+#: `_parse_covers_the_compound` counts asks with the intent layer's joiner
+#: pattern — the same one `AtomicityFeatures`' joiner-mid signal reads, so
+#: routing and the model can never disagree about where a sentence divides.
+from assistant.intent.coordination import ASK_JOINER_RE as _ASK_JOINER_RE
+
 # The gate patterns and the verdict type (carried from v1 at retirement).
 _STRONG_COMPOUND_RE = re.compile(
     r"\band\s+(?:then|also)\b"
@@ -146,23 +151,6 @@ class Atomicity:
         if ROUTER.looks_compound(text):
             return "model-compound"
         return None
-
-
-#: One ASK-JOINER between two asks; N joiners announce N+1 asks. ", and" and
-#: "and then" are ONE joiner, not two — the alternation is ordered longest-
-#: first so the compound forms win. A comma inside a single ask ("friday,
-#: march 5th") over-counts, which is the safe direction: over-counting asks
-#: only makes `_parse_covers_the_compound` more willing to defer.
-_ASK_JOINER_RE = re.compile(
-    r"(?:"
-    r",?\s*\band\s+(?:then|also)\b"
-    r"|,\s*(?:then|also|plus)\b"
-    r"|[.;!?]\s+(?:also|then|plus|and)\b"
-    r"|\s[—–]\s*and\b"
-    r"|,?\s*\band\b"
-    r"|[;,]"
-    r"),?",                     # ". Also," is ONE joiner, not a joiner + a comma
-    re.I)
 
 
 def _parse_covers_the_compound(reason: str, text: str, intents) -> bool:
