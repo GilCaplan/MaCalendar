@@ -8,15 +8,6 @@ to the log below so decisions stay findable.
 
 ## Open
 
-**Q8 — May a SMALL trained component (logistic regression over hand-written
-features, fit offline on the dev slice, deterministic at inference) live
-inside FastRule/segment for the event-vs-task kind decision?** The research
-sweep (R6) recommends it over the regex family that grows case by case (Q1
-added another). It stays local, milliseconds, explainable — but it's a
-trained artifact inside the rules layer, so it feels design-adjacent enough
-to ask. If yes it replaces ~5 regex rules with one calibrated scorer.
-
-
 **Q6 — Reminders for events INSIDE Shabbat/yom tov (e.g. Shabbat lunch):
 suppress entirely (shipped default) or roll into one pre-candle-lighting
 digest banner?** Lifestyle call, not engineering.
@@ -54,6 +45,11 @@ digest banner?** Lifestyle call, not engineering.
 - 2026-09-04 — **Date-only occasion reminders**: calendar events. → Cycle 2.
 
 ## Answered log
+
+**Q8 (2026-09-07): APPROVED — "can try the q8 idea."** A small logistic
+regression over hand features for the event-vs-task kind decision, fit
+offline on dev labels, deterministic at inference. Ships only if it beats
+the regex family in a measured cycle; negative result gets banked too.
 
 **Q7 (2026-09-06): object-based restructure APPROVED — with the acceptance
 criterion in Gil's words: "the logic doesn't change at all nor should the
