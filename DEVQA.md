@@ -8,13 +8,6 @@ to the log below so decisions stay findable.
 
 ## Open
 
-**Q7 — [DESIGN · blocks cycle 10] The DeepSystem object structure** — your
-checkpoint. The proposal + its three open questions (first-move scope;
-`run_transcript` shim; the shared Component interface) are in
-`DOCUMENTATION/DEEPSYSTEM_DESIGN.md` §8; §1 is the plain-language walkthrough.
-Rule going forward: every design-change ask registers a row HERE, with the
-detail in its design doc — this file is the one inbox.
-
 **Q6 — Reminders for events INSIDE Shabbat/yom tov (e.g. Shabbat lunch):
 suppress entirely (shipped default) or roll into one pre-candle-lighting
 digest banner?** Lifestyle call, not engineering.
@@ -52,6 +45,14 @@ digest banner?** Lifestyle call, not engineering.
 - 2026-09-04 — **Date-only occasion reminders**: calendar events. → Cycle 2.
 
 ## Answered log
+
+**Q7 (2026-09-06): object-based restructure APPROVED — with the acceptance
+criterion in Gil's words: "the logic doesn't change at all nor should the
+results, should just be cleaner." All three recommendations confirmed:
+(1) pure refactor first, cycle 10 separate; (2) `run_transcript` stays as a
+shim; (3) shared Component interface. Verification bar: full test suite
+green + a behavior-identical confirmation run against the era-2 baseline
+before merge.**
 
 **Q1 (2026-09-06): dated "I need to <meet/talk>…" = EVENT.** Implemented same
 day: `_NEED_ENCOUNTER_RE` in segment's pinned-kind rules (encounter verbs +
