@@ -19,7 +19,23 @@ But what stayed committed got much safer — **fast correct-on-committed 79%
 garbage 0%). Deep 78→71 is composition, not regression: it inherited ~11
 hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
-**Verdict: CONFIRMED — merged to main.** The integration's promise was
+**Verdict: CONFIRMED — merged to main.**
+
+## F4 (sandbox, era 2) — REGISTERED PREDICTION 2026-09-06, before implementation
+
+Two fixes, diagnosed from the run-16-era sandbox misses (dev-only mined):
+**F4a** — the interrogative gate reads a leading polite imperative ("Can you
+create a new list…") as a question; exempt "can/could/would/will you
+<create-verb>". **F4b** — "mark 13 october of this year as my birthday"
+fast-commits complete_todo at 0.95: "mark <date> as <occasion>" must be an
+all-day create_event (and never complete_todo when the object is a date).
+
+**Predict (dev-full 600):** committed +2–4 rows; correct-on-committed +0.3–0.8pp
+(one false-accept removed, 1–2 over-blocks recovered); recoverable-abstain
+down ~1pp. Held-out reported, never mined. Non-goals: the delete-veto
+over-blocks stay (product safety beats the count metric); remind-and-then
+mis-kinds deferred to F5 with their own diagnosis.
+ The integration's promise was
 precision-on-committed and it delivered exactly that; coverage is the open
 debt, measured as recoverable-abstain (17.4% standalone), and is F4's
 explicit target in the sandbox lane. These numbers are the era-2 baseline
