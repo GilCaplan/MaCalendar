@@ -144,7 +144,13 @@ whatever version its checkout has committed — so a mid-cycle FastRule edit
 can never change a measurement in flight (versioning is by git: the sandbox
 edits its tree, the loop tree's is frozen at its commit).
 
-**Integration cadence: every 2–3 cycles**, at a cycle boundary, the sandbox's
+**The lane NEVER waits (Gil, 2026-09-07):** FastRule iteration — mining,
+implementing, sandbox measuring — runs continuously, INCLUDING while an
+engine cycle is measuring (the lane scripts pin BLAS to one thread
+structurally, which is what makes two model-loading processes safe
+together). Only INTEGRATION synchronizes with the engine.
+
+**Integration cadence: when ready, or every 2–3 cycles**, at a cycle boundary, the sandbox's
 graduated batches merge into the loop tree and the next full-engine run
 doubles as the joint confirmation (a smarter FastRule shifts which rows reach
 deep; only a joint run prices that). After each integration the fastlane
