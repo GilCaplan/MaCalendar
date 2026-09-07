@@ -21,7 +21,30 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
-## K1 (Q8 experiment) — REGISTERED PREDICTION 2026-09-07, before implementation
+## K1 (Q8) — ACTUAL (2026-09-07): direction right, magnitude 6× the prediction
+
+**Kind-accuracy on labeled create rows (1495: calendar/set=event,
+lists/createoradd=task, e+e, t+t):** deterministic chain (`_kind_of` +
+`_enforce_pinned_kinds`) **71.5% dev / 67.8% held-out**; the 16-feature
+logistic scorer **99.0% dev / 98.5% held-out** (aggregate only). Predicted
++2–5pp; actual +27.5pp dev. No overfit signature (dev→held-out drop is
+0.5pp). Weights are explainable and printed by the experiment (list-words
+−4.90 dominates the task side; occasion +2.36 / remindish +2.11 / dated
++1.43 the event side). Remaining dev misses are genuinely ambiguous
+("Make new playlist…").
+
+**Honest caveats before wiring (K2):** (1) the engine's EFFECTIVE kind
+accuracy is higher than this baseline — the deep track's LLM also labels
+kinds, so the wired-in gain will be much smaller than +27pp; the win targets
+the deterministic layer and LLM mis-kind overrides (the e+t missing-half
+family). (2) The dataset's phrasings make "list" nearly a label giveaway —
+legitimate for our distribution, thinner off it. **K2 wiring plan (next
+deep cycle): the classifier arbitrates ONLY where the pinned convention
+rules are silent** — Gil's rulings (remind+clock⇒event, Q1 encounters…)
+stay authoritative; the scorer replaces the blind fallthrough, not the
+conventions. Weights ship as a versioned constants file.
+
+### The registered prediction (kept for the record)
 
 **Change under test (offline first, no engine change):** a logistic
 regression over ~15 hand features (segment's own regexes as features:
