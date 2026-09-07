@@ -2936,5 +2936,70 @@
   "events": 1,
   "tasks": 0,
   "template": "schedule {event_title} with {name} {recurrence} at {time}"
+ },
+ {
+  "family": "c_confsub_ee_1",
+  "nuance": "confirm_subprompt",
+  "action": "create_event",
+  "atomic": false,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {date} at {time} and should i also add {event_title2}?",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": []
+ },
+ {
+  "family": "c_confsub_et_1",
+  "nuance": "confirm_subprompt",
+  "action": "create_event",
+  "atomic": false,
+  "events": 1,
+  "tasks": 0,
+  "template": "add {event_title} to my calendar {date} and what if i put {task_title2} on my list?",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": []
+ },
+ {
+  "family": "c_confsub_te_1",
+  "nuance": "confirm_subprompt",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 1,
+  "template": "remind me to {task_title} and should i book {event_title2} {date}?",
+  "event_label_sources": [],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_confsub_tt_1",
+  "nuance": "confirm_subprompt",
+  "action": "create_todo",
+  "atomic": false,
+  "events": 0,
+  "tasks": 1,
+  "template": "add {task_title} to my list and do you think i should add {task_title2} too?",
+  "event_label_sources": [],
+  "task_label_sources": [
+   "title"
+  ]
+ },
+ {
+  "family": "c_confsub_ee_2",
+  "nuance": "confirm_subprompt",
+  "action": "create_event",
+  "atomic": false,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} for {date} at {time}, and what if we added {event_title2} {date2}?",
+  "event_label_sources": [
+   "title"
+  ],
+  "task_label_sources": []
  }
 ]

@@ -492,3 +492,21 @@ correct routing, and ANY fast commit scores as a violation (a mutation
 without confirmation). The fastrule6k scorer implements this without special
 cases: propose rows can never satisfy its commit-correctness predicate.
 Current action composition: {'complete_todo': 235, 'create_event': 2166, 'create_todo': 1237, 'delete_event': 269, 'delete_todo': 197, 'mixed': 1005, 'propose': 251, 'query': 215, 'update_event': 248, 'update_todo': 177}.
+
+## Schema update — confirm subprompts + the two-phase shape (2026-09-07)
+
+Gil's observation after the Q9 flow shipped: questions now exist as WHOLE
+commands (phase-1 rows, `action: "propose"`, above), as **subprompts inside
+a compound**, and as the first half of a **two-phase interaction**. Coverage:
+
+- **Subprompt families** `c_confsub_*` (5 families, 74 rows, 60 train /
+  14 test): "book gym at 7 and should i also add yoga?" — labeled to the
+  SHIPPED ruling: the imperative half executes (counts reflect only it), the
+  question half creates nothing and no dialog appears inside a compound
+  (ENGINE.md documents why; a unit test pins it). The `confirm_subprompt`
+  nuance tag is the single flip point if the ruling ever changes.
+- **Phase 2 (the yes/no)** is deliberately NOT dataset rows: a single-shot
+  dataset cannot score a dialog turn. It is pinned by the feature's contract
+  tests (accept creates exactly once — idempotent; decline creates nothing;
+  expired token errors), and the would-be-created object's ground truth
+  already rides in each propose row's `slots`.
