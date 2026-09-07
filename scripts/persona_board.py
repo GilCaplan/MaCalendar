@@ -53,12 +53,44 @@ if str(ROOT) not in sys.path:
 from scripts import fastrule_shape as FS       # noqa: E402
 
 DATA = ROOT / "dataset" / "personas" / "personas.jsonl"
-PERSONAS = ["observant_student", "household_parent", "freelance_consultant",
-            "retiree", "uni_student", "esl_speaker"]
-SHORT = {p: p[:13] for p in PERSONAS}
+BASE = ["observant_student", "household_parent", "freelance_consultant",
+        "retiree", "uni_student", "esl_speaker"]
+#: filled from whichever file is scored — the ablation file's columns are
+#: `vocab:<p>` / `phrase:<p>` cells, not personas
+PERSONAS: list = []
+SHORT: dict = {}
 
 
-_AMPM = re.compile(r"\b(?:am|pm)\b|\bnoon\b|\bmidnight\b|\bmidday\b", re.I)
+def set_columns(labels) -> None:
+    """Column order: the persona order if this is the persona file, else the
+    ablation's two blocks in that same order. Never the file's own order,
+    which is shuffled."""
+    global PERSONAS, SHORT
+    labels = set(labels)
+    order = [p for p in BASE if p in labels]
+    for prefix in ("vocab:", "phrase:"):
+        order += [prefix + p for p in BASE if prefix + p in labels]
+    order += sorted(labels - set(order))
+    PERSONAS = order
+    SHORT = {p: p[-13:] for p in order}
+
+
+def blocks_of(labels):
+    """The groups a variance spread is meaningful WITHIN. One block for the
+    persona file; for the ablation, the vocab block and the phrase block are
+    separate experiments and must never be pooled."""
+    v = [p for p in labels if p.startswith("vocab:")]
+    f = [p for p in labels if p.startswith("phrase:")]
+    if v and f:
+        return [("VOCABULARY VARIES, phrasing held at the control", v),
+                ("PHRASING VARIES, vocabulary held at the control", f)]
+    return [("across personas", list(labels))]
+
+
+#: `\bam\b` does NOT match "8:45am" — digit and letter are both word
+#: characters, so there is no boundary between them. The lookbehind is what
+#: makes "8:45am" match while "program" does not.
+_AMPM = re.compile(r"(?<![a-z])(?:am|pm)\b|\bnoon\b|\bmidnight\b|\bmidday\b", re.I)
 _CLOCK24 = re.compile(r"^(?:at\s+)?(\d{1,2}):(\d{2})$")
 
 
@@ -361,9 +393,15 @@ def main() -> int:
     ap.add_argument("--examples", type=int, default=0,
                     help="print N failing rows per persona per bucket (synthetic data — mining is fine)")
     ap.add_argument("--persona", help="restrict the failing-row dump to one persona")
+    ap.add_argument("--data", default=str(DATA),
+                    help="jsonl to score (default the persona set; pass "
+                         "dataset/personas/personas_ablation.jsonl for the "
+                         "vocabulary-vs-phrasing ablation)")
     a = ap.parse_args()
 
-    rows = [json.loads(l) for l in DATA.open(encoding="utf-8")]
+    path = pathlib.Path(a.data)
+    rows = [json.loads(l) for l in path.open(encoding="utf-8")]
+    set_columns({r["persona"] for r in rows})
     structures = sorted({r["structure"] for r in rows})
     cells, fails, reasons, preds = score(rows, max(a.examples, 3))
 

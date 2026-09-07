@@ -101,6 +101,25 @@ PERSONAS = [
     "esl_speaker",
 ]
 
+# --- the ablation (--ablation) -------------------------------------------
+# The persona board shows THAT quality varies. It cannot say whether the cause
+# is the WORDS or the WAY OF SPEAKING, because a persona changes both at once.
+# This splits them. A persona's banks divide into:
+#
+#   CONTENT   what the person talks about — names, activities, things.
+#             This is "vocabulary" in the sense the multi-user claim uses it:
+#             material that ends up inside a SLOT.
+#   STYLE     how they say it — the templates, plus the temporal expressions
+#             and disfluencies, which are habits rather than subject matter.
+#
+# Two blocks, each holding one half fixed against the control persona:
+#   vocab:<p>   control's STYLE + <p>'s CONTENT   -> spread = vocabulary alone
+#   phrase:<p>  <p>'s STYLE + control's CONTENT   -> spread = phrasing alone
+CONTENT_BANKS = ("names", "event_titles", "task_titles", "items", "occasions", "quotable")
+ABLATION_CONTROL = "observant_student"
+ROWS_PER_ABLATION_CELL = 210
+ABLATION_OUT = PERSONA_DIR / "personas_ablation.jsonl"
+
 VOCAB_PATH = pathlib.Path(os.path.expanduser("~/.assistant_tools/vocab.json"))
 
 
@@ -179,14 +198,14 @@ def build_families(structures, personas):
 # quota allocation (deterministic, weight-aware, capacity-capped)
 # ---------------------------------------------------------------------------
 
-def allocate(fams, fillers_of, total: int) -> dict:
+def allocate(fams, fillers: dict, total: int) -> dict:
     """Rows per family for ONE persona: weight-proportional, floored at
     MIN_ROWS_PER_FAMILY, capped at each family's combinatorial capacity, and
     fixed up to sum exactly `total`. Every tie is broken by a stable hash of
     the family name, so the result never depends on dict order or PYTHONHASHSEED.
     """
     order = sorted(fams, key=lambda f: (stable_int(SEED, "alloc", f["family"]), f["family"]))
-    caps = {f["family"]: family_capacity(f, fillers_of[f["persona"]]) for f in order}
+    caps = {f["family"]: family_capacity(f, fillers) for f in order}
     W = sum(f["weight"] for f in order) or 1.0
     q = {}
     for f in order:
@@ -322,6 +341,10 @@ def main() -> int:
     ap.add_argument("--no-leak-check", action="store_true",
                     help="skip the vocabulary leak gate (CI has no vocabulary; "
                          "never pass this on the author's machine)")
+    ap.add_argument("--ablation", action="store_true",
+                    help="write personas_ablation.jsonl instead: 12 cells that hold "
+                         "vocabulary or phrasing fixed against the control, so the "
+                         "board can say WHICH of the two the spread comes from")
     a = ap.parse_args()
 
     catalog = load_json(PERSONA_DIR / "structures.json")["structures"]
@@ -338,18 +361,40 @@ def main() -> int:
 
     fams = build_families(catalog, personas)
 
-    seen: set = set()
+    # cell = (label, whose TEMPLATES + style banks, whose CONTENT banks)
+    if a.ablation:
+        cells = ([(f"vocab:{p}", ABLATION_CONTROL, p) for p in PERSONAS]
+                 + [(f"phrase:{p}", p, ABLATION_CONTROL) for p in PERSONAS])
+        per_cell, out_path = ROWS_PER_ABLATION_CELL, ABLATION_OUT
+    else:
+        cells = [(p, p, p) for p in PERSONAS]
+        per_cell, out_path = ROWS_PER_PERSONA, OUT
+
     rows = []
-    for pid in PERSONAS:
-        mine = [f for f in fams if f["persona"] == pid]
-        quotas = allocate(mine, fillers_of, ROWS_PER_PERSONA)
+    global_seen: set = set()
+    for label, tpl_owner, content_owner in cells:
+        fill = dict(fillers_of[tpl_owner])
+        for k in CONTENT_BANKS:
+            fill[k] = fillers_of[content_owner][k]
+        mine = []
+        for f in fams:
+            if f["persona"] != tpl_owner:
+                continue
+            g = dict(f)
+            g["persona"] = label
+            g["family"] = f"{label}:{f['structure']}:{f['variant']}"
+            mine.append(g)
+        # In ablation mode two cells can legitimately produce the same
+        # sentence (the control's own cell appears in both blocks), so dedup
+        # is per cell there; in normal mode it is global, which is stricter.
+        seen = set() if a.ablation else global_seen
+        quotas = allocate(mine, fill, per_cell)
         for f in sorted(mine, key=lambda f: f["family"]):
-            n = quotas[f["family"]]
-            for i, (text, slots) in enumerate(gen_rows(f, n, fillers_of[pid], seen), 1):
+            for i, (text, slots) in enumerate(gen_rows(f, quotas[f["family"]], fill, seen), 1):
                 rows.append({
                     "id": f"{f['family']}-{i:03d}",
                     "text": text,
-                    "persona": pid,
+                    "persona": label,
                     "split": "test",          # ALWAYS. see PERSONAS.md
                     "tier": f["tier"],
                     "structure": f["structure"],
@@ -369,21 +414,23 @@ def main() -> int:
     random.Random(f"{SEED}:order").shuffle(rows)
 
     # ---- verification -------------------------------------------------
-    assert len(rows) == ROWS_PER_PERSONA * len(PERSONAS), len(rows)
+    assert len(rows) == per_cell * len(cells), len(rows)
+    labels = [c[0] for c in cells]
     texts = [r["text"] for r in rows]
-    assert len(set(texts)) == len(texts), "duplicate text across the set"
+    if not a.ablation:
+        assert len(set(texts)) == len(texts), "duplicate text across the set"
     assert len({r["id"] for r in rows}) == len(rows), "duplicate id"
     assert all(r["split"] == "test" for r in rows), "a persona row is not test-only"
     by_persona = Counter(r["persona"] for r in rows)
-    assert set(by_persona) == set(PERSONAS) and set(by_persona.values()) == {ROWS_PER_PERSONA}
-    # the structure-matched invariant: every persona covers every structure
+    assert set(by_persona) == set(labels) and set(by_persona.values()) == {per_cell}
+    # the structure-matched invariant: every cell covers every structure
     cover = defaultdict(set)
     for r in rows:
         cover[r["persona"]].add(r["structure"])
     ids = {s["id"] for s in catalog}
-    for pid in PERSONAS:
-        if cover[pid] != ids:
-            raise ValueError(f"{pid} is missing structure(s) {sorted(ids - cover[pid])}")
+    for label in labels:
+        if cover[label] != ids:
+            raise ValueError(f"{label} is missing structure(s) {sorted(ids - cover[label])}")
 
     leaks = {} if a.no_leak_check else leak_check(rows)
     if leaks:
@@ -396,9 +443,13 @@ def main() -> int:
             "with a reason.")
 
     # ---- composition table --------------------------------------------
-    print(f"PERSONA TEST SETS — {len(rows)} rows, "
-          f"{len(PERSONAS)} personas x {ROWS_PER_PERSONA}, "
+    kind = "ABLATION CELLS" if a.ablation else "PERSONA TEST SETS"
+    print(f"{kind} — {len(rows)} rows, {len(cells)} cells x {per_cell}, "
           f"{len(catalog)} shared structures, {len(fams)} families")
+    if a.ablation:
+        print(f"  vocab:<p>  = {ABLATION_CONTROL}'s phrasing + <p>'s content banks "
+              f"({', '.join(CONTENT_BANKS)})")
+        print(f"  phrase:<p> = <p>'s phrasing + {ABLATION_CONTROL}'s content banks")
     print(f"Split: test={sum(1 for r in rows if r['split']=='test')} "
           f"(TEST-ONLY by construction — never fitted on)")
     print(f"Unique texts: {len(set(texts))}/{len(rows)}")
@@ -407,19 +458,19 @@ def main() -> int:
           f"({vocab_n} author words checked, "
           f"{len(allowed_words())} declared general)")
     print()
-    hdr = f"{'':22s}" + "".join(f"{p[:13]:>15s}" for p in PERSONAS)
+    hdr = f"{'':22s}" + "".join(f"{p[-13:]:>15s}" for p in labels)
     print("Rows by action:")
     print(hdr)
     acts = sorted({r["expect"]["action"] for r in rows})
     grid = Counter((r["persona"], r["expect"]["action"]) for r in rows)
     for act in acts:
-        print(f"  {act:20s}" + "".join(f"{grid[(p, act)]:>15d}" for p in PERSONAS))
+        print(f"  {act:20s}" + "".join(f"{grid[(p, act)]:>15d}" for p in labels))
     print()
     print("Rows by atomicity (ground truth):")
     print(hdr)
     ag = Counter((r["persona"], r["expect"]["atomic"]) for r in rows)
-    for flag, label in ((True, "atomic"), (False, "compound")):
-        print(f"  {label:20s}" + "".join(f"{ag[(p, flag)]:>15d}" for p in PERSONAS))
+    for flag, lab in ((True, "atomic"), (False, "compound")):
+        print(f"  {lab:20s}" + "".join(f"{ag[(p, flag)]:>15d}" for p in labels))
     print()
     print("Mean words per utterance (the phrasing-style fingerprint):")
     print(hdr)
@@ -427,23 +478,23 @@ def main() -> int:
     for r in rows:
         wl[r["persona"]].append(len(r["text"].split()))
     print(f"  {'words':20s}" + "".join(
-        f"{sum(wl[p])/len(wl[p]):>15.1f}" for p in PERSONAS))
-    print(f"  {'shortest':20s}" + "".join(f"{min(wl[p]):>15d}" for p in PERSONAS))
-    print(f"  {'longest':20s}" + "".join(f"{max(wl[p]):>15d}" for p in PERSONAS))
+        f"{sum(wl[p])/len(wl[p]):>15.1f}" for p in labels))
+    print(f"  {'shortest':20s}" + "".join(f"{min(wl[p]):>15d}" for p in labels))
+    print(f"  {'longest':20s}" + "".join(f"{max(wl[p]):>15d}" for p in labels))
     print()
-    print("Sample row per persona:")
-    for pid in PERSONAS:
-        ex = next(r for r in rows if r["persona"] == pid and r["structure"] == "and_et")
-        print(f"  {pid:22s} {ex['text']}")
+    print("Sample row per cell (structure `and_et`, the same ask in every voice):")
+    for lab in labels:
+        ex = next(r for r in rows if r["persona"] == lab and r["structure"] == "and_et")
+        print(f"  {lab:22s} {ex['text']}")
 
     if a.no_write:
         print("\n--no-write: nothing written")
         return 0
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    with open(OUT, "w", encoding="utf-8") as f:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False, sort_keys=True) + "\n")
-    print(f"\nWrote {len(rows)} rows to {OUT}")
+    print(f"\nWrote {len(rows)} rows to {out_path}")
     return 0
 
 

@@ -90,6 +90,16 @@ def run(state: EngineState, cfg) -> EngineState:
     from assistant.trace import VOCAB, DONE
 
     text = strip_stop_keyword(state.raw_text, cfg.audio.stop_phrases)
+    # Spoken noise comes off HERE, once, so everything downstream is generic
+    # (Gil's architecture call): the "mhmm"/"umm" openers, the courtesy
+    # wrapper, a trailing "or something", a mid-sentence self-correction.
+    # This used to live inside FastRule's own normalisation, so the DEEP
+    # track never got it — and real-usage review showed the LLM path failing
+    # 5 of 5 on rambling dictation that opened with exactly these words.
+    # Courtesy is left ON here: FastRule's interrogative gate reads the raw
+    # words to tell a question from a polite imperative.
+    from assistant.intent.cleanup import strip_spoken_noise
+    text = strip_spoken_noise(text, drop_courtesy=False)
 
     if is_trivial_transcript(text):
         state.ignored = True

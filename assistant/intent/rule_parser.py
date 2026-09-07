@@ -157,7 +157,7 @@ _STT_EXPANSIONS: list[tuple[str, str]] = [
     # --- F9 (simple-first abstain mining): 209 of 540 simple abstains were
     # outright skips caused by leading filler/courtesy hiding the command
     # from ^-anchored routing. Strip them FIRST (list order applies).
-    (r"^(?:um+|uh+|so|well|ok(?:ay)?|alright|hey|yeah)[,\s]+", ""),
+
     (r"^(?:could|can)\s+you\s+tell\s+me\s+", ""),
     # F18a: the general form — "can you remove X" was extracting the TARGET
     # as "you" (then correctly vetoed as generic). The interrogative gate
@@ -471,6 +471,12 @@ def _preprocess(transcript: str) -> tuple[str, bool]:
     # existed in the deep track's decompose stage.
     from assistant.intent import lead_time as _lead_time
     text, _minutes = _lead_time.split(text, restore_verb=True)
+    # The same spoken-noise reader the transcript stage uses (one copy, two
+    # callers): FastRule is also handed RAW text directly by the sandbox and
+    # by any caller that skips the pipeline, and these patterns are
+    # idempotent, so cleaning twice costs nothing.
+    from assistant.intent.cleanup import strip_spoken_noise
+    text = strip_spoken_noise(text, drop_courtesy=False)
 
     # Complexity gate: content-word count (stop/filler words don't add complexity)
     _FILLER = frozenset({
