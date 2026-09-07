@@ -80,8 +80,11 @@
   .pbar button:hover{border-color:var(--amber); color:var(--amber);}
   #pbody{overflow-y:auto; padding:14px 18px 6px; font-size:14.5px;}
   #pbody p{margin:0 0 12px; max-width:62ch;}
-  #pbody ul{margin:0 0 12px; padding-left:20px;}
+  #pbody ul, #pbody ol{margin:0 0 12px; padding-left:20px;}
   #pbody li{margin:0 0 8px;}
+  #pbody h3{font:600 13.5px/1.3 'IBM Plex Mono',monospace; letter-spacing:.02em;
+            margin:18px 0 8px; color:var(--ink);}
+  #pbody h3:first-child{margin-top:0;}
   #pbody code{font:500 12.5px 'IBM Plex Mono',monospace; background:var(--codebg);
               padding:1px 5px; border-radius:4px;}
   #pbody .figs{font:500 13px/1.7 'IBM Plex Mono',monospace; color:var(--amber);}
@@ -474,6 +477,7 @@
 
 <nav id="rail" aria-label="Jump to any step">
   <button data-go="home" id="bhome">⌂ system</button>
+  <button data-go="brain">◆ walkthrough</button>
   <button data-go="hear"><b>1</b>hear</button>
   <button data-go="correct"><b>2</b>correct</button>
   <button data-go="parse"><b>3</b>rules</button>
@@ -494,7 +498,95 @@ const P = {
     z:[352,256,1.9],
     sum:`<p>One process understands and executes everything. The host's own window and every attached surface are thin clients — <strong>none of them contains a parser</strong>.</p>
     <p class="figs">15 actions · 109 endpoints · ~35,491 lines · a test suite</p>`,
-    more:`<p>One process holds the pipeline and two of the three models: the speech model and the grammar
+    more:`<h3>How one command becomes an answer</h3>
+    <p>The whole path, start to finish. Two pieces do double duty &mdash; the rule parser and the
+    judge each show up twice in the story below &mdash; so they're defined once, under "the pieces
+    it reuses," rather than re-explained at both places they run. Read the numbered list straight
+    through for the story; the rail below (or &larr;/&rarr;) still opens any one step for its full
+    mechanics.</p>
+    <ol>
+      <li><strong>Arrival.</strong> A command comes in &mdash; typed, or already turned to text by
+      Whisper &mdash; from the Mac or the phone.</li>
+      <li><strong>Intake.</strong> Anything already queued is merged into this one; filler and
+      false starts are dropped right here and never remembered, so a run of throat-clearing never
+      teaches the model that throat-clearing is normal speech.</li>
+      <li><strong>Repair.</strong> The words are checked against the personal vocabulary: a known
+      mishearing is fixed and remembered for next time; a word the vocabulary only doubts stops
+      everything here and asks you to check it before anything runs.</li>
+      <li><strong>Ask the rule parser</strong> &mdash; the deterministic front door, and the same
+      engine asked again later, per fragment, once the deep track is running.</li>
+      <li><strong>If it commits</strong> &mdash; the score clears 0.85, nothing required is
+      missing, and none of a few narrow refusals fire (a compound cue the score missed, a mutation
+      aimed at a bare noun, a confident read that mixes a create with an edit) &mdash; the action
+      executes and the reply goes back immediately, well under a second, no model touched. Then,
+      quietly behind that reply, the judge (below) reviews what was just written and either renames
+      a placeholder title outright or flags a bigger disagreement for a one-tap look. Done.</li>
+      <li><strong>If it defers</strong>, the command enters the deep track instead &mdash; the same
+      pipeline, now run in front of the person rather than behind the answer.</li>
+      <li><strong>Segment</strong> splits the transcript into its separate asks &mdash; an event, a
+      task, a schedule question &mdash; on free delimiters first, the model only when none of those
+      find a seam; unsure, it under-splits, because a wrong merge gets two more chances downstream
+      and a wrong split does not.</li>
+      <li><strong>Decompose</strong> breaks each of those into one bounded pass of atomic pieces:
+      two spoken times joined by "and" becomes two events, an enumerated list becomes one task per
+      item, "buy 5 apples" becomes one task carrying a count of five rather than five identical
+      rows.</li>
+      <li><strong>Validate, generate, validate again.</strong> The same fifteen deterministic rules
+      run twice around this step &mdash; once on the plain text, once more on the finished objects
+      &mdash; catching things like a spoken recurrence rounded to one the system can keep (said back
+      to you in the reply), or an end filed before its start; only when observance is turned on in
+      settings, that second pass also holds anything the pipeline is about to create out of Shabbat
+      and yom tov unless it's a meal, davening or leyning. In between the two passes, each piece
+      becomes a concrete event or task: the rule parser reads it first, for free; the model is asked
+      only about what the rules can't, grounded on that one piece's own words and never a
+      neighbour's. When a piece still can't be read cleanly, the system does not invent one &mdash;
+      the honest fallbacks, below, take over instead.</li>
+      <li><strong>The judge</strong> reads the original words, lists what was asked, and code
+      compares that list against what generate produced &mdash; blaming whichever stage lost or
+      mangled something. A miss re-runs the blamed stage with the mistake quoted into its retry, at
+      most three times in total; a still-missing ask past that budget is admitted in the reply
+      rather than dropped quietly.</li>
+      <li><strong>Commit &amp; label.</strong> Once the judge has nothing left to blame, colour and
+      category are decided, tasks are tagged, everything is written to the one local database, and
+      the reply goes back.</li>
+    </ol>
+
+    <h3>The pieces it reuses</h3>
+    <p><strong>The rule parser</strong> &mdash; asked whole-command as the front door (list item 4
+    above), and again per fragment inside generate (item 9). The same deterministic machinery both
+    times, checked against the same
+    0.85 threshold either way in this build: normalize shorthand, route the verb, fill in dates and
+    times, score its own doubts. Full mechanics under <em>3&nbsp;&middot;&nbsp;rules first</em> and
+    <em>4&nbsp;&middot;&nbsp;fast?</em> below.</p>
+    <p><strong>The judge</strong> &mdash; the model extracting what was asked, never grading itself;
+    code does the comparing. Used inline as its own list item (10) above, and again behind every
+    fast commit (item 5, "if it commits") &mdash; the same code both times, so a fix to how it reads
+    the words helps both paths at once. Full mechanics under <em>8&nbsp;&middot;&nbsp;compare</em>
+    below.</p>
+    <p><strong>Segment &amp; decompose</strong> &mdash; two separate, deterministic-first stages,
+    each running once per command, never looping back into each other. If a piece the rules can't
+    finish reading still looks like more than one thing, it is handed to the model as-is rather
+    than sent back for a second split &mdash; a bounded re-split loop there is a proposed
+    refinement, not something this build does. Full mechanics under
+    <em>5&nbsp;&middot;&nbsp;split&nbsp;&middot;&nbsp;split again</em> below.</p>
+    <p><strong>The honest fallbacks</strong> (inside generate) &mdash; when a piece can't be parsed
+    cleanly, the system is built to never invent one: a task-shaped piece becomes a task of its own
+    words (<code>task_fallback</code>); an event-shaped piece that literally asks to set an event,
+    reminder or appointment, with a real time-word grounding it, becomes a plainly-titled event,
+    tried only after one retry that restates the piece explicitly as an event
+    (<code>event_kind_retry</code>, then <code>event_fallback</code>); and a collective title
+    standing in for several items is avoided structurally on the rule path, by instruction on the
+    model's.</p>
+    <p><strong>The background verifier</strong> &mdash; the judge again, running behind a fast
+    commit rather than in front of one. Its patches are tiered: renaming a placeholder title is
+    applied outright; anything you can see added or removed is only ever proposed, a one-tap
+    suggestion published through the same token the client already polls, not an automatic rewrite
+    &mdash; an earlier always-on version that applied its own fixes was measured and found to do
+    more harm than good. Letting it auto-apply again is a future change, gated on first proving its
+    correction precision is high enough to trust.</p>
+
+    <h3>The fifteen actions</h3>
+    <p>One process holds the pipeline and two of the three models: the speech model and the grammar
     tagger both load inside it. The language model runs beside it and answers when asked.</p>
 
     <p>An action is one verb the assistant knows, and the list is closed &mdash; fifteen of them.
