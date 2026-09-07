@@ -21,7 +21,29 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
-## F6 (FastRule-6000 lane) — REGISTERED PREDICTION 2026-09-07, before implementation
+## F6 — ACTUAL (2026-09-07, fastlane 6c2bca1): three families fixed, prediction narrowly under
+
+**Train (4,800):** correct-on-committed **74.7 → 81.1%** (predicted 82–86 —
+just short: the encounter family lands as correct-ABSTAINS rather than
+commits, which raises precision but not the committed-correct numerator);
+commit 42.0 → 40.7% (predicted 40–43 ✓); atomicity flat (predicted ✓);
+title 82.8 → 83.0. **Test aggregate: 77.5 → 82.9% correct-on-committed** —
+the fixes generalize to unseen wording families (+5.4pp, aggregates only,
+never mined). **Dual-gate ✓:** old-pool dev-full byte-flat (92.4 raw /
+94.7 adj). 59 unit tests green.
+
+Fix layers, for the record: encounters = route override ABOVE the
+need-to→todo row; date-marking = broadened F4b rewrite; completion speak =
+rewrite-funnel into "mark X as done" + phrase-route + phrase-captured
+match_title (noun-chunking fails on verb-led titles). FS1 (fastrule6k.py)
+shipped alongside: all six metrics, per-family floors, test = aggregates
+only by construction. Known residue for F7, from train mining: rename/
+update targeting, "set X as high priority", interrogative-create policy
+(dataset labels them creates; the F3 gate abstains them — a convention
+tension for Gil), atomicity recall 45% (gates miss half the true compounds
+— the R1 segment-side pre-split is the planned lever).
+
+### The registered prediction (kept for the record)
 
 **FS2 baseline (the new set is deliberately harder):** train 42.0% commit ·
 74.7% correct-on-committed · atomicity gates P 87.2 / R 45.1 · title 82.8 ·
