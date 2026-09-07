@@ -21,6 +21,18 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## Era-2 cycle 1 — REGISTERED PREDICTION 2026-09-06, run launched
+
+**Change under test:** Q1 convention (Gil's DEVQA ruling, committed 3235f48):
+a dated "I need to <meet/talk/have a conversation>" is an event —
+`_NEED_ENCOUNTER_RE` in segment's pinned kinds. **Predict (dev-fast 250 vs
+run-16 baseline):** the encounter-family rows flip to the event side —
+event+task +0–1 rows, everything else flat within the 1.5-pt noise floor
+(adjusted 80.0 ± noise, fast share unchanged — the rule fires in segment,
+deep track only). F4 is NOT aboard (sandbox-only, integrates on the 2–3
+cycle cadence). Next deep hypothesis (dentist query-mutation) diagnosed
+while this measures.
+
 ## F4 (sandbox, era 2) — REGISTERED PREDICTION 2026-09-06, before implementation
 
 Two fixes, diagnosed from the run-16-era sandbox misses (dev-only mined):
