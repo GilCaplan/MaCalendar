@@ -21,6 +21,17 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## F9 (simple-first batch 3) — REGISTERED PREDICTION 2026-09-07
+
+**From the abstain-reason mining (simple train: 209 skip / 92 missing-date /
+22 missing-titles):** three normalization families: (a) leading filler+
+courtesy strip ("um/uh/so/well/ok," and "could you (tell me)?" before any
+command) — anchored patterns (^route-overrides) never see past them;
+(b) "let's do/have/get X" → "book X" (create-speak the verb map can't key);
+(c) STT misspellings the expansion table lacks: tommorow, apointment,
+remindar. **Predict (train simple):** commit 65.7 → 70–74% at ≥90%
+correct-on-committed; dual-gate flat; complex board flat.
+
 ## F8 — ACTUAL (2026-09-07): NEGATIVE, and decisive
 
 Sweep 0.85→0.55: simple commit moves only 62.4→66.0%, correctness flat.
