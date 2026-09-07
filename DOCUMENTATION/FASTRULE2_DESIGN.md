@@ -96,6 +96,22 @@ FastRule had to be. The specific rot:
    (folder + tag, never deleted).
 4. The engine never notices: same FastRuleResult, same call sites.
 
+## Complex-but-doable — the split-and-recurse affordance (designed in, built later)
+
+Today a compound defers wholesale (complex commit ~28%, and commits are
+only 71% right). v2's per-fragment components enable the doable subset:
+when the coordination check fires WITH a confident boundary, split there
+and run EACH HALF through the same five components at the fragment
+instance (FastRule(0.60) — the lenient bar that exists for pre-atomized
+pieces); commit only if every half clears its bar and gates — one shaky
+half defers the whole command, so the failure mode stays "slower", never
+"half-executed". This is the cycle-10 rules-first-per-fragment idea living
+inside FastRule. Guards: recursion only on high-margin boundary detections
+(a wrong split makes two garbage halves — the known spaCy mis-parse shapes
+stay deferred); depth 1 (a half that still looks compound defers).
+Per the simple-first ruling this is an AFFORDANCE of the structure, not
+first-port scope — it becomes a lane batch when simple hits its target.
+
 ## Open questions for Gil
 
 1. **Scope of the first build:** straight port into the new structure
