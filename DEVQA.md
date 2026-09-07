@@ -53,6 +53,16 @@ digest banner?** Lifestyle call, not engineering.
 
 ## Answered log
 
+**Q10 (2026-09-07, Gil design ruling): Stage-2 routing becomes TWO tiered
+subsystems.** (1) KIND — event vs task; (2) OPERATION — new/edit/remove/
+complete/query. Each is rules-first (regex/tables/pinned conventions answer
+when confident — trivial cases stay trivial and Gil's rulings stay
+sovereign) with a small logistic-regression model as the fallthrough when
+rules aren't confident. Action = kind × operation, composed. K1 is the KIND
+subsystem's model (proven 99.0/98.5); K3 is the OPERATION subsystem's model
+(labels free in dataset B). A rules-vs-model disagreement is an abstain
+signal. Implemented in the lane (F-batches), integrated at F15.
+
 **Q9 (2026-09-07): interrogative creates → CONFIRM PROMPT.** "should i add
 yoga…?" neither auto-creates nor gets silently dropped: the client pops a
 box with the parsed proposal — yes creates it, no discards it. Same

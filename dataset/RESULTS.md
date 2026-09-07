@@ -21,6 +21,21 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## K3 (operation scorer, Q10 subsystem) — REGISTERED PREDICTION 2026-09-07
+
+**Experiment (offline, K1's script pattern):** multiclass logistic
+(one-vs-rest, pure python) over hand features (operation-verb inventory
+hits, phrase shapes: from-my-X / as-done / to-‹when› / question openers /
+list-words…) for OPERATION ∈ {new, edit, remove, complete, query}, trained
+on B-train's atomic single-action rows (labels by construction; mixed/
+propose excluded), judged against the CURRENT router's operation accuracy
+on the same rows (its routed action mapped to an operation; an abstain
+counts as a miss for coverage honesty). **Predict:** the current router
+lands 80–88% (it's been patched hard by F6–F10); the model lands 92–96%;
+the model's biggest wins are on edit/complete phrasings without inventory
+verbs. Held-out = B-test aggregate only. Ships nothing — a win graduates it
+into the Q10 two-subsystem router build.
+
 ## F9+F10 — ACTUAL (2026-09-07, fastlane 364b714 + f10)
 
 **F9 (filler/courtesy strip, let's-do, measured misspellings):** simple
