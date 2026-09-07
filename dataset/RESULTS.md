@@ -46,6 +46,20 @@ eval):** kind macro-F1 82.6 → 86+; operation macro-F1 73.4 → 78+ (query P
 57 → 70+, remove F1 62 → 70+); downstream test simple commit 72.0 → 73–75%
 at ≥92% correct; A-pool dual-gate within ±0.5 of 94.3.
 
+## F13 — ACTUAL (2026-09-07): NEGATIVE on both fronts, banked
+
+(a) Kind on segment's "proven" regexes REGRESSED on test (82.6 → 80.5;
+union of both sets 81.4 — still worse): K1's features earned their 99% on
+a different label task, and here they couple to wording families that
+mislead on unseen ones. Reverted to the F12 set (82.6 restored).
+(b) The operation precision-interaction features flipped ZERO test
+predictions (too narrow) — removed as dead weight. **Lesson: the models'
+test gap is not a feature-tinkering problem — it's a training-VARIETY
+problem.** Next lever (F14): grow training data — the A-pool's 2,699
+conventioned rows as additional kind/operation training text (train-side
+only), attacking family-overfit with real-usage wording. Feature work
+paused until the data lever is measured.
+
 ## TEST-EVAL SNAPSHOT (2026-09-07) — the reporting baseline going forward (Gil)
 
 Reported numbers are B-TEST (full 1,200) from here on; train = tuning only.
