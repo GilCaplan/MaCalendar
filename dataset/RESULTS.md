@@ -21,6 +21,21 @@ hard rows fast used to get wrong (deep n 152→163). p50 8636 / p95 55073.
 
 **Verdict: CONFIRMED — merged to main.**
 
+## K1 (Q8 experiment) — REGISTERED PREDICTION 2026-09-07, before implementation
+
+**Change under test (offline first, no engine change):** a logistic
+regression over ~15 hand features (segment's own regexes as features:
+clockish, dated, remindish, remind-to-verb, occasion, encounter-verb,
+task-verbs, list-words, calendar-words…) for the event-vs-task kind
+decision, fit on dev labels (rank ≤600; calendar/set=event,
+lists/createoradd=task, e+e=event, t+t=task), evaluated against the CURRENT
+deterministic labeler (`_kind_of` + `_enforce_pinned_kinds`) on the same
+rows. **Predict:** classifier beats the regex family's dev kind-accuracy by
++2–5pp (the regexes are precision-tuned patches, so their recall on unusual
+phrasings should lag a weighted combination); held-out AGGREGATE confirms
+the direction. If it loses, the negative result is banked and the regexes
+stay. Only a dev win graduates it to a wired-in engine cycle (K2).
+
 ## Era-2 cycle 3 — ACTUAL (run 19, 2026-09-07): CONFIRMED, first real era-2 gain
 
 **All four predicted directions correct, and the sizes beat the prediction:**
