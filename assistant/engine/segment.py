@@ -318,9 +318,24 @@ def _llm_segments(state: EngineState, cfg) -> "list[Item] | None":
     from assistant.engine import llm as _llm
 
     text = state.text
-    if len(text.split()) < 6 or not _COMPOUND_HINT.search(text):
+    # FastRule already read this command and may have concluded it is more
+    # than one item (Gil: pass its work to the next stage). A STRUCTURE
+    # verdict is stronger evidence than the cue-word regex below — the
+    # atomicity model reaches ~88% compound recall on the FastRule test half,
+    # where the regex only knows announced joiners ("and then", "; also").
+    verdict = state.fastrule_verdict or {}
+    fastrule_says_compound = verdict.get("reason_class") == "structure"
+    if len(text.split()) < 6:
+        return None
+    if not fastrule_says_compound and not _COMPOUND_HINT.search(text):
         return None
     system = _SEGMENT_SYSTEM
+    if fastrule_says_compound:
+        # ground the call in WHY the deterministic reader declined, rather
+        # than asking the model to rediscover it from the raw words
+        system += ("\n\nA deterministic parser read this command and concluded "
+                   f"it is more than one request ({verdict.get('reason')}). "
+                   "Trust that it contains at least two, and find the split.")
     if state.mistakes:
         # A loop-back from step 6 carries what went wrong last time — the
         # retried attempt must not repeat it.

@@ -126,6 +126,14 @@ class EngineState:
     findings: list = field(default_factory=list)      # list[CheckFinding]
     retries: dict = field(default_factory=dict)       # stage name → re-entries
     mistakes: list = field(default_factory=list)      # carried into retried
+    #: what FastRule concluded about the WHOLE command at the front door,
+    #: even when it declined to commit (Gil, 2026-09-07: "run FastRule but
+    #: don't commit, keep it running through the system to the next stage").
+    #: Its work used to be discarded here and the deep track started cold;
+    #: the stages below are LLM calls, and this is the context that makes
+    #: them better-informed. Shape: {"reason", "reason_class", "confidence",
+    #: "actions"} — never the intent objects, which the deep track rebuilds.
+    fastrule_verdict: "dict | None" = None
     #: texts FastRule has already judged this command (Q12): it is
     #: deterministic, so re-asking the same words wastes a retry that
     #: cannot change its mind.

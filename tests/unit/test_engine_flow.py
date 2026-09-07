@@ -387,3 +387,36 @@ def test_a_two_intent_parse_keeps_fast_despite_a_joiner(monkeypatch, cfg):
                                      ("create_todo", SimpleNamespace())]))
     st = EngineState(raw_text="", text="book gym at 7. Also, add milk to my list")
     assert generate.fast_propose(st, cfg) is True
+
+
+def test_fastrule_work_travels_forward_when_it_declines(registry_with_real_actions):
+    """Gil's ruling: on a non-atomic command FastRule still does the work —
+    it just doesn't commit, and what it concluded goes to the next stage as
+    context for the LLM stages. It used to be discarded on defer, so the
+    deep track started cold on a command that had already been read once."""
+    from assistant.engine import generate, load_config
+    from assistant.engine.state import EngineState
+
+    st = EngineState(raw_text="book the gym at 6 and remind me to buy milk",
+                     text="book the gym at 6 and remind me to buy milk",
+                     source="test")
+    assert generate.fast_propose(st, load_config()) is False   # a compound
+    v = st.fastrule_verdict
+    assert v and v["reason"], "the verdict must survive the deferral"
+    assert v["reason_class"] == "structure"      # "this is more than one item"
+    assert 0.0 <= v["confidence"] <= 1.0
+
+
+def test_background_verify_is_silent_in_measurement_runs(monkeypatch):
+    """MACALENDAR_NO_WARMUP is the project's no-daemon-threads flag; this
+    spawn site ignored it and fired an LLM call per fast-committed row,
+    which the sealed-test eval saw as p95 136s (engine audit P8)."""
+    import assistant.engine as engine
+    from assistant.engine.state import EngineState
+    spawned = []
+    monkeypatch.setattr(engine.threading, "Thread",
+                        lambda *a, **k: spawned.append(k) or type(
+                            "T", (), {"start": lambda self: None})())
+    st = EngineState(raw_text="buy milk", text="buy milk", source="test")
+    engine._start_background_verify(st, engine.load_config())
+    assert spawned == []

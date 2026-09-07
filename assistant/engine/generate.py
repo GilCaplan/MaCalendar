@@ -114,6 +114,15 @@ def fast_propose(state: EngineState, cfg) -> bool:
                              actions=[n for n, _ in res.intents])
         return True
 
+    # Declined — but the work is not wasted: what FastRule concluded travels
+    # forward as context for the deep track's LLM stages (Gil's ruling).
+    from assistant.engine.fastrule import reason_class
+    state.fastrule_verdict = {
+        "reason": res.reason,
+        "reason_class": reason_class(res.reason),
+        "confidence": res.confidence,
+        "actions": [n for n, _ in res.intents],
+    }
     if state.trace:
         state.trace.step(RULE, "Rule parser",
                          f"({res.confidence:.2f}) {res.reason} — deep track",
