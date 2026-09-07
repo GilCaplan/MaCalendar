@@ -1386,7 +1386,11 @@ def _fill_slots(span, action_name: str, temporal: dict, current_view: str) -> di
                         if c.root.head == tok and not any(_in_temporal(t, temporal_spans) for t in c)
                     ]
                     if pobj_chunks:
-                        slots["new_title"] = _clean_title(pobj_chunks[0].text)
+                        cand = _clean_title(pobj_chunks[0].text)
+                        # F7b: "set X as HIGH PRIORITY" — the priority phrase
+                        # is a level, never the task's new name
+                        if not re.match(r"^(?:high|medium|low)\s+priority$", cand, re.I):
+                            slots["new_title"] = cand
                         break
             # "set priority to high/medium/low" or "make it high priority"
             # Only match explicit priority-level words to avoid false hits like "grocery priority"
