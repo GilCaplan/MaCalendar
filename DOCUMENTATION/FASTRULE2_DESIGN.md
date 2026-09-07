@@ -46,12 +46,44 @@ FastRule had to be. The specific rot:
   supervision, measured precision/recall. v2 keeps their shape and gives
   the rest of the system the same discipline.
 
-## The v2 shape: five components, one contract each
+## The organizing idea: ONE decision pattern, applied everywhere (Gil, 2026-09-07)
+
+Every judgment in v2 has the same tiered shape:
+
+    rules answer when confident  →  a tiny model answers when they can't
+    →  DEFER when neither is sure
+
+Three decisions get it: **Is this atomic?** (the new first layer), **which
+operation?**, **which kind?**. That uniformity — not component count — is
+what un-convolutes the system: one pattern to understand, test, and
+supervise, three times.
+
+**The division of labor it implies (Gil's framing):** an "atomic item" =
+one event or task. FastRule is the ATOMIC-ITEM EXECUTOR — it only ever
+handles one item; the DEEP SYSTEM is the ATOMIZER — its whole point is
+breaking a command into atomic items, then calling FastRule per item (the
+0.60 fragment instance) to create each one. The front door (0.80) is just
+the special case where the user's whole command is already one atom.
+
+## The v2 shape: a first layer + five components
 
     FastRule(threshold)                    # unchanged public face:
       .run(text) -> FastRuleResult         # committed | reason, intents,
                                            # confidence, missing_slots
 
+    0. Atomicity    — THE FIRST LAYER (Gil): is this ONE atomic item?
+                      Rules tier = the existing compound gates
+                      (strong-compound cue words, clause-coordination,
+                      mixed-mode) — precision-strong (87–91%) and kept
+                      as-is. Model tier = a third tiny logistic, trained on
+                      dataset B's atomic flag (labels by construction,
+                      train half only) — aimed squarely at the measured
+                      recall hole (gates catch only ~45–50% of true
+                      compounds). Verdict: atomic → proceed; compound or
+                      unsure → DEFER (and later: hand the boundary to
+                      split-and-recurse). The fragment instance (0.60)
+                      skips this layer's defer — deep already atomized —
+                      but keeps it as the "needs further breakdown" alarm.
     1. Normalizer   — LEXICAL ONLY: expansions, misspellings, filler/
                       courtesy strip. Semantic rewrites are RETIRED; their
                       jobs move to where the meaning lives (Router routes
@@ -77,10 +109,13 @@ FastRule had to be. The specific rot:
                       two-times, …), so R2's calibration finally has one
                       place to refit, and the bimodality F8 found is
                       inspectable per signal.
-    5. Gatekeeper   — the gates as they are (compound/coordination,
-                      interrogative→propose, generic-target, misroute),
-                      one module, each gate a named object with its own
-                      test and its own supervision metric.
+    5. Gatekeeper   — intent-level vetoes ONLY (interrogative→propose,
+                      generic-target, misroute) — the compound gates moved
+                      up into layer 0 where they belong; each gate stays a
+                      named object with its own test and supervision
+                      metric. Downstream of layer 0, everything may assume
+                      ONE atomic item — the assumption that simplifies
+                      every component below it.
 
 ## Kept exactly (the things that worked)
 
@@ -89,7 +124,8 @@ FastRule had to be. The specific rot:
 - The **two ML models at the F12 state** (weights, floors 2.5/1.5, balanced
   fit, train-only fitting, test-eval reporting) — now the Router's model
   tier rather than a None-return patch.
-- The **gates** — semantics, names, supervision metrics.
+- The **gates** — semantics, names, supervision metrics (compound gates
+  relocated to layer 0, not changed).
 - The **verb table and phrase overrides** — as the Router's rules tier,
   with tier order made explicit and documented.
 - The **measurement discipline** — registered predictions, B-test reported,
@@ -140,3 +176,8 @@ first-port scope — it becomes a lane batch when simple hits its target.
 3. **Slot specs as data** opens the door to per-family extractor tests and
    the R8 title work — in scope for v2, or a follow-up lane batch?
    (Recommend: follow-up.)
+4. **The atomicity model** (layer 0's model tier): train and wire it as
+   part of the v2 build, or port the current gates first and add the model
+   as the first post-switch batch? (Recommend: port gates first — the
+   model is additive and its labels/eval already exist, so it slots in
+   cleanly as a measured batch.)
