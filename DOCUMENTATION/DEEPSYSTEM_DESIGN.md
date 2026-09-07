@@ -210,7 +210,7 @@ Verifier.review(state):                # same Crosscheck object as the deep trac
 
 ## 4 · The object model
 
-### 3.1 Component — the shared interface
+### 4.1 Component — the shared interface
 
 ```
 class Component(Protocol):
@@ -221,7 +221,7 @@ class Component(Protocol):
 FastRule is already a Component; stages become Components. The system is
 uniformly composable.
 
-### 3.2 Engine — the brain's entry (replaces `run_transcript`)
+### 4.2 Engine — the brain's entry (replaces `run_transcript`)
 
 ```
 class Engine:
@@ -232,7 +232,7 @@ class Engine:
     def run(self, prompt, source, trace, view) -> Response   # §2.1
 ```
 
-### 3.3 DeepSystem — the deep track as an object
+### 4.3 DeepSystem — the deep track as an object
 
 ```
 class DeepSystem:
@@ -243,7 +243,7 @@ class DeepSystem:
     def run(self, state) -> state                   # §2.2
 ```
 
-### 3.4 Stage — one step, frozen contract in a class
+### 4.4 Stage — one step, frozen contract in a class
 
 ```
 class Stage:
