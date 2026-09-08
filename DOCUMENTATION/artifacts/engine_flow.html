@@ -1,0 +1,344 @@
+<title>Engine Flow</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+  :root{
+    --bg:#e8ebee; --panel:#f6f7f8; --screen:#eef1f3; --ink:#1b222b; --muted:#5b6673;
+    --line:#b9c2cc; --faint:#d6dce2; --amber:#8f6407; --amber-soft:rgba(158,113,10,.10);
+    --model:#116e83; --good:#20714a; --shadow:rgba(20,28,38,.16);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0b0f14; --panel:#141a22; --screen:#0f141b; --ink:#dde4eb; --muted:#8a96a3;
+      --line:#33404f; --faint:#1c2530; --amber:#e3aa3d; --amber-soft:rgba(227,170,61,.09);
+      --model:#5cc3d6; --good:#54b183; --shadow:rgba(0,0,0,.55);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0b0f14; --panel:#141a22; --screen:#0f141b; --ink:#dde4eb; --muted:#8a96a3;
+    --line:#33404f; --faint:#1c2530; --amber:#e3aa3d; --amber-soft:rgba(227,170,61,.09);
+    --model:#5cc3d6; --good:#54b183; --shadow:rgba(0,0,0,.55);
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg); color:var(--ink); margin:0; padding:0 0 64px;
+       font:16px/1.62 'IBM Plex Serif',Georgia,serif;}
+  header{max-width:1080px; margin:0 auto; padding:38px 24px 8px;}
+  .eyebrow{font:11px/1 'IBM Plex Mono',ui-monospace,monospace; letter-spacing:2.2px;
+           color:var(--muted); text-transform:uppercase; margin:0 0 10px;}
+  h1{font:600 40px/1.05 'IBM Plex Mono',ui-monospace,monospace; letter-spacing:-1px;
+     margin:0 0 14px;}
+  .lede{max-width:62ch; margin:0 0 6px;}
+  .hint{font:13px/1.6 'IBM Plex Mono',ui-monospace,monospace; color:var(--muted); margin:.4rem 0 0;}
+  .hint b{color:var(--ink); font-weight:600;}
+  main{max-width:1080px; margin:0 auto; padding:6px 24px;}
+  svg.flow{width:100%; height:auto; display:block;}
+  .box{fill:var(--screen); stroke:var(--line); stroke-width:1.4;}
+  .box.accent{fill:var(--amber-soft); stroke:var(--amber); stroke-width:1.8;}
+  .box.model{stroke:var(--model);}
+  .name{font:600 13px 'IBM Plex Mono',ui-monospace,monospace; fill:var(--ink);
+        text-anchor:middle; pointer-events:none;}
+  .step{font:9px 'IBM Plex Mono',ui-monospace,monospace; fill:var(--muted);
+        text-anchor:middle; pointer-events:none;}
+  .edge{stroke:var(--line); stroke-width:1.5; fill:none;}
+  .edge.loop{stroke:var(--amber); stroke-dasharray:5 3;}
+  .edge.two-way{stroke:var(--model); stroke-width:1.8;}
+  .elabel{font:9px 'IBM Plex Mono',ui-monospace,monospace; fill:var(--muted);
+          text-anchor:middle; pointer-events:none;}
+  .hit{stroke:transparent; stroke-width:16; fill:none; cursor:help;}
+  g.wire:hover .edge{stroke:var(--amber); stroke-width:2.4;}
+  g.node:hover .box{stroke:var(--amber); stroke-width:2.4;}
+  .legend{max-width:1080px; margin:14px auto 0; padding:0 24px;
+          font:12px/1.9 'IBM Plex Mono',ui-monospace,monospace; color:var(--muted);}
+  .legend b{color:var(--ink);}
+  .legend svg{vertical-align:middle;}
+</style>
+
+<header>
+  <p class="eyebrow">MACalendar · assistant/engine</p>
+  <h1>ENGINE FLOW</h1>
+  <p class="lede">Every box is a black box: what it does inside is its own business.
+  What is pinned is the <strong>contract</strong> — what it is handed, and what it hands on.</p>
+  <p class="hint"><b>Hover a wire</b> for the formal input and output crossing it ·
+  <b>hover a box</b> for what it owns</p>
+</header>
+
+<main>
+<svg class="flow" viewBox="0 0 1000 880" role="img"
+     aria-label="Flow chart of the MACalendar engine: intake, transcript, segment, decompose, validate, generate with FastRule beside it, crosscheck, commit and label, with a loop-back arrow from crosscheck to segment.">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7"
+            orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--line)"/>
+    </marker>
+    <marker id="ara" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7"
+            orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--amber)"/>
+    </marker>
+  </defs>
+
+  <!-- ============================ NODES ============================ -->
+  <g class="node"><title>intake — step 0, in the orchestrator (assistant/engine/__init__.py).
+Owns the lock, so one command is parsed at a time. Commands arriving mid-run are queued and
+coalesced up to engine.coalesce_max_tokens; overflow runs sequentially.</title>
+    <rect class="box" x="380" y="34" width="240" height="46" rx="8"/>
+    <text class="name" x="500" y="55">intake</text>
+    <text class="step" x="500" y="69">step 0 · the queue and the lock</text>
+  </g>
+
+  <g class="node"><title>transcript — step 1 (transcript.py). The only person-specific stage:
+the personal vocabulary repairs what was misheard and spoken filler comes off, so every stage
+after it is generic.</title>
+    <rect class="box" x="380" y="120" width="240" height="46" rx="8"/>
+    <text class="name" x="500" y="141">transcript</text>
+    <text class="step" x="500" y="155">step 1 · repair the words</text>
+  </g>
+
+  <g class="node"><title>segment — step 2 (segment.py). Splits the command into independent
+items and gives each a kind. Three tiers: literal delimiters, the clause parse, then one gated
+LLM call. Biased to UNDER-split — a wrong merge has two more chances, a wrong split is garbage
+immediately.</title>
+    <rect class="box" x="380" y="206" width="240" height="46" rx="8"/>
+    <text class="name" x="500" y="227">segment</text>
+    <text class="step" x="500" y="241">step 2 · into independent asks</text>
+  </g>
+
+  <g class="node"><title>decompose — step 3 (decompose.py). Breaks one item into the several
+things it really is: two spoken times, a list of items, a count. Bounded to one pass, ids one
+level deep.</title>
+    <rect class="box" x="380" y="292" width="240" height="46" rx="8"/>
+    <text class="name" x="500" y="313">decompose</text>
+    <text class="step" x="500" y="327">step 3 · into atomic pieces</text>
+  </g>
+
+  <g class="node"><title>validate — step 4 (validate.py). Two passes: text repair before
+generation, then seventeen NAMED field rules in fixed order after it, plus the observance gate.
+Every rule that fires is recorded by name.</title>
+    <rect class="box" x="380" y="378" width="240" height="46" rx="8"/>
+    <text class="name" x="500" y="399">validate</text>
+    <text class="step" x="500" y="413">step 4 · the named rules</text>
+  </g>
+
+  <g class="node"><title>generate — step 5 (generate.py). Owns ALL text-to-intent conversion.
+Hands each item to FastRule first and asks the model only for what the rules could not read.</title>
+    <rect class="box accent" x="380" y="464" width="240" height="46" rx="8"/>
+    <text class="name" x="500" y="485">generate</text>
+    <text class="step" x="500" y="499">step 5 · items become intents</text>
+  </g>
+
+  <g class="node"><title>FastRule — engine/fastrule.py. The deterministic rule parser plus its
+abstention gates and a confidence threshold, as one selective classifier. ~50 ms, no model.
+Abstaining is a correct outcome, not a miss.</title>
+    <rect class="box model" x="742" y="464" width="200" height="46" rx="8"/>
+    <text class="name" x="842" y="485">FastRule</text>
+    <text class="step" x="842" y="499">no model · commit or defer</text>
+  </g>
+
+  <g class="node"><title>crosscheck — step 6 (crosscheck.py). The model EXTRACTS the asks the raw
+words contain; deterministic code diffs that list against what was produced and routes the blame.
+The model never picks the stage.</title>
+    <rect class="box" x="380" y="550" width="240" height="46" rx="8"/>
+    <text class="name" x="500" y="571">crosscheck</text>
+    <text class="step" x="500" y="585">step 6 · extract, then diff</text>
+  </g>
+
+  <g class="node"><title>commit — the only place the engine writes. Everything goes through the
+action classes and db.py; a blocked item is refused out loud, never dropped quietly.</title>
+    <rect class="box accent" x="380" y="636" width="240" height="46" rx="8"/>
+    <text class="name" x="500" y="657">commit</text>
+    <text class="step" x="500" y="671">the only write</text>
+  </g>
+
+  <g class="node"><title>label — step 7 (label.py). Event category and colour, task tags. The
+action classes already applied them; this stage reads the results back onto the items so the
+reply and the trace can report what was chosen.</title>
+    <rect class="box" x="380" y="722" width="240" height="46" rx="8"/>
+    <text class="name" x="500" y="743">label</text>
+    <text class="step" x="500" y="757">step 7 · read the labels back</text>
+  </g>
+
+  <g class="node"><title>the answer returned to whichever client asked — the Mac GUI or the
+phone. Same response shape for both; `source` only labels the trace.</title>
+    <rect class="box" x="380" y="808" width="240" height="46" rx="8" stroke-dasharray="4 3"/>
+    <text class="name" x="500" y="829">the answer</text>
+    <text class="step" x="500" y="843">message · actions · refresh</text>
+  </g>
+
+  <!-- ============================ WIRES ============================ -->
+  <g class="wire"><title>input:  raw_text — str. Exactly the words that arrived, unmodified.
+        Alongside it: source ∈ {"mac","ios","test"}, current_view — str,
+        supports_edit / supports_confirm — bool.
+
+output: EngineState — the one object every stage receives and mutates.
+        Nothing else passes between stages: no side channels, no imports
+        of another stage's internals.</title>
+    <line class="edge" x1="500" y1="80" x2="500" y2="114" marker-end="url(#ar)"/>
+    <line class="hit" x1="500" y1="80" x2="500" y2="114"/>
+  </g>
+
+  <g class="wire"><title>input:  raw_text — str, the unmodified transcript.
+
+output: text — str, the working transcript after repair. Every later stage
+        reads THIS, never raw_text (except crosscheck, which grounds on the
+        original on purpose).
+        corrections — list, vocabulary fixes in the client's shape.
+        needs_edit — list, words too doubtful to proceed on.
+        ignored — bool; a false start is not parsed and not remembered.</title>
+    <line class="edge" x1="500" y1="166" x2="500" y2="200" marker-end="url(#ar)"/>
+    <line class="hit" x1="500" y1="166" x2="500" y2="200"/>
+  </g>
+
+  <g class="wire"><title>input:  text — str, one whole command.
+
+output: items — list[Item], ordered, FRESH each time this stage runs.
+        Item at this point carries only:
+          id   — str, "item_1", "item_2", …
+          kind — str, one of "event" | "task" | "review" | "other"
+          text — str, the words belonging to this item
+        slots, action, intent and labels are still empty; later stages fill them.</title>
+    <line class="edge" x1="500" y1="252" x2="500" y2="286" marker-end="url(#ar)"/>
+    <line class="hit" x1="500" y1="252" x2="500" y2="286"/>
+  </g>
+
+  <g class="wire"><title>input:  items — list[Item] with id, kind, text.
+
+output: items — the same list, where an item may be REPLACED by its sub-items.
+        Sub-item ids encode the split: "item_1" becomes "item_1-1", "item_1-2".
+        Depth is bounded at one level; there is no "item_1-2-3".
+        item.slots — dict, filled here: quantity (int),
+        reminder_minutes (int), recurrence hints.</title>
+    <line class="edge" x1="500" y1="338" x2="500" y2="372" marker-end="url(#ar)"/>
+    <line class="hit" x1="500" y1="338" x2="500" y2="372"/>
+  </g>
+
+  <g class="wire"><title>input:  items — list[Item], now atomic.
+
+output: item.text repaired in place where it was garbled.
+        item.blocked — str | None. A reason set here means the item is NEVER
+        executed and the refusal is spoken out loud (the observance gate).
+        state.fixes — list[Fix{stage, rule, before, after, note}], one entry
+        per named rule that fired, so every change is greppable in the trace.</title>
+    <line class="edge" x1="500" y1="424" x2="500" y2="458" marker-end="url(#ar)"/>
+    <line class="hit" x1="500" y1="424" x2="500" y2="458"/>
+  </g>
+
+  <g class="wire"><title>TWO-WAY — generate asks, FastRule answers. Drawn without arrowheads
+because neither side is upstream of the other: generate calls it per item and decides what to
+do with the verdict.
+
+generate sends:   text — str, ONE item's words (and current_view — str).
+
+FastRule returns: FastRuleResult
+      committed     — bool. True: take `intents` on the fast track.
+      intents       — list[(action_name: str, intent: BaseIntent)]
+      confidence    — float, 0.0-1.0
+      reason        — str | None. None when committed; otherwise why it
+                      abstained ("generic-title:event", "skip:…").
+      missing_slots — list | None
+      rule_result   — the raw parse, so the caller handing off to the model
+                      passes what the rules DID read instead of starting cold.</title>
+    <line class="edge two-way" x1="620" y1="487" x2="742" y2="487"/>
+    <line class="hit" x1="620" y1="487" x2="742" y2="487"/>
+    <text class="elabel" x="681" y="479">asks · answers</text>
+  </g>
+
+  <g class="wire"><title>input:  items — list[Item] with text and slots.
+
+output: item.action — str, the registry action name ("create_event",
+        "create_todo", "update_event", "delete_event", "complete_todo",
+        "query_schedule", …).
+        item.intent — BaseIntent, the validated pydantic object carrying the
+        fields that action needs (title, date, start_time, end_time, …).
+        Nothing is written to the database yet.</title>
+    <line class="edge" x1="500" y1="510" x2="500" y2="544" marker-end="url(#ar)"/>
+    <line class="hit" x1="500" y1="510" x2="500" y2="544"/>
+  </g>
+
+  <g class="wire"><title>input:  raw_text — str (the ORIGINAL words, on purpose) and the produced
+        item.intent objects.
+
+output: findings — list[CheckFinding]
+      type         — str, "missing" | "extra" | "wrong_fields"
+      item_id      — str | None
+      detail       — str, the human sentence shown in the trace
+      blamed_stage — str, one of the STAGES names, chosen by a DETERMINISTIC
+                     router. The model extracts; it never picks the stage.
+
+EMPTY findings ⇒ the parse is clean and execution proceeds to commit.</title>
+    <path class="edge" d="M 500 596 L 500 630" marker-end="url(#ar)"/>
+    <path class="hit" d="M 500 596 L 500 630"/>
+    <text class="elabel" x="562" y="617">no findings</text>
+  </g>
+
+  <g class="wire"><title>LOOP-BACK — a finding sends execution back and the stages after it
+re-run. At most 3 re-entries per command, all stages combined.
+
+carried back: state.mistakes — list[str], what went wrong last time. Each
+              re-run's prompt receives it, so the same error is not repeated.
+              state.retries — dict, stage name → re-entry count.
+
+The loop also STOPS EARLY when a re-run would begin from the same items with
+the same complaint: it cannot help, and it only spends the budget.
+
+On exhaustion the last parse is judged anyway, committed, and the reply says
+so — it is never silently dropped.</title>
+    <path class="edge loop" d="M 380 573 L 300 573 L 300 229 L 374 229" marker-end="url(#ara)"/>
+    <path class="hit" d="M 380 573 L 300 573 L 300 229 L 374 229"/>
+    <text class="elabel" x="286" y="405" transform="rotate(-90 286 405)">blame sends it back · ≤ 3</text>
+  </g>
+
+  <g class="wire"><title>input:  items carrying action + intent, none of them blocked.
+
+output: executed — list[ExecutedAction]
+      item_id — str
+      action  — str
+      message — str, the human sentence for the reply
+      ok      — bool
+      record  — tuple | None: ("event"|"todo", row id, action name, index),
+                attributed PER ITEM, which is what stops one item's feedback
+                landing on another's row.
+      state.messages — list[str], reply fragments in order.
+      state.refresh  — str, "events" | "todos" | "both" | "" — tells the
+                       client which surface to reload.</title>
+    <line class="edge" x1="500" y1="682" x2="500" y2="716" marker-end="url(#ar)"/>
+    <line class="hit" x1="500" y1="682" x2="500" y2="716"/>
+  </g>
+
+  <g class="wire"><title>input:  executed — list[ExecutedAction], the rows actually written.
+
+output: item.labels — dict. Event category and colour, task tags. The action
+        classes already applied these when writing; this stage reads them back
+        onto the items so the reply and the trace can report what was chosen
+        rather than guessing.</title>
+    <line class="edge" x1="500" y1="768" x2="500" y2="802" marker-end="url(#ar)"/>
+    <line class="hit" x1="500" y1="768" x2="500" y2="802"/>
+  </g>
+
+  <!-- self-loops -->
+  <g class="wire"><title>SELF-LOOP — recursive, and BOUNDED. One decomposition pass: an item is
+split at most once, so ids go one level deep ("item_1-2") and never further ("item_1-2-3").</title>
+    <path class="edge" d="M 620 305 C 690 292, 690 330, 624 318" marker-end="url(#ar)"/>
+    <path class="hit" d="M 620 305 C 690 292, 690 330, 624 318"/>
+    <text class="elabel" x="712" y="315">bounded, depth 1</text>
+  </g>
+
+  <g class="wire"><title>SELF-LOOP — FOR EACH ITEM. generate runs once per atomic item, and each
+item independently takes the rule answer or the model's. One command with three items makes
+three passes through here.</title>
+    <path class="edge" d="M 380 477 C 310 464, 310 502, 376 490" marker-end="url(#ar)"/>
+    <path class="hit" d="M 380 477 C 310 464, 310 502, 376 490"/>
+    <text class="elabel" x="252" y="487">for each item</text>
+  </g>
+</svg>
+</main>
+
+<p class="legend">
+  <b>Reading the wires.</b>
+  <svg width="46" height="10" aria-hidden="true"><line x1="0" y1="5" x2="36" y2="5"
+    stroke="var(--line)" stroke-width="1.5" marker-end="url(#ar)"/></svg>
+  one direction — what the previous box outputs IS what the next one is handed &nbsp;·&nbsp;
+  <svg width="46" height="10" aria-hidden="true"><line x1="0" y1="5" x2="42" y2="5"
+    stroke="var(--model)" stroke-width="1.8"/></svg>
+  no arrowhead — the two talk BOTH ways &nbsp;·&nbsp;
+  <svg width="46" height="10" aria-hidden="true"><line x1="0" y1="5" x2="36" y2="5"
+    stroke="var(--amber)" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#ara)"/></svg>
+  a loop, with its budget on it
+</p>

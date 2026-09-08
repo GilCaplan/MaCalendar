@@ -115,6 +115,15 @@ def _phrase_to_date(phrase: str, today: "_dt.date") -> "str | None":
 #: an annoyance; a wrong DELETE destroys something they may not get back. The
 #: project already rules that "deleting is destructive" — the metric should
 #: say so too, or the loop has no reason to prefer failing safely.
+_NOW_RE = re.compile(r"\\b(?:right\\s+now|now|immediately|asap)\\b", re.I)
+
+#: A title that names nothing — the word for a calendar entry rather than a
+#: name for one. Same shape as fastrule's `_GENERIC_TARGET_RE`.
+_EMPTY_TITLE_RE = re.compile(
+    r"^(?:my |the |a |an |this )?"
+    r"(?:reminder|alert|event|appointment|task|todo|thing|item|meeting)s?$",
+    re.I)
+
 _SEVERITY = {
     "delete_event": 4, "delete_todo": 4,     # irreversible-ish loss
     "update_event": 2, "update_todo": 2,     # overwrote something real
@@ -178,7 +187,8 @@ def main() -> int:
     T_OK = T_N = 0                        # explicit times: right / scored
     INVENT = INVENT_N = 0                 # a time produced where none was said
     D_OK = D_N = 0                        # resolvable dates: right / scored
-    HARM = 0                              # severity-weighted cost of wrong commits
+    HARM = 0
+    TITLE_N = TITLE_BAD = NOW_N = NOW_MIDNIGHT = 0                              # severity-weighted cost of wrong commits
     HARM_BY: collections.Counter = collections.Counter()
     viol: collections.Counter = collections.Counter()
     miss_reason: collections.Counter = collections.Counter()
@@ -267,6 +277,34 @@ def main() -> int:
                     INVENT_N += 1
                     if _HHMM.match(got_t) and got_t != "00:00":
                         INVENT += 1
+            # --- TITLE QUALITY (added 2026-09-08). Until now this board
+            # mentioned the word "title" once and scored it nowhere, so an
+            # event called "event" at midnight was a PERFECT commit by its
+            # arithmetic: right count, right action family. That is exactly
+            # what reached the user from the phone, at confidence 1.00.
+            if act in ("create_event", "create_todo"):
+                for nm, iv in res.intents:
+                    if not nm.startswith("create"):
+                        continue
+                    for tt in ([str(getattr(iv, "title", "") or "")]
+                               + [str(x) for x in (getattr(iv, "titles", None) or [])]):
+                        tt = tt.strip()
+                        if not tt:
+                            continue
+                        TITLE_N += 1
+                        if _EMPTY_TITLE_RE.match(tt):
+                            TITLE_BAD += 1
+            # --- "NOW" ROWS. `time correctness` only scores an EXPLICIT clock
+            # phrase, so every row whose time is the word "now" was skipped —
+            # 152 of them in this dataset alone. They are the rows that landed
+            # at midnight, scored as fine.
+            if act == "create_event" and _NOW_RE.search(r["text"]):
+                firste = next((i for n, i in res.intents
+                               if n == "create_event"), None)
+                got_now = str(getattr(firste, "start_time", "") or "")
+                NOW_N += 1
+                if got_now == "00:00":
+                    NOW_MIDNIGHT += 1
             if ok:
                 A_OK += 1
             else:
@@ -293,6 +331,14 @@ def main() -> int:
         print(f"\nDATE CORRECTNESS (on committed creates)")
         print(f"   resolvable date right    {pc(D_OK, D_N)}  (n={D_N}; "
               f"range phrases like 'next week' excluded, no single right answer)")
+    if TITLE_N:
+        print(f"\nTITLE QUALITY (on committed creates)")
+        print(f"   titles that name nothing  {pc(TITLE_BAD, TITLE_N)}  "
+              f"({TITLE_BAD}/{TITLE_N}) — 'event', 'the appointment', 'a task'")
+    if NOW_N:
+        print(f"\n\"NOW\" ROWS (the word is a time; `time correctness` skips them)")
+        print(f"   booked at midnight        {pc(NOW_MIDNIGHT, NOW_N)}  "
+              f"({NOW_MIDNIGHT}/{NOW_N})")
     if A_WRONG:
         print(f"\nHARM (severity-weighted cost of wrong commits)")
         print(f"   harm score               {HARM}  over {A_WRONG} wrong commits "
