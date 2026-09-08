@@ -427,6 +427,50 @@ finish.
 
 ---
 
+## 6b · Known gaps found while wiring — NOT yet fixed
+
+Recorded rather than fixed, because the current job is wiring the engine
+together, not improving FastSeg (Gil, 2026-09-08). Each is a real case with a
+real reproduction.
+
+### The month can be severed from its ordinal
+
+**Input**
+
+```
+add gym on tuesday at 6am and add yoga on tuesday at 7pm
+and add my conference on the 20th of November at 9am
+```
+
+**What Segmentation returns for the third item**
+
+```
+text = 'add my conference of November'      <- the month is in the ACTION
+time = 'on the 20th at 9am'                 <- and missing from the TIME
+```
+
+**What went wrong.** `_TIME_PATTERNS` knows `November 20` but not
+`the 20th of November`, so the bare-ordinal pattern claims `the 20th` and
+`of November` is left behind in the action. No token is lost — `spoken()`
+returns `add my conference of November on the 20th at 9am` — but the month has
+moved *before* the ordinal, and the title now reads "conference of November".
+
+**Consequence.** The event books in the CURRENT month.
+`tests/integration/test_date_sanity_fixes.py::
+test_a_relative_date_repeated_for_two_events_does_not_swallow_a_third` fails
+because of this — **it is a NEW red introduced by the wiring**, not one of the
+three pre-existing failures, and it should be counted as such.
+
+**The fix, when we get to it**, is a pattern, not a downstream repair: capture
+`the 20th of November` as one span. That stays inside the capture contract —
+it adds no information and resolves nothing. A downstream fix cannot help here,
+because by then the month is already part of the title.
+
+> **Distinguish this from the case that is NOT a gap.** "the 20th" with no month
+> at all is correctly captured as `on the 20th` and correctly resolved
+> downstream to the next future 20th. Segmentation captures words; deciding
+> WHICH 20th is `decompose_validate`'s job and it already works.
+
 ## 7 · Layout
 
 ```
