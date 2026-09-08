@@ -29,7 +29,7 @@ enum EngineChain {
             ChainSlot(stage: "vocab", label: "fix words", heading: "Fix words",
                       body: "The transcript is corrected against your personal vocabulary — the names, places and phrases the speech model mishears. A word the vocabulary itself doubts can be checked with you before anything runs, so a mishearing never becomes a wrong event."),
             ChainSlot(stage: "rule", label: "rules first", heading: "Rules first",
-                      body: "A deterministic rule parser reads the command first — 76 verb mappings — and scores its own confidence. When it is sure it answers in milliseconds without ever calling the language model. That is the fast lane; the deep track keeps checking behind it."),
+                      body: "A deterministic rule parser reads the command first — 84 verb mappings — and scores its own confidence. When it is sure it answers in milliseconds without ever calling the language model. That is the fast lane; the deep track keeps checking behind it."),
             ChainSlot(stage: "rule", label: "split · split again", heading: "Split, then split again",
                       body: "The command is broken into its independent items, then each item is broken down again — two times in a sentence is two events, a list is one task per thing, a recurrence becomes a series. Deterministic where it can be; the model only when an item is genuinely ambiguous."),
             ChainSlot(stage: "validate", label: "repair · rules", heading: "Repair & validate",
