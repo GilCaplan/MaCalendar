@@ -1676,3 +1676,84 @@ list-splitting and quantity extraction).
   Adding delete/complete verbs to a TASK matcher moves rows toward
   destructive operations. If harm (weighted destructive errors) rises at all,
   that is a banked negative regardless of what mis-typed does.
+
+### CYCLE A PART 2 — RESULT — 2026-09-08
+
+**Prediction met on every registered line, and the guard conditions held.**
+
+A new instrument first: `scripts/kind_board.py`. The kind decision had no
+board, which is why it stayed broken — the atomizer board reported "mis-typed"
+as one undirected number, and the failure was almost entirely one direction.
+
+**The kind board, both held-out halves (unseen families — the split is by
+family, so these are constructions the fix never saw):**
+
+| | FastRule 7,200 test | personas test | realspeech test |
+|---|---|---|---|
+| kind accuracy | 59.4% → **73.7%** | 79.1% → **87.7%** | 93.8% → **97.8%** |
+| non-create to-do ops | 1.2% → **51.6%** | 0.9% → **45.0%** | — |
+| create to-do | 29.3% → **50.3%** | 53.6% → **70.9%** | 78.3% → 97.8% |
+| create event (the cost) | 91.2% → 90.6% | 100% → **100%** | 100% → 100% |
+
+On the TRAIN half, task recall went 0.341 → 0.745 and task precision 0.902 →
+0.982; the train/test gap is unseen families, not a fake gain — every held-out
+half moved.
+
+**The atomizer board (the registered metric), test halves:**
+
+| | FastRule | personas |
+|---|---|---|
+| complex mis-typed | 38.8% → **24.8%** | 16.5% → **10.7%** |
+| simple mis-typed | 45.2% → **28.8%** | 30.2% → **17.7%** |
+| complex count-correct | 75.1% → **76.2%** | 70.5% → 70.5% |
+| simple count-correct | 99.6% → **99.8%** | 100% → **100%** |
+| complex OVER (budget ≤3%) | 2.9% → **2.6%** | 1.8% → **1.8%** |
+
+Count-correctness was predicted to HOLD and instead rose; OVER stayed inside
+budget. The simple-tier mis-typing gain was not predicted and is the larger
+one — simple rows are the majority of real traffic.
+
+**What was actually wrong**, in the order the board found it:
+1. `_REVIEW_RE`'s "my schedule" arm was UNANCHORED, so "drop piano lesson
+   from my schedule" — a delete — scored as a question. Review F1
+   0.766 → 0.925.
+2. `_TASK_RE` recognised only CREATE-shaped to-do wording. The strongest fix
+   needed no verb at all: an explicit list DESTINATION ("on my list", "from
+   my tasks"), which is what makes a delete or an edit a to-do.
+3. `_kind_of` ignored the pinned "remind me TO <verb>" errand form that
+   `_enforce_pinned_kinds` already honoured, so any remind-worded row with a
+   clock time went to the calendar.
+4. `^get` claimed "get rid of" (a delete), and naming the calendar outright
+   ("get rid of that task ON MY CALENDAR") did not outrank the to-do signals.
+
+**A negative worth banking: fixing kind BROKE the splitter, and the board saw
+it before the tests did.** `decompose.run()` branches entirely on kind, so
+correcting the kind routed hundreds of items into `_split_tasks` for the first
+time — and `list_split` is pure string work that cuts at "and" without being
+able to tell a request from the words around one. OVER jumped to 8.6% and
+"lost" to 5.8% ("wash the car, done and dusted" → "wash done" + "wash
+dusted"; "pack and label the boxes" → a task called "pack"). This is the SAME
+shape as part 1: fixing the upstream stage exposes the downstream one.
+
+The fix is `assistant/intent/asks.py` — one shared reader, `is_an_ask`, in the
+layer both stages can call, so segment's clause tier and decompose's list tier
+cannot drift. A split is refused WHOLE rather than dropping the bad piece:
+those words still belong to the command, and a merged item is recoverable
+where deleted words are not. **Verified end to end: zero content words lost
+across all 4,920 test rows.**
+
+(The board's own `lost` line reads 2.8% on the FastRule half. That is not word
+destruction — it counts a gold ask whose anchor no longer appears as a
+distinguishable item, i.e. an under-split artifact. Measured directly, word
+loss is zero.)
+
+**Also fixed, incidentally:** `tests/unit/test_mixed_commands.py::test_a_list_
+of_things_to_buy_makes_exactly_its_items`, the order-dependent failure logged
+in TASKS.md, now passes in the full suite — "add buy milk and buy bread to my
+list" reads as a task, so the list splitter runs on it instead of generate
+failing to route an event. 1311 passed, 0 failed. The logged diagnosis stands
+as the reason it was order-dependent; the kind fix removed the dependency.
+
+**Still open:** shopping lists ("pick up folders and light bulbs from the
+store") split into two where the dataset says one — that is the pending Q14
+np_decoy relabel, not a defect. 20 reviews still read as events.

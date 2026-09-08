@@ -36,15 +36,104 @@ _COALESCE_RE = re.compile(r"\(\s*[\"“]([^\"“”]+)[\"”]\s*\)")
 _BRACKET_RE = re.compile(r"\[([^\[\]]+)\]")
 
 # A schedule question, not an instruction to create anything.
+#
+# The "my schedule" arm used to be UNANCHORED, so any command that merely
+# mentioned the schedule was read as a question about it — "drop piano lesson
+# from my schedule" is a DELETE, and it was scoring as a review (14 rows on
+# the FastRule train half, every one of them a `drop … from my schedule`).
+# It now needs a looking verb in front of it, which is what made it a question
+# in the first place.
+#
+# The looking verbs also had a gap of their own: "check my calendar for this
+# week" and "could you tell me what's on my calendar" are plainly reviews and
+# matched nothing (50 rows read as events).
+# Deliberately NOT here: "remind me of" and "give me" — the first is a
+# reminder and the second opens a lead-time clause ("give me a heads up
+# 30 minutes before"). Both read as questions and are not; including them
+# turned 25 tasks into reviews.
+# "check OFF mail the package" completes a to-do; only a bare "check" is a
+# looking verb. Same trap as the schedule arm: a word that reads as a query
+# in isolation is part of an action verb here.
+_LOOK_VERB = (r"(?:what(?:'s| is| do| have| does)?|show|tell me|"
+              r"check(?!\s*(?:off|out)\b)|see|"
+              r"look at|pull up|read|bring up|"
+              r"do i have|when is|when's|how many|list)")
+
 _REVIEW_RE = re.compile(
-    r"^(?:what(?:'s| is| do| have)?|show me|do i have|when is|when's|how many|"
-    r"list|tell me)\b|(?:\bmy (?:schedule|day|week|agenda)\b)", re.I)
+    rf"^(?:please\s+|hey\s+|um+\s+|so\s+)?(?:can|could|would|will)?\s*"
+    rf"(?:you\s+)?{_LOOK_VERB}\b"
+    rf"|\b{_LOOK_VERB}\b[^.?!]{{0,40}}\bmy\s+"
+    rf"(?:schedule|day|week|agenda|calendar|diary)\b",
+    re.I)
 
 # To-do phrasing. Only used as a first reading; step 5 decides the action.
+#
+# It used to recognise CREATE-shaped to-do wording and nothing else, so every
+# way of COMPLETING, EDITING or UN-LISTING a task fell through to "event" —
+# and because `decompose.run()` branches entirely on kind, that cost the
+# decomposition as well as the label. Measured on the FastRule 7,200 train
+# half: non-create to-do operations scored 8.8% (41 of 467), and task RECALL
+# was 0.341 against event recall 0.978. The errors were almost all one
+# direction: 730 tasks read as events, 41 events read as tasks.
+
+#: The strongest signal there is, and the one that needed no verb: an explicit
+#: to-do DESTINATION anywhere in the sentence. "get rid of cancel the
+#: subscription ON MY LIST", "remove X FROM MY LIST", "drop X FROM MY TASKS"
+#: name no create verb at all, and the destination is what makes them tasks.
+#: "calendar" and "schedule" are deliberately absent — those are events.
+_LIST_DEST = (
+    r"\b(?:to-?do|task|shopping|grocery|errand)s?\s+list\b"
+    # bare "list" belongs here: the commonest spoken form is "on my list" /
+    # "from my list" with no qualifier at all, and requiring one missed every
+    # such row ("just get rid of cancel the subscription ON MY LIST").
+    r"|\b(?:on|to|off|from|in)\s+(?:my|the)\s+"
+    r"(?:to-?do|task|shopping|grocery|errand|list)s?(?:\s+list)?\b"
+    r"|\bmy\s+(?:to-?do|task|errand|list)s?\b"
+)
+
+#: Completing a to-do. These say nothing about a calendar and cannot be
+#: confused with booking something: "mark X as done", "i already did X",
+#: "check off X", "i finished X", "i'm done with X".
+#: `complet(?:e|ed)?` rather than `complete` because the corpus carries the
+#: truncation the recogniser actually produces ("mark X as complet").
+
+_TODO_DONE = (
+    r"\bmark\b[^.?!]{0,40}\b(?:as\s+)?(?:done|complet(?:e|ed)?|finished)\b"
+    r"|\b(?:check|cross|tick)\s+(?:it\s+|that\s+|this\s+)?off\b"
+    r"|^(?:complete|finish|finished)\s+\w"
+    r"|\bi\s+(?:already\s+)?(?:did|finished|completed)\b"
+    r"|\bi'?m\s+done\s+with\b"
+    r"|\balready\s+(?:did|done|finished|handled)\b"
+)
+
+#: Naming a to-do outright, and the errand openers the original list missed
+#: ("i gotta pack for the trip", "create a task to water the plants").
+_TODO_NAMED = (
+    r"^(?:create|add|make|set)\s+(?:a|an)\s+(?:new\s+)?(?:task|to-?do)\b"
+    # "set a reminder TO <verb>" is an errand; "set a reminder 2 hours before
+    # FOR standup" is a calendar entry with a lead time. Only the first is a
+    # to-do, and the "to" is what tells them apart.
+    r"|^(?:create|add|make|set)\s+(?:a|an)\s+remind\w*\s+to\b"
+    r"|^i\s+(?:gotta|have to|got to|must|should|need to)\b"
+    r"|^(?:don'?t let me forget|do not forget|dont forget)\b"
+)
+
+#: CHORE verbs in the imperative — the errands a to-do list is for. Nothing
+#: here can book anything: the calendar verbs (book, schedule, meet, plan,
+#: invite) are deliberately absent, and so is "call", which is genuinely
+#: ambiguous between an errand and an appointment and is left to the model.
+_CHORE_VERB = (
+    r"^(?:file|wash|fold|print|clean|organi[sz]e|pack|water|vacuum|hoover|"
+    r"restock|refill|renew|mail|post|submit|charge|feed|sweep|mow|iron|dust|"
+    r"declutter|tidy|empty|defrost|sort out|drop off|take out|back up|"
+    r"wrap|donate|recycle|shred|scan|photocopy)\b"
+)
+
 _TASK_RE = re.compile(
     r"^(?:add|put)\s+.*\b(?:to|on)\s+(?:my\s+)?(?:to-?do|task|shopping)|"
-    r"^(?:remind me to|i need to|remember to|buy|get|pick up)\b|"
-    r"\b(?:to-?do list|task list)\b", re.I)
+    r"^(?:remind me to|i need to|remember to|buy|get(?!\s+rid\b)|pick up)\b|"
+    rf"{_LIST_DEST}|{_TODO_DONE}|{_TODO_NAMED}|{_CHORE_VERB}",
+    re.I)
 
 
 # A clock time inside a "remind" phrasing flips it to the calendar: the
@@ -63,7 +152,8 @@ _REMIND_TO_VERB_RE = re.compile(r"\bremind\s+\w+\s+to\b", re.I)
 
 # "I need to <meet/talk/…>" — an encounter being arranged, not an errand.
 _NEED_ENCOUNTER_RE = re.compile(
-    r"\bi need to\s+(?:meet|talk|speak|see|catch up|sit down|"
+    r"\bi\s+(?:need to|should|want to|would like to|gotta|have to|must)\s+"
+    r"(?:meet|talk|speak|see|catch up|sit down|"
     r"have\s+a\s+(?:conversation|chat|word|meeting|call))\b", re.I)
 
 # An occasion someone attends (not an errand someone does) …
@@ -180,12 +270,41 @@ def _enforce_pinned_kinds(kind: str, text: str) -> str:
     return kind
 
 
+#: The calendar named as the destination. It OUTRANKS every to-do signal:
+#: "get rid of that task on my calendar the 3rd" says "task" and means an
+#: event, and the destination is the speaker being explicit about which of
+#: the two lists they mean.
+_CALENDAR_DEST_RE = re.compile(
+    r"\b(?:on|to|in|from|off)\s+(?:my|the)\s+"
+    r"(?:calendar|schedule|diary|agenda)\b", re.I)
+
+
+#: Arranging to be in the same place as someone — "get Blake and me TOGETHER
+#: for staff meeting", "meet up with Sage", "catch up with Jordan". These open
+#: with `get`, which the errand list claims, but nobody puts a gathering on a
+#: to-do list; it is an appointment being made.
+_GATHERING_RE = re.compile(
+    r"\bget\s+[\w' ]{0,30}\btogether\b"
+    r"|\bmeet(?:\s+up)?\s+with\b"
+    r"|\bcatch\s+up\s+with\b"
+    r"|\bsit\s+down\s+with\b", re.I)
+
+
 def _kind_of(text: str) -> str:
     t = text.strip()
     if _REVIEW_RE.search(t):
         return "review"
+    if _CALENDAR_DEST_RE.search(t) or _GATHERING_RE.search(t):
+        return "event"
     if _TASK_RE.search(t):
-        if re.search(r"\bremind", t, re.I) and _CLOCKISH_RE.search(t):
+        # The pinned convention distinguishes "remind me TO <verb> …" (an
+        # errand — stays a task) from "remind me ABOUT <occasion> …" (a
+        # calendar entry). `_enforce_pinned_kinds` already honours that split;
+        # this call site did not, and flipped ANY remind-worded row carrying a
+        # clock time to the calendar. "remind me to feed the cat at 14:00" is
+        # a to-do with a time on it, not a meeting with the cat.
+        if (re.search(r"\bremind", t, re.I) and _CLOCKISH_RE.search(t)
+                and not _REMIND_TO_VERB_RE.search(t)):
             return "event"
         return "task"
     return "event"

@@ -74,9 +74,19 @@ DATASETS = {
 
 
 def _predict(text: str) -> str:
+    """Kind, as segment would decide it IN THE PIPELINE.
+
+    The cleanup matters and is easy to leave out: transcript (step 1) strips
+    spoken noise before segment ever sees the words, and several of the kind
+    regexes are `^`-anchored. Feeding raw dataset text here makes "um i need
+    to do the laundry" look like a miss that the real pipeline never has, and
+    would send this cycle chasing a fault in the wrong stage.
+    """
     from assistant.engine.segment import _kind_of, _enforce_pinned_kinds
-    k = _kind_of(text)
-    return _enforce_pinned_kinds(k, text)
+    from assistant.intent.cleanup import strip_spoken_noise
+
+    clean = strip_spoken_noise(text)
+    return _enforce_pinned_kinds(_kind_of(clean), clean)
 
 
 def _prf(matrix, cls) -> "tuple[float, float, float, int]":

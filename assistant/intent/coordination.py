@@ -104,7 +104,14 @@ class Boundary:
 #: Words that join two asks and belong to neither of them. Used only to widen
 #: the cut once the PARSE has already decided there is a boundary here — it
 #: never decides on its own.
-_COORD_WORDS = frozenset({"and", "then", "also", "plus", "or", "but"})
+#: "as" and "well" are here for the multi-word joiner "as well as", which the
+#: pre-filter already lists but the walk-back did not: cutting at the final
+#: "as" stranded "as well" on the first ask and dropped the "as" entirely.
+#: They are safe because this walk only ever consumes tokens IMMEDIATELY
+#: adjacent to a boundary the parse already found — "mark the task as done and
+#: X" stops at "done", which is not a joiner.
+_COORD_WORDS = frozenset({"and", "then", "also", "plus", "or", "but",
+                          "as", "well"})
 
 #: A split is only worth making if both halves are substantive. One word on
 #: either side is a parse artifact, not an ask — and an empty half would hand

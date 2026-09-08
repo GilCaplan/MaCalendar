@@ -110,11 +110,30 @@ def _split_times(item: Item) -> "list[Item] | None":
 
 
 def _split_tasks(item: Item) -> "list[Item] | None":
-    from assistant.intent.list_split import split_items
-    parts = split_items(item.text)
+    """The list splitter, with the same discipline segment's clause tier has:
+    every piece must be an ASK.
+
+    `list_split` is pure string work, so it cuts at commas and "and" without
+    being able to tell a request from the words around one. That was invisible
+    while most to-dos were mis-kinded as events and never reached here; fixing
+    the kind decision routed them all in at once and the tears surfaced —
+    "wash the car, done and dusted" became "wash done" + "wash dusted",
+    "pack and label the boxes" left a task called "pack", and a tag question
+    ("does that seem right") became an item of its own.
+
+    The whole split is refused rather than the bad piece dropped: those words
+    are still part of the command, and a merged item is recoverable where
+    deleted words are not.
+    """
+    from assistant.intent.asks import every_part_is_an_ask
+    from assistant.intent.list_split import ACTION_VERBS, split_items
+
+    parts = [p.strip() for p in split_items(item.text) if p.strip()]
     if len(parts) <= 1:
         return None
-    return [Item(id=f"{item.id}-{j}", kind="task", text=p.strip(),
+    if not every_part_is_an_ask(parts, ACTION_VERBS):
+        return None
+    return [Item(id=f"{item.id}-{j}", kind="task", text=p,
                  slots=dict(item.slots))
             for j, p in enumerate(parts, start=1)]
 
