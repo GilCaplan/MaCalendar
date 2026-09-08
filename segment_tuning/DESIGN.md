@@ -29,10 +29,19 @@ INPUT   text : str          (one command, after transcript repair)
 ╚═══════════════════════════════════════════════════════════════╝
                   ↓  proposed [(action, time, tag), …]
 
-╔═ VERIFIER · one LLM call · EVERY command ════════════════════╗
+╔═ LLMSEG · one model call · EVERY command ════════════════════╗
 ║  sees the original string + FastSeg's proposal                ║
-║  "No Change"  → keep FastSeg's answer                         ║
-║  correction   → replace with it, wholesale                    ║
+║  ALWAYS emits a decomposition — it never judges               ║
+╚═══════════════════════════════════════════════════════════════╝
+                  ↓  LLMSeg's [(action, time, tag), …]
+
+╔═ ACCEPT · deterministic ═════════════════════════════════════╗
+║  diff LLMSeg's answer against FastSeg's                       ║
+║  identical            → nothing changed                       ║
+║  differs, invariant   → take LLMSeg's                         ║
+║    holds                                                      ║
+║  differs, invariant   → KEEP FASTSEG'S. A model that dropped  ║
+║    violated             a word does not get to overwrite.     ║
 ╚═══════════════════════════════════════════════════════════════╝
 
 OUTPUT  [(action, time, tag), …]
