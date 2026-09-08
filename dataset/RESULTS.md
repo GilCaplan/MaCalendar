@@ -1556,3 +1556,73 @@ reference (run 21): raw 83%, complex 67%, event+task 59%, fast path 90%.
 - **Risk:** a deterministic splitter that fires wrongly creates garbage items
   immediately, where an under-split gets recovered downstream. If OVER rises
   above 3% or boundary-integrity degrades, that is a banked negative.
+
+### CYCLE A — RESULT (part 1 of 4: the boundary splitter) — 2026-09-07
+
+Change 1 of the four shipped and measured on its own, so the delta has one
+cause. Changes 2–4 (`_TASK_RE`, the daypart rule, the np_decoy relabel) are
+still ahead; the mis-typed prediction belongs to those and is NOT judged here.
+
+**What changed.** `coordination.clause_boundaries` keeps the position the
+check already computed instead of throwing it away, and `segment` gained a
+deterministic tier that splits there. Then two guard families the board's own
+failures named:
+
+- **a modifier is not an ask.** A trailing lead-time offset ("…at 1pm and give
+  me a nudge an hour before"), an anaphoric commit ("…, put that in the
+  diary", "…, please change it"), a bare annotation ("…and add a note") and a
+  completion marker ("submit the report, wrapped up") all point back at the
+  ask already spoken. An ask has to NAME something; these do not.
+- **a date inside the first ask is not shared.** Only a date the utterance
+  OPENS with is copied into later parts — the mirror of the repeated-relative-
+  date bug fixed in a987aba.
+
+**Boundary integrity — the headline** (compounds with distinguishable anchors,
+test halves):
+
+| | FastRule 7,200 | personas |
+|---|---|---|
+| clean (each item = one whole ask) | 5.8% → **41.7%** | 0.0% → **43.2%** |
+| bleed (two asks in one item) | 93.7% → 57.8% | 100.0% → 56.8% |
+| lost (words survive in no item) | 0.5% → 0.5% | 0.0% → **0.0%** |
+| duplicated | 0.0% → 0.0% | 0.0% → 0.0% |
+
+**Count-correctness by tier:**
+
+| | FastRule 7,200 | personas |
+|---|---|---|
+| complex count-correct | 60.4% → **75.1%** | 49.8% → **70.5%** |
+| complex UNDER | 36.7% → 22.0% | 48.9% → 27.7% |
+| complex OVER | 2.9% → **2.9%** | 1.4% → **1.8%** |
+| simple count-correct | 99.9% → 99.6% | 100.0% → **100.0%** |
+
+**Every persona improved**, 4.5 to 12.6 points of count-correctness:
+retiree 79.5→92.1, freelance_consultant 77.4→88.8, esl_speaker 76.9→88.3,
+observant_student 75.0→83.8, household_parent 70.0→81.4, uni_student
+75.5→80.0. The spread widened (9.5 → 12.1 pt) because the gains were uneven,
+not because anyone regressed.
+
+**Segment stopped being a no-op**: rows it returned as >1 item went 0 (0.0%)
+→ 312 (12.4%) on personas. And it got CHEAPER — segment model calls 1150→890
+and 991→684, about 25–30% fewer, because a confident boundary no longer needs
+the gated LLM call.
+
+**Verdict against the prediction: confirmed, and OVER held.** The predicted
+range (25–40% / 15–30% atomized) was beaten on both halves. The stated risk —
+"if OVER rises above 3% that is a banked negative" — did not fire: 2.9% and
+1.8%. Simple-tier correctness, the thing Gil ranked first, is intact.
+
+**It did not arrive that way.** The first cut over-split **139 persona rows and
+28 FastRule rows** that were atomic, and dipped simple-tier correctness to
+95.4% — a real regression on the tier that matters most. Both guard families
+above exist because those rows were read one at a time rather than the
+headline being accepted. Over-splits now 5 and 3.
+
+**Banked, unfixed:** 4 rows where spaCy tags the gerund in "washing up liquid"
+as a verb and splits a shopping list; 3 FastRule rows still lost (0.5%,
+unchanged from baseline — not caused here).
+
+**Not judged yet:** mis-typing rose in absolute terms (personas complex
+25/606 → 133/807) because splitting EXPOSES second items that then need
+kinding, and `_TASK_RE` still recognises no non-create todo verb. That is
+cycle A change 2, measured next.

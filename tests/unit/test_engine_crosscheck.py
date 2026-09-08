@@ -101,8 +101,14 @@ def test_a_blocked_item_is_not_an_extra(cfg, monkeypatch):
 def test_loop_back_reruns_segment_with_the_mistake(cfg, monkeypatch):
     """First pass merges two asks into one item; the cross-check notices the
     missing task; the re-run (with the mistake in the prompt) splits properly
-    and the second check is clean."""
-    text = "book gym on tuesday at 7am and remind me to buy milk"
+    and the second check is clean.
+
+    The input is one segment's deterministic clause tier declines (an event
+    chain sharing a leading date), so the merge this scenario needs is the
+    LLM tier's to make. With a plainly-coordinated command the parse now
+    splits it correctly first time and there is no loop-back to observe.
+    """
+    text = "tomorrow gym at 7 am and a meeting with Tal at 11"
 
     calls = {"n": 0}
 
@@ -158,7 +164,11 @@ def test_loop_back_reruns_segment_with_the_mistake(cfg, monkeypatch):
 
 
 def test_loop_budget_is_finite_and_admitted(cfg, monkeypatch):
-    """A check that keeps failing stops after MAX_REENTRIES and says so."""
+    """A check that keeps failing stops after MAX_REENTRIES and says so.
+
+    The scripted segment never splits, so the input must be one the
+    deterministic clause tier also declines — otherwise the parse splits it
+    and the never-resolving disagreement this test needs never happens."""
     def scripted_llm(cfg_, system, user, schema=None):
         if "split ONE voice command" in system:
             return {"items": []}, 1                    # never splits
@@ -180,7 +190,7 @@ def test_loop_budget_is_finite_and_admitted(cfg, monkeypatch):
         **{"return_value.execute.return_value": "did it"})
     monkeypatch.setattr(generate, "get_registry", lambda: registry)
 
-    out = engine.run_transcript("book gym at 7 and remind me to buy milk",
+    out = engine.run_transcript("tomorrow gym at 7 am and a meeting with Tal at 11",
                                 source="test")
     assert "not sure I caught every part" in out["message"]
 

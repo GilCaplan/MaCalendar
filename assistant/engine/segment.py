@@ -207,7 +207,84 @@ def _deterministic_segments(text: str, cfg) -> "tuple[list[str], str | None]":
                  if s.strip()]
         if len(parts) > 1:
             return parts, "separator"
+    parts = _clause_segments(text)
+    if len(parts) > 1:
+        return parts, "clauses"
     return [text.strip()], None
+
+
+def _clause_segments(text: str) -> "list[str]":
+    """Split where the PARSE shows two asks meeting — "book the gym and remind
+    me to buy milk" — and nowhere else.
+
+    Why this tier had to exist: every delimiter above is something the PHONE
+    inserts (brackets, the coalescing wrapper, a configured separator), not
+    anything a person says. On dictated speech none of them can ever fire, and
+    the board measured the consequence — 0 splits in 4,920 rows, so 6.2% of
+    compounds were atomized correctly and every real compound fell through to
+    the LLM tier or stayed merged.
+
+    `coordination.split_clauses` is the judgement (dependency parse: a VERB
+    conjunct with its own argument is a second ask; a NOUN conjunct is a longer
+    noun phrase), so names, lists and shared objects are never split — "meeting
+    with Tal and Ravid", "buy chicken and rice", "wash and fold the laundry"
+    all come back whole. The under-split bias is preserved: no confident
+    boundary means no split, and the LLM tier still gets its turn.
+    """
+    from assistant.intent.coordination import split_clauses
+
+    # An enumeration with a header ("two tasks due tomorrow: A and B") is the
+    # LLM tier's specialty and not this one's: the header has to be recognised
+    # and dropped, and its shared deadline distributed into each item. A clause
+    # split cuts at the "and" but not at the colon, which glues the header onto
+    # the first item and loses the deadline from the rest. Leave it alone.
+    if _HEADER_PREFIX_RE.match(text) or _WRAPPED_RE.search(text):
+        return [text.strip()]
+
+    parts = [p.strip() for p in split_clauses(text) if p.strip()]
+    if len(parts) < 2:
+        return [text.strip()]
+    # A modifier is not an ask — refuse the whole split rather than dropping
+    # it, because its words (the reminder offset, the destination, the
+    # annotation) still belong to the command the later stages read. Checked
+    # on EVERY part, not just the trailing ones: the modifier leads as often
+    # as it follows ("flag this, restock the pantry").
+    if any(_is_modifier_not_ask(p) for p in parts):
+        return [text.strip()]
+    # Residue guards, the same two the LLM tier applies to its own output: a
+    # fragment is the splitter imagining structure, and a part that is only
+    # scheduling words ("due tomorrow") is phrasing left over, not a request.
+    if any(len(p.split()) < 2 for p in parts) or any(_schedule_only(p) for p in parts):
+        return [text.strip()]
+    return _share_leading_date(parts)
+
+
+def _share_leading_date(parts: "list[str]") -> "list[str]":
+    """Carry a date said ONCE at the front into the parts that have none.
+
+    "tomorrow gym at 7 am and a meeting with Tal at 11" is two events, both
+    tomorrow — but a clause split leaves the second one dateless, and a
+    dateless create lands today. The LLM tier's prompt already distributes a
+    shared date this way; the deterministic tier has to do it too or splitting
+    would trade a merge bug for a date bug.
+
+    Deliberately LEADING only, and leading means the utterance OPENS with it.
+    A date sitting inside the first ask belongs to that ask — "book gym
+    tomorrow at 7am and remind me to buy milk" is a gym session tomorrow and a
+    milk errand with no date at all, so copying "tomorrow" onto the milk would
+    invent a deadline the speaker never gave. That is the same failure as a
+    repeated relative date overwriting other events' real dates, which this
+    project has already had once. A trailing date is ambiguous for the mirror
+    reason ("buy milk and call the dentist tomorrow" may or may not date the
+    milk), so it is left to a stage that can weigh it.
+    """
+    if not _DATED_RE.match(parts[0]):
+        return parts                      # the date is not the opening words
+    dated = [bool(_DATED_RE.search(p)) for p in parts]
+    if any(dated[1:]):
+        return parts                      # a later part names its own date
+    phrase = _DATED_RE.match(parts[0]).group(0).strip()
+    return [parts[0]] + [f"{p} {phrase}" for p in parts[1:]]
 
 
 # Words that can (but very often do not) join two independent requests. Their
@@ -219,6 +296,94 @@ _COMPOUND_HINT = re.compile(r"\b(and|then|also|plus|after that)\b|,|;", re.I)
 _HEADER_RE = re.compile(
     r"^(?:please\s+)?(?:add|set|create|make|new|two|three|four|\d+)\s+"
     r"(?:tasks?|events?|reminders?|things?)(?:\s+due\s+\w+)?\s*:?$", re.I)
+
+# The same header, still ATTACHED to the list it introduces — "two tasks due
+# tomorrow: buy groceries and …". Only the deterministic clause tier needs
+# this form, to recognise an enumeration it should not touch.
+_HEADER_PREFIX_RE = re.compile(
+    r"^(?:please\s+)?(?:add|set|create|make|new|two|three|four|\d+)\s+"
+    r"(?:tasks?|events?|reminders?|things?)\b[^:]{0,30}:", re.I)
+
+# A trailing clause that MODIFIES the ask before it rather than being a second
+# ask. Both shapes measured on the persona test half, where a naive clause
+# split manufactured 139 items out of atomic commands:
+#
+#   • a lead-time offset — "…at 1pm and give me a nudge an hour before" (51 of
+#     the 139). A reminder offset is a SLOT of the event it follows; there is
+#     nothing for it to be an ask ABOUT on its own.
+#   • an anaphoric commit — "…, put that in the diary", "…, do cross it off",
+#     "…, sorry put in calendar". The speaker is naming where the FIRST ask
+#     goes, using a pronoun to point back at it.
+#
+# The unifying rule, and why these are safe to refuse: an ask has to name
+# something of its own. A tail that only points back at what was already said
+# is one ask still being spoken.
+_LEAD_TIME_TAIL_RE = re.compile(
+    r"\b(?:before|ahead(?:\s+of\s+(?:time|it))?|in\s+advance|earlier)\s*[.!?]?$",
+    re.I)
+
+_BACKREF_RE = re.compile(r"\b(?:it|that|this|them|those|these)\b", re.I)
+
+#: Command verbs that act on a thing rather than naming one. Paired with a
+#: back-reference below — "please change IT", "do cross IT off", "put THAT in
+#: the diary" — they are the speaker saying what to do with the ask they just
+#: made. The edit and delete verbs matter as much as the filing ones: the
+#: persona board's `ue_move` and `de_named` families end almost every command
+#: this way ("…has been moved to 8:30am, please change it").
+_FILE_VERB_RE = re.compile(
+    r"\b(?:put|add|stick|pop|note|jot|log|save|enter|cross|tick|check|mark|"
+    r"flag|cancel|change|delete|remove|move|reschedule|update|rename|drop|"
+    r"clear|scratch|bin|shift)\b", re.I)
+
+#: "put in calendar" — a destination with nothing to put in it. Also "add a
+#: note", "add a reminder": an ANNOTATION on the ask just made, carrying no
+#: content of its own ("change the due date of X to friday AND ADD A NOTE" is
+#: one edit, and was 14 of the FastRule half's 28 atomic over-splits).
+_DESTINATION_ONLY_RE = re.compile(
+    r"^(?:(?:so|sorry|please|do|and|then|also|just|now|ok(?:ay)?)\s+)*"
+    r"(?:put|add|stick|pop|note|save|enter)\s+"
+    r"(?:it|that|this|them)?\s*(?:in|on|onto|into|to)?\s*"
+    r"(?:a|an|my|the)?\s*(?:calendar|diary|schedule|list|to-?do|tasks?|agenda|"
+    r"planner|note|reminder|comment|label|flag|tag)?"
+    r"\s*[.!?]?$", re.I)
+
+
+def _names_something(part: str) -> bool:
+    """Does this part name a thing, or is it only a verb?
+
+    An ask has a subject. "wrapped up", "sorted", "done with that" are the
+    speaker closing the sentence they just said, and a clause split turns them
+    into items that then get a title invented for them. Parsing is affordable
+    here — the doc is memoised and segment is not the latency-critical path.
+    """
+    from assistant.intent.coordination import parsed
+
+    doc = parsed(part)
+    if doc is None:
+        return True                # cannot tell ⇒ do not block on this ground
+    return any(t.pos_ in ("NOUN", "PROPN", "PRON", "NUM") for t in doc)
+
+
+def _is_modifier_not_ask(part: str) -> bool:
+    """Is this part a modifier of the ask beside it, rather than its own ask?"""
+    if _LEAD_TIME_TAIL_RE.search(part):
+        return True
+    if _FILE_VERB_RE.search(part) and _BACKREF_RE.search(part):
+        return True
+    if _DESTINATION_ONLY_RE.match(part):
+        return True
+    return not _names_something(part)
+
+
+# "add X and Y to my list" — one verb and one destination WRAPPING both items.
+# A clause split cuts at the "and" and tears the wrapper in half, leaving an
+# unroutable "add buy milk" and a "buy bread to my list" carrying words that
+# were never a title. Decompose owns this shape (it knows to distribute the
+# verb and drop the destination), so the clause tier must not touch it.
+_WRAPPED_RE = re.compile(
+    r"^(?:please\s+)?(?:add|put|stick|throw|chuck)\b.*\b(?:to|on|onto|in)\s+"
+    r"(?:my|the)\s+(?:to-?do|task|shopping|grocery|groceries|errand|"
+    r"calendar|list|schedule)\b", re.I)
 
 _SEGMENT_SCHEMA = {
     "type": "object",
@@ -379,7 +544,11 @@ def run(state: EngineState, cfg) -> EngineState:
 
     # The delimiters must not survive into titles — an event called "[gym]"
     # helps nobody. The working transcript becomes the joined segments.
-    if how:
+    #
+    # A CLAUSE split is exempt: it cuts at a joiner the speaker actually said,
+    # so there is no delimiter to strip, and rejoining the parts would drop
+    # that "and" from the text every later stage grounds itself on.
+    if how and how != "clauses":
         state.text = " ".join(segments)
 
     state.items = [

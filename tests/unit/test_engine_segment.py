@@ -50,6 +50,80 @@ def test_task_phrasing_is_read_as_task(cfg):
     assert st.items[0].kind == "task"
 
 
+# --- the clause tier: the parse splits what speech actually sounds like ----
+#
+# Every delimiter above is something the PHONE inserts, so on dictated speech
+# none of them can fire — the board measured 0 splits in 4,920 rows, which is
+# why only 6.2% of compounds were atomized correctly. These pin the tier that
+# reads the dependency parse instead, and the LLM must not be consulted for
+# any of them.
+
+def _no_llm(monkeypatch):
+    def _boom(*a, **k):
+        raise AssertionError("the clause tier must not need the model")
+    monkeypatch.setattr(engine_llm, "call_json", _boom)
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("book the gym and remind me to buy milk",
+     ["book the gym", "remind me to buy milk"]),
+    ("delete the gym session and add yoga on sunday",
+     ["delete the gym session", "add yoga on sunday"]),
+    ("call mom then pick up the dry cleaning",
+     ["call mom", "pick up the dry cleaning"]),
+    ("add gym tomorrow, buy milk, and call the dentist",
+     ["add gym tomorrow", "buy milk", "call the dentist"]),
+])
+def test_two_asks_are_split_without_the_model(text, expected, cfg, monkeypatch):
+    _no_llm(monkeypatch)
+    st = _seg(text, cfg)
+    assert [it.text for it in st.items] == expected
+
+
+@pytest.mark.parametrize("text", [
+    "meeting with Tal and Ravid at Kems tomorrow evening",   # two guests
+    "buy chicken and rice for dinner",                        # two things
+    "wash and fold the laundry",                              # serial verb
+    "meeting with tal and mark tomorrow",                     # a name that is also a verb
+])
+def test_one_ask_joined_by_and_is_never_split(text, cfg, monkeypatch):
+    """The join is inside ONE ask. A wrong merge is recoverable downstream; a
+    wrong split creates two garbage items immediately, so this direction is
+    the one that must never fail."""
+    _no_llm(monkeypatch)
+    st = _seg(text, cfg)
+    assert len(st.items) == 1
+
+
+def test_a_date_inside_the_first_ask_is_not_copied_onto_the_second(cfg, monkeypatch):
+    """"book gym tomorrow at 7am and remind me to buy milk" is a gym session
+    tomorrow and a milk errand with NO date.
+
+    Copying "tomorrow" onto the milk invents a deadline the speaker never
+    gave — the same failure as a repeated relative date overwriting other
+    events' real dates, which shipped once already. Only a date the utterance
+    OPENS with is shared."""
+    _no_llm(monkeypatch)
+    st = _seg("book gym tomorrow at 7am and remind me to buy milk", cfg)
+    assert [it.text for it in st.items] == [
+        "book gym tomorrow at 7am", "remind me to buy milk"]
+
+
+def test_an_enumeration_header_is_left_to_the_llm_tier(cfg, monkeypatch):
+    """A clause split cuts at the "and" but not at the colon, which would glue
+    the header onto the first item and lose the shared deadline from the rest.
+    The LLM tier owns headers; this one must decline."""
+    seen = {}
+
+    def _capture(cfg_, system, user, schema=None):
+        seen["called"] = True
+        return {"items": []}, 1
+
+    monkeypatch.setattr(engine_llm, "call_json", _capture)
+    _seg("two tasks due tomorrow: buy groceries and return the library book", cfg)
+    assert seen.get("called"), "the enumeration must reach the LLM tier"
+
+
 # --- the LLM path: consulted only when the words suggest compounding -------
 
 def test_no_compound_hint_means_no_llm_call(cfg, monkeypatch):
@@ -61,13 +135,20 @@ def test_no_compound_hint_means_no_llm_call(cfg, monkeypatch):
 
 
 def test_llm_split_of_two_independent_requests(cfg, monkeypatch):
+    """The LLM tier still splits what the parse could not read confidently.
+
+    The input is deliberately one the deterministic tier declines (an event
+    chain sharing a leading date, where no clause boundary is confident) —
+    otherwise this would never reach the model and would be testing nothing.
+    """
     monkeypatch.setattr(engine_llm, "call_json", lambda *a, **k: ({"items": [
-        {"kind": "event", "text": "book gym tomorrow at 7am"},
-        {"kind": "task", "text": "remind me to buy milk"},
+        {"kind": "event", "text": "gym at 7 am tomorrow"},
+        {"kind": "event", "text": "a meeting with Tal at 11 tomorrow"},
     ]}, 5))
-    st = _seg("book gym tomorrow at 7am and remind me to buy milk", cfg)
+    st = _seg("tomorrow gym at 7 am and a meeting with Tal at 11", cfg)
     assert [(it.kind, it.text) for it in st.items] == [
-        ("event", "book gym tomorrow at 7am"), ("task", "remind me to buy milk")]
+        ("event", "gym at 7 am tomorrow"),
+        ("event", "a meeting with Tal at 11 tomorrow")]
     assert st.llm_ms == 5
 
 
@@ -94,7 +175,7 @@ def test_llm_failure_never_loses_the_command(cfg, monkeypatch):
     def _offline(*a, **k):
         raise RuntimeError("ollama offline")
     monkeypatch.setattr(engine_llm, "call_json", _offline)
-    st = _seg("book gym tomorrow at 7am and remind me to buy milk", cfg)
+    st = _seg("tomorrow gym at 7 am and a meeting with Tal at 11", cfg)
     assert len(st.items) == 1            # one item is always a legitimate reading
 
 
@@ -106,7 +187,8 @@ def test_loop_back_mistakes_reach_the_prompt(cfg, monkeypatch):
         return {"items": []}, 1
 
     monkeypatch.setattr(engine_llm, "call_json", _capture)
-    st = EngineState(raw_text="x", text="book gym at 7 and remind me to buy milk")
+    st = EngineState(raw_text="x",
+                     text="tomorrow gym at 7 am and a meeting with Tal at 11")
     st.mistakes = ["you merged two independent requests"]
     segment.run(st, cfg)
     assert "merged two independent requests" in seen["system"]

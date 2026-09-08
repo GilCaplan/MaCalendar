@@ -58,3 +58,6 @@ dataset/snapshots/*/
 
 # Run archives: data stays local (manifests stay tracked as the identity record)
 dataset/runs/**/*.gz
+
+# regenerable render output from scripts/shoot_explorer.py
+DOCUMENTATION/artifacts/_shots/
