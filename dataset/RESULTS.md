@@ -1869,3 +1869,28 @@ the source.
 - Both: no change to the OTHER lane. If 4b moves the `--llm` numbers or 4a
   moves the deterministic ones, my model of the call graph is wrong and that
   is the finding.
+
+### CYCLE A PART 4b — RESULT — the pinned conventions now apply on every path
+
+**Correct change, far smaller effect than predicted.** Deterministic lane,
+FastRule test half: complex mis-typed **24.8% → 24.2%** (209 → 204 of 843) —
+five rows. Predicted 20–23%; missed low. Count-correctness unchanged (76.2%
+complex, 99.8% simple) exactly as predicted, and the `--llm` lane is untouched,
+so the call-graph model was right.
+
+**Why the prediction over-shot, and it is a lesson about the instrument:**
+`kind_board._predict` applies `_kind_of` AND `_enforce_pinned_kinds`. So the
+board was already simulating the fixed pipeline — 4b makes the PIPELINE match
+what the board had been measuring all along, which by construction the board
+cannot show. I predicted a kind-board movement that was impossible.
+
+That is worth writing down: **a board that models the fix cannot measure the
+fix.** The kind board's `_predict` is a reimplementation of the pipeline's kind
+path, and a reimplementation can be AHEAD of the real thing. Its 73.7% was
+never the deterministic path's real accuracy; it was the accuracy the path
+would have had if it called both functions. The real path was worse, and
+nothing was reporting that.
+
+**Banked as a small positive with a correction to the instrument's meaning.**
+The change stands on its own terms — the pinned conventions are product rules
+and must hold wherever an item came from, not only when a model produced it.

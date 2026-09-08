@@ -29,6 +29,7 @@ from __future__ import annotations
 import re
 
 from assistant.engine.state import EngineState, Item
+from assistant.intent.asks import every_part_is_an_ask
 
 # ("…")and("…") — the step-0 coalescing wrapper. Parentheses+quotes because a
 # bare "and" very much can occur inside one command.
@@ -652,6 +653,17 @@ def _llm_segments(state: EngineState, cfg) -> "list[Item] | None":
     # word with no verb or time) is the model imagining structure — refuse it.
     if any(len(t.split()) < 2 for _, t in parts):
         return None
+    # …and the same discipline the deterministic tiers carry. Measured on the
+    # FastRule test half, the `--llm` lane splits compounds far better than the
+    # parse (bleed 55.8% → 7.3%) and INVENTS structure where there is none:
+    # OVER 12.8% on the complex tier, and atomic rows kept-at-1 falling from
+    # 99.8% to 95.1%. The families say what it is doing — generic_target
+    # 62.7% OVER, date_marking 34.8%, all_day 33.3%, propose_confirm 27.1%:
+    # every one a shape with no second ask to find. The model has no
+    # under-split bias of its own, so the bias stays enforced in code here,
+    # exactly as it is for the clause tier and the list tier.
+    if not every_part_is_an_ask([t for _, t in parts]):
+        return None
     return [Item(id=f"item_{i + 1}", kind=k, text=t)
             for i, (k, t) in enumerate(parts)]
 
@@ -670,8 +682,16 @@ def run(state: EngineState, cfg) -> EngineState:
     if how and how != "clauses":
         state.text = " ".join(segments)
 
+    # `_enforce_pinned_kinds` used to be reachable ONLY from `_llm_segments`,
+    # so every item the deterministic tiers produced bypassed the pinned
+    # product conventions — the reminder-about-an-occasion rule, the "i need
+    # to meet" encounter rule, the calendar-invite rule. That was survivable
+    # while the deterministic tiers split almost nothing; the clause splitter
+    # made this path carry most of the traffic, and the conventions have to
+    # hold wherever the item came from.
     state.items = [
-        Item(id=f"item_{i + 1}", kind=_kind_of(seg), text=seg)
+        Item(id=f"item_{i + 1}",
+             kind=_enforce_pinned_kinds(_kind_of(seg), seg), text=seg)
         for i, seg in enumerate(segments)
     ]
 
