@@ -2009,3 +2009,33 @@ to 0 and kept 12 of the 14 gained compounds.
 **I predicted this failure mode in the comment before measuring it** ("book
 club" was the example I wrote down), which is the argument for measuring the
 guard rather than trusting the reasoning that produced it.
+
+## CYCLE B — REAL USAGE — REGISTERED PREDICTION 2026-09-08
+
+**Aimed by the instrument that outranks the others.** Two real failures came
+off Gil's phone today and both were genuine engine defects, not dataset
+artefacts: a run booked at midnight because "now" was never read as a time,
+and a create committed at confidence 1.00 titled "event". Neither was visible
+on any board — the FastRule shape board scores counts and action families,
+and an event called "event" at 00:00 has the right count and the right family.
+
+**So the hypothesis is about the INSTRUMENT before the code:** the boards
+cannot see the two things that actually reached the user. If that is true,
+the real-speech board should barely move despite today's fixes, and the gap
+is a metric gap rather than an engine gap.
+
+**Baseline** (before 643b01f): realspeech faithful/test — handled 70.3%,
+correct-on-handled 85.9%, explicit time right 96.2% (n=26), 0 destructive.
+
+**Predict:**
+- realspeech faithful/test: **correct-on-handled moves ≤2 pt** either way, and
+  the "now" fix shows up on **no line of the board** — because no row in that
+  set says "now", and the board has no title-quality column at all.
+- The engine board's **garbage-titles** line is the only existing metric that
+  could have caught the "event" title, and it only counts a fixed junk list
+  ({then, and, also, and then, so, please, now}) — which does NOT contain
+  "event". So it could not have caught it either.
+- **If both hold, cycle B's deliverable is a metric, not a patch**: a
+  title-quality line on the product-shape board, and "event"/"appointment"/
+  "reminder" added to the garbage list, then re-measure to find how many
+  existing rows were silently passing with a meaningless title.
