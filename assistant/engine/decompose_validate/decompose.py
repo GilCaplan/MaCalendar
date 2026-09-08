@@ -69,14 +69,14 @@ def _llm_split_times(item: Item, state, cfg) -> "list[Item] | None":
     whose words carry two or more clock-time mentions is worth a call."""
     from assistant.engine import llm as _llm
 
-    mentions = _TIME_MENTION_RE.findall(item.text)
+    mentions = _TIME_MENTION_RE.findall(item.spoken())
     if len(mentions) < 2:
         return None
-    if " and " not in item.text.lower():
+    if " and " not in item.spoken().lower():
         return None
     # "from 6 to 8" is a RANGE — two mentions, one event. Only more mentions
     # than the range accounts for makes this worth a look.
-    if re.search(rf"\bfrom\s+{_TIME}\s*(?:to|until|till)\s+\d", item.text,
+    if re.search(rf"\bfrom\s+{_TIME}\s*(?:to|until|till)\s+\d", item.spoken(),
                  re.IGNORECASE) and len(mentions) <= 2:
         return None
     system = _DECOMPOSE_SYSTEM
@@ -84,7 +84,7 @@ def _llm_split_times(item: Item, state, cfg) -> "list[Item] | None":
         system += "\n\nOn a previous attempt at THIS command you made these " \
                   "mistakes — do not repeat them:\n- " + "\n- ".join(state.mistakes)
     try:
-        out, ms = _llm.call_json(cfg, system, f"The request: {item.text}", _DECOMPOSE_SCHEMA)
+        out, ms = _llm.call_json(cfg, system, f"The request: {item.spoken()}", _DECOMPOSE_SCHEMA)
         state.llm_ms += ms
     except Exception:
         return None
@@ -97,13 +97,14 @@ def _llm_split_times(item: Item, state, cfg) -> "list[Item] | None":
 
 
 def _split_times(item: Item) -> "list[Item] | None":
-    m = _TIME_LIST_RE.search(item.text)
+    spoken = item.spoken()
+    m = _TIME_LIST_RE.search(spoken)
     if not m:
         return None
     t1, t2 = m.group(1).strip(), m.group(2).strip()
     subs = []
     for j, t in enumerate((t1, t2), start=1):
-        text = item.text[:m.start()] + f"at {t}" + item.text[m.end():]
+        text = spoken[:m.start()] + f"at {t}" + spoken[m.end():]
         subs.append(Item(id=f"{item.id}-{j}", kind=item.kind, text=text.strip(),
                          slots=dict(item.slots)))
     return subs
@@ -128,7 +129,7 @@ def _split_tasks(item: Item) -> "list[Item] | None":
     from assistant.intent.asks import every_part_is_an_ask
     from assistant.intent.list_split import ACTION_VERBS, split_items
 
-    parts = [p.strip() for p in split_items(item.text) if p.strip()]
+    parts = [p.strip() for p in split_items(item.spoken()) if p.strip()]
     if len(parts) <= 1:
         return None
     if not every_part_is_an_ask(parts, ACTION_VERBS):
@@ -140,10 +141,11 @@ def _split_tasks(item: Item) -> "list[Item] | None":
 
 def _extract_quantity(item: Item) -> None:
     from assistant.intent.quantity import split_quantity
-    clean, count = split_quantity(item.text)
+    clean, count = split_quantity(item.spoken())
     if count > 1:
         item.slots["quantity"] = count
         item.text = clean
+        item.time = None   # folded into text above
 
 
 def _strip_reminder_clause(item) -> None:
@@ -154,11 +156,12 @@ def _strip_reminder_clause(item) -> None:
     copy cannot drift from the other."""
     from assistant.intent import lead_time
 
-    rest, minutes = lead_time.split(item.text)
+    rest, minutes = lead_time.split(item.spoken())
     if minutes is None:
         return
     item.slots["reminder_minutes"] = minutes
     item.text = rest
+    item.time = None   # folded into text above
 
 
 def run(state: EngineState, cfg) -> EngineState:

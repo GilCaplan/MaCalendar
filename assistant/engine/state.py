@@ -61,7 +61,14 @@ class Item:
 
     id: str
     kind: str                 # one of ITEM_KINDS
-    text: str                 # the words for this item; stages may repair it
+    text: str                 # the ACTION words for this item; stages may
+                              # repair it. Since segmentation returns
+                              # (action, time, tag), the time is NOT in here —
+                              # it is in `time`. Use `spoken()` when you need
+                              # the command as the speaker said it.
+    time: str | None = None   # step 2: the time reference AS SPOKEN, never
+                              # resolved ("next friday", not a date). None when
+                              # the implementation does not separate it.
     slots: dict = field(default_factory=dict)   # structured hints: quantity,
                                                 # recurrence, attendees, times…
     action: str | None = None                   # step 5: registry action name
@@ -69,6 +76,28 @@ class Item:
     blocked: str | None = None                  # step 4: refusal reason (never
                                                 # executed; reported honestly)
     labels: dict = field(default_factory=dict)  # step 7: category / tag
+
+    def spoken(self) -> str:
+        """This item as the speaker said it — the action WITH its time.
+
+        Anything that parses an item for a date or a duration wants this, not
+        `text`. `FastRule` and the LLM parser both extract the time from the
+        string they are given, so handing them `text` alone silently produced
+        events with no time at all.
+
+        The date FLOOR is left out when the speaker never said it: SPEC defaults
+        an untimed item to "today", and pasting that in would put a word in the
+        title that nobody uttered.
+        """
+        when = (self.time or "").strip()
+        if not when:
+            return self.text
+        keep = [w for w in when.split()
+                if w.lower() != "today" or "today" in self.text.lower()]
+        tail = " ".join(keep).strip()
+        if not tail or tail.lower() in self.text.lower():
+            return self.text
+        return f"{self.text} {tail}"
 
 
 @dataclass

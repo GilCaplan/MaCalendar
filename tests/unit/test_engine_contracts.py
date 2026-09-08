@@ -58,7 +58,12 @@ def test_engine_state_fields():
 
 def test_item_fields():
     assert _field_names(Item) == {
-        "id", "kind", "text", "slots", "action", "intent", "blocked", "labels",
+        # `time` added 2026-09-08 (Gil): segmentation returns
+        # (action, time, tag), so the item carries the time separately instead
+        # of leaving it buried in `text`. A deliberate contract change, not a
+        # drift — see assistant/engine/segmentation/ARCHITECTURE.md.
+        "id", "kind", "text", "time", "slots", "action", "intent", "blocked",
+        "labels",
     }, FROZEN
 
 

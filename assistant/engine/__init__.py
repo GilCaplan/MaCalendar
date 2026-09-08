@@ -36,7 +36,7 @@ from typing import Any
 # aliases below are unchanged, and so are the Stage("...") identifiers — the
 # trace-visible stage set is pinned by trace.py's CHAINS and
 # test_panel_agreement, so this move is a relocation, not a shape change.
-from assistant.engine.segmentation.old_seg import segment as _segment
+from assistant.engine import segmentation as _segment
 from assistant.engine.ingest import repair as _transcript
 from assistant.engine.ingest.coalesce import coalesce  # noqa: F401  (re-exported: server.py and tests import it from here)
 from assistant.engine.decompose_validate import decompose as _decompose

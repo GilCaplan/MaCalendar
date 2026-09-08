@@ -107,7 +107,18 @@ def test_loop_back_reruns_segment_with_the_mistake(cfg, monkeypatch):
     chain sharing a leading date), so the merge this scenario needs is the
     LLM tier's to make. With a plainly-coordinated command the parse now
     splits it correctly first time and there is no loop-back to observe.
+
+    PINNED TO `old_seg` (2026-09-08). The loop-back can only be observed with a
+    segmenter that can CHANGE ITS MIND on a re-run. FastSeg is deterministic and
+    LLMSeg is off by default, so re-running segmentation on unchanged text
+    returns the same items and there is nothing for the second pass to fix —
+    the same reason `state.asked_fastrule` exists. This test covers the
+    loop-back MECHANISM, so it runs against the implementation that has an LLM
+    tier; `assistant/engine/segmentation/ARCHITECTURE.md` records that the
+    mechanism is inert while LLMSeg is off.
     """
+    import assistant.engine.segmentation as _seg
+    monkeypatch.setattr(_seg, "IMPLEMENTATION", "old_seg")
     text = "tomorrow gym at 7 am and a meeting with Tal at 11"
 
     calls = {"n": 0}

@@ -9,7 +9,8 @@ Contract (see DOCUMENTATION/ENGINE.md):
       in the background. Always records the score it saw.
   run(state, cfg) -> state
       Deep track, per item:
-      reads   item.text, item.slots, state.text
+      reads   item.spoken() (action WITH its time — a parser needs the
+              time in the string), item.slots, state.text
       writes  item.action, item.intent (an item whose text parses into
               several intents is expanded into sub-items, one intent each —
               per-item attribution is what keeps feedback from corrupting a
@@ -230,14 +231,14 @@ def _parse_item(item: Item, state: EngineState, cfg) -> "list | None":
             seen = state.asked_fastrule
             asked_before = item.text in seen
             seen.add(item.text)
-            res = None if asked_before else FastRule(bar).run(item.text, state.current_view)
+            res = None if asked_before else FastRule(bar).run(item.spoken(), state.current_view)
             if res is None:
                 if state.trace:
                     from assistant.trace import RULE
                     state.trace.step(RULE, f"Read {_friendly(item.id)}",
                                      "unchanged since the last attempt — "
                                      "straight to the model", ok=True)
-                got = parser.parse(item.text)
+                got = parser.parse(item.spoken())
                 _llm_trace(state, parser, cfg, f"Read {_friendly(item.id)}")
                 return _guard_inventions(got, item, state)
             if res.committed:
@@ -260,8 +261,8 @@ def _parse_item(item: Item, state: EngineState, cfg) -> "list | None":
                     state.trace.step(RULE, f"Read {_friendly(item.id)}",
                                      f"still more than one item ({res.reason})")
             rr = res.rule_result
-            got = parser.parse_with_context(item.text, rr) if rr is not None \
-                else parser.parse(item.text)
+            got = parser.parse_with_context(item.spoken(), rr) if rr is not None \
+                else parser.parse(item.spoken())
             _llm_trace(state, parser, cfg, f"Read {_friendly(item.id)}")
             got = _guard_inventions(got, item, state)
             if cls == REFUSAL:
@@ -271,7 +272,7 @@ def _parse_item(item: Item, state: EngineState, cfg) -> "list | None":
             pass
         except Exception:
             pass
-    got = parser.parse(item.text)
+    got = parser.parse(item.spoken())
     _llm_trace(state, parser, cfg, f"Read {_friendly(item.id)}")
     return _guard_inventions(got, item, state)
 
@@ -344,7 +345,7 @@ def run(state: EngineState, cfg) -> EngineState:
             # signature: 72% of event+task failures). One retry, restating
             # segment's own judgment in the words.
             try:
-                retried = _get_parser(cfg).parse(f"set an event: {item.text}")
+                retried = _get_parser(cfg).parse(f"set an event: {item.spoken()}")
                 _llm_trace(state, _get_parser(cfg), cfg, f"Re-read {_friendly(item.id)} as an event")
             except Exception:
                 retried = None
@@ -353,7 +354,7 @@ def run(state: EngineState, cfg) -> EngineState:
                               note="the parse contradicted the item's event kind")
                 got = retried
         if item.kind == "event" and (not got or all(n == "unknown" for n, _ in got)):
-            fb = _event_fallback(item.text)
+            fb = _event_fallback(item.spoken())
             if fb is not None:
                 item.action, item.intent = "create_event", fb
                 _apply_slots(item)      # a stripped lead time rides fallbacks too

@@ -115,6 +115,9 @@ def board(name: str, rows, predict, gold_of) -> dict:
 def main() -> None:
     import argparse
     ap = argparse.ArgumentParser()
+    ap.add_argument("--test", action="store_true",
+                    help="score the SEALED half — aggregates only, no row detail, "
+                         "and it never spawns a hypothesis (project rule)")
     ap.add_argument("--limit", type=int, default=0,
                     help="cap the rows; the OLD stage falls back to the LLM, so a "
                          "full pass is a model job")
@@ -124,14 +127,15 @@ def main() -> None:
     cfg = load_config()
     rows = [r for r in assign_splits(
         sc.load_rows(sorted(glob.glob(f"{_HERE}/datasets/*.jsonl"))))
-        if r["split"] == "train"]
+        if r["split"] == ("test" if a.test else "train")]
     if a.limit:
         # TRAP-STRATIFIED, not the first N: the rows sort by id, so a plain head
         # would be one template family repeated and would say nothing about the
         # shapes the two systems actually differ on.
         rows = stratified_sample(rows, a.limit)
 
-    print(f"{len(rows)} rows — segment-tuning TRAIN half\n")
+    print(f"{len(rows)} rows — segment-tuning "
+          f"{'SEALED TEST' if a.test else 'TRAIN'} half\n")
     print("Both systems judged ONLY on what both were built to do. The old "
           "stage never\nseparated time from action, so `time` and `exact-row` "
           "are N/A for it BY DESIGN,\nnot a failure — it is not scored on them.\n")
