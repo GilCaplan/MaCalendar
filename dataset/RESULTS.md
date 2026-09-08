@@ -1521,3 +1521,38 @@ overrides an explicit clock time. "book the coffee MORNING … thursday at
 7pm" → 08:00, while "coffee meetup" → 19:00. "the siyum TONIGHT at 8:45am"
 → 20:45. The substitution is unanchored and runs before temporal
 extraction, so a title word silently rewrites the user's stated time.
+
+## SPRINT CYCLE A — THE ATOMIZER — REGISTERED PREDICTION 2026-09-07
+
+**Baseline to beat** (atomizer board, deterministic path): compounds
+atomized correctly **6.2%** on the FastRule 7,200 test half, **0.0%** on the
+personas; segment split NOTHING in 4,920 rows; mis-typed 41.6%; decompose
+net-negative on personas (0 rescued, 17 damaged). Engine sealed-300
+reference (run 21): raw 83%, complex 67%, event+task 59%, fast path 90%.
+
+**Changes** (all implementation; architecture frozen):
+1. `coordination` returns the clause BOUNDARY it already computes, not a
+   boolean; segment splits deterministically at a confident boundary and
+   falls back to the LLM otherwise (its under-split bias preserved — an
+   unconfident boundary does not split).
+2. The four board-found bugs: `_split_tasks` hard-coding `kind="task"`;
+   the wrapper-phrase tear producing garbage titles; the lost shared
+   deadline; `_TASK_RE` recognising no non-create todo verb.
+3. Q15: a daypart is NOT a clock time (the largest mis-kind driver, 499 of
+   609).
+4. Q14: relabel the np_decoy families — a list of things for one verb is one
+   item PER THING.
+
+**Predict:**
+- atomizer board, B-test: compounds atomized correctly **6.2% → 25–40%**
+  (segment gains a mechanism that fires on speech); personas **0.0% → 15–30%**
+  (the boundary detector is not wording-specific, unlike decompose's rules);
+  mis-typed **41.6% → 15–25%** (the daypart rule and `_TASK_RE` are the two
+  named drivers); OVER stays ≤3% (the bias is preserved).
+- FastRule shape board: unchanged ±1 — this cycle does not touch FastRule.
+- engine dev-100: complex tier UP 5–15 pt; overall raw up 2–5 pt. (Noise
+  floor ~2.5–3 pt on dev-100, so only the complex movement is expected to
+  be legible.)
+- **Risk:** a deterministic splitter that fires wrongly creates garbage items
+  immediately, where an under-split gets recovered downstream. If OVER rises
+  above 3% or boundary-integrity degrades, that is a banked negative.
