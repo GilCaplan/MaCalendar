@@ -610,3 +610,74 @@ critical path of every command:
 2. **A smaller model may be the right one here.** Judging a proposal is an
    easier task than producing one, so the verifier may not need the same model
    the deep track uses. Worth testing once the board exists.
+
+---
+
+# 10 · Tuning the verifier prompt against llama3.1:8b (measured 2026-09-08)
+
+Gil asked whether the 8B we already have is good enough, rather than
+downloading another. **It is — but not with the protocol I first drafted.**
+
+14 cases (7 where FastSeg is right, 7 where it is wrong), temperature 0,
+scored on the FINAL DECOMPOSITION whichever protocol produced it.
+
+| variant | correct |
+|---|---|
+| V1 — as drafted: "No Change" or a correction | **5 / 14** |
+| V2 — V1 + a four-point checklist | **1 / 14** |
+| V3 — **no "No Change": always emit, we diff** | **11 / 14** |
+| V4 — V1 + explicit wrongness conditions | 9 / 14 |
+| V5 — V3 + count-first + "the parser is often wrong" | 9 / 14 |
+| V6 — V3 with no proposal shown at all | 8 / 14 |
+| V7 — V3 + count instruction, anchor kept | 9 / 14 |
+
+**Five findings, each with a number behind it:**
+
+1. **Removing the judgement is the whole win: 5 → 11.** Asking an 8B "is this
+   right?" invites the accept bias — V1 waved through 4 of 7 broken inputs.
+   Asking it to PRODUCE, then diffing deterministically, removes the decision
+   from the model entirely. This is the project's own crosscheck principle
+   applied one stage earlier: the model produces, code compares.
+2. **The anchor is worth +3** (V3 11 vs V6 8). Showing FastSeg's proposal
+   genuinely helps, which matches DialogUSR's grounding result.
+3. **But do not undermine it** (V5, 9). Telling the model the proposal is
+   "often wrong" made it start deleting correct times again.
+4. **Any extra instruction on top of V3 costs points** (V5, V7 both 9). The
+   winning prompt is the simple one.
+5. **A checklist is fatal** (V2, 1/14). It makes the model narrate — "Check 1:
+   COUNT. The command has…" — which breaks the output contract every time. An
+   8B cannot run a checklist silently.
+
+**Separately: counting is easy.** Asked ONLY "how many separate requests?",
+the same model scored **10/10** — including every trap: two people joined by
+"and" (1), serial verbs (1), a three-ask command (3), and a shopping list (2).
+Folding that instruction into the rewrite prompt HURT (V7), so if the count is
+wanted it belongs in its own call, at the price of a second round trip.
+
+**What V3 still gets wrong** — all three are cases where it keeps FastSeg's
+error: a back-scoped date, a merged compound, and a missed third ask. Two of
+the three are count errors, which is exactly what the separate count call is
+good at. That is the trade to measure on the real dataset: one call at 11/14,
+or two calls with a count gate.
+
+## The tuned prompt (V3)
+
+```
+COMMAND (exactly as spoken):
+{cmd}
+
+A parser proposed this decomposition. It may be right or wrong:
+{proposal}
+
+<RULES: the action/time/tag definitions and the four time-assignment rules>
+
+<EXAMPLES: the five traps>
+
+Output the CORRECT decomposition as one JSON object. If the proposal above is
+already correct, output it unchanged. Output the JSON and nothing else - no
+explanation, no preamble, no code fence.
+```
+
+Note what is NOT in it: no "No Change", no checklist, no count instruction, no
+warning that the parser is unreliable. Every one of those was tried and every
+one scored worse.
