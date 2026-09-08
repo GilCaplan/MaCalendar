@@ -73,7 +73,8 @@
 
 <main>
 <svg class="flow" viewBox="0 0 1400 372" role="img"
-     aria-label="Flow chart of the MACalendar engine, left to right: the words, intake, transcript, segment, decompose, validate, generate, crosscheck, commit, label, the answer. FastRule sits below generate and talks both ways. A dashed loop returns from crosscheck to segment with a budget of three.">
+     aria-label="Flow chart of the MACalendar engine, left to right: the audio prompt, intake, transcript, segment, decompose, validate, generate, crosscheck, commit, label, the answer. FastRule sits below generate and talks both ways. A dashed loop returns from crosscheck to segment with a budget of three.">
+  <title></title>
   <defs>
     <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7"
             orient="auto-start-reverse">
@@ -84,249 +85,122 @@
       <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--amber)"/>
     </marker>
   </defs>
-  <g class="node"><title>the spoken command, already turned into text. Whisper runs on the GPU
-from a cached model before the engine is called at all, so step 0 never sees audio — only
-words.</title>
-    <rect class="box" x="30" y="168" width="100" height="62" rx="8" stroke-dasharray="4 3"/>
-    <text class="name" x="80.0" y="195">the words</text>
+  <g class="node" data-tip="the audio prompt the speaker gave — where the whole journey starts.&#10;&#10;Whisper transcribes it on the GPU from a cached model BEFORE the engine is&#10;called, so what actually crosses the first wire is a string. Step 0 never&#10;receives audio.&#10;&#10;Typed text enters at exactly this point too, which is why typing works as&#10;well as speaking." aria-label="the audio prompt the speaker gave — where the whole journey starts.">
+    <circle class="box" cx="68" cy="199" r="37" stroke-dasharray="4 3"/>
+    <text class="name" x="68" y="196">audio</text>
+    <text class="name" x="68" y="210">prompt</text>
     
   </g>
-  <g class="node"><title>intake — step 0, in the orchestrator (assistant/engine/__init__.py).
-Owns the lock, so one command is parsed at a time. Commands arriving mid-run are queued and
-coalesced up to engine.coalesce_max_tokens; overflow runs sequentially.</title>
+  <g class="node" data-tip="intake — step 0, in the orchestrator (assistant/engine/__init__.py).&#10;Owns the lock, so one command is parsed at a time. Commands arriving mid-run are queued and&#10;coalesced up to engine.coalesce_max_tokens; overflow runs sequentially." aria-label="intake — step 0, in the orchestrator (assistant/engine/__init__.py).">
     <rect class="box" x="152" y="168" width="100" height="62" rx="8"/>
     <text class="name" x="202.0" y="195">intake</text>
     <text class="step" x="202" y="211">step 0</text>
   </g>
-  <g class="node"><title>transcript — step 1 (transcript.py). The only person-specific stage:
-the personal vocabulary repairs what was misheard and spoken filler comes off, so every stage
-after it is generic.</title>
+  <g class="node" data-tip="transcript — step 1 (transcript.py). The only person-specific stage:&#10;the personal vocabulary repairs what was misheard and spoken filler comes off, so every stage&#10;after it is generic." aria-label="transcript — step 1 (transcript.py). The only person-specific stage:">
     <rect class="box" x="274" y="168" width="100" height="62" rx="8"/>
     <text class="name" x="324.0" y="195">transcript</text>
     <text class="step" x="324" y="211">step 1</text>
   </g>
-  <g class="node"><title>segment — step 2 (segment.py). Splits the command into independent
-items and gives each a kind. Three tiers: literal delimiters, the clause parse, then one gated
-LLM call. Biased to UNDER-split — a wrong merge has two more chances, a wrong split is garbage
-immediately.</title>
+  <g class="node" data-tip="segment — step 2 (segment.py). Splits the command into independent&#10;items and gives each a kind. Three tiers: literal delimiters, the clause parse, then one gated&#10;LLM call. Biased to UNDER-split — a wrong merge has two more chances, a wrong split is garbage&#10;immediately." aria-label="segment — step 2 (segment.py). Splits the command into independent">
     <rect class="box" x="396" y="168" width="100" height="62" rx="8"/>
     <text class="name" x="446.0" y="195">segment</text>
     <text class="step" x="446" y="211">step 2</text>
   </g>
-  <g class="node"><title>decompose — step 3 (decompose.py). Breaks one item into the several
-things it really is: two spoken times, a list of items, a count. Bounded to one pass, ids one
-level deep.</title>
+  <g class="node" data-tip="decompose — step 3 (decompose.py). Breaks one item into the several&#10;things it really is: two spoken times, a list of items, a count. Bounded to one pass, ids one&#10;level deep." aria-label="decompose — step 3 (decompose.py). Breaks one item into the several">
     <rect class="box" x="518" y="168" width="100" height="62" rx="8"/>
     <text class="name" x="568.0" y="195">decompose</text>
     <text class="step" x="568" y="211">step 3</text>
   </g>
-  <g class="node"><title>validate — step 4 (validate.py). Two passes: text repair before
-generation, then seventeen NAMED field rules in fixed order after it, plus the observance gate.
-Every rule that fires is recorded by name.</title>
+  <g class="node" data-tip="validate — step 4 (validate.py). Two passes: text repair before&#10;generation, then seventeen NAMED field rules in fixed order after it, plus the observance gate.&#10;Every rule that fires is recorded by name." aria-label="validate — step 4 (validate.py). Two passes: text repair before">
     <rect class="box" x="640" y="168" width="100" height="62" rx="8"/>
     <text class="name" x="690.0" y="195">validate</text>
     <text class="step" x="690" y="211">step 4</text>
   </g>
-  <g class="node"><title>generate — step 5 (generate.py). Owns ALL text-to-intent conversion.
-Hands each item to FastRule first and asks the model only for what the rules could not read.</title>
+  <g class="node" data-tip="generate — step 5 (generate.py). Owns ALL text-to-intent conversion.&#10;Hands each item to FastRule first and asks the model only for what the rules could not read." aria-label="generate — step 5 (generate.py). Owns ALL text-to-intent conversion.">
     <rect class="box accent" x="762" y="168" width="100" height="62" rx="8"/>
     <text class="name" x="812.0" y="195">generate</text>
     <text class="step" x="812" y="211">step 5</text>
   </g>
-  <g class="node"><title>crosscheck — step 6 (crosscheck.py). The model EXTRACTS the asks the raw
-words contain; deterministic code diffs that list against what was produced and routes the blame.
-The model never picks the stage.</title>
+  <g class="node" data-tip="crosscheck — step 6 (crosscheck.py). The model EXTRACTS the asks the raw&#10;words contain; deterministic code diffs that list against what was produced and routes the blame.&#10;The model never picks the stage." aria-label="crosscheck — step 6 (crosscheck.py). The model EXTRACTS the asks the raw">
     <rect class="box" x="884" y="168" width="100" height="62" rx="8"/>
     <text class="name" x="934.0" y="195">crosscheck</text>
     <text class="step" x="934" y="211">step 6</text>
   </g>
-  <g class="node"><title>commit — the only place the engine writes. Everything goes through the
-action classes and db.py; a blocked item is refused out loud, never dropped quietly.</title>
+  <g class="node" data-tip="commit — the only place the engine writes. Everything goes through the&#10;action classes and db.py; a blocked item is refused out loud, never dropped quietly." aria-label="commit — the only place the engine writes. Everything goes through the">
     <rect class="box accent" x="1006" y="168" width="100" height="62" rx="8"/>
     <text class="name" x="1056.0" y="195">commit</text>
     <text class="step" x="1056" y="211">the write</text>
   </g>
-  <g class="node"><title>label — step 7 (label.py). Event category and colour, task tags. The
-action classes already applied them; this stage reads the results back onto the items so the
-reply and the trace can report what was chosen.</title>
+  <g class="node" data-tip="label — step 7 (label.py). Event category and colour, task tags. The&#10;action classes already applied them; this stage reads the results back onto the items so the&#10;reply and the trace can report what was chosen." aria-label="label — step 7 (label.py). Event category and colour, task tags. The">
     <rect class="box" x="1128" y="168" width="100" height="62" rx="8"/>
     <text class="name" x="1178.0" y="195">label</text>
     <text class="step" x="1178" y="211">step 7</text>
   </g>
-  <g class="node"><title>the answer returned to whichever client asked — the Mac GUI or the
-phone. Same response shape for both; `source` only labels the trace.</title>
+  <g class="node" data-tip="the answer returned to whichever client asked — the Mac GUI or the&#10;phone. Same response shape for both; `source` only labels the trace." aria-label="the answer returned to whichever client asked — the Mac GUI or the">
     <rect class="box" x="1250" y="168" width="100" height="62" rx="8" stroke-dasharray="4 3"/>
     <text class="name" x="1300.0" y="195">the answer</text>
     
   </g>
-  <g class="node"><title>FastRule — engine/fastrule.py. The deterministic rule parser plus its
-abstention gates and a confidence threshold, as one selective classifier. ~50 ms, no model.
-Abstaining is a correct outcome, not a miss.</title>
+  <g class="node" data-tip="FastRule — engine/fastrule.py. The deterministic rule parser plus its&#10;abstention gates and a confidence threshold, as one selective classifier. ~50 ms, no model.&#10;Abstaining is a correct outcome, not a miss." aria-label="FastRule — engine/fastrule.py. The deterministic rule parser plus its">
     <rect class="box model" x="742" y="292" width="140" height="52" rx="8"/>
     <text class="name" x="812" y="313">FastRule</text>
     <text class="step" x="812" y="328">no model · ~50 ms</text>
   </g>
-  <g class="wire"><title>carries  a STRING — the transcription of the spoken prompt.
-
-Whisper has already run, on the GPU from a cached model, before the engine is
-called: step 0 never receives audio, only words. Typed text enters by exactly
-the same door, which is why typing works as well as speaking.</title>
+  <g class="wire" data-tip="carries  a STRING — the transcription of the spoken prompt.&#10;&#10;Whisper has already run, on the GPU from a cached model, before the engine is&#10;called: step 0 never receives audio, only words. Typed text enters by exactly&#10;the same door, which is why typing works as well as speaking." aria-label="carries  a STRING — the transcription of the spoken prompt.">
     <line class="edge" x1="130" y1="199.0" x2="146" y2="199.0" marker-end="url(#ar)"/>
     <line class="hit" x1="130" y1="199.0" x2="146" y2="199.0"/>
   </g>
-  <g class="wire"><title>carries  raw_text — str. Exactly the words that arrived, unmodified.
-
-Wrapped in the EngineState that every stage from here on receives and mutates,
-alongside source ∈ {"mac","ios","test"}, current_view — str, and the client
-capability flags supports_edit / supports_confirm — bool.
-
-Nothing else passes between stages: no side channels, no imports of another
-stage's internals.</title>
+  <g class="wire" data-tip="carries  raw_text — str. Exactly the words that arrived, unmodified.&#10;&#10;Wrapped in the EngineState that every stage from here on receives and mutates,&#10;alongside source ∈ {&quot;mac&quot;,&quot;ios&quot;,&quot;test&quot;}, current_view — str, and the client&#10;capability flags supports_edit / supports_confirm — bool.&#10;&#10;Nothing else passes between stages: no side channels, no imports of another&#10;stage&#x27;s internals." aria-label="carries  raw_text — str. Exactly the words that arrived, unmodified.">
     <line class="edge" x1="252" y1="199.0" x2="268" y2="199.0" marker-end="url(#ar)"/>
     <line class="hit" x1="252" y1="199.0" x2="268" y2="199.0"/>
   </g>
-  <g class="wire"><title>carries  text — str. The working transcript, after the personal vocabulary
-         has repaired what was misheard and spoken filler has come off.
-
-Every stage from here reads THIS, never raw_text — except crosscheck, which
-grounds on the original on purpose.
-
-Set on the state in passing: corrections — list (vocabulary fixes, in the
-client's shape), needs_edit — list (words too doubtful to proceed on),
-ignored — bool (a false start is not parsed and not remembered).</title>
+  <g class="wire" data-tip="carries  text — str. The working transcript, after the personal vocabulary&#10;         has repaired what was misheard and spoken filler has come off.&#10;&#10;Every stage from here reads THIS, never raw_text — except crosscheck, which&#10;grounds on the original on purpose.&#10;&#10;Set on the state in passing: corrections — list (vocabulary fixes, in the&#10;client&#x27;s shape), needs_edit — list (words too doubtful to proceed on),&#10;ignored — bool (a false start is not parsed and not remembered)." aria-label="carries  text — str. The working transcript, after the personal vocabulary">
     <line class="edge" x1="374" y1="199.0" x2="390" y2="199.0" marker-end="url(#ar)"/>
     <line class="hit" x1="374" y1="199.0" x2="390" y2="199.0"/>
   </g>
-  <g class="wire"><title>carries  items — list[Item], ordered. Rebuilt fresh whenever segment runs.
-
-Item at this point:
-    id    — str, "item_1", "item_2", …
-    kind  — str, one of "event" | "task" | "review" | "other"
-    text  — str, the words belonging to this item
-
-slots, action, intent and labels are still empty; the stages after this fill
-them in turn.</title>
+  <g class="wire" data-tip="carries  items — list[Item], ordered. Rebuilt fresh whenever segment runs.&#10;&#10;Item at this point:&#10;    id    — str, &quot;item_1&quot;, &quot;item_2&quot;, …&#10;    kind  — str, one of &quot;event&quot; | &quot;task&quot; | &quot;review&quot; | &quot;other&quot;&#10;    text  — str, the words belonging to this item&#10;&#10;slots, action, intent and labels are still empty; the stages after this fill&#10;them in turn." aria-label="carries  items — list[Item], ordered. Rebuilt fresh whenever segment runs.">
     <line class="edge" x1="496" y1="199.0" x2="512" y2="199.0" marker-end="url(#ar)"/>
     <line class="hit" x1="496" y1="199.0" x2="512" y2="199.0"/>
   </g>
-  <g class="wire"><title>carries  items — list[Item], now ATOMIC: one event or one task each.
-
-An item may have been replaced by its sub-items, and the ids say so:
-"item_1" becomes "item_1-1", "item_1-2". Depth is bounded at one level —
-there is no "item_1-2-3".
-
-item.slots — dict, filled here: quantity (int), reminder_minutes (int),
-recurrence hints.</title>
+  <g class="wire" data-tip="carries  items — list[Item], now ATOMIC: one event or one task each.&#10;&#10;An item may have been replaced by its sub-items, and the ids say so:&#10;&quot;item_1&quot; becomes &quot;item_1-1&quot;, &quot;item_1-2&quot;. Depth is bounded at one level —&#10;there is no &quot;item_1-2-3&quot;.&#10;&#10;item.slots — dict, filled here: quantity (int), reminder_minutes (int),&#10;recurrence hints." aria-label="carries  items — list[Item], now ATOMIC: one event or one task each.">
     <line class="edge" x1="618" y1="199.0" x2="634" y2="199.0" marker-end="url(#ar)"/>
     <line class="hit" x1="618" y1="199.0" x2="634" y2="199.0"/>
   </g>
-  <g class="wire"><title>TWO-WAY — the one wire here that carries something different each way, which
-is why it has no arrowhead. Neither side is upstream of the other: generate
-calls FastRule per item and decides what to do with the verdict.
-
-→ generate sends   text — str, ONE item's words (and current_view — str).
-
-← FastRule returns FastRuleResult
-      committed     — bool. True: take `intents` on the fast track.
-      intents       — list[(action_name: str, intent: BaseIntent)]
-      confidence    — float, 0.0–1.0
-      reason        — str | None. None when committed; otherwise why it
-                      abstained ("generic-title:event", "skip:…").
-      missing_slots — list | None
-      rule_result   — the raw parse, so a hand-off to the model passes what
-                      the rules DID read instead of starting cold.</title>
+  <g class="wire" data-tip="TWO-WAY — the one wire here that carries something different each way, which&#10;is why it has no arrowhead. Neither side is upstream of the other: generate&#10;calls FastRule per item and decides what to do with the verdict.&#10;&#10;→ generate sends   text — str, ONE item&#x27;s words (and current_view — str).&#10;&#10;← FastRule returns FastRuleResult&#10;      committed     — bool. True: take `intents` on the fast track.&#10;      intents       — list[(action_name: str, intent: BaseIntent)]&#10;      confidence    — float, 0.0–1.0&#10;      reason        — str | None. None when committed; otherwise why it&#10;                      abstained (&quot;generic-title:event&quot;, &quot;skip:…&quot;).&#10;      missing_slots — list | None&#10;      rule_result   — the raw parse, so a hand-off to the model passes what&#10;                      the rules DID read instead of starting cold." aria-label="TWO-WAY — the one wire here that carries something different each way, which">
     <line class="edge two-way" x1="812" y1="230" x2="812" y2="286"/>
     <line class="hit" x1="812" y1="230" x2="812" y2="286"/>
   </g>
-  <g class="wire"><title>carries  items — list[Item], text repaired in place where it was garbled.
-
-item.blocked — str | None. A reason set here means the item is NEVER executed
-and the refusal is spoken out loud (this is the observance gate).
-
-state.fixes — list[Fix{stage, rule, before, after, note}], one entry per named
-rule that fired, so every change is greppable in the trace.</title>
+  <g class="wire" data-tip="carries  items — list[Item], text repaired in place where it was garbled.&#10;&#10;item.blocked — str | None. A reason set here means the item is NEVER executed&#10;and the refusal is spoken out loud (this is the observance gate).&#10;&#10;state.fixes — list[Fix{stage, rule, before, after, note}], one entry per named&#10;rule that fired, so every change is greppable in the trace." aria-label="carries  items — list[Item], text repaired in place where it was garbled.">
     <line class="edge" x1="740" y1="199.0" x2="756" y2="199.0" marker-end="url(#ar)"/>
     <line class="hit" x1="740" y1="199.0" x2="756" y2="199.0"/>
   </g>
-  <g class="wire"><title>carries  items — list[Item], each now carrying what to DO.
-
-    item.action — str, the registry action name: "create_event",
-                  "create_todo", "update_event", "delete_event",
-                  "complete_todo", "query_schedule", …
-    item.intent — BaseIntent, the validated object holding that action's
-                  fields (title, date, start_time, end_time, …).
-
-Nothing has been written to the database yet.</title>
+  <g class="wire" data-tip="carries  items — list[Item], each now carrying what to DO.&#10;&#10;    item.action — str, the registry action name: &quot;create_event&quot;,&#10;                  &quot;create_todo&quot;, &quot;update_event&quot;, &quot;delete_event&quot;,&#10;                  &quot;complete_todo&quot;, &quot;query_schedule&quot;, …&#10;    item.intent — BaseIntent, the validated object holding that action&#x27;s&#10;                  fields (title, date, start_time, end_time, …).&#10;&#10;Nothing has been written to the database yet." aria-label="carries  items — list[Item], each now carrying what to DO.">
     <line class="edge" x1="862" y1="199.0" x2="878" y2="199.0" marker-end="url(#ar)"/>
     <line class="hit" x1="862" y1="199.0" x2="878" y2="199.0"/>
   </g>
-  <g class="wire"><title>carries  state.mistakes — list[str]. What went wrong last time, handed to
-         each re-run's prompt so the same error is not repeated.
-         state.retries — dict, stage name → re-entry count.
-
-At most 3 re-entries per command, all stages combined.
-
-The loop also STOPS EARLY when a re-run would begin from the same items with
-the same complaint — it cannot help, and it only spends the budget.
-
-On exhaustion the last parse is judged anyway, committed, and the reply says
-so. It is never silently dropped.</title>
+  <g class="wire" data-tip="carries  state.mistakes — list[str]. What went wrong last time, handed to&#10;         each re-run&#x27;s prompt so the same error is not repeated.&#10;         state.retries — dict, stage name → re-entry count.&#10;&#10;At most 3 re-entries per command, all stages combined.&#10;&#10;The loop also STOPS EARLY when a re-run would begin from the same items with&#10;the same complaint — it cannot help, and it only spends the budget.&#10;&#10;On exhaustion the last parse is judged anyway, committed, and the reply says&#10;so. It is never silently dropped." aria-label="carries  state.mistakes — list[str]. What went wrong last time, handed to">
     <path class="edge loop" d="M 934 168 L 934 66 L 446 66 L 446 162" marker-end="url(#ara)"/>
     <path class="hit" d="M 934 168 L 934 66 L 446 66 L 446 162"/>
     <text class="elabel" x="690" y="52">blame sends it back · ≤ 3</text>
   </g>
-  <g class="wire"><title>carries  findings — list[CheckFinding], and the permission to write is that
-         this list is EMPTY.
-
-A finding is:
-    type         — str, "missing" | "extra" | "wrong_fields"
-    item_id      — str | None
-    detail       — str, the sentence shown in the trace
-    blamed_stage — str, a STAGES name, chosen by a DETERMINISTIC router.
-                   The model extracts the asks; it never picks the stage.
-
-Any finding sends execution back along the dashed wire instead.</title>
+  <g class="wire" data-tip="carries  findings — list[CheckFinding], and the permission to write is that&#10;         this list is EMPTY.&#10;&#10;A finding is:&#10;    type         — str, &quot;missing&quot; | &quot;extra&quot; | &quot;wrong_fields&quot;&#10;    item_id      — str | None&#10;    detail       — str, the sentence shown in the trace&#10;    blamed_stage — str, a STAGES name, chosen by a DETERMINISTIC router.&#10;                   The model extracts the asks; it never picks the stage.&#10;&#10;Any finding sends execution back along the dashed wire instead." aria-label="carries  findings — list[CheckFinding], and the permission to write is that">
     <line class="edge" x1="984" y1="199.0" x2="1000" y2="199.0" marker-end="url(#ar)"/>
     <line class="hit" x1="984" y1="199.0" x2="1000" y2="199.0"/>
   </g>
-  <g class="wire"><title>carries  executed — list[ExecutedAction], the rows actually written.
-
-    item_id — str
-    action  — str
-    message — str, the human sentence for the reply
-    ok      — bool
-    record  — tuple | None: ("event"|"todo", row id, action name, index),
-              attributed PER ITEM, which is what stops one item's feedback
-              landing on another's row.
-
-Also set: state.messages — list[str], reply fragments in order, and
-state.refresh — "events" | "todos" | "both" | "", telling the client which
-surface to reload.</title>
+  <g class="wire" data-tip="carries  executed — list[ExecutedAction], the rows actually written.&#10;&#10;    item_id — str&#10;    action  — str&#10;    message — str, the human sentence for the reply&#10;    ok      — bool&#10;    record  — tuple | None: (&quot;event&quot;|&quot;todo&quot;, row id, action name, index),&#10;              attributed PER ITEM, which is what stops one item&#x27;s feedback&#10;              landing on another&#x27;s row.&#10;&#10;Also set: state.messages — list[str], reply fragments in order, and&#10;state.refresh — &quot;events&quot; | &quot;todos&quot; | &quot;both&quot; | &quot;&quot;, telling the client which&#10;surface to reload." aria-label="carries  executed — list[ExecutedAction], the rows actually written.">
     <line class="edge" x1="1106" y1="199.0" x2="1122" y2="199.0" marker-end="url(#ar)"/>
     <line class="hit" x1="1106" y1="199.0" x2="1122" y2="199.0"/>
   </g>
-  <g class="wire"><title>carries  the response the client renders — message (str), actions (list),
-         refresh (str), the trace, the memory id behind the thumbs, and a
-         pending id when the model was offline.
-
-item.labels — dict — was filled just before: event category and colour, task
-tags. The action classes applied them when writing; label reads them back so
-the reply reports what was chosen rather than guessing.</title>
+  <g class="wire" data-tip="carries  the response the client renders — message (str), actions (list),&#10;         refresh (str), the trace, the memory id behind the thumbs, and a&#10;         pending id when the model was offline.&#10;&#10;item.labels — dict — was filled just before: event category and colour, task&#10;tags. The action classes applied them when writing; label reads them back so&#10;the reply reports what was chosen rather than guessing." aria-label="carries  the response the client renders — message (str), actions (list),">
     <line class="edge" x1="1228" y1="199.0" x2="1244" y2="199.0" marker-end="url(#ar)"/>
     <line class="hit" x1="1228" y1="199.0" x2="1244" y2="199.0"/>
   </g>
-  <g class="wire"><title>SELF-LOOP — one item goes in, N atomic items come out.
-
-Recursive but BOUNDED: a single decomposition pass, so ids go one level deep
-("item_1-2") and never further ("item_1-2-3").</title>
+  <g class="wire" data-tip="SELF-LOOP — one item goes in, N atomic items come out.&#10;&#10;Recursive but BOUNDED: a single decomposition pass, so ids go one level deep&#10;(&quot;item_1-2&quot;) and never further (&quot;item_1-2-3&quot;)." aria-label="SELF-LOOP — one item goes in, N atomic items come out.">
     <path class="edge" d="M 553 230 C 541 270, 595 270, 583 232" marker-end="url(#ar)"/>
     <path class="hit" d="M 553 230 C 541 270, 595 270, 583 232"/>
     <text class="elabel" x="568" y="288">depth 1</text>
   </g>
-  <g class="wire"><title>SELF-LOOP — one pass PER ITEM.
-
-generate runs once for each atomic item, and each item independently takes the
-rule answer or the model's. A command with three items makes three passes.</title>
+  <g class="wire" data-tip="SELF-LOOP — one pass PER ITEM.&#10;&#10;generate runs once for each atomic item, and each item independently takes the&#10;rule answer or the model&#x27;s. A command with three items makes three passes." aria-label="SELF-LOOP — one pass PER ITEM.">
     <path class="edge" d="M 797 168 C 785 128, 839 128, 827 166" marker-end="url(#ar)"/>
     <path class="hit" d="M 797 168 C 785 128, 839 128, 827 166"/>
     <text class="elabel" x="812" y="120">per item</text>
@@ -345,8 +219,7 @@ rule answer or the model's. A command with three items makes three passes.</titl
   var groups = document.querySelectorAll('g.wire, g.node');
 
   function textFor(g) {
-    var el = g.querySelector(':scope > title');
-    return el ? el.textContent : '';
+    return g.getAttribute('data-tip') || '';
   }
   function place(x, y) {
     tip.classList.add('on');
