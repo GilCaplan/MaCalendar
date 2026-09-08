@@ -8,6 +8,34 @@ to the log below so decisions stay findable.
 
 ## Open
 
+**Q16 — Does a trailing deadline scope over every task, or only the last
+one?** (2026-09-08, from cycle A's diagnosis.) "submit the grades and prepare
+the slides **by friday**" — is friday the deadline for both, or only for the
+slides? English supports both readings, and this project's standing convention
+is to pick one and apply it everywhere rather than guess per sentence (the same
+call already made for "until" vs "through").
+
+**Why I am asking instead of measuring.** I looked, and the data cannot decide
+it: **0 of 10,920 corpus rows have the explicit-marker shape**, and the nearest
+attested shape has self-contradictory gold — 45 train rows attach the trailing
+date to ask 1, 15 attach it to ask 2, and none attach it to both. So any rule I
+picked would be my preference wearing a measurement's clothes.
+
+**Why it matters now.** Segment's clause tier deliberately shares only a date
+the utterance OPENS with, never a trailing one, because a repeated relative
+date silently overwriting real dates was a shipped bug (a987aba). That
+asymmetry is currently a safety choice, not a ruling — and a wrong due date is
+user-visible harm in both directions: sharing invents a deadline nobody gave,
+not sharing drops one they did.
+
+My recommendation, if you want one: **share it for TASKS with an explicit
+marker ("by friday", "before monday"), not for events, and not for a bare
+trailing date.** A deadline marker scopes naturally over a list; an event's
+date does not. But this is your call, and I will implement whichever way you
+say — including "leave it alone", which is the current behaviour and costs
+nothing measurable today.
+
+
 **Q13 — Is a fast commit on a compound a violation when it produces exactly
 the right records?** (F16, 2026-09-07.) `fastrule_shape` scores ANY commit
 on a non-atomic row as a routing violation. On B-test 129 such commits
