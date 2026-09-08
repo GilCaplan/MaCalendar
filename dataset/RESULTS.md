@@ -1837,3 +1837,35 @@ _(Capture note: I ran the board through `tail -60`, so the M1–M3 block —
 including the headline "compounds atomized correctly" line and the by-ask-count
 table — scrolled off. The numbers above are all from M5/M7/tier sections that
 survived. The next run captures the whole board.)_
+
+## CYCLE A PART 4 — REGISTERED PREDICTION 2026-09-08
+
+Two changes, deliberately paired because they are measurable in DIFFERENT
+LANES — so bundling them costs no attribution.
+
+**4a — give the LLM tier the discipline the deterministic tiers have.**
+(Shows only in `--llm`.) `intent/asks.py` is applied to segment's clause tier
+and decompose's list tier and was never applied to the model's own output,
+whose only post-call guard is "no part shorter than two words". Part 3
+measured the consequence: OVER 12.8% on complex, 4.9% on simple.
+
+**4b — `_enforce_pinned_kinds` on the deterministic path.** (Shows only in the
+default lane.) It is called from exactly ONE place, inside `_llm_segments`;
+`segment.run()` builds items with `_kind_of` alone. So every item the clause
+splitter produces bypasses the pinned conventions — the reminder-about-an-
+occasion rule, the "i need to meet" encounter rule, the calendar-invite rule.
+The splitter added in part 1 made that path carry most of the traffic, which
+is part of why mis-typing rose. Found by the diagnosis fan-out, verified in
+the source.
+
+**Predict:**
+- 4a, `--llm` lane: complex OVER **12.8% → 5–8%**, simple count-correct
+  **95.1% → ≥98%**. Complex count-correct must not fall below 80% — refusing
+  a genuine split is the cost, and if it lands under 80 the guard is too
+  strict and gets loosened rather than kept.
+- 4b, default lane: complex mis-typed **24.8% → 20–23%**, kind-board accuracy
+  on the FastRule test half **73.7% → 76–80%**. Count-correctness unchanged
+  (this touches labels, not splitting).
+- Both: no change to the OTHER lane. If 4b moves the `--llm` numbers or 4a
+  moves the deterministic ones, my model of the call graph is wrong and that
+  is the finding.
