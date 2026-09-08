@@ -1942,3 +1942,36 @@ model tier is worth about +198 correct rows of 2,400.
 **Carried forward as the named next constraint:** 120 atomic rows over-split
 by the model, concentrated in four nameable families. Not a mystery — a
 target.
+
+### CYCLE A PART 5 — STOPPED BY THE LEAKAGE RULE, AND THAT IS THE RESULT
+
+4a left a named target: 120 atomic rows the model still splits, concentrated
+in `all_day` (33.3% OVER), `three_ask` (19.7%), `generic_target_complex`
+(21.6%), `propose_confirm` (11.0%). I went to mine the training half for the
+mechanism and **there is nothing there to mine**: the train pool holds only 49
+atomic rows across those families, and segment over-splits **0 of them**.
+
+The FastRule 7,200 split is BY FAMILY. So the failing constructions are, by
+construction, ones the training half does not contain. Direction may only come
+from training-pool failures (ITERATION_PROTOCOL, the sealed-set rule), and
+there are none — the honest options are to tune against held-out rows, which
+is forbidden and would make every subsequent number meaningless, or to stop.
+
+**Stopping. This is the "change the data, not the code" case**, and it is the
+first time this loop has actually hit it: a component stops improving on its
+dataset because the dataset no longer contains the failures that remain. The
+next cycle is a DATA cycle — generate training-half coverage for the four
+shapes, then re-aim.
+
+Worth noting what this does NOT mean. The four families are not mysterious:
+each is a shape with no second ask to find (an all-day block, a three-part
+list, a vague target, a question weighing one action). A rule could be written
+from the family NAMES alone without looking at a single held-out row. That
+would still be tuning to the test set through a side channel, so it is not
+being done — the generated rows have to come first and the rule has to be
+validated on them.
+
+**Also visible and train-reachable, so it becomes the other half of the next
+cycle:** `remind_then` is 50.0% UNDER-split (14 rows) — "remind me to X and
+then remind me to Y" is a compound the model merges. Under-splitting is the
+cheap error, but 50% of a named family is not noise.
