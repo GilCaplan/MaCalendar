@@ -519,3 +519,47 @@ Two cheap mitigations if the bias proves large:
    it should test are known and listed above.
 2. Show it FastSeg's answer only AFTER asking it to decompose, so it commits
    first. Costs more tokens; only worth it if the bias is bad.
+
+## 9.1 · The verifier runs on EVERY command — RULED (Gil, 2026-09-08)
+
+> "the LLM call should be made regardless — if it returns No Change we
+> continue anyway; if a correction, we take the correction and continue from
+> there."
+
+So it is synchronous and in the path, and the correction is authoritative:
+FastSeg's answer is replaced, not merged.
+
+**The cost, stated plainly because it is large.** Today FastRule commits in
+~50 ms on ~47% of commands with no model call at all. An always-on verifier
+means every command pays one round trip — even a two-word "No Change" costs
+prompt processing plus generation, which on this hardware is roughly **1–2 s
+minimum**. The common case therefore goes from ~50 ms to ~1–2 s, a 20–40×
+increase, though it stays well under the 4–30 s the deep path costs today.
+
+That may be entirely acceptable for a calendar assistant. The point is that it
+is a real trade and it should be **decided on a number rather than a
+preference** — which is exactly what this dataset makes possible.
+
+**The two numbers that settle it.** A verifier is not judged by accuracy but
+by whether its interventions help:
+
+- **Correction RECALL** — of the rows where FastSeg is wrong, how many does
+  the verifier fix? This is the value it adds.
+- **Correction PRECISION** — of the rows it chooses to change, how many does
+  it actually improve? A verifier that repairs 80% of errors while breaking
+  5% of the answers that were already right can still be **net negative**,
+  because correct answers vastly outnumber wrong ones. This is the number
+  that decides whether the design ships.
+
+Both fall straight out of the dataset: run FastSeg alone, run FastSeg +
+verifier, and diff against gold. Add a third line for the bias ADaPT warns
+about — how often it says "No Change" on a row that is known wrong.
+
+**Two consequences for the implementation**, given the call is now on the
+critical path of every command:
+1. **Keep the prompt short.** Every token is latency on every command. The
+   seven worked examples in §9 are there for accuracy; if latency bites, they
+   are the first thing to measure trimming.
+2. **A smaller model may be the right one here.** Judging a proposal is an
+   easier task than producing one, so the verifier may not need the same model
+   the deep track uses. Worth testing once the board exists.
