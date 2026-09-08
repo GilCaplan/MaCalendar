@@ -1894,3 +1894,51 @@ nothing was reporting that.
 **Banked as a small positive with a correction to the instrument's meaning.**
 The change stands on its own terms — the pinned conventions are product rules
 and must hold wherever an item came from, not only when a model produced it.
+
+### CYCLE A PART 4a — RESULT — the guard works, and the lane is production
+
+**FastRule test half, `--llm` lane, before and after giving the LLM tier
+`intent/asks.py`:**
+
+| | before 4a | after 4a | predicted |
+|---|---|---|---|
+| complex count-correct | 84.4% | **90.1%** | ≥80% ✓ |
+| complex OVER | 12.8% | **6.8%** | 5–8% ✓ |
+| simple count-correct | 95.1% | **96.6%** | ≥98% ✗ |
+| simple OVER | 4.9% | **3.4%** | |
+| compounds atomized correctly | — | **89.6%** | |
+| 2-ask count-correct | — | **92.3%** | (part 3 predicted 65–80%) |
+
+**Two of three guards met.** Over-splitting halved into the predicted band and
+count-correctness ROSE rather than paying for it — refusing the model's bad
+splits does not cost its good ones. The atomic-row guard missed: 96.6% against
+≥98%, so 120 of 1,774 single-ask commands are still split by the model. The
+guard is not tight enough for the shapes part 3 named (generic_target,
+date_marking, all_day, propose_confirm) and that is where the next tightening
+goes.
+
+**And the reframing, which matters more than the numbers: THIS LANE IS
+PRODUCTION.** `segment.run()` calls `_llm_segments` whenever the deterministic
+tiers found nothing, so the model tier is live. The board's DEFAULT lane —
+the one every result before part 3 was measured in — is the artificial one; it
+disables the model to isolate the deterministic tier.
+
+That isolation is legitimate and it is how parts 1, 2 and 4b were correctly
+attributed. But it means the deterministic numbers were never the product's
+behaviour, and this cycle is the first time the product's own compound
+handling has been on a board at all:
+
+| | deterministic (isolation) | with the model (production) |
+|---|---|---|
+| compounds atomized correctly | 43.5% | **89.6%** |
+| 2-ask count-correct | 44.1% | **92.3%** |
+| complex count-correct | 76.2% | **90.1%** |
+| simple count-correct | 99.8% | 96.6% |
+
+The product is much better at compounds than the isolation lane suggested,
+and somewhat worse at leaving single commands alone. Net on this slice, the
+model tier is worth about +198 correct rows of 2,400.
+
+**Carried forward as the named next constraint:** 120 atomic rows over-split
+by the model, concentrated in four nameable families. Not a mystery — a
+target.
