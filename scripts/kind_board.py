@@ -76,6 +76,20 @@ DATASETS = {
 def _predict(text: str) -> str:
     """Kind, as segment would decide it IN THE PIPELINE.
 
+    **This is a REIMPLEMENTATION of segment's kind path, and it has already
+    been ahead of the real one.** When this board was written, `segment.run()`
+    called `_kind_of` alone — `_enforce_pinned_kinds` was reachable only from
+    `_llm_segments` — while this function called both. So every number it
+    reported was the accuracy the deterministic path WOULD have had if it
+    applied the pinned conventions, not the accuracy it had. Nothing was
+    reporting the real one, and a cycle was predicted against a movement that
+    was arithmetically impossible (part 4b).
+
+    They agree as of 59a524e. If `run()`'s kind assignment changes again, this
+    must change with it — or better, both should come to call one named reader
+    in segment.py, which is the fix this comment is standing in for.
+
+
     The cleanup matters and is easy to leave out: transcript (step 1) strips
     spoken noise before segment ever sees the words, and several of the kind
     regexes are `^`-anchored. Feeding raw dataset text here makes "um i need
