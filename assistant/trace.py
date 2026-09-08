@@ -55,7 +55,7 @@ STAGE_INFO = {
             "runs, so a mishearing never becomes a wrong event."),
         "rules first": (
             "Rules first",
-            "A deterministic rule parser reads the command first \u2014 76 verb "
+            "A deterministic rule parser reads the command first \u2014 84 verb "
             "mappings \u2014 and scores its own confidence. When it is sure it answers "
             "in milliseconds without ever calling the language model. That is the "
             "fast lane; the deep track keeps checking behind it."),

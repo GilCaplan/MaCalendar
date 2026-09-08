@@ -17,7 +17,6 @@ If confidence >= RULE_THRESHOLD and missing_slots == []:
 Else:
   → pass raw_slots to LLM as pre-analysis context (parse_with_context)
 
-RuleParserSkip is raised when the complexity gate fires or no intent matches.
 Pipeline catches it and falls through to full LLM parse.
 """
 
