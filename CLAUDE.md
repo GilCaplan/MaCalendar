@@ -248,11 +248,15 @@ of the single-item commands instead of deferring them" is. Say which data
 consequence. This applies in chat and in every md file.
 
 **Always name the metric with the number.** "70→72" is meaningless in a vacuum;
-"count-correct 73.5%→75% on event+task" is a result. There are six metrics
-(count-correctness, missing-half, date-collapse, garbage-titles,
-parse-path/latency, and — since 2026-09-07 — label-correctness: category
-accuracy + macro P/R/F1 on events, tag micro-P/R/F1 on tasks, matched items
-only, against the dataset's canonical category fixture), each with slices — never report a score without saying
+"count-correct 73.5%→75% on event+task" is a result. Metrics are organised BY COMPONENT, not as one flat list — `dataset/METRICS.md`
+is the map. Five levels: the ENGINE board (count-correctness, item P/R/F1,
+missing-half, date-collapse, garbage titles, field quality, label-correctness,
+parse path + latency); FASTRULE's product-shape board (atomic handle-rate and
+correct-on-handled are PRIMARY, plus date/time correctness, invention rate,
+harm, and the non-atomic diagnostic split); the CLASSIFIERS (accuracy +
+per-class P/R/F1 for atomicity, operation, kind); the PERSONAS (per-speaker
+boards and the spread); and REAL USAGE (`weekly_review`), **which outranks the
+rest** — it is the only instrument measuring real speech. Each has slices — never report a score without saying
 which metric and which slice, in chat and in the md files alike.
 
 The hand-written corpus (`scripts/audit_assistant.py` →

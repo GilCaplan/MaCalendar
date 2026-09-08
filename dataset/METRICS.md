@@ -1,4 +1,74 @@
-# Metrics for scoring a dataset run
+# The metrics — organised by what they measure
+
+_Restructured 2026-09-07. There is no longer one flat list: each COMPONENT is
+measured at its own granularity, which is the whole point of stage isolation
+— the engine's headline can only say THAT something is wrong; a component
+measured on its own says WHAT._
+
+**The pattern is the same everywhere** (Gil's framing): recall = "of the
+things that should have happened, how many did", precision = "of what we
+did, how much was right" — asked at the level of a classifier decision, a
+component's job, an item, or a slot. Three metrics deliberately break that
+pattern, each because precision/recall cannot express something we care
+about: **harm** (errors are not equal), the **knew-vs-accident split**
+(measures the mechanism, not the outcome), and **latency**.
+
+## Level 1 — the ENGINE (`engine_dataset_compare` → `score_dataset_run`)
+
+| metric | question |
+|---|---|
+| count-correctness (raw + product-adjusted) | did the command produce the right number of events/tasks? |
+| item-level precision / recall / F1 | of expected items, how many exist; of created items, how many were asked for |
+| missing-half | on a two-part command that failed, WHICH half vanished |
+| date-collapse | did two dated things land on one date |
+| garbage titles | a title the transcript never justified |
+| field quality / when-correct | are the matched items' contents grounded in what was said |
+| label-correctness | category accuracy + macro P/R/F1 (events), tag micro-P/R/F1 (tasks) |
+| parse path + latency (p50/p95) | which track answered, and how slowly |
+
+## Level 2 — FASTRULE, the atomic-item executor (`scripts/fastrule_shape.py`)
+
+Measured by what it is FOR, not how busy it is. **Primary** (Gil, Q13):
+
+| metric | question |
+|---|---|
+| **atomic handle-rate** | of single-item commands, how many did it act on (coverage) |
+| **correct-on-handled** | of what it acted on, how much was right (precision) |
+| date correctness | of committed creates with a resolvable date phrase, how many landed right |
+| time correctness | of committed events with an explicit spoken time, how many matched |
+| invention rate | events where NO time was said — did it invent one anyway |
+| **harm** | severity-weighted cost of wrong commits: delete=4, update/complete=2, create=1, query=0 — because a wrong delete and a wrong title are not the same failure |
+
+**Diagnostic** (non-atomic rows — the engine decides, so no target):
+covered (all asks present, acceptable) · **half-executed** (an ask missing —
+the real defect) · deferred, split into "knew it was compound" vs "by
+accident", because only the first survives as FastRule improves.
+
+## Level 3 — the CLASSIFIERS (`scripts/fit_route_models.py`, `atomicity_board.py`)
+
+Accuracy + per-class precision/recall/F1 + macro-F1 for atomicity,
+operation and kind — reported per dataset, and for atomicity as three
+separate predictors (rules alone / model alone / the wired layer), because
+that is what revealed the layer scoring worse than the model inside it.
+Error COUNTS not just rates: a wrong "compound" costs a slow path, a wrong
+"atomic" half-executes a command.
+
+## Level 4 — SPEAKERS (`scripts/persona_board.py`)
+
+Per-persona boards plus the SPREAD between best and worst — the spread is
+the finding. Plus the vocabulary-vs-phrasing ablation, which showed the
+engine is tuned to sentence shapes (7–29 pt) and not to vocabulary (0–3 pt).
+
+## Level 5 — REAL USAGE (`scripts/weekly_review.py`) — the outer gate
+
+Flag rate and accuracy on Gil's actual commands, test traffic excluded.
+**This one outranks the others**: it is the only instrument measuring real
+speech, and it currently disagrees with them sharply (50% vs an 85%
+benchmark). A cycle that moves a benchmark while this stays flat has not
+helped anybody.
+
+---
+
 
 `scripts/score_dataset_run.py` scores a `dummy_<N>.db` (or diffs two of
 them) without any hand-written ground truth. That's only possible because of

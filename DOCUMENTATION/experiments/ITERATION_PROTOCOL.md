@@ -94,7 +94,7 @@ their conventions pass.
 main engine: `python -m scripts.engine_dataset_compare --limit 0 --test`.
 Pure evaluation — nothing else: no change rides the run, no hypothesis comes
 from it, the tooling emits aggregates only, and the result is recorded as a
-single MILESTONE line in RESULTS.md (all six metrics, labeled "milestone —
+single MILESTONE line in RESULTS.md (the full engine board, labeled "milestone —
 sealed test") for Gil. It answers exactly one question — is the training
 progress real off the training pool? — and its slope across milestones is
 the honest generalization trajectory. If a milestone disappoints, the
@@ -129,7 +129,7 @@ four is still handled wrongly. That, not handle rate, is the next target.
 Cycle running is suspended in favour of STAGE ISOLATION
 (`DOCUMENTATION/STAGE_ISOLATION_PLAN.md`). Everything in this protocol
 stays true and resumes unchanged when the parts are proven — eras,
-registered predictions, the six metrics, the sealed test, the every-10
+registered predictions, the metric levels (dataset/METRICS.md), the sealed test, the every-10
 milestone. What changes meanwhile: **the unit of work is a stage, not a
 cycle**, and each stage is judged on its own dataset's test half rather
 than the engine board.
@@ -304,7 +304,7 @@ what teaches the next step.
 
 **Every measurement run also appends one row to `dataset/loop_log.csv`** —
 baseline, fix rerun, upsize confirm, held-out check alike: started/finished
-timestamps, duration, commit, slice, and **all five metrics with their
+timestamps, duration, commit, slice, and **the engine board's metrics with their
 breakdowns** — count-correct (overall/complexity/compound-kind),
 missing-half, latency p50/p95, parse-path mix (n_deep/n_fast + per-path
 correctness), e+e date-collapse, garbage titles — plus a one-line summary.
