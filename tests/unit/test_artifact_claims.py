@@ -784,3 +784,47 @@ def test_the_split_drawn_on_the_loop_view_matches_the_files():
             f"test_split.json holds {n_sealed} rows")
     if not drew:
         pytest.skip("no published page draws the split")
+
+
+def test_the_metric_formulas_on_the_evaluation_view_match_the_scorers():
+    """The evaluation view's hover tooltips spell out how each number is
+    computed — the severity weights, the field-quality weights, the brevity
+    cutoff. Those are constants in the scorers, and a page that quotes them
+    goes stale the moment one is tuned.
+
+    Reads the RAW file, not `all_prose`: the tooltips live in <title> inside
+    <svg>, and the prose fixture strips <svg> on purpose. Written against
+    `all_prose` first, this test passed happily while the severity weight was
+    perturbed to 5 — a check that cannot fail is worse than no check, so it is
+    verified to go red before being trusted.
+    """
+    import re as _re
+    shape = (ROOT / "scripts" / "fastrule_shape.py").read_text()
+    fieldq = (ROOT / "scripts" / "field_quality.py").read_text()
+
+    sev = dict(_re.findall(
+        r'"(delete_event|update_event|complete_todo|create_event)":\s*(\d)', shape))
+    weights = dict(_re.findall(
+        r'weights\["(when|title|extras)"\]\s*=\s*([\d.]+)', fieldq))
+    brevity = _re.search(r"len\(words\)\s*<=\s*(\d+)", fieldq)
+    assert sev and weights and brevity, "could not read the constants out of the scorers"
+
+    checked = False
+    for path in PAGES:
+        raw = path.read_text()
+        if "THE PRODUCT-SHAPE BOARD" not in raw:
+            continue
+        checked = True
+        name = path.name
+        for label, value in (("delete", sev["delete_event"]),
+                             ("update", sev["update_event"]),
+                             ("create", sev["create_event"])):
+            assert f"{label} {value}" in raw, (
+                f"{name}: harm weights the {label} at {value}; the page says otherwise")
+        for slot in ("when", "title", "extras"):
+            assert f"{slot} {weights[slot]}" in raw, (
+                f"{name}: field quality weights `{slot}` at {weights[slot]}")
+        assert f"up to {brevity.group(1)} words" in raw, (
+            f"{name}: the title brevity cutoff is {brevity.group(1)} words")
+    if not checked:
+        pytest.skip("no page carries the evaluation formulas")

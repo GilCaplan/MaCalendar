@@ -877,31 +877,99 @@
     <text x="640" y="54" font-size="9.5" letter-spacing="1.2" fill="var(--muted)">AND THE DATA EACH ONE READS</text>
     <text x="462" y="54" font-size="7" fill="var(--muted)">a board reads the</text>
     <text x="462" y="64" font-size="7" fill="var(--muted)">set it points to</text>
-    <g data-panel="lvl1" role="button" tabindex="0" aria-label="Board 1: the engine board. count-correctness · item P/R/F1 · field quality · labels"><title>Board 1: the engine board. count-correctness · item P/R/F1 · field quality · labels</title>
+    <g data-panel="lvl1" role="button" tabindex="0" aria-label="Board 1: the engine board. count-correctness · item P/R/F1 · field quality · labels"><title>Board 1: the engine board. count-correctness · item P/R/F1 · field quality · labels
+
+BOARD 1 — THE ENGINE BOARD  (score_dataset_run.py + field_quality.py)
+
+count-correctness = scored rows where the COUNT of created records met the expectation / scored rows.
+   It compares NUMBERS OF RECORDS, never their words:
+   • compound event+task -&gt; needs &gt;=1 event AND &gt;=1 task
+   • a creation request  -&gt; needs &gt;=1 record of any kind
+   • a query or a delete -&gt; needs EXACTLY 0 records created (creating one is the failure)
+
+field quality = per created item, a weighted score:  event = when 0.5 + title 0.3 + extras 0.2
+   • when.TIME  — produced start_time vs every explicit clock time in the transcript,
+                  compared as (hour mod 12, minutes). A bare "at 7" matches any minute.
+                  Nothing said about a time -&gt; NOT SCORED, rather than counted right.
+   • when.DATE  — produced ISO date vs today / tonight / tomorrow / a named weekday.
+                  Only those are checkable; any other phrase -&gt; NOT SCORED.
+   • title      — share of the title's content words that also appear in the transcript,
+                  times a brevity factor (1.0 up to 7 words, then 7/len, floor 0.3).
+                  Stopwords and bare digits are excluded from "content words".
+   • extras     — location / description / attendees: if present, &gt;=50% of their words
+                  must come from the transcript (an invention check). Absent -&gt; not scored.
+
+garbage titles = a created title that matches a fixed junk list ("event", "reminder", ...).
+date-collapse  = 2+ created events sharing one identical (date, start_time) pair.</title>
       <rect class="frame" x="30" y="68" width="390" height="62" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
       <text x="225" y="88" text-anchor="middle" font-size="9.5" font-weight="600">1 · the engine board</text>
       <text x="225" y="102" text-anchor="middle" font-size="7" fill="var(--amber)">grain: the whole command</text>
       <text x="225" y="116" text-anchor="middle" font-size="7.5" fill="var(--muted)">count-correctness · item P/R/F1 · field quality · labels</text>
     </g>
-    <g data-panel="lvl2" role="button" tabindex="0" aria-label="Board 2: the product-shape board. handled? · right? · harm · half-executions"><title>Board 2: the product-shape board. handled? · right? · harm · half-executions</title>
+    <g data-panel="lvl2" role="button" tabindex="0" aria-label="Board 2: the product-shape board. handled? · right? · harm · half-executions"><title>Board 2: the product-shape board. handled? · right? · harm · half-executions
+
+BOARD 2 — THE PRODUCT-SHAPE BOARD  (fastrule_shape.py)
+
+handled (the coverage half)      = atomic rows FastRule COMMITTED on / atomic rows.
+correct-on-handled (the precision half) = committed rows that were right / committed rows.
+   "right" is again a COUNT test, plus the action family:
+   • create -&gt; events created &gt;= expected AND todos created &gt;= expected
+   • query / delete / update -&gt; zero records created, and at least one action
+     whose name starts with the expected family
+
+date correctness = committed creates whose ISO date equals what the gold date_phrase
+   resolves to on a frozen clock. A phrase naming a RANGE resolves to nothing and is not scored.
+time correctness = produced start_time == the gold time_phrase as HH:MM — scored ONLY when
+   that phrase is an explicit clock time.
+invention rate   = of committed events where the speaker said NO time at all, the share
+   given a start_time other than 00:00. (00:00 = all-day = the honest answer.)
+
+harm = SUM OF SEVERITY over wrong commits, not a count:
+   delete 4  ·  update 2  ·  complete 2  ·  create 1  ·  query 0.
+   A count would call a wrong delete and a spurious row the same failure. They are not.</title>
       <rect class="frame" x="30" y="142" width="390" height="62" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
       <text x="225" y="162" text-anchor="middle" font-size="9.5" font-weight="600">2 · the product-shape board</text>
       <text x="225" y="176" text-anchor="middle" font-size="7" fill="var(--amber)">grain: one command's routing</text>
       <text x="225" y="190" text-anchor="middle" font-size="7.5" fill="var(--muted)">handled? · right? · harm · half-executions</text>
     </g>
-    <g data-panel="lvl3" role="button" tabindex="0" aria-label="Board 3: the three classifiers. per-class P/R/F1 · both error kinds as COUNTS"><title>Board 3: the three classifiers. per-class P/R/F1 · both error kinds as COUNTS</title>
+    <g data-panel="lvl3" role="button" tabindex="0" aria-label="Board 3: the three classifiers. per-class P/R/F1 · both error kinds as COUNTS"><title>Board 3: the three classifiers. per-class P/R/F1 · both error kinds as COUNTS
+
+BOARD 3 — THE THREE CLASSIFIERS  (atomicity / operation / kind)
+
+Per class: precision = correct predictions of that class / all predictions of it.
+           recall    = correct predictions of that class / all true instances of it.
+           F1        = harmonic mean of the two.
+Both error directions are reported as COUNTS as well as rates, because a rate hides
+which way the model is failing — and the kind classifier's failure was almost entirely
+one direction (tasks read as events) while its accuracy looked ordinary.</title>
       <rect class="frame" x="30" y="216" width="390" height="62" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
       <text x="225" y="236" text-anchor="middle" font-size="9.5" font-weight="600">3 · the three classifiers</text>
       <text x="225" y="250" text-anchor="middle" font-size="7" fill="var(--amber)">grain: one decision</text>
       <text x="225" y="264" text-anchor="middle" font-size="7.5" fill="var(--muted)">per-class P/R/F1 · both error kinds as COUNTS</text>
     </g>
-    <g data-panel="lvl4" role="button" tabindex="0" aria-label="Board 4: the speakers. a board each, and the SPREAD between best and worst"><title>Board 4: the speakers. a board each, and the SPREAD between best and worst</title>
+    <g data-panel="lvl4" role="button" tabindex="0" aria-label="Board 4: the speakers. a board each, and the SPREAD between best and worst"><title>Board 4: the speakers. a board each, and the SPREAD between best and worst
+
+BOARD 4 — THE SPEAKERS  (persona_board.py)
+
+Every board above, recomputed per invented speaker, plus the SPREAD = best minus worst.
+The spread is the metric: one number for the whole set can be healthy while the system
+works twice as well for the speaker who talks like its author. Measured: atomic handle
+rate 72.2% for that speaker against 33.9% for a terse student.</title>
       <rect class="frame" x="30" y="290" width="390" height="62" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
       <text x="225" y="310" text-anchor="middle" font-size="9.5" font-weight="600">4 · the speakers</text>
       <text x="225" y="324" text-anchor="middle" font-size="7" fill="var(--amber)">grain: one speaker</text>
       <text x="225" y="338" text-anchor="middle" font-size="7.5" fill="var(--muted)">a board each, and the SPREAD between best and worst</text>
     </g>
-    <g data-panel="lvl5" role="button" tabindex="0" aria-label="Board 5: real usage. the flag rate — and it outranks everything above it"><title>Board 5: real usage. the flag rate — and it outranks everything above it</title>
+    <g data-panel="lvl5" role="button" tabindex="0" aria-label="Board 5: real usage. the flag rate — and it outranks everything above it"><title>Board 5: real usage. the flag rate — and it outranks everything above it
+
+BOARD 5 — REAL USAGE  (weekly_review.py) — outranks everything above
+
+flag rate = commands the person marked wrong / commands they actually gave.
+   Test traffic (source: "test") is excluded, and verdicts arriving in a BURST are
+   dropped — clearing a backlog in one sitting is not a judgement about each command.
+   It refuses to report an accuracy at all below three approvals, rather than
+   publishing a number computed from two.
+There is no constructed ground truth here: the label IS a person's verdict.</title>
       <rect class="frame" x="30" y="364" width="390" height="62" rx="6" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.6"/>
       <text x="225" y="384" text-anchor="middle" font-size="9.5" font-weight="600" fill="var(--amber)">5 · real usage</text>
       <text x="225" y="398" text-anchor="middle" font-size="7" fill="var(--amber)">grain: one real command</text>
