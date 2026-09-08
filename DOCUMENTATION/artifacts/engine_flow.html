@@ -73,7 +73,7 @@
 
 <main>
 <svg class="flow" viewBox="0 0 1400 372" role="img"
-     aria-label="Flow chart of the MACalendar engine, left to right: the audio prompt, intake, transcript, segment, decompose, validate, generate, crosscheck, commit, label, the answer. FastRule sits below generate and talks both ways. A dashed loop returns from crosscheck to segment with a budget of three.">
+     aria-label="Flow chart of the MACalendar engine, left to right: the audio transcription, intake, transcript, segment, decompose, validate, generate, crosscheck, commit, label, the answer. FastRule sits below generate and talks both ways. A dashed loop returns from crosscheck to segment with a budget of three.">
   <title></title>
   <defs>
     <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7"
@@ -85,10 +85,10 @@
       <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--amber)"/>
     </marker>
   </defs>
-  <g class="node" data-tip="the audio prompt the speaker gave — where the whole journey starts.&#10;&#10;Whisper transcribes it on the GPU from a cached model BEFORE the engine is&#10;called, so what actually crosses the first wire is a string. Step 0 never&#10;receives audio.&#10;&#10;Typed text enters at exactly this point too, which is why typing works as&#10;well as speaking." aria-label="the audio prompt the speaker gave — where the whole journey starts.">
-    <circle class="box" cx="68" cy="199" r="37" stroke-dasharray="4 3"/>
-    <text class="name" x="68" y="196">audio</text>
-    <text class="name" x="68" y="210">prompt</text>
+  <g class="node" data-tip="the TRANSCRIPTION of what the speaker said — where the journey starts.&#10;&#10;Whisper transcribes it on the GPU from a cached model BEFORE the engine is&#10;called, so what actually crosses the first wire is a string. Step 0 never&#10;receives audio.&#10;&#10;Typed text enters at exactly this point too, which is why typing works as&#10;well as speaking." aria-label="the TRANSCRIPTION of what the speaker said — where the journey starts.">
+    <circle class="box" cx="70" cy="199" r="45" stroke-dasharray="4 3"/>
+    <text class="name" x="70" y="196" style="font-size:10px">audio</text>
+    <text class="name" x="70" y="209" style="font-size:10px">transcription</text>
     
   </g>
   <g class="node" data-tip="intake — step 0, in the orchestrator (assistant/engine/__init__.py).&#10;Owns the lock, so one command is parsed at a time. Commands arriving mid-run are queued and&#10;coalesced up to engine.coalesce_max_tokens; overflow runs sequentially." aria-label="intake — step 0, in the orchestrator (assistant/engine/__init__.py).">
