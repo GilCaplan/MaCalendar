@@ -1,7 +1,7 @@
 """Run a segment implementation over the corpus and print its six boards.
 
-    python -m segment_tuning.run_board --predictor fastseg          # no model
-    python -m segment_tuning.run_board --predictor segment          # + LLMSeg
+    python -m assistant.engine.segmentation.experiments.run_board --predictor fastseg          # no model
+    python -m assistant.engine.segmentation.experiments.run_board --predictor segment          # + LLMSeg
 
 Two rules this runner enforces so the numbers stay honest:
 
@@ -26,12 +26,12 @@ import os
 import sys
 import time
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_ROOT = os.path.dirname(_HERE)
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_HERE)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from segment_tuning import score as scorer               # noqa: E402
+from assistant.engine.segmentation.experiments import score as scorer               # noqa: E402
 
 #: Fraction of families held out. Matches the hand-written files' own ~40%,
 #: which were split before this runner existed.
@@ -99,7 +99,7 @@ def stratified_sample(rows: "list[dict]", size: int,
     return sorted(picked.values(), key=key)
 
 
-_CACHE = os.path.join(_HERE, "runs", "llmseg_cache.jsonl")
+_CACHE = os.path.join(_HERE, "experiments", "runs", "llmseg_cache.jsonl")
 
 
 def _load_cache() -> dict:
@@ -135,7 +135,7 @@ def build_predictor(name: str):
     # import allowlist, so the predictor reports `seconds` and board E
     # aggregates it into a per-row average.
     if name == "fastseg":
-        from segment_tuning.fastseg import fastseg
+        from assistant.engine.segmentation.fastseg.fastseg import fastseg
 
         def predict(text):
             t0 = time.perf_counter()
@@ -144,7 +144,7 @@ def build_predictor(name: str):
                     "seconds": time.perf_counter() - t0, "tier": "fastseg"}
         return predict, "FastSeg alone (deterministic, no model)"
     if name == "segment":
-        from segment_tuning.llmseg import segment
+        from assistant.engine.segmentation.llmseg.llmseg import segment
 
         # A model pass costs ~19s a row, so a 150-row board is 45 minutes and a
         # killed run used to lose all of it. Every answer is cached on disk by
@@ -188,7 +188,7 @@ def main() -> None:
     ap.add_argument("--samples", type=int, default=12)
     a = ap.parse_args()
 
-    rows = assign_splits(scorer.load_rows(sorted(glob.glob(f"{_HERE}/data/*.jsonl"))))
+    rows = assign_splits(scorer.load_rows(sorted(glob.glob(f"{_HERE}/datasets/*.jsonl"))))
     want = "test" if a.test else "train"
     rows = [r for r in rows if r["split"] == want]
     if a.source:

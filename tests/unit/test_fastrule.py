@@ -4,7 +4,7 @@ conftest.py has already pointed every store at scratch before this import.
 """
 import pytest
 
-from assistant.engine.fastrule import FastRule
+from assistant.engine.fastrule.fastrule import FastRule
 
 
 @pytest.fixture
@@ -151,7 +151,7 @@ def test_f16_the_model_tier_is_consulted_on_a_multi_intent_parse(fastrule):
     about it is the next test's business.
     """
     from types import SimpleNamespace
-    from assistant.engine.fastrule import Atomicity
+    from assistant.engine.fastrule.fastrule import Atomicity
     two = [("create_event", SimpleNamespace()), ("create_todo", SimpleNamespace())]
     text = "book gym on tuesday at 7am and remind me to buy milk"
     assert Atomicity().judge(text, two) == "model-compound"
@@ -166,7 +166,7 @@ def test_f16_routing_commits_a_compound_the_parse_fully_covers(fastrule):
     sentence read as two intents drops one, which is the real harm.
     """
     from types import SimpleNamespace
-    from assistant.engine.fastrule import _parse_covers_the_compound
+    from assistant.engine.fastrule.fastrule import _parse_covers_the_compound
     two = [("create_event", SimpleNamespace()), ("create_todo", SimpleNamespace())]
     one = [("create_event", SimpleNamespace())]
     assert _parse_covers_the_compound(

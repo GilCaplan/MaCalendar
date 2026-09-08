@@ -20,9 +20,9 @@ from __future__ import annotations
 import pytest
 
 from assistant.engine import _confirm_proposal, _create_spec
-from assistant.engine.segment import is_interrogative_create
+from assistant.engine.segmentation.old_seg.segment import is_interrogative_create
 from assistant.engine.state import EngineState, Item
-from assistant.engine import validate as _validate
+from assistant.engine.decompose_validate import validate as _validate
 
 
 # ---------------------------------------------------------------------------
@@ -194,7 +194,7 @@ def confirming_engine(monkeypatch):
     """Stub steps 2-5 so the gate is exercised without a model: the words are
     a question about creating something, and the parse is a create."""
     from assistant.actions.calendar.intent import CalendarIntent
-    from assistant.engine import generate as _generate
+    from assistant.engine.generate import generate as _generate
 
     def fake_deep(state, cfg):
         state.items = [Item(id="item_1", kind="event", text=state.text,

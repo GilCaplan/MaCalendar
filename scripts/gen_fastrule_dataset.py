@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Generate the FastRule eval/train dataset from pattern + filler banks
-under dataset/fastrule/banks/. Currently 7,200 rows: the original 6,000-row
+under assistant/engine/fastrule/datasets/banks/. Currently 7,200 rows: the original 6,000-row
 stratified 80/20 pool (train 4,800 / test 1,200) plus a 1,200-row
 forced-test-only pool grown on top of it (Gil, 2026-09-07) — see
-`build_forced_test()` and dataset/fastrule/SPLIT.md.
+`build_forced_test()` and assistant/engine/fastrule/datasets/SPLIT.md.
 
 WHY a generator instead of thousands of hand-written rows: the banks are the
 authored artifact (pattern SKELETONS + generic slot fillers); this script
@@ -36,8 +36,8 @@ Usage:
     python -m scripts.gen_fastrule_dataset            # generate + verify
     python -m scripts.gen_fastrule_dataset --no-write  # verify-only dry run
 
-See dataset/fastrule/DATASET.md for the schema and design rationale, and
-dataset/fastrule/SPLIT.md for how the 80/20 train/test split is built and
+See assistant/engine/fastrule/datasets/DATASET.md for the schema and design rationale, and
+assistant/engine/fastrule/datasets/SPLIT.md for how the 80/20 train/test split is built and
 why TEST ROWS MUST NEVER BE MINED (Gil's ruling — see that file).
 """
 from __future__ import annotations

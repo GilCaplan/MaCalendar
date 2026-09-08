@@ -12,7 +12,7 @@ VERB-rooted and an EVENT, because `book` is a calendar verb. If the lexical
 variant beats the syntactic one, the tag problem is not syntactic and a POS
 rewrite should not be sold on it.
 
-    python -m segment_tuning.pos_sizing
+    python -m assistant.engine.segmentation.experiments.pos_sizing
 
 Train half only — direction comes from the training pool.
 """
@@ -23,8 +23,8 @@ import glob
 import os
 import sys
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_ROOT = os.path.dirname(_HERE)
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_HERE)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
@@ -39,9 +39,9 @@ os.environ.setdefault("MACALENDAR_CATEGORIES", f"{_SCRATCH}/cat.json")
 os.environ.setdefault("MACALENDAR_TRACE_BUS", f"{_SCRATCH}/trace.jsonl")
 os.environ.setdefault("MACALENDAR_NO_WARMUP", "1")
 
-from segment_tuning import score as sc                 # noqa: E402
-from segment_tuning.fastseg import fastseg, find_time_refs   # noqa: E402
-from segment_tuning.run_board import assign_splits     # noqa: E402
+from assistant.engine.segmentation.experiments import score as sc                 # noqa: E402
+from assistant.engine.segmentation.fastseg.fastseg import fastseg, find_time_refs   # noqa: E402
+from assistant.engine.segmentation.experiments.run_board import assign_splits     # noqa: E402
 
 #: Verbs that put something on the CALENDAR even though they are verbs. This
 #: is the list the syntactic hypothesis has to beat — if it wins, the signal is
@@ -131,7 +131,7 @@ def make_variants(nlp):
 
 def main() -> None:
     rows = [r for r in assign_splits(
-        sc.load_rows(sorted(glob.glob(f"{_HERE}/data/*.jsonl"))))
+        sc.load_rows(sorted(glob.glob(f"{_HERE}/datasets/*.jsonl"))))
         if r["split"] == "train"]
 
     print(f"loading spaCy…", flush=True)

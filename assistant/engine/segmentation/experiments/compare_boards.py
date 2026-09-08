@@ -8,8 +8,8 @@ on one board that is paid for on another cannot be reported as a win.
 Model answers are replayed from `runs/prompt_lab_cache.jsonl`, so this makes NO
 model calls and can be re-run freely.
 
-    python -m segment_tuning.compare_boards --variant v4-full
-    python -m segment_tuning.compare_boards --variant boundaries --source handwritten
+    python -m assistant.engine.segmentation.experiments.compare_boards --variant v4-full
+    python -m assistant.engine.segmentation.experiments.compare_boards --variant boundaries --source handwritten
 """
 from __future__ import annotations
 
@@ -18,8 +18,8 @@ import glob
 import os
 import sys
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_ROOT = os.path.dirname(_HERE)
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_HERE)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
@@ -31,10 +31,11 @@ for k, v in dict(MACALENDAR_DB=f"{_S}/c.db", MACALENDAR_MEMORY_DB=f"{_S}/m.db",
                  MACALENDAR_NO_WARMUP="1").items():
     os.environ.setdefault(k, v)
 
-from segment_tuning import llmseg, score as sc               # noqa: E402
-from segment_tuning.fastseg import fastseg                   # noqa: E402
-from segment_tuning.prompt_lab import _cache_load, interpret  # noqa: E402
-from segment_tuning.run_board import assign_splits, stratified_sample  # noqa: E402
+from assistant.engine.segmentation.llmseg import llmseg
+from assistant.engine.segmentation.experiments import score as sc               # noqa: E402
+from assistant.engine.segmentation.fastseg.fastseg import fastseg                   # noqa: E402
+from assistant.engine.segmentation.experiments.prompt_lab import _cache_load, interpret  # noqa: E402
+from assistant.engine.segmentation.experiments.run_board import assign_splits, stratified_sample  # noqa: E402
 
 #: (label, path into the result dict, formatter). Every board is represented —
 #: omitting one is how a regression gets reported as a win.
@@ -105,7 +106,7 @@ def main() -> None:
     a = ap.parse_args()
 
     pool = [r for r in assign_splits(
-        sc.load_rows(sorted(glob.glob(f"{_HERE}/data/*.jsonl"))))
+        sc.load_rows(sorted(glob.glob(f"{_HERE}/datasets/*.jsonl"))))
         if r["split"] == "train"]
     rows = stratified_sample(pool, a.sample)
     cache = _cache_load()

@@ -34,7 +34,7 @@ structure-matched macro-average (the clean comparison).
 
 GROUND TRUTH IS BY CONSTRUCTION, never hand-labelled: this script chose the
 filler that became `slots.title`, and the structure declares
-action/atomic/events/tasks once. Same row schema as `dataset/fastrule/` so the
+action/atomic/events/tasks once. Same row schema as `assistant/engine/fastrule/datasets/` so the
 same scorers can read it.
 
 TEST-ONLY, ALWAYS. Every row is `split: "test"`. These rows are never used to

@@ -188,15 +188,31 @@ def check_engine(deep: bool = False) -> Check:
     c = Check("engine — the assistant pipeline (this version)")
     from assistant.trace import BRAIN_VERSION, CHAINS
     c.add(True, f"brain version: {BRAIN_VERSION}")
-    # every stage module imports (wired)
-    stages = ["transcript", "segment", "decompose", "validate", "generate", "crosscheck", "label"]
+    # Every stage module imports (wired). Each entry is (component folder,
+    # module to import) — the folder name is what the health check reports and
+    # what `test_the_engine_layer_covers_every_real_engine_stage` matches
+    # against, and the module path is what actually proves the stage is wired.
+    # Both are needed since the component-folder restructure: a component can
+    # hold more than one stage module (decompose_validate holds two) and the
+    # folder name is no longer the import path.
+    stages = [
+        ("ingest",             "assistant.engine.ingest.repair"),
+        ("ingest",             "assistant.engine.ingest.coalesce"),
+        ("segmentation",       "assistant.engine.segmentation.old_seg.segment"),
+        ("decompose_validate", "assistant.engine.decompose_validate.decompose"),
+        ("decompose_validate", "assistant.engine.decompose_validate.validate"),
+        ("generate",           "assistant.engine.generate.generate"),
+        ("llmjudge",           "assistant.engine.llmjudge.llmjudge"),
+        ("label",              "assistant.engine.label.label"),
+    ]
     import importlib
-    for st in stages:
+    for component, module in stages:
+        leaf = module.rsplit(".", 1)[-1]
         try:
-            importlib.import_module(f"assistant.engine.{st}")
-            c.add(True, f"stage wired: {st}")
+            importlib.import_module(module)
+            c.add(True, f"stage wired: {component}/{leaf}")
         except Exception as e:
-            c.add(False, f"stage MISSING: {st} — {e}")
+            c.add(False, f"stage MISSING: {component}/{leaf} — {e}")
     # the version has a documented chain of thought
     c.add(BRAIN_VERSION in CHAINS, f"chain-of-thought spec defined for {BRAIN_VERSION}")
     # the live path answers with a coherent trace + the right version

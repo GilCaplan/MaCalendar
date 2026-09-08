@@ -1,0 +1,67 @@
+rows: 571 of 1040 TRAIN   traps 44/44   hand-written 80 (14%)   95% CI +/-4.1%
+  FastSeg alone   exact-row  50.3%   item-count  83.0%
+
+    …boundaries 25/571
+    …boundaries 50/571
+    …boundaries 75/571
+    …boundaries 100/571
+    …boundaries 125/571
+    …boundaries 150/571
+    …boundaries 175/571
+    …boundaries 200/571
+    …boundaries 225/571
+    …boundaries 250/571
+    …boundaries 275/571
+    …boundaries 300/571
+    …boundaries 325/571
+    …boundaries 350/571
+    …boundaries 375/571
+    …boundaries 400/571
+    …boundaries 425/571
+    …boundaries 450/571
+    …boundaries 475/571
+    …boundaries 500/571
+    …boundaries 525/571
+    …boundaries 550/571
+  boundaries      exact-row  33.8%   item-count  57.8%   fixes 31 / breaks 126   unusable 0  skipped 0   4.0s/row
+    …count 25/571
+    …count 50/571
+    …count 75/571
+    …count 100/571
+    …count 125/571
+    …count 150/571
+    …count 175/571
+    …count 200/571
+    …count 225/571
+    …count 250/571
+    …count 275/571
+    …count 300/571
+    …count 325/571
+    …count 350/571
+    …count 375/571
+    …count 400/571
+    …count 425/571
+    …count 450/571
+    …count 475/571
+    …count 500/571
+    …count 525/571
+    …count 550/571
+  count           exact-row  48.2%   item-count  80.6%   fixes 6 / breaks 19   unusable 6  skipped 0   0.9s/row
+    …v4-full 25/571
+    …v4-full 50/571
+    …v4-full 75/571
+    …v4-full 100/571
+    …v4-full 125/571
+    …v4-full 150/571
+    …v4-full 175/571
+    …v4-full 200/571
+    …v4-full 225/571
+    …v4-full 250/571
+    …v4-full 275/571
+    …v4-full 300/571
+    …v4-full 325/571
+    …v4-full 350/571
+    …v4-full 375/571
+    …v4-full 400/571
+    …v4-full 425/571
+    …v4-full 450/571

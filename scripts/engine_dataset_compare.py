@@ -328,7 +328,7 @@ def main() -> int:
     # which used to happen inside the first row's freeze, so every fast_propose
     # raised and all 250 rows silently took the deep track (caught on the
     # 2026-09-05 re-baseline: parse paths {'deep': 250}).
-    from assistant.engine import generate as _gen
+    from assistant.engine.generate import generate as _gen
     _rp = _gen._get_rule_parser()
     if _rp is not None:
         try:

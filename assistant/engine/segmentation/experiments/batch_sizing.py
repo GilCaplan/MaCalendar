@@ -22,7 +22,7 @@ Two separate questions, deliberately measured together:
     reply can spoil K commands — so the product wants a smaller, safer K than
     the harness does.
 
-    python -m segment_tuning.batch_sizing            # one llama job, ~10 min
+    python -m assistant.engine.segmentation.experiments.batch_sizing            # one llama job, ~10 min
 """
 from __future__ import annotations
 
@@ -31,8 +31,8 @@ import os
 import sys
 import time
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_ROOT = os.path.dirname(_HERE)
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_HERE)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
@@ -44,10 +44,10 @@ for k, v in dict(MACALENDAR_DB=f"{_S}/c.db", MACALENDAR_MEMORY_DB=f"{_S}/m.db",
                  MACALENDAR_NO_WARMUP="1").items():
     os.environ.setdefault(k, v)
 
-from segment_tuning import llmseg                       # noqa: E402
-from segment_tuning.fastseg import fastseg              # noqa: E402
+from assistant.engine.segmentation.llmseg import llmseg                       # noqa: E402
+from assistant.engine.segmentation.fastseg.fastseg import fastseg              # noqa: E402
 
-_CACHE = os.path.join(_HERE, "runs", "llmseg_cache.jsonl")
+_CACHE = os.path.join(_HERE, "experiments", "runs", "llmseg_cache.jsonl")
 
 
 def load_baseline() -> "list[tuple[str, list]]":

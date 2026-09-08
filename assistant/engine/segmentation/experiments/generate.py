@@ -1,7 +1,7 @@
 """Turn the existing 321 FastRule templates into segment gold, by construction.
 
 The hand-written rows in `data/*_traps.jsonl` are the honest core, but they are
-slow to write and they carry my blind spots. `dataset/fastrule/banks/
+slow to write and they carry my blind spots. `assistant/engine/fastrule/datasets/banks/
 complex_patterns.json` already holds 321 templates that were built for a
 different board — and it encodes exactly what segment gold needs:
 
@@ -31,13 +31,13 @@ import random
 import re
 import sys
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_ROOT = os.path.dirname(_HERE)
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_HERE)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 _BANKS = os.path.join(_ROOT, "dataset", "fastrule", "banks")
 
-from segment_tuning import invariant                  # noqa: E402
+from assistant.engine.segmentation.fastseg import invariant                  # noqa: E402
 
 # --------------------------------------------------------------------------
 # What counts as a time reference — by SLOT NAME, which is why gold is exact
@@ -356,7 +356,7 @@ def build(per_template: int = 6, seed: int = 20260908) -> "tuple[list[dict], lis
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--per-template", type=int, default=6)
-    ap.add_argument("--out", default=os.path.join(_HERE, "data", "generated.jsonl"))
+    ap.add_argument("--out", default=os.path.join(_HERE, "datasets", "generated.jsonl"))
     ap.add_argument("--report", action="store_true")
     a = ap.parse_args()
 

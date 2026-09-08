@@ -16,7 +16,7 @@ So compound RECALL is the metric to move, with precision as the guard rail.
 Two datasets, reported separately (Gil, 2026-09-07 — "use more than one
 dataset"):
 
-    B = dataset/fastrule/fastrule_7200.jsonl   `expect.atomic` is ground
+    B = assistant/engine/fastrule/datasets/fastrule_7200.jsonl   `expect.atomic` is ground
         truth BY CONSTRUCTION; split by pattern family, so the test half is
         wordings never trained on. Generated, so its compound phrasings are
         template-shaped.
@@ -137,8 +137,8 @@ def predictions(rows, floor: "float | None" = None):
     all three predictors come out of the same pass.
     """
     from freezegun import freeze_time
-    from assistant.engine import generate as _generate
-    from assistant.engine.fastrule import Atomicity
+    from assistant.engine.generate import generate as _generate
+    from assistant.engine.fastrule.fastrule import Atomicity
     from assistant.intent.classifier import ROUTER
 
     atom = Atomicity()

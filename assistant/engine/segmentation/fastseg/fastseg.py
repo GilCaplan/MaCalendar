@@ -28,11 +28,12 @@ import os
 import re
 import sys
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from segment_tuning import invariant as _invariant   # noqa: E402
+from assistant.engine.segmentation.fastseg import invariant as _invariant   # noqa: E402
 
 # ---------------------------------------------------------------------------
 # TIME EXPRESSIONS
@@ -468,7 +469,7 @@ def tag(action: str, time_str: str) -> str:
     `pos_sizing.py`; calendar commands are VERB-rooted imperatives, so a
     root-POS signal is anti-correlated with the answer.
     """
-    from assistant.engine.segment import _enforce_pinned_kinds, _kind_of
+    from assistant.engine.segmentation.old_seg.segment import _enforce_pinned_kinds, _kind_of
 
     kind = _enforce_pinned_kinds(_kind_of(action), action)
     if kind not in ("event", "task", "review"):

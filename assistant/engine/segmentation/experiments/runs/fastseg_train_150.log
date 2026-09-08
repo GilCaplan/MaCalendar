@@ -1,0 +1,40 @@
+
+==========================================================================
+FastSeg alone (deterministic, no model)
+corpus: 150 rows · TRAIN half
+==========================================================================
+segment board — 150 rows, 216 gold items, 205 predicted items
+(items matched by action token-overlap ≥ 0.50, Dice)
+
+A · BOUNDARIES — did we cut in the right places
+   exact-set match (actions)   64.7%  (97/150)   <- the headline
+   exact-row (action+time+tag) 47.3%  (71/150)
+   right ITEM COUNT            88.7%  (133/150)   <- the CUT alone
+   (exact-set needs the time lifted OUT of the action too; the count line is the cut on its own)
+   item precision              98.5%  (202/205)
+   item recall                 93.5%  (202/216)
+   item F1                     96.0%
+   OVER-split                 3 rows (+3 items)   <- garbage immediately
+   UNDER-split                14 rows (-14 items)   <- two more chances downstream
+   (never summed: the two failures do not cost the same)
+
+B · ACTION/TIME — the invariant, and where the time landed
+   NO-INVENTION violations    0 items (0 tokens, 0 rows)   ok
+   NO-LOSS violations         20 items (41 tokens, 20 rows)   MUST BE 0
+   time-assignment accuracy    79.7%  (161/202 matched items)
+     same tokens, any order    80.2%  (a copied edge word may land either side)
+     on DEFAULT 'today'        91.5%  (n=59)
+     on a SPOKEN time          74.8%  (n=143)  <- the one that cannot be guessed
+
+C · TAG — event | task | review
+   accuracy                    79.2%  (160/202 matched items)
+   event        P  77.0%  R  88.2%  F1  82.2%   (support 110)
+   review       P 100.0%  R  87.5%  F1  93.3%   (support 8)
+   task         P  81.2%  R  66.7%  F1  73.2%   (support 84)
+   confusion (gold ↓ / predicted →)
+             event    review      task
+   event        97         0        13
+   review         1         7         0
+   task         28         0        56
+
+D · VERIFIER — does the correction pay for itself

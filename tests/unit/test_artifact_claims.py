@@ -539,7 +539,7 @@ def _public_words() -> set[str]:
 def test_the_named_rule_count_matches_validate(all_prose):
     """"Fifteen named rules" on the explorer must track the module that owns
     them — a rule added without updating the page is how numbers rot."""
-    import assistant.engine.validate as v
+    import assistant.engine.decompose_validate.validate as v
     n = sum(1 for name in dir(v) if name.startswith("_rule_"))
     word = _word(n)
     for name, text in all_prose.items():
@@ -550,7 +550,7 @@ def test_the_named_rule_count_matches_validate(all_prose):
 
 
 def test_the_loop_budget_matches_crosscheck(all_prose):
-    from assistant.engine.crosscheck import MAX_REENTRIES
+    from assistant.engine.llmjudge.llmjudge import MAX_REENTRIES
     word = _word(MAX_REENTRIES)
     for name, text in all_prose.items():
         if "loop" not in text.lower() or "re-runs the stage" not in text.lower():
@@ -573,6 +573,20 @@ def test_the_loop_budget_matches_crosscheck(all_prose):
 #: Only a page that draws FastRule's internals uses this phrase.
 _ENGINE_MARK = "atomic-item executor"
 
+#: Where each engine stage module lives. Components moved into per-component
+#: folders (2026-09-08), so the stage NAME is no longer the file name — this map
+#: is the single place that knows the difference.
+_STAGE_FILES = {
+    "transcript": "ingest/repair.py",
+    "segment":    "segmentation/old_seg/segment.py",
+    "decompose":  "decompose_validate/decompose.py",
+    "validate":   "decompose_validate/validate.py",
+    "generate":   "generate/generate.py",
+    "crosscheck": "llmjudge/llmjudge.py",
+    "label":      "label/label.py",
+}
+_FASTRULE_PY = "assistant/engine/fastrule/fastrule.py"
+
 
 def _classes(path: pathlib.Path) -> set:
     return {m.group(1) for m in re.finditer(r"^class (\w+)", path.read_text(), re.M)}
@@ -580,9 +594,9 @@ def _classes(path: pathlib.Path) -> set:
 
 def test_the_fastrule_components_named_on_the_page_exist(all_prose):
     """FastRule's inner objects, by the names the page prints."""
-    have = _classes(ROOT / "assistant" / "engine" / "fastrule.py")
+    have = _classes(ROOT / _FASTRULE_PY)
     for cls in ("FastRule", "Atomicity", "Gatekeeper", "Scorer"):
-        assert cls in have, f"{cls} is no longer a class in engine/fastrule.py"
+        assert cls in have, f"{cls} is no longer a class in {_FASTRULE_PY}"
     for name, text in all_prose.items():
         if _ENGINE_MARK not in text:
             continue
@@ -622,7 +636,7 @@ def test_the_deep_stage_names_match_the_state_contract(all_prose):
 
 def test_the_deferral_reason_classes_are_current(all_prose):
     """A deferral's class decides the handoff — there are exactly three."""
-    from assistant.engine.fastrule import (INCAPACITY, REFUSAL, STRUCTURE,
+    from assistant.engine.fastrule.fastrule import (INCAPACITY, REFUSAL, STRUCTURE,
                                            _REASON_CLASS)
     classes = {REFUSAL, STRUCTURE, INCAPACITY}
     assert set(_REASON_CLASS.values()) == classes, (
@@ -637,7 +651,7 @@ def test_the_deferral_reason_classes_are_current(all_prose):
 
 def test_the_two_fastrule_thresholds_are_current(all_prose):
     """The front door's bar and the per-fragment bar are different numbers."""
-    from assistant.engine.generate import SUBITEM_RULE_THRESHOLD
+    from assistant.engine.generate.generate import SUBITEM_RULE_THRESHOLD
     from assistant.intent.rule_parser import RULE_THRESHOLD
     for name, text in all_prose.items():
         if "per fragment" not in text:
@@ -685,10 +699,9 @@ def test_the_count_of_model_calling_stages_is_current(all_prose):
     deterministic — so it is read from the stage modules themselves.
     """
     engine = ROOT / "assistant" / "engine"
-    stages = ("transcript", "segment", "decompose", "validate", "generate",
-              "crosscheck", "label")
-    callers = [s for s in stages
-               if re.search(r"call_json\(|parser\.parse", (engine / f"{s}.py").read_text())]
+    callers = [name for name, rel in _STAGE_FILES.items()
+               if re.search(r"call_json\(|parser\.parse",
+                            (engine / rel).read_text())]
     for name, text in all_prose.items():
         if "stages may call the language model" not in text:
             continue
@@ -708,7 +721,9 @@ def test_the_dataset_sizes_quoted_are_current(all_prose):
     import json
     pool = ROOT / "dataset" / "inputs" / "history_3000.json"
     sealed = ROOT / "dataset" / "inputs" / "test_split.json"
-    generated = ROOT / "dataset" / "fastrule" / "fastrule_7200.jsonl"
+    # FastRule's dataset moved into its component folder (2026-09-08).
+    generated = (ROOT / "assistant" / "engine" / "fastrule" / "datasets"
+                 / "fastrule_7200.jsonl")
     personas = ROOT / "dataset" / "personas" / "personas.jsonl"
     if not all(p.exists() for p in (pool, sealed, generated, personas)):
         pytest.skip("the datasets are not present in this checkout")
@@ -799,7 +814,8 @@ def test_the_metric_formulas_on_the_evaluation_view_match_the_scorers():
     verified to go red before being trusted.
     """
     import re as _re
-    shape = (ROOT / "scripts" / "fastrule_shape.py").read_text()
+    shape = (ROOT / "assistant" / "engine" / "fastrule" / "experiments"
+             / "fastrule_shape.py").read_text()
     fieldq = (ROOT / "scripts" / "field_quality.py").read_text()
 
     sev = dict(_re.findall(

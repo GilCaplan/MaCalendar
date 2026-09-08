@@ -778,7 +778,7 @@ class Pipeline:
 # step 1 of every command); this client imports the same helpers for its own
 # recording UX — the streaming stop-word listener and the review bar — so the
 # two can never disagree about what ends a recording.
-from assistant.engine.transcript import (            # noqa: E402
+from assistant.engine.ingest.repair import (            # noqa: E402
     build_stop_re as _build_stop_re,
     strip_stop_keyword as _strip_stop_keyword,
 )

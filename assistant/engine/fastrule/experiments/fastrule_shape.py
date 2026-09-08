@@ -169,7 +169,7 @@ def main() -> int:
     mining = a.split == "train"
 
     from freezegun import freeze_time
-    from assistant.engine.fastrule import FastRule
+    from assistant.engine.fastrule.fastrule import FastRule
     from assistant.intent.rule_parser import RULE_THRESHOLD
 
     fr = FastRule(RULE_THRESHOLD)

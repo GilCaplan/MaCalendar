@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 import assistant.engine.llm as engine_llm
-import assistant.engine.segment as segment
+import assistant.engine.segmentation.old_seg.segment as segment
 from assistant.engine import load_config
 from assistant.engine.state import EngineState
 
@@ -310,7 +310,7 @@ def test_a_dated_i_need_to_meet_is_an_event_q1():
     """DEVQA Q1 (Gil, 2026-09-06): a dated "I need to <meet/talk/…>" is an
     appointment being made, not an errand — the dataset's ground truth calls
     it a calendar event. Undated encounters and dated errands are unchanged."""
-    from assistant.engine.segment import _enforce_pinned_kinds
+    from assistant.engine.segmentation.old_seg.segment import _enforce_pinned_kinds
     assert _enforce_pinned_kinds(
         "task", "on Monday, the 20th, I need to have a conversation with Greg") == "event"
     assert _enforce_pinned_kinds("task", "I need to meet Sam tomorrow") == "event"

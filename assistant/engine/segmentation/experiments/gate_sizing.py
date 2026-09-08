@@ -21,7 +21,7 @@ TWO RULES THIS FILE OBEYS, because both are easy to violate by accident:
      so this is free and repeatable, and the same cache can be re-mined as
      new gates are proposed.
 
-    python -m segment_tuning.gate_sizing
+    python -m assistant.engine.segmentation.experiments.gate_sizing
 """
 from __future__ import annotations
 
@@ -31,8 +31,8 @@ import os
 import re
 import sys
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_ROOT = os.path.dirname(_HERE)
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_HERE)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
@@ -44,9 +44,9 @@ for k, v in dict(MACALENDAR_DB=f"{_S}/c.db", MACALENDAR_MEMORY_DB=f"{_S}/m.db",
                  MACALENDAR_NO_WARMUP="1").items():
     os.environ.setdefault(k, v)
 
-from segment_tuning import score as sc                      # noqa: E402
-from segment_tuning.fastseg import fastseg, find_time_refs, cut   # noqa: E402
-from segment_tuning.run_board import assign_splits, _load_cache   # noqa: E402
+from assistant.engine.segmentation.experiments import score as sc                      # noqa: E402
+from assistant.engine.segmentation.fastseg.fastseg import fastseg, find_time_refs, cut   # noqa: E402
+from assistant.engine.segmentation.experiments.run_board import assign_splits, _load_cache   # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ def exact(gold, pred) -> bool:
 def main() -> None:
     cache = _load_cache()
     rows = [r for r in assign_splits(
-        sc.load_rows(sorted(glob.glob(f"{_HERE}/data/*.jsonl"))))
+        sc.load_rows(sorted(glob.glob(f"{_HERE}/datasets/*.jsonl"))))
         if r["split"] == "train" and r["text"] in cache]
     if not rows:
         raise SystemExit("cache is empty — run the segment board first")

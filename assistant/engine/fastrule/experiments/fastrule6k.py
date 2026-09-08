@@ -3,7 +3,7 @@
     python -m scripts.fastrule6k                # train 4,800: full board + mining
     python -m scripts.fastrule6k --split test   # test 1,200: AGGREGATES ONLY
 
-Ground truth is by construction (dataset/fastrule/DATASET.md). Scoring per
+Ground truth is by construction (assistant/engine/fastrule/datasets/DATASET.md). Scoring per
 row, against `expect`:
   • commit/abstain + counts + action  — the selective-classifier core;
   • ATOMICITY DETECTION — the first direct gate supervision: a compound
@@ -17,7 +17,7 @@ row, against `expect`:
 
 LEAKAGE GUARD, enforced here: --split test prints aggregates only — no row
 text, no per-family lines, no misses. Test mistakes are never mined
-(dataset/fastrule/SPLIT.md; ITERATION_PROTOCOL.md).
+(assistant/engine/fastrule/datasets/SPLIT.md; ITERATION_PROTOCOL.md).
 """
 from __future__ import annotations
 
@@ -74,7 +74,7 @@ def main() -> int:
     # imports + the recognizer's lazy first-analyze happen OUTSIDE the frozen
     # clock (the main harness's epoch lesson: freezing during warm-up breaks
     # every later date resolution) — only the scoring loop runs frozen.
-    from assistant.engine.fastrule import FastRule
+    from assistant.engine.fastrule.fastrule import FastRule
     from assistant.actions.calendar.categories import classify as _classify
     from assistant.actions.todo import tagging as _tagging
     from assistant.intent.rule_parser import RULE_THRESHOLD

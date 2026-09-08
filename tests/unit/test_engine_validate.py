@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 import assistant.engine.llm as engine_llm
-import assistant.engine.validate as validate
+import assistant.engine.decompose_validate.validate as validate
 from assistant.engine import load_config
 from assistant.engine.state import EngineState, Item
 

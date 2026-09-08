@@ -35,12 +35,13 @@ import re
 import sys
 import urllib.request
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from segment_tuning import invariant as _invariant    # noqa: E402
-from segment_tuning.fastseg import fastseg           # noqa: E402
+from assistant.engine.segmentation.fastseg import invariant as _invariant    # noqa: E402
+from assistant.engine.segmentation.fastseg.fastseg import fastseg           # noqa: E402
 
 TAGS = ("event", "task", "review")
 MODEL = "llama3.1:8b"

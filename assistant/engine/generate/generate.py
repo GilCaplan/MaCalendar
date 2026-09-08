@@ -93,7 +93,7 @@ def fast_propose(state: EngineState, cfg) -> bool:
     front-door instance; the deep track is its net). A thin adapter — the
     parser + gates + threshold live in assistant/engine/fastrule.FastRule."""
     from assistant.intent.rule_parser import RULE_THRESHOLD
-    from assistant.engine.fastrule import FastRule   # v2 structure, v1 behavior (diff-gated 7200/7200)
+    from assistant.engine.fastrule.fastrule import FastRule   # v2 structure, v1 behavior (diff-gated 7200/7200)
     from assistant.trace import RULE
 
     res = FastRule(RULE_THRESHOLD).run(state.text, state.current_view)
@@ -116,7 +116,7 @@ def fast_propose(state: EngineState, cfg) -> bool:
 
     # Declined — but the work is not wasted: what FastRule concluded travels
     # forward as context for the deep track's LLM stages (Gil's ruling).
-    from assistant.engine.fastrule import reason_class
+    from assistant.engine.fastrule.fastrule import reason_class
     state.fastrule_verdict = {
         "reason": res.reason,
         "reason_class": reason_class(res.reason),
@@ -174,7 +174,7 @@ def _honour_refusal(got, res, item: Item, state: EngineState):
         return got
     if not (res.reason or "").startswith("generic-target"):
         return got          # the other refusals stand as parsed
-    from assistant.engine.fastrule import _GENERIC_TARGET_RE
+    from assistant.engine.fastrule.fastrule import _GENERIC_TARGET_RE
     kept = []
     for name, intent in got:
         if name.startswith(("update_", "delete_", "complete_")):
@@ -209,7 +209,7 @@ def _parse_item(item: Item, state: EngineState, cfg) -> "list | None":
                    target) but a bare re-read must not overturn it
       INCAPACITY → "I couldn't read this": the LLM takes over, as designed
     """
-    from assistant.engine.fastrule import (FastRule, REFUSAL, STRUCTURE,
+    from assistant.engine.fastrule.fastrule import (FastRule, REFUSAL, STRUCTURE,
                                            reason_class)
     from assistant.intent.rule_parser import RULE_THRESHOLD, RuleParserSkip
 

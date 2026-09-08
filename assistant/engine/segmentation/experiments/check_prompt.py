@@ -16,7 +16,7 @@ Hand-auditing found them once. This finds them every time, the way
      disagreement is printed, because a prompt that teaches something FastSeg
      contradicts means one of the two is wrong and BOTH cannot be shipped
 
-    python -m segment_tuning.check_prompt
+    python -m assistant.engine.segmentation.experiments.check_prompt
 """
 from __future__ import annotations
 
@@ -25,8 +25,8 @@ import os
 import re
 import sys
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_ROOT = os.path.dirname(_HERE)
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_HERE)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
@@ -38,8 +38,9 @@ for k, v in dict(MACALENDAR_DB=f"{_S}/c.db", MACALENDAR_MEMORY_DB=f"{_S}/m.db",
                  MACALENDAR_NO_WARMUP="1").items():
     os.environ.setdefault(k, v)
 
-from segment_tuning import invariant, llmseg                # noqa: E402
-from segment_tuning.fastseg import fastseg, find_time_refs  # noqa: E402
+from assistant.engine.segmentation.fastseg import invariant
+from assistant.engine.segmentation.llmseg import llmseg                # noqa: E402
+from assistant.engine.segmentation.fastseg.fastseg import fastseg, find_time_refs  # noqa: E402
 
 _DAY = re.compile(
     r"\b(today|tomorrow|tonight|yesterday|monday|tuesday|wednesday|thursday|"

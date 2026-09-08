@@ -62,7 +62,7 @@ def _item(kind, text, id="item_1", action=None, intent=None):
 # ---------------------------------------------------------------------------
 
 def _cases_transcript(cfg):
-    from assistant.engine import transcript
+    from assistant.engine.ingest import repair as transcript
 
     def strip_case():
         st = _state("add lunch tomorrow at one execute")
@@ -79,7 +79,7 @@ def _cases_transcript(cfg):
 
 
 def _cases_segment(cfg):
-    from assistant.engine import segment
+    from assistant.engine.segmentation.old_seg import segment
 
     def case(text, want_n, want_kinds=None, needs_llm=True):
         def run():
@@ -104,7 +104,7 @@ def _cases_segment(cfg):
 
 
 def _cases_decompose(cfg):
-    from assistant.engine import decompose
+    from assistant.engine.decompose_validate import decompose
 
     def two_walks():
         st = _items_state([_item("event", "walk the dog at 9am and 2:30pm")])
@@ -143,7 +143,7 @@ def _cases_decompose(cfg):
 def _cases_validate(cfg):
     import datetime as dt
     from types import SimpleNamespace
-    from assistant.engine import validate
+    from assistant.engine.decompose_validate import validate
 
     def ev(**kw):
         base = dict(title="x", date=None, start_time=None, end_time=None,
@@ -189,7 +189,7 @@ def _cases_validate(cfg):
 
 
 def _cases_generate(cfg):
-    from assistant.engine import generate
+    from assistant.engine.generate import generate
 
     def case(text, kind, want_actions, needs_llm):
         def run():
@@ -211,7 +211,7 @@ def _cases_crosscheck(cfg):
     """Extraction quality against seeded mistakes: the check must notice a
     dropped ask and an invented row, and stay quiet when all is covered."""
     from types import SimpleNamespace
-    from assistant.engine import crosscheck
+    from assistant.engine.llmjudge import crosscheck
 
     def _ev(id, title, text=""):
         return _item("event", text or title, id=id, action="create_event",

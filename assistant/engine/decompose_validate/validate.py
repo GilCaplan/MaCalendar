@@ -786,7 +786,7 @@ def _rule_interrogative_create_asks_first(state, cfg, item, pairs) -> bool:
         return False
     if not getattr(getattr(cfg, "engine", None), "confirm_create", True):
         return False
-    from assistant.engine.segment import is_interrogative_create
+    from assistant.engine.segmentation.old_seg.segment import is_interrogative_create
     if not is_interrogative_create(item.text or ""):
         return False
     if sum(1 for other, _a, _i in pairs if other.intent is not None) != 1:

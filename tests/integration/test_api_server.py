@@ -87,7 +87,7 @@ def app_client(tmp_path, monkeypatch, sample_config, isolated_registry):
 
     # Reset module-level lazy singletons so each test gets a clean registry/parser
     # built against the mocked config, rather than reusing state from a prior test.
-    import assistant.engine.generate as engine_generate
+    import assistant.engine.generate.generate as engine_generate
     import assistant.engine.llm as engine_llm
     monkeypatch.setattr(engine_generate, "_parser", None)
     monkeypatch.setattr(engine_generate, "_rule_parser", None)

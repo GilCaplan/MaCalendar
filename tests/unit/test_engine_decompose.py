@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-import assistant.engine.decompose as decompose
+import assistant.engine.decompose_validate.decompose as decompose
 import assistant.engine.llm as engine_llm
 from assistant.engine import load_config
 from assistant.engine.state import EngineState, Item
@@ -103,7 +103,7 @@ def test_depth_is_bounded_to_one_split(cfg):
 # --- reminder-clause stripping (cycle 8, notifications phase 3) -----------
 
 def test_inline_reminder_clause_lands_in_slots():
-    from assistant.engine.decompose import _strip_reminder_clause
+    from assistant.engine.decompose_validate.decompose import _strip_reminder_clause
     from assistant.engine.state import Item
     it = Item(id="item_1", kind="event",
               text="book gym tomorrow at 6:30 and give me a heads-up half an hour before")
@@ -113,7 +113,7 @@ def test_inline_reminder_clause_lands_in_slots():
 
 
 def test_with_a_reminder_noun_form():
-    from assistant.engine.decompose import _strip_reminder_clause
+    from assistant.engine.decompose_validate.decompose import _strip_reminder_clause
     from assistant.engine.state import Item
     it = Item(id="item_1", kind="event",
               text="meeting with Dana Monday 9am with a 15 minute reminder")
@@ -123,7 +123,7 @@ def test_with_a_reminder_noun_form():
 
 
 def test_leading_alert_me_hours_form():
-    from assistant.engine.decompose import _strip_reminder_clause
+    from assistant.engine.decompose_validate.decompose import _strip_reminder_clause
     from assistant.engine.state import Item
     it = Item(id="item_1", kind="event",
               text="Alert me 2 hours before my meeting on Tuesday with client")
@@ -134,7 +134,7 @@ def test_leading_alert_me_hours_form():
 def test_until_through_sentences_never_touched():
     # The whole reason the strip lives in decompose: a bare surviving
     # "before" would read as a recurrence-end marker in validate.
-    from assistant.engine.decompose import _strip_reminder_clause
+    from assistant.engine.decompose_validate.decompose import _strip_reminder_clause
     from assistant.engine.state import Item
     for txt in ("run daily until the end of September",
                 "shiur weekly through October 3rd",
@@ -145,7 +145,7 @@ def test_until_through_sentences_never_touched():
 
 
 def test_bare_reminder_command_left_for_the_fallback():
-    from assistant.engine.decompose import _strip_reminder_clause
+    from assistant.engine.decompose_validate.decompose import _strip_reminder_clause
     from assistant.engine.state import Item
     it = Item(id="item_1", kind="event", text="remind me 30 minutes before")
     _strip_reminder_clause(it)
@@ -155,7 +155,7 @@ def test_bare_reminder_command_left_for_the_fallback():
 def test_leading_courtesy_prefix_cleaned_after_strip():
     # C8 regression: "please remind me 1 hour before the meeting..." left
     # "please the meeting..." - a verbless mangle the LLM misread.
-    from assistant.engine.decompose import _strip_reminder_clause
+    from assistant.engine.decompose_validate.decompose import _strip_reminder_clause
     from assistant.engine.state import Item
     it = Item(id="item_1", kind="event",
               text="please remind me 1 hour before the meeting I hace tomorrow")

@@ -43,7 +43,7 @@ WHAT IT MEASURES (all counts as well as rates — the errors are asymmetric)
 
 TWO DATASETS, reported separately
 
-    B  dataset/fastrule/fastrule_7200.jsonl  — ground truth BY CONSTRUCTION,
+    B  assistant/engine/fastrule/datasets/fastrule_7200.jsonl  — ground truth BY CONSTRUCTION,
        split by pattern family.  Test half is the reported number.
     P  dataset/personas/personas.jsonl — 6 synthetic speakers, TEST-ONLY
        forever (dataset/personas/PERSONAS.md).  Rambling vs terse speakers
@@ -282,7 +282,7 @@ class Runner:
         self.use_fastrule = use_fastrule
         self.fr = None
         if use_fastrule:
-            from assistant.engine.fastrule import FastRule
+            from assistant.engine.fastrule.fastrule import FastRule
             from assistant.intent.rule_parser import RULE_THRESHOLD
             self.fr = FastRule(RULE_THRESHOLD)
             self.fr.run("book gym tomorrow at 7am")   # warm off the frozen clock
@@ -290,13 +290,13 @@ class Runner:
     def state(self, text: str):
         """Everything the deep track has when segment receives the command:
         the repaired transcript, and FastRule's verdict travelling forward."""
-        from assistant.engine import transcript
+        from assistant.engine.ingest import repair as transcript
         from assistant.engine.state import EngineState
         st = EngineState(raw_text=text, text=text, source="test")
         transcript.run(st, self.cfg)
         committed = False
         if self.fr is not None:
-            from assistant.engine.fastrule import reason_class
+            from assistant.engine.fastrule.fastrule import reason_class
             res = self.fr.run(st.text)
             if res and res.committed:
                 committed = True
@@ -312,7 +312,8 @@ class Runner:
     def run_row(self, text: str) -> dict:
         """One row through segment, then decompose.  Returns both snapshots
         plus the model-call attempt counts per stage."""
-        from assistant.engine import decompose, segment
+        from assistant.engine.segmentation.old_seg import segment
+        from assistant.engine.decompose_validate import decompose
         st, committed = self.state(text)
         if st.ignored:
             return {"ignored": True, "fast": committed}

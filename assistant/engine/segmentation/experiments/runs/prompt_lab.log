@@ -1,0 +1,6 @@
+rows: 159  (TRAIN half, replayed from the segment board's cache)
+  FastSeg alone    45.3%
+  P1 v3-full       39.0%   fixes 6 / breaks 16
+
+    …boundaries 25/159
+    …boundaries 50/159

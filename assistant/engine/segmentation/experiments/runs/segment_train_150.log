@@ -1,0 +1,148 @@
+
+==========================================================================
+Segment = FastSeg -> LLMSeg -> accept
+corpus: 150 rows · TRAIN half
+==========================================================================
+segment board — 150 rows, 216 gold items, 206 predicted items
+(items matched by action token-overlap ≥ 0.50, Dice)
+
+A · BOUNDARIES — did we cut in the right places
+   exact-set match (actions)   64.0%  (96/150)   <- the headline
+   exact-row (action+time+tag) 40.7%  (61/150)
+   right ITEM COUNT            88.0%  (132/150)   <- the CUT alone
+   (exact-set needs the time lifted OUT of the action too; the count line is the cut on its own)
+   item precision              96.6%  (199/206)
+   item recall                 92.1%  (199/216)
+   item F1                     94.3%
+   OVER-split                 4 rows (+4 items)   <- garbage immediately
+   UNDER-split                14 rows (-14 items)   <- two more chances downstream
+   (never summed: the two failures do not cost the same)
+
+B · ACTION/TIME — the invariant, and where the time landed
+   NO-INVENTION violations    1 items (1 tokens, 1 rows)   MUST BE 0
+   NO-LOSS violations         35 items (60 tokens, 32 rows)   MUST BE 0
+   time-assignment accuracy    74.4%  (148/199 matched items)
+     same tokens, any order    76.4%  (a copied edge word may land either side)
+     on DEFAULT 'today'        91.5%  (n=59)
+     on a SPOKEN time          67.1%  (n=140)  <- the one that cannot be guessed
+
+C · TAG — event | task | review
+   accuracy                    78.4%  (156/199 matched items)
+   event        P  79.1%  R  85.0%  F1  82.0%   (support 107)
+   review       P  70.0%  R  87.5%  F1  77.8%   (support 8)
+   task         P  78.4%  R  69.0%  F1  73.4%   (support 84)
+   confusion (gold ↓ / predicted →)
+             event    review      task
+   event        91         0        16
+   review         1         7         0
+   task         23         3        58
+
+D · VERIFIER — does the correction pay for itself
+   not run (needs BOTH a fastseg and a final prediction)
+
+E · COST
+   model calls / row          1.00  (150 calls over 150 rows)
+   wall clock / row           10.13s  (total 1520.0s, max 33.11s)
+   decided by                 agreed 69 · corrected 46 · rejected: item 1 invented ['tomorrow'] 1 · rejected: lost ['add', 'list'] 1 · rejected: lost ['add'] 4 · rejected: lost ['annual', 'checkup', 'discuss'] 1 · rejected: lost ['appointment', 'book', 'car', 'service'] 1 · rejected: lost ['book', 'hall', 'town'] 1 · rejected: lost ['could', 'maybe', 'thinking', 'was', 'we'] 1 · rejected: lost ['date', 'due', 'flip'] 1 · rejected: lost ['eve', 'new', "year's"] 1 · rejected: lost ['exceptions', 'no'] 1 · rejected: lost ['first', "let's"] 1 · rejected: lost ['know', 'really', 'should'] 1 · rejected: lost ['need', 'remind'] 3 · rejected: lost ['need'] 2 · rejected: lost ['remind'] 12 · rejected: lost ['rest', 'year'] 2 · rejected: lost ['things', 'three'] 1
+
+F · COMPOSITION — what the numbers above were computed OVER
+   gold-count distribution (asks per row)
+      1   ask     91 rows (60.7%)   exact-row  45.1%
+      2   ask     52 rows (34.7%)   exact-row  30.8%
+      3   ask      7 rows ( 4.7%)   exact-row  57.1%
+   by trap
+      and_compound                     n=13    exact-row  23.1%     26861ms
+      lead_time                        n=13    exact-row   0.0%     10956ms
+      mixed_mode                       n=13    exact-row  61.5%     11097ms
+      texture                          n=12    exact-row  25.0%      7267ms
+      extra                            n=11    exact-row  45.5%     11016ms
+      np_decoy                         n=11    exact-row  81.8%      6129ms
+      attendee                         n=10    exact-row  60.0%      5619ms
+      date_marking                     n=8     exact-row 100.0%      5459ms
+      recurrence                       n=8     exact-row  62.5%      6436ms
+      joiner                           n=7     exact-row   0.0%      9691ms
+      remind_then                      n=7     exact-row  14.3%      9417ms
+      generic_target_complex           n=6     exact-row  33.3%      6875ms
+      three_ask                        n=6     exact-row  66.7%      8598ms
+      dated_encounter                  n=5     exact-row  20.0%     11060ms
+      time_list_vs_range               n=4     exact-row  25.0%      6273ms
+      and-two-asks                     n=4     exact-row  25.0%      7155ms
+      mixed-kind                       n=4     exact-row  25.0%      7155ms
+      all_day                          n=3     exact-row 100.0%     20511ms
+      until_through                    n=2     exact-row   0.0%      6269ms
+      no-time-defaults-today           n=2     exact-row   0.0%      7163ms
+      name-coordination                n=1     exact-row   0.0%      6595ms
+      shared-object                    n=1     exact-row 100.0%      5987ms
+      anaphoric-tail                   n=1     exact-row   0.0%      6285ms
+      enumeration-header               n=1     exact-row   0.0%      7803ms
+      shared-date-leading-edge         n=1     exact-row   0.0%      7803ms
+      idiom                            n=1     exact-row   0.0%      6139ms
+      as-well-as                       n=1     exact-row   0.0%      7492ms
+      quantity-not-time                n=1     exact-row   0.0%      6981ms
+      list-of-things                   n=1     exact-row   0.0%      6981ms
+      shared-deadline-trailing-edge    n=1     exact-row   0.0%      7266ms
+      cross-kind-edge                  n=1     exact-row   0.0%      7266ms
+
+--- reading the failures (not a board; a pointer) ---
+   [gen_c2_and2_ee_1_0] get annual checkup on the books for in five days at 11am as well as product demo for new year's eve
+      traps ['and_compound']
+      gold  [('get annual checkup on the books', 'for in five days at 11am', 'event'), ('product demo', "for new year's eve", 'event')]
+      pred  [('get annual checkup on the books', 'in five days at 11am', 'task'), ('product demo', "for new year's eve", 'event')]
+      why   ['right items, wrong time or tag']
+   [gen_c2_encounter2_1_4] i need to sync up with Taylor next wednesday
+      traps ['dated_encounter']
+      gold  [('i need to sync up with Taylor', 'next wednesday', 'event')]
+      pred  [('i need to sync up with Taylor', 'next wednesday', 'task')]
+      why   ['right items, wrong time or tag']
+   [gen_c2_encounter2_1_5] i need to sync up with Riley next wednesday
+      traps ['dated_encounter']
+      gold  [('i need to sync up with Riley', 'next wednesday', 'event')]
+      pred  [('i need to sync up with Riley', 'next wednesday', 'task')]
+      why   ['right items, wrong time or tag']
+   [gen_c2_joiner2_2_0] schedule workshop for on the 15th. along with that, remind me to file the taxes
+      traps ['joiner']
+      gold  [('schedule workshop . along with that', 'for on the 15th', 'event'), ('remind me to file the taxes', 'today', 'task')]
+      pred  [('schedule workshop for along with that, remind me to file the taxes', 'on the 15th', 'event')]
+      why   ["unmatched gold: ['schedule workshop . along with that']"]
+   [gen_c2_leadtime2_1_2] ping me 30 minutes before ahead of oil change this morning at 7am
+      traps ['lead_time']
+      gold  [('ping me ahead of oil change', 'this morning 30 minutes before at 7am', 'event')]
+      pred  [('ping me 30 minutes before ahead of oil change', 'this morning at 7am', 'event')]
+      why   ['right items, wrong time or tag']
+   [gen_c2_leadtime2_2_1] give me a nudge 30 minutes before to pack for the trip
+      traps ['lead_time']
+      gold  [('give me a nudge to pack for the trip', 'today 30 minutes before', 'task')]
+      pred  [('give me a nudge 30 minutes before to pack for the trip', '30 minutes before', 'event')]
+      why   ['right items, wrong time or tag']
+   [gen_c2_leadtime2_2_5] give me a nudge an hour before to book a flight
+      traps ['lead_time']
+      gold  [('give me a nudge to book a flight', 'today an hour before', 'task')]
+      pred  [('give me a nudge an hour before to book a flight', 'an hour before', 'event')]
+      why   ['right items, wrong time or tag']
+   [gen_c2_mixedmode2_1_0] scrap onboarding session off the calendar and throw dentist appointment on there instead the day after tomorrow at 7am
+      traps ['mixed_mode']
+      gold  [('scrap onboarding session off the calendar', 'today at 7am', 'event'), ('throw dentist appointment on there instead', 'the day after tomorrow at 7am', 'event')]
+      pred  [('scrap onboarding session off the calendar', 'the day after tomorrow at 7am', 'event'), ('throw dentist appointment on there instead', 'the day after tomorrow at 7am', 'event')]
+      why   ['right items, wrong time or tag']
+   [gen_c2_mixedmode2_2_0] forget email the landlord, i'd rather walk the dog a week from today
+      traps ['mixed_mode']
+      gold  [('forget email the landlord', 'a week from today', 'task'), ("i'd rather walk the dog", 'a week from today', 'task')]
+      pred  [("forget email the landlord, i'd rather walk the dog", 'a week from today', 'event')]
+      why   ["unmatched gold: ['forget email the landlord']"]
+   [gen_c2_mixedmode2_2_5] forget refill the prescription, i'd rather back up the laptop the 30th
+      traps ['mixed_mode']
+      gold  [('forget refill the prescription', 'the 30th', 'task'), ("i'd rather back up the laptop", 'the 30th', 'task')]
+      pred  [("forget refill the prescription, i'd rather back up the laptop the 30th", 'the 30th', 'event')]
+      why   ["unmatched gold: ['forget refill the prescription']"]
+   [gen_c2_query2_1_5] give me the rundown on this afternoon
+      traps ['extra']
+      gold  [('give me the rundown', 'on this afternoon', 'review')]
+      pred  [('give me the rundown', 'this afternoon', 'event')]
+      why   ['right items, wrong time or tag']
+   [gen_c2_remindthen2_1_4] first change the air filter, then let's get wedding rehearsal on the calendar for next friday
+      traps ['remind_then']
+      gold  [('first change the air filter', 'for next friday', 'task'), ("let's get wedding rehearsal on the calendar", 'for next friday', 'event')]
+      pred  [('first change the air filter', 'for next friday', 'event'), ("let's get wedding rehearsal on the calendar", 'for next friday', 'event')]
+      why   ['right items, wrong time or tag']
+
+wall clock: 728.7s

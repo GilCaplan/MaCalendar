@@ -7,7 +7,7 @@ This deliberately owns NO metric of its own. It selects a slice of
 here are literally the FastRule product-shape board (atomic handle-rate,
 correct-on-handled, date/time correctness, harm, the non-atomic diagnostic
 buckets and the propose defer rate), computed by the same code that produces
-them on `dataset/fastrule/`. Two boards that share a scorer are comparable;
+them on `assistant/engine/fastrule/datasets/`. Two boards that share a scorer are comparable;
 two boards that share only a vocabulary are not.
 
 The one thing this adds is the SLICE, because a real-speech board has two

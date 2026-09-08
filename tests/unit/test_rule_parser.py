@@ -188,7 +188,7 @@ def test_a_four_way_compound_is_refused(parser):
         "I want to schedule a meeting with John and also remind me to buy milk "
         "and then call the dentist and furthermore please add a gym session tomorrow at noon"
     )
-    from assistant.engine.fastrule import FastRule
+    from assistant.engine.fastrule.fastrule import FastRule
     from assistant.intent.rule_parser import RULE_THRESHOLD
     res = FastRule(RULE_THRESHOLD).run(long)
     assert not res.committed, "a four-part command must not fast-commit"

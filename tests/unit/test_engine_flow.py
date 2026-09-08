@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import assistant.engine as engine
-import assistant.engine.generate as generate
+import assistant.engine.generate.generate as generate
 import assistant.stt.vocab as vocab_mod
 from assistant.engine.state import EngineState, Item
 from assistant.exceptions import OllamaUnavailableError
@@ -172,7 +172,7 @@ def scratch_vocab(monkeypatch, tmp_path):
 
 
 def test_a_saved_edit_becomes_an_alias(scratch_vocab):
-    from assistant.engine import transcript
+    from assistant.engine.ingest import repair as transcript
     pairs = transcript.learn_from_edit("call noga tomorrow at nine",
                                        "call Noa tomorrow at nine")
     assert pairs == [("noga", "Noa")]
@@ -181,7 +181,7 @@ def test_a_saved_edit_becomes_an_alias(scratch_vocab):
 
 
 def test_an_untouched_resubmit_whitelists_after_two_confirms(scratch_vocab):
-    from assistant.engine import transcript
+    from assistant.engine.ingest import repair as transcript
     text = "meet Moxie at the park tomorrow"
     assert transcript.confirm_unchanged(text) == []          # first confirm
     promoted = transcript.confirm_unchanged(text)            # second
@@ -233,7 +233,7 @@ def test_coalesce_single_input_is_unwrapped():
 
 
 def test_the_wrapper_round_trips_through_segment(cfg):
-    from assistant.engine import segment
+    from assistant.engine.segmentation.old_seg import segment
     batch = engine.coalesce(["gym tomorrow at 7am", "buy milk"], max_tokens=300)[0]
     st = EngineState(raw_text=batch, text=batch)
     segment.run(st, cfg)
@@ -251,7 +251,7 @@ def test_repeated_attempt_messages_fold_into_one(monkeypatch):
         return state
 
     monkeypatch.setattr(generate, "run", failing_run)
-    import assistant.engine.crosscheck as crosscheck
+    import assistant.engine.llmjudge.llmjudge as crosscheck
 
     def always_missing(state, cfg):
         from assistant.engine.state import CheckFinding
@@ -394,7 +394,8 @@ def test_fastrule_work_travels_forward_when_it_declines(registry_with_real_actio
     it just doesn't commit, and what it concluded goes to the next stage as
     context for the LLM stages. It used to be discarded on defer, so the
     deep track started cold on a command that had already been read once."""
-    from assistant.engine import generate, load_config
+    from assistant.engine import load_config
+    from assistant.engine.generate import generate
     from assistant.engine.state import EngineState
 
     st = EngineState(raw_text="book the gym at 6 and remind me to buy milk",

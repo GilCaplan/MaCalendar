@@ -25,7 +25,7 @@ The date FLOOR is excluded when rebuilding the old gold: "today" is a value the
 labelling adds, not a word the speaker said, so an implementation that never
 emitted it must not be charged for the omission.
 
-    python -m segment_tuning.old_vs_new
+    python -m assistant.engine.segmentation.experiments.old_vs_new
 """
 from __future__ import annotations
 
@@ -33,8 +33,8 @@ import glob
 import os
 import sys
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_ROOT = os.path.dirname(_HERE)
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_HERE)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
@@ -46,9 +46,10 @@ for k, v in dict(MACALENDAR_DB=f"{_S}/c.db", MACALENDAR_MEMORY_DB=f"{_S}/m.db",
                  MACALENDAR_NO_WARMUP="1").items():
     os.environ.setdefault(k, v)
 
-from segment_tuning import invariant, score as sc          # noqa: E402
-from segment_tuning.fastseg import fastseg                 # noqa: E402
-from segment_tuning.run_board import assign_splits         # noqa: E402
+from assistant.engine.segmentation.fastseg import invariant
+from assistant.engine.segmentation.experiments import score as sc          # noqa: E402
+from assistant.engine.segmentation.fastseg.fastseg import fastseg                 # noqa: E402
+from assistant.engine.segmentation.experiments.run_board import assign_splits         # noqa: E402
 
 
 def old_gold(row: "dict") -> "list[dict]":
@@ -67,7 +68,7 @@ def old_gold(row: "dict") -> "list[dict]":
 
 def run_old(text: str, cfg) -> "list[dict]":
     """One command through the shipped segment stage."""
-    from assistant.engine import segment
+    from assistant.engine.segmentation.old_seg import segment
     from assistant.engine.state import EngineState
 
     state = EngineState(raw_text=text, text=text, source="test")
@@ -110,7 +111,7 @@ def main() -> None:
 
     cfg = load_config()
     rows = [r for r in assign_splits(
-        sc.load_rows(sorted(glob.glob(f"{_HERE}/data/*.jsonl"))))
+        sc.load_rows(sorted(glob.glob(f"{_HERE}/datasets/*.jsonl"))))
         if r["split"] == "train"]
 
     print(f"{len(rows)} rows — segment-tuning TRAIN half\n")

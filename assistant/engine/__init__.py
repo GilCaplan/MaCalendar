@@ -32,15 +32,18 @@ import os
 import threading
 from typing import Any
 
-from assistant.engine import (
-    crosscheck as _crosscheck,
-    decompose as _decompose,
-    generate as _generate,
-    label as _label,
-    segment as _segment,
-    transcript as _transcript,
-    validate as _validate,
-)
+# Stages live in component folders (see each ARCHITECTURE.md). The local
+# aliases below are unchanged, and so are the Stage("...") identifiers — the
+# trace-visible stage set is pinned by trace.py's CHAINS and
+# test_panel_agreement, so this move is a relocation, not a shape change.
+from assistant.engine.segmentation.old_seg import segment as _segment
+from assistant.engine.ingest import repair as _transcript
+from assistant.engine.ingest.coalesce import coalesce  # noqa: F401  (re-exported: server.py and tests import it from here)
+from assistant.engine.decompose_validate import decompose as _decompose
+from assistant.engine.decompose_validate import validate as _validate
+from assistant.engine.generate import generate as _generate
+from assistant.engine.label import label as _label
+from assistant.engine.llmjudge import llmjudge as _crosscheck
 from assistant.engine.component import Component, Stage
 from assistant.engine.state import EngineState, ExecutedAction
 from assistant.exceptions import AssistantError, TargetNotFound
@@ -57,35 +60,6 @@ def _brain_version() -> str:
 # just made") and the per-run trace. Waiting here is the ingest queue — FIFO,
 # invisible, and the wait shows up honestly in the trace's total.
 _run_lock = threading.Lock()
-
-
-def coalesce(texts: "list[str]", max_tokens: int = 300) -> "list[str]":
-    """Step 0, half two: queued inputs are combined into ("…")and("…") batches
-    up to a token budget (≈4 chars/token), so several short queued commands
-    cost one parse instead of several; overflow runs in later batches. The
-    wrapper is deterministic for step 2 to split — logic stays independent."""
-    batches: list[str] = []
-    current: list[str] = []
-    used = 0
-    for text in texts:
-        t = (text or "").strip()
-        if not t:
-            continue
-        cost = max(1, len(t) // 4)
-        if current and used + cost > max_tokens:
-            batches.append(_wrap(current))
-            current, used = [], 0
-        current.append(t)
-        used += cost
-    if current:
-        batches.append(_wrap(current))
-    return batches
-
-
-def _wrap(parts: "list[str]") -> str:
-    if len(parts) == 1:
-        return parts[0]
-    return "and".join(f'("{p}")' for p in parts)
 
 
 def load_config():
@@ -533,7 +507,7 @@ def _start_background_verify(state: EngineState, cfg) -> None:
 def _background_verify(state: EngineState, cfg) -> "dict | None":
     """The check itself, on the worker thread. Returns the correction payload
     for the verify endpoint (None = agreed)."""
-    from assistant.engine.validate import is_placeholder_title
+    from assistant.engine.decompose_validate.validate import is_placeholder_title
 
     speech: list[str] = []
     refresh: set = set()

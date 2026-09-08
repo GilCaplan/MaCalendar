@@ -219,7 +219,7 @@ def pc(x):
 def score(rows, examples: int):
     """Run FastRule over every row once; bucket by (persona, structure)."""
     from freezegun import freeze_time
-    from assistant.engine.fastrule import FastRule
+    from assistant.engine.fastrule.fastrule import FastRule
     from assistant.intent.rule_parser import RULE_THRESHOLD
 
     fr = FastRule(RULE_THRESHOLD)

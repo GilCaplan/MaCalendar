@@ -96,7 +96,7 @@ def _predict(text: str) -> str:
     to do the laundry" look like a miss that the real pipeline never has, and
     would send this cycle chasing a fault in the wrong stage.
     """
-    from assistant.engine.segment import _kind_of, _enforce_pinned_kinds
+    from assistant.engine.segmentation.old_seg.segment import _kind_of, _enforce_pinned_kinds
     from assistant.intent.cleanup import strip_spoken_noise
 
     clean = strip_spoken_noise(text)

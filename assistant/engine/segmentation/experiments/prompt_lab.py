@@ -24,8 +24,8 @@ no-invention violations are impossible by construction; FastSeg re-derives
 action/time/tag from the model's boundaries. If the hypothesis is right, P2
 keeps the 6 fixes and loses far fewer than 16.
 
-    python -m segment_tuning.prompt_lab --variants boundaries count
-    python -m segment_tuning.prompt_lab --limit 40      # a quick look
+    python -m assistant.engine.segmentation.experiments.prompt_lab --variants boundaries count
+    python -m assistant.engine.segmentation.experiments.prompt_lab --limit 40      # a quick look
 
 ONE llama job at a time. Answers are cached per (variant, text) so a killed
 run is never wasted.
@@ -41,8 +41,8 @@ import re
 import sys
 import time
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_ROOT = os.path.dirname(_HERE)
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_HERE)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
@@ -54,13 +54,14 @@ for k, v in dict(MACALENDAR_DB=f"{_S}/c.db", MACALENDAR_MEMORY_DB=f"{_S}/m.db",
                  MACALENDAR_NO_WARMUP="1").items():
     os.environ.setdefault(k, v)
 
-from segment_tuning import llmseg, score as sc              # noqa: E402
-from segment_tuning.fastseg import (fastseg, assign_times,  # noqa: E402
+from assistant.engine.segmentation.llmseg import llmseg
+from assistant.engine.segmentation.experiments import score as sc              # noqa: E402
+from assistant.engine.segmentation.fastseg.fastseg import (fastseg, assign_times,  # noqa: E402
                                     tag as fs_tag, _tidy)
-from segment_tuning.run_board import (assign_splits,          # noqa: E402
+from assistant.engine.segmentation.experiments.run_board import (assign_splits,          # noqa: E402
                                       stratified_sample)
 
-_CACHE = os.path.join(_HERE, "runs", "prompt_lab_cache.jsonl")
+_CACHE = os.path.join(_HERE, "experiments", "runs", "prompt_lab_cache.jsonl")
 
 
 def _cache_load() -> dict:
@@ -195,7 +196,7 @@ def main() -> None:
     a = ap.parse_args()
 
     pool = [r for r in assign_splits(
-        sc.load_rows(sorted(glob.glob(f"{_HERE}/data/*.jsonl"))))
+        sc.load_rows(sorted(glob.glob(f"{_HERE}/datasets/*.jsonl"))))
         if r["split"] == "train"]
     # TRAP-STRATIFIED, not proportional. The first prompt slice was
     # proportional and left 13 of 44 traps EMPTY — including serial-verb,

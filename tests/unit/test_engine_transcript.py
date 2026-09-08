@@ -7,7 +7,7 @@ def test_spoken_noise_comes_off_in_the_cleanup_stage(sample_config):
     FastRule's own normalisation, so the DEEP track never got it: real-usage
     review showed the LLM path failing 5 of 5 on rambling dictation opening
     with exactly these words."""
-    from assistant.engine import transcript
+    from assistant.engine.ingest import repair as transcript
     from assistant.engine.state import EngineState
 
     st = EngineState(raw_text="Alright, we have a movie today from 3pm to 6pm",

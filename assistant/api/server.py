@@ -175,7 +175,8 @@ def warm_up_components() -> None:
     the first phone command doesn't pay 10–20 s of cold starts."""
     def _go() -> None:
         import time as _t
-        from assistant.engine import generate as _gen, load_config as _engine_cfg
+        from assistant.engine import load_config as _engine_cfg
+        from assistant.engine.generate import generate as _gen
         t0 = _t.perf_counter()
         for name, fn in (("rule parser", _gen._get_rule_parser),
                          ("whisper", _get_stt),
@@ -576,7 +577,7 @@ def create_app() -> Flask:
         # about the same words would be nagging.
         edited_from = (body.get("edited_from") or "").strip()
         if edited_from:
-            from assistant.engine import transcript as _engine_transcript
+            from assistant.engine.ingest import repair as _engine_transcript
             if edited_from.strip().lower() != transcript.lower():
                 learned = _engine_transcript.learn_from_edit(edited_from, transcript, src)
                 if learned:

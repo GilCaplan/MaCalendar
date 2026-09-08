@@ -3,7 +3,7 @@
 
 WHY THIS EXISTS
 ---------------
-Every board we own measures well-formed prompts. `dataset/fastrule/`'s 7,200
+Every board we own measures well-formed prompts. `assistant/engine/fastrule/datasets/`'s 7,200
 rows are clean single-clause commands; the 3,000-row verification pool is
 tidied history. Meanwhile `scripts/weekly_review.py` — the only instrument
 pointed at REAL usage — reads a 50% flag rate against benchmarks in the
@@ -26,7 +26,7 @@ author's real vocabulary read-only and FAILS THE BUILD if any word of it
 tests/unit/test_artifact_claims.py) reaches a generated row. It reuses
 scripts/gen_personas.py's gate rather than reimplementing it.
 
-GROUND TRUTH BY CONSTRUCTION, exactly as dataset/fastrule/ does: this script
+GROUND TRUTH BY CONSTRUCTION, exactly as assistant/engine/fastrule/datasets/ does: this script
 composed the asks, so it knows how many events and tasks the utterance
 should produce, which action it is, whether it is atomic, and what went into
 every slot. The speech layer that damages the surface NEVER changes what was
