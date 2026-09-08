@@ -64,47 +64,65 @@ get a due date?), and whether TIMES behave like DATES (`"gym and yoga at 7"` —
 both at 7, or only the yoga?). The dataset must contain both shapes so the
 question is answered by data rather than by me.
 
-## 3 · The architecture being proposed
+## 3 · The architecture — THREE PHASES, not one
 
-Gil: *"cut and edit, right after that we need to classify two things — event /
-task / review, and if it's a single task or not so we can decide if the same
-item needs to be segmented again."*
+Gil, 2026-09-08, and this replaces what I had:
+
+> "given a string input we need to break down to all the independent
+> actions/tasks, then GIVEN THAT AND THE ORIGINAL STRING we need to adjust
+> where needed the time tag."
+
+The correction that matters: **time assignment is its own phase, and it reads
+the ORIGINAL STRING, not just the pieces.** I had it fused into the cut as an
+"edit", which is wrong for exactly the reason Gil raised about tier A — once
+`("gym tomorrow")and("buy milk")` has been cut on its brackets, a splitter
+working piece-by-piece can no longer see that "tomorrow" might cover the milk.
+A separate phase holding both the pieces AND the original can.
 
 ```
-   text ──► CUT & EDIT ──► for each piece: ┌─ KIND      event | task | review
-                ▲                          └─ ATOMIC?  done | split again
-                └──────────── not atomic ──────────────┘        (bounded)
+  text
+   │
+   │ ── PHASE 1 · BREAK DOWN ─────────────────────────────
+   │      find every independent action. CUTTING ONLY —
+   │      no time reasoning happens here at all.
+   │        A  literal delimiters   (phone artifacts)
+   │        B  clause parse         (fires on speech)
+   │        C  one gated LLM call   (only if A and B found nothing)
+   │        ↺  loop A+B to a fixed point
+   │        GUARD  refuse a split where any piece is not an ask
+   │   ↓
+   │   pieces: ["gym", "buy milk"]
+   │
+   │ ── PHASE 2 · TIME ASSIGNMENT ────────────────────────
+   │      INPUT: the pieces AND the original string, together.
+   │      For each piece decide its date and its time:
+   │        · a reference INSIDE a piece      → binds to that piece
+   │        · a reference at an EDGE of the
+   │          command, owned by no piece      → covers every piece
+   │                                            that has none of its own
+   │        · no date anywhere                → TODAY
+   │        · a time is needed and none given → NOW (the clock)
+   │   ↓
+   │   pieces + when: [("gym", tomorrow), ("buy milk", tomorrow)]
+   │
+   └── PHASE 3 · CLASSIFY ───────────────────────────────
+          each piece → event | task | review
 ```
 
-Three consequences worth stating plainly:
+**Why three phases and not one pass:** each has a different input, a different
+failure mode and a different metric, so each can be tuned and blamed on its
+own. Phase 1 is judged on boundaries, phase 2 on whether the right piece got
+the right date, phase 3 on kind accuracy. Today all three are entangled in one
+function, which is why fixing the splitter this morning made mis-typing worse
+and no single number could say why.
 
-1. **Segmentation becomes recursive**, driven by the atomicity classifier —
-   which is a real change. It is one pass today, and depth is bounded at 2 by
-   decompose appending sub-items to a new list rather than re-entering them.
-2. **The recursion needs a bound.** Proposed: max depth 3, and a piece that
-   comes back unchanged stops immediately (the same "no progress, no point"
-   rule that fixed the crosscheck loop today).
-3. **THE CEILING IS MEASURED, and it is small.** Gil asked for this before
-   building. Re-running the deterministic splitter on its own output changes
-   the count on **2 of 5,014 FastRule rows (0.0%), 0 of 1,864 personas (0.0%)
-   and 8 of 847 real-speech rows (0.9%)**.
-
-   But the rows it does fix are the three-ask ones, and it fixes them
-   completely — `"remind me to organize the garage, call the plumber, and book
-   blood test friday"` comes out as 2 pieces on one pass and the right 3 on
-   two. So the splitter is NOT idempotent: it can leave a boundary on the
-   table.
-
-   **That changes the recommendation.** The cheap half of recursion — loop the
-   DETERMINISTIC tiers to a fixed point — costs microseconds, no model, no
-   classifier, and collects the whole measured ceiling. The expensive half —
-   an atomicity classifier gating a re-split — cannot beat that same ceiling,
-   so on current evidence it is not worth its call. Proposed: take the free
-   loop, and revisit the gated version only if the real-speech number grows.
-
-4. **Every LLM call is a cost.** Gil: *"we do want to minimize LLM calls
-   because that's slow."* So the atomicity gate must be cheap — which makes
-   §4 the open research question, not an implementation detail.
+**One nuance in the "default to now" rule, flagged not assumed.** Gil: *"if no
+time given the default should be today, and if need specific time then right
+now whatever the current time is."* Read literally that would end all-day
+events — `"add the interview on next friday"` is legitimately 00:00–23:59
+today and should stay that way. My reading: the time defaults to the clock only
+when the item NEEDS a clock time; a dated event with no time spoken stays
+all-day. **Confirm this reading before it is labelled.**
 
 ## 4 · The classification method — RESEARCH FIRST
 
