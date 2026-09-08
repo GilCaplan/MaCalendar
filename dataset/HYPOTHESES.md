@@ -24,7 +24,19 @@ needing one is marked **[Gil]** and is blocked until asked.
 
 ## The queue
 
-**NEXT UP — cycle work authorised by Gil (2026-09-07 evening).** All three
+**THE SPRINT (Gil, 2026-09-07): three broad cycles with unlimited
+IMPLEMENTATION latitude, since the architecture is settled — then narrow
+again.** Full proposal: `DOCUMENTATION/experiments/SPRINT_PROPOSAL.md`.
+A: the atomizer (it is the ceiling on everything — 6.2% of compounds
+atomized correctly, and segment's deterministic tier is a no-op on speech
+because it looks for punctuation the phone inserts). B: speech that is not
+Gil's (72.2% vs 33.9% handle-rate across personas; the cause is `^`-anchored
+features, not vocabulary). C: what the user actually sees (times 82.6%,
+dates 90.4%, 35 destructive errors, 31 half-executed compounds).
+Prerequisite alongside A: the real-speech dataset, without which the sprint
+optimises clean prompts and could leave real usage at 50%.
+
+**Also queued (2026-09-07 evening):** All three
 are IMPLEMENTATION (no contract, component or flow changes), so they run
 inside the loop under the normal discipline: registered prediction first,
 judged on the FastRule 7,200 test half AND the persona boards, dual-gated
