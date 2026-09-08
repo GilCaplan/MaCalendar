@@ -1,0 +1,20 @@
+# Words that appear in the author's personal vocabulary but are ordinary
+# general English, so their presence in a generated real-speech row is not a
+# leak. Same rule as dataset/personas/allowed_words.txt and
+# DOCUMENTATION/artifacts/public_words.txt: a vocabulary word is a leak
+# UNLESS declared here, with a reason.
+
+tomorrow      # a date word every English speaker uses; unavoidable in a calendar dataset
+
+# Two entries the vocabulary layer LEARNED as generic-English repairs, not as
+# personal shorthand. Both are ordinary calendar English with no personal
+# content, and both are in the FastRule banks' register already.
+dentist appointment   # auto-learned repair of a mishearing; a phrase every English speaker uses
+set a meeting         # the commonest calendar imperative in English; auto-learned as a repair target
+
+# An ALIAS entry (the mishearing side of the pair above), which this dataset's
+# gate also checks — see read_vocab_aliases() in scripts/gen_realspeech.py.
+# The damage table here was authored independently and happens to contain the
+# same mishearing, which is evidence the shapes are faithful, not a leak: no
+# personal content is involved either way.
+set meaning   # ordinary mis-recognition of "set a meeting"; no personal content

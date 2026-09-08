@@ -1,0 +1,170 @@
+{
+ "_comment": [
+  "The SPEECH LAYER: disfluency and speech-recognition-damage banks.",
+  "Every entry here is a SHAPE extracted from the author's real command",
+  "history (~/.assistant_tools/nlu_memory.db) and rebuilt over generic",
+  "fillers. No real utterance, name, place or piece of personal shorthand",
+  "appears in this file — see REALSPEECH.md's 'How the shapes were derived'.",
+  "A transform in this bank is TEXT-ONLY: it changes what was heard, never",
+  "what was meant, so ground truth stays correct by construction."
+ ],
+
+ "openers": ["alright,", "right,", "okay,", "so,", "um,", "yeah so,", "again,",
+             "now,", "well,", "ok so,", "alright so,", "right so,"],
+
+ "mid_fillers": ["um", "uh", "like", "you know", "i mean", "sort of"],
+
+ "hedge_tails": ["yeah", "okay", "as well", "too", "got it", "right", "please",
+                 "thanks", "if you can"],
+
+ "dangler_tails": ["to", "and", "with", "for", "at", "the", "so", "but", "as"],
+
+ "meta_tails": ["so do that as well", "summarize that nicely", "put that down",
+                "and that's it", "make that happen", "so add those",
+                "is that clear", "thank you"],
+
+ "cutoff_tails": ["and i also need to b-", "and then i want to s-", "also add a-",
+                  "plus there is the-", "and one more th-", "oh and the-",
+                  "and after that i n-"],
+
+ "stall_phrases": ["one second, one moment,", "hold on, let me think,",
+                   "bear with me, one moment,", "let's see, it is,",
+                   "wait, one moment, one moment,", "hang on, hang on,"],
+
+ "apology_tails": ["excuse me. excuse me.", "sorry about that.", "excuse me.",
+                   "sorry, sorry."],
+
+ "wake_bleed": ["xq", "xq. xq.", "execute", "ex q", "exec you"],
+
+ "wake_suffix": [", execute.", ", execute?", ". execute.", " execute.", ", xq."],
+
+ "ui_tags": ["[TASKS VIEW] ", "[CALENDAR VIEW] "],
+
+ "joins": {
+  "and":        " and ",
+  "andthen":    " and then ",
+  "aswellas":   ", as well as ",
+  "addition":   ". in addition to that, ",
+  "commathen":  ", then ",
+  "andalso":    " and also ",
+  "andthenadd": ". and then in addition to that, ",
+  "period":     ". "
+ },
+
+ "correction_cues": ["sorry,", "sorry, i mean", "no, i mean", "excuse me,",
+                     "sorry, not that,", "no wait,"],
+
+ "wrong_dates": ["tomorrow", "monday", "next week", "today", "thursday", "sunday"],
+ "wrong_times": ["two", "nine", "eleven", "four", "seven", "half past ten"],
+
+ "_name_mangles_comment": [
+  "Proper-noun homophone substitution — the single most frequent damage kind",
+  "measured in the real history (19.3% of rows). Each generic name maps to",
+  "surface forms an acoustic model plausibly produces for it. The ground",
+  "truth attendee becomes the SURFACE form: the parser cannot know the",
+  "intended spelling, so extracting what was actually said is the correct",
+  "behaviour, and repairing it is the vocabulary layer's job, not the",
+  "parser's. The intended value is kept in `intended` for diagnosis."
+ ],
+ "name_mangles": {
+  "Alex":     ["Alec", "Alix"],
+  "Jordan":   ["Jordyn", "Gordon"],
+  "Sam":      ["Cam", "Sane"],
+  "Taylor":   ["Tailor", "Teller"],
+  "Morgan":   ["Morgen", "More Gan"],
+  "Casey":    ["Kacey", "K C"],
+  "Riley":    ["Reilly", "Rally"],
+  "Jamie":    ["Jaime", "Jammy"],
+  "Drew":     ["Dru", "True"],
+  "Reese":    ["Reece", "Reef"],
+  "Avery":    ["Avry", "Every"],
+  "Quinn":    ["Quin", "Queen"],
+  "Skyler":   ["Sky Lure", "Schuyler"],
+  "Rowan":    ["Roan", "Rowing"],
+  "Dana":     ["Donna", "Dayna"],
+  "Charlie":  ["Charley", "Char Lee"],
+  "Jesse":    ["Jessie", "Jazzy"],
+  "Cameron":  ["Camron", "Cameroon"],
+  "Harper":   ["Harpur", "Hopper"],
+  "Emerson":  ["Emmerson", "Immerse On"],
+  "Finley":   ["Finlay", "Finally"],
+  "Blake":    ["Blaike", "Blayk"],
+  "Sage":     ["Sayge", "Sarge"],
+  "Robin":    ["Robbin", "Robbing"],
+  "Parker":   ["Parka", "Par Ker"],
+  "Devon":    ["Deven", "Devin"]
+ },
+
+ "_verb_mangles_comment": [
+  "Command-verb damage (7.2% of real rows): the imperative itself is heard",
+  "as content, which is the failure that hurts most — there is no verb left",
+  "for a rule parser to key on. Longest key wins; applied at most once."
+ ],
+ "verb_mangles": {
+  "set a meeting":     ["set meaning", "sad meeting", "start emitting"],
+  "set an event":      ["set an advent", "said an event", "set and event"],
+  "create an event":   ["creative and", "create and event", "creating advent"],
+  "create a meeting":  ["creating meeting", "create meaning"],
+  "remind me to":      ["rewind me to", "remind mitt to", "remind need to"],
+  "i need to buy":     ["i need to by", "i needed a buy", "you need to buy"],
+  "what do i have":    ["what do i half", "what to i have"],
+  "edit the event":    ["at it the event", "edited the event"],
+  "cancel":            ["can sell", "cancer"],
+  "schedule":          ["shed you'll", "sketch you'll"],
+  "put down":          ["put dawn", "pull down"],
+  "set for":           ["sat for", "said for"],
+  "add":               ["at", "ad"],
+  "book":              ["booked", "boot"]
+ },
+
+ "_possessive_comment": [
+  "Possessive fused or lost (3.6% of real rows, and the single shape that",
+  "produced the most confident wrong action in the history): an apostrophe-s",
+  "phrase is heard as one word or as a two-word proper noun, so the head",
+  "noun disappears and the utterance reads like a different task entirely."
+ ],
+ "possessive_templates": [
+  {"clean": "walk {name}'s dog",        "damaged": ["walk {name}sdog", "walk {name} Stalk", "walk {name}s Dog"]},
+  {"clean": "feed {name}'s cat",        "damaged": ["feed {name}scat", "feed {name} Scat", "feed {name}s Cat"]},
+  {"clean": "water {name}'s plants",    "damaged": ["water {name}splants", "water {name} Splants"]},
+  {"clean": "pick up {name}'s package", "damaged": ["pick up {name}spackage", "pick up {name} Space Age"]},
+  {"clean": "return {name}'s book",     "damaged": ["return {name}sbook", "return {name}s Boot"]},
+  {"clean": "drive {name}'s car",       "damaged": ["drive {name}scar", "drive {name} Scar"]}
+ ],
+
+ "_compound_comment": [
+  "Compound-word fusion (3.6%): two words of a noun phrase run together, so",
+  "the title becomes a token no lexicon contains."
+ ],
+ "compound_titles": [
+  {"clean": "cold brew",     "damaged": ["coldbrew", "Colbrew", "Cole Brew"]},
+  {"clean": "ice cream",     "damaged": ["icecream", "I Scream"]},
+  {"clean": "dry cleaning",  "damaged": ["drycleaning", "Dry Clean Ing"]},
+  {"clean": "book club",     "damaged": ["bookclub", "Book Lub"]},
+  {"clean": "car wash",      "damaged": ["carwash", "Car Warsh"]},
+  {"clean": "bike ride",     "damaged": ["bikeride", "Bike Rid"]},
+  {"clean": "grocery store", "damaged": ["grocerystore", "Grocery Stor"]},
+  {"clean": "study group",   "damaged": ["studygroup", "Study Grip"]}
+ ],
+
+ "_loanword_comment": [
+  "Loanword to word salad (8.4%): a word English borrowed keeps its foreign",
+  "phonology, so the recogniser spells it as a run of unrelated English",
+  "words. The real history's instances are all Hebrew/liturgical terms;",
+  "these are generic loanwords with the identical damage geometry."
+ ],
+ "loanword_titles": [
+  {"clean": "pilates session",       "damaged": ["pill lattes session", "pie lates session"]},
+  {"clean": "espresso tasting",      "damaged": ["expresso tasting", "ex press oh tasting"]},
+  {"clean": "karate practice",       "damaged": ["kah rah tay practice", "carrot day practice"]},
+  {"clean": "origami workshop",      "damaged": ["or a gummy workshop", "oh rig ami workshop"]},
+  {"clean": "quinoa delivery",       "damaged": ["keen wah delivery", "quin oh a delivery"]},
+  {"clean": "physiotherapy session", "damaged": ["fizzy oh therapy session", "physio the rapey session"]},
+  {"clean": "kombucha order",        "damaged": ["come booch a order", "kom bootcha order"]},
+  {"clean": "falafel run",           "damaged": ["fell awful run", "fall a full run"]},
+  {"clean": "croissant order",       "damaged": ["kwa son order", "cross ant order"]},
+  {"clean": "barista course",        "damaged": ["bar eastern course", "bar rista course"]},
+  {"clean": "sudoku club",           "damaged": ["sue dough coup club", "so do koo club"]},
+  {"clean": "tempura night",         "damaged": ["temp your a night", "tem pura night"]}
+ ]
+}

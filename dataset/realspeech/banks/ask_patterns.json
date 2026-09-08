@@ -1,0 +1,610 @@
+{
+ "_comment": [
+  "ASK SKELETONS — one sub-ask each, in the four REGISTERS the real history",
+  "actually uses (imperative / declarative / bare / polite). A row is one or",
+  "more of these composed with a join from speech.json, then run through the",
+  "speech layer. Placeholders follow the FastRule generator's contract",
+  "(scripts/gen_fastrule_dataset.BASE_INFO): {event_title}->title,",
+  "{task_title}->title, {item}->title, {date}->date_phrase, {time}->time_phrase,",
+  "{name}->attendee, {query_range}->date_phrase. Slot suffixing (_2, _3, _4) is",
+  "applied by the composer per ask position, so the skeletons stay unsuffixed.",
+  "",
+  "`content` names which content bank supplies the title, so the damage layer",
+  "knows what it may attack: 'event'/'task'/'item' draw the plain banks;",
+  "'possessive'/'compound'/'loanword' draw the damageable banks in speech.json.",
+  "A skeleton with no title slot omits it."
+ ],
+ "asks": {
+  "e_imp_meeting": {
+   "action": "create_event",
+   "register": "imp",
+   "template": "set a meeting {date} at {time}"
+  },
+  "e_imp_meeting_with": {
+   "action": "create_event",
+   "register": "imp",
+   "template": "set a meeting for me {date} at {time} with {name}"
+  },
+  "e_imp_event_for": {
+   "action": "create_event",
+   "register": "imp",
+   "template": "set an event for {date} at {time} for {event_title}",
+   "content": "event"
+  },
+  "e_imp_create": {
+   "action": "create_event",
+   "register": "imp",
+   "template": "create an event {date} at {time} for {event_title}",
+   "content": "event"
+  },
+  "e_imp_add_on": {
+   "action": "create_event",
+   "register": "imp",
+   "template": "add {event_title} on {date} at {time}",
+   "content": "event"
+  },
+  "e_imp_putdown": {
+   "action": "create_event",
+   "register": "imp",
+   "template": "put down {event_title} on {date} at {time}",
+   "content": "event"
+  },
+  "e_imp_book": {
+   "action": "create_event",
+   "register": "imp",
+   "template": "book {event_title} {date} at {time}",
+   "content": "event"
+  },
+  "e_imp_schedule": {
+   "action": "create_event",
+   "register": "imp",
+   "template": "schedule {event_title} for {date} at {time}",
+   "content": "event"
+  },
+  "e_imp_setfor": {
+   "action": "create_event",
+   "register": "imp",
+   "template": "set for {date} at {time} to {task_title}",
+   "content": "task"
+  },
+  "e_imp_setfor_poss": {
+   "action": "create_event",
+   "register": "imp",
+   "template": "set for {date} at {time} to {event_title}",
+   "content": "possessive"
+  },
+  "e_imp_loan": {
+   "action": "create_event",
+   "register": "imp",
+   "template": "book {event_title} {date} at {time}",
+   "content": "loanword"
+  },
+  "e_decl_have": {
+   "action": "create_event",
+   "register": "decl",
+   "template": "i have {event_title} {date} at {time}",
+   "content": "event"
+  },
+  "e_decl_had": {
+   "action": "create_event",
+   "register": "decl",
+   "template": "i had an event on {date} at {time} for {event_title}",
+   "content": "event"
+  },
+  "e_decl_thereis": {
+   "action": "create_event",
+   "register": "decl",
+   "template": "there is {event_title} {date} at {time}",
+   "content": "event"
+  },
+  "e_decl_wehave": {
+   "action": "create_event",
+   "register": "decl",
+   "template": "we have {event_title} {date} at {time}",
+   "content": "event"
+  },
+  "e_decl_willbe": {
+   "action": "create_event",
+   "register": "decl",
+   "template": "there will be {event_title} on {date} at {time}",
+   "content": "event"
+  },
+  "e_decl_ineedgo": {
+   "action": "create_event",
+   "register": "decl",
+   "template": "i need to go to {event_title} on {date} at {time}",
+   "content": "loanword"
+  },
+  "e_bare_title_first": {
+   "action": "create_event",
+   "register": "bare",
+   "template": "{event_title} {date} at {time}",
+   "content": "event"
+  },
+  "e_bare_date_first": {
+   "action": "create_event",
+   "register": "bare",
+   "template": "{date} at {time} {event_title}",
+   "content": "event"
+  },
+  "e_bare_with": {
+   "action": "create_event",
+   "register": "bare",
+   "template": "{event_title} on {date} at {time} with {name}",
+   "content": "event"
+  },
+  "e_bare_compound": {
+   "action": "create_event",
+   "register": "bare",
+   "template": "{event_title} {date} at {time}",
+   "content": "compound"
+  },
+  "e_pol_canyou": {
+   "action": "create_event",
+   "register": "pol",
+   "template": "can you set a meeting {date} at {time} for {event_title}",
+   "content": "event"
+  },
+  "e_pol_please": {
+   "action": "create_event",
+   "register": "pol",
+   "template": "please set an event for me {date} at {time} for {event_title}",
+   "content": "event"
+  },
+  "e_pol_couldyou": {
+   "action": "create_event",
+   "register": "pol",
+   "template": "could you add {event_title} on {date} at {time}",
+   "content": "event"
+  },
+  "t_imp_remind": {
+   "action": "create_todo",
+   "register": "imp",
+   "template": "remind me to {task_title}",
+   "content": "task"
+  },
+  "t_imp_addlist": {
+   "action": "create_todo",
+   "register": "imp",
+   "template": "add {task_title} to my list",
+   "content": "task"
+  },
+  "t_imp_putlist": {
+   "action": "create_todo",
+   "register": "imp",
+   "template": "put {task_title} on my list",
+   "content": "task"
+  },
+  "t_imp_poss": {
+   "action": "create_todo",
+   "register": "imp",
+   "template": "remind me to {task_title}",
+   "content": "possessive"
+  },
+  "t_decl_needto": {
+   "action": "create_todo",
+   "register": "decl",
+   "template": "i need to {task_title}",
+   "content": "task"
+  },
+  "t_decl_needbuy": {
+   "action": "create_todo",
+   "register": "decl",
+   "template": "i need to buy {item}",
+   "content": "item"
+  },
+  "t_decl_haveto": {
+   "action": "create_todo",
+   "register": "decl",
+   "template": "i have to {task_title}",
+   "content": "task"
+  },
+  "t_decl_needbuy_cmp": {
+   "action": "create_todo",
+   "register": "decl",
+   "template": "i need to buy {item}",
+   "content": "compound"
+  },
+  "t_bare_list": {
+   "action": "create_todo",
+   "register": "bare",
+   "template": "{task_title}, on my list",
+   "content": "task"
+  },
+  "t_pol_canremind": {
+   "action": "create_todo",
+   "register": "pol",
+   "template": "can you remind me to {task_title}",
+   "content": "task"
+  },
+  "t_pol_pleaseadd": {
+   "action": "create_todo",
+   "register": "pol",
+   "template": "please add {task_title} to my list",
+   "content": "task"
+  },
+  "q_imp_whatdo": {
+   "action": "query",
+   "register": "imp",
+   "template": "what do i have {query_range}"
+  },
+  "q_imp_schedule": {
+   "action": "query",
+   "register": "imp",
+   "template": "what's on my schedule {query_range}"
+  },
+  "q_imp_showme": {
+   "action": "query",
+   "register": "imp",
+   "template": "show me my schedule for {query_range}"
+  },
+  "q_pol_canyoutell": {
+   "action": "query",
+   "register": "pol",
+   "template": "can you tell me what i have {query_range}"
+  },
+  "u_imp_edit": {
+   "action": "update_event",
+   "register": "imp",
+   "template": "edit the event on {date}, change it to {time}"
+  },
+  "u_imp_fix": {
+   "action": "update_event",
+   "register": "imp",
+   "template": "fix the meeting {date}, the one with {name}, change it to {time}"
+  },
+  "u_imp_move": {
+   "action": "update_event",
+   "register": "imp",
+   "template": "move {event_title} on {date} to {time}",
+   "content": "event"
+  },
+  "u_decl_justmade": {
+   "action": "update_event",
+   "register": "decl",
+   "template": "the event you just made on {date}, it should be at {time}"
+  },
+  "u_pol_canyoufix": {
+   "action": "update_event",
+   "register": "pol",
+   "template": "can you fix the meeting on {date} so it starts at {time}"
+  },
+  "d_imp_cancel": {
+   "action": "delete_event",
+   "register": "imp",
+   "template": "cancel {event_title} on {date}",
+   "content": "event"
+  },
+  "d_imp_delete": {
+   "action": "delete_event",
+   "register": "imp",
+   "template": "delete the meeting on {date} at {time}"
+  },
+  "d_imp_remove": {
+   "action": "delete_event",
+   "register": "imp",
+   "template": "remove {event_title} from my calendar",
+   "content": "event"
+  },
+  "d_pol_pleasecancel": {
+   "action": "delete_event",
+   "register": "pol",
+   "template": "please cancel {event_title} on {date}",
+   "content": "event"
+  },
+  "e_imp_meeting_about": {
+   "action": "create_event",
+   "register": "imp",
+   "template": "set a meeting {date} at {time} with {name} about {event_title}",
+   "content": "event"
+  },
+  "e_imp_add_name": {
+   "action": "create_event",
+   "register": "imp",
+   "template": "add {event_title} with {name} on {date} at {time}",
+   "content": "event"
+  },
+  "e_decl_have_name": {
+   "action": "create_event",
+   "register": "decl",
+   "template": "i have {event_title} with {name} {date} at {time}",
+   "content": "event"
+  },
+  "e_bare_loan": {
+   "action": "create_event",
+   "register": "bare",
+   "template": "{event_title} {date} at {time} with {name}",
+   "content": "loanword"
+  },
+  "e_pol_loan": {
+   "action": "create_event",
+   "register": "pol",
+   "template": "can you book {event_title} for {date} at {time}",
+   "content": "loanword"
+  },
+  "e_pol_name": {
+   "action": "create_event",
+   "register": "pol",
+   "template": "please set a meeting with {name} on {date} at {time}"
+  },
+  "t_imp_remind_loan": {
+   "action": "create_todo",
+   "register": "imp",
+   "template": "remind me to book {event_title}",
+   "content": "loanword"
+  },
+  "t_decl_pickup_loan": {
+   "action": "create_todo",
+   "register": "decl",
+   "template": "i need to remember to book the {item}",
+   "content": "loanword"
+  },
+  "t_decl_needbuy_name": {
+   "action": "create_todo",
+   "register": "decl",
+   "template": "i need to call {name} about the {item}",
+   "content": "item"
+  },
+  "u_imp_move_name": {
+   "action": "update_event",
+   "register": "imp",
+   "template": "move the meeting with {name} on {date} to {time}"
+  },
+  "u_decl_name": {
+   "action": "update_event",
+   "register": "decl",
+   "template": "the meeting with {name} on {date} should be at {time}"
+  },
+  "d_imp_cancel_name": {
+   "action": "delete_event",
+   "register": "imp",
+   "template": "cancel the meeting with {name} on {date}"
+  },
+  "d_pol_name": {
+   "action": "delete_event",
+   "register": "pol",
+   "template": "could you delete the meeting with {name} on {date}"
+  },
+  "q_imp_anything": {
+   "action": "query",
+   "register": "imp",
+   "template": "do i have anything {query_range}"
+  }
+ },
+ "_structures_comment": [
+  "STRUCTURES — how many asks and of which types. `asks` lists the action",
+  "class per position ('e' create_event, 't' create_todo, 'q' query,",
+  "'u' update_event, 'd' delete_event); the composer picks a concrete",
+  "skeleton of that class in the family's register. `pool` is which sampling",
+  "pool the structure feeds: 'faithful' rows are drawn at the ask-count",
+  "marginals MEASURED in the real history, 'stress' rows oversample the",
+  "multi-ask tail for mining and per-shape diagnosis (see REALSPEECH.md)."
+ ],
+ "structures": {
+  "e1": {
+   "asks": [
+    "e"
+   ],
+   "registers": [
+    "imp",
+    "decl",
+    "bare",
+    "pol"
+   ]
+  },
+  "t1": {
+   "asks": [
+    "t"
+   ],
+   "registers": [
+    "imp",
+    "decl",
+    "bare",
+    "pol"
+   ]
+  },
+  "q1": {
+   "asks": [
+    "q"
+   ],
+   "registers": [
+    "imp",
+    "pol"
+   ]
+  },
+  "u1": {
+   "asks": [
+    "u"
+   ],
+   "registers": [
+    "imp",
+    "decl",
+    "pol"
+   ]
+  },
+  "d1": {
+   "asks": [
+    "d"
+   ],
+   "registers": [
+    "imp",
+    "pol"
+   ]
+  },
+  "ee2": {
+   "asks": [
+    "e",
+    "e"
+   ],
+   "registers": [
+    "imp",
+    "decl",
+    "bare"
+   ]
+  },
+  "tt2": {
+   "asks": [
+    "t",
+    "t"
+   ],
+   "registers": [
+    "imp",
+    "decl"
+   ]
+  },
+  "et2": {
+   "asks": [
+    "e",
+    "t"
+   ],
+   "registers": [
+    "imp",
+    "decl"
+   ]
+  },
+  "te2": {
+   "asks": [
+    "t",
+    "e"
+   ],
+   "registers": [
+    "imp",
+    "decl"
+   ]
+  },
+  "eq2": {
+   "asks": [
+    "e",
+    "q"
+   ],
+   "registers": [
+    "imp"
+   ]
+  },
+  "ed2": {
+   "asks": [
+    "e",
+    "d"
+   ],
+   "registers": [
+    "imp"
+   ]
+  },
+  "eu2": {
+   "asks": [
+    "e",
+    "u"
+   ],
+   "registers": [
+    "imp"
+   ]
+  },
+  "eee3": {
+   "asks": [
+    "e",
+    "e",
+    "e"
+   ],
+   "registers": [
+    "imp",
+    "decl",
+    "bare"
+   ]
+  },
+  "eet3": {
+   "asks": [
+    "e",
+    "e",
+    "t"
+   ],
+   "registers": [
+    "imp",
+    "decl"
+   ]
+  },
+  "ttt3": {
+   "asks": [
+    "t",
+    "t",
+    "t"
+   ],
+   "registers": [
+    "imp",
+    "decl"
+   ]
+  },
+  "ete3": {
+   "asks": [
+    "e",
+    "t",
+    "e"
+   ],
+   "registers": [
+    "imp"
+   ]
+  },
+  "eeee4": {
+   "asks": [
+    "e",
+    "e",
+    "e",
+    "e"
+   ],
+   "registers": [
+    "imp",
+    "decl"
+   ]
+  },
+  "eeet4": {
+   "asks": [
+    "e",
+    "e",
+    "e",
+    "t"
+   ],
+   "registers": [
+    "imp",
+    "bare"
+   ]
+  },
+  "eett4": {
+   "asks": [
+    "e",
+    "e",
+    "t",
+    "t"
+   ],
+   "registers": [
+    "imp"
+   ]
+  }
+ },
+ "_null_comment": [
+  "NULL rows — 4.8% of the real history is an utterance carrying no ask at",
+  "all: a bare wake word, a cut-off syllable, an answer to a question the",
+  "assistant never asked. Creating anything from one of these is the most",
+  "visible failure the store contains, so they are kept as their own family."
+ ],
+ "null_texts": [
+  "execute",
+  "execute a",
+  "execute a...",
+  "no",
+  "no.",
+  "wait",
+  "um",
+  "i need a b-",
+  "can you j-",
+  "set a-",
+  "so i-",
+  "hold on",
+  "actually no",
+  "yeah",
+  "okay so",
+  "one second",
+  "hmm",
+  "what",
+  "never mind",
+  "sorry"
+ ]
+}
