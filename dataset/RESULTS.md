@@ -1787,3 +1787,53 @@ would otherwise be aimed at a stage nobody has observed working.
 - **If the lane does NOT beat the deterministic path**, that is the finding —
   it would mean the compound ceiling is the prompt or the model rather than
   the gate, and the next cycle aims there instead of at coverage.
+
+### CYCLE A PART 3 — RESULT — the LLM lane, measured at last
+
+**FastRule 7,200 test half. Deterministic-only (the lane every previous
+conclusion came from) vs `--llm`:**
+
+| | deterministic | with the model | |
+|---|---|---|---|
+| boundary clean | 41.4% | **89.4%** | +48.0 |
+| bleed (two asks in one item) | 55.8% | **7.3%** | −48.5 |
+| complex count-correct | 76.2% | **84.4%** | +8.2 |
+| complex UNDER | 21.2% | **2.8%** | −18.4 |
+| complex OVER | 2.6% | **12.8%** | +10.2 |
+| simple count-correct | 99.8% | **95.1%** | −4.7 |
+| simple OVER | 0.2% | **4.9%** | +4.7 |
+| rows segment split | 10.8% | **33.2%** | |
+
+**Prediction: half right, and the half it got wrong is the important half.**
+Compound splitting beat the predicted range — under-splitting essentially
+disappears (21.2% → 2.8%), which is what the deep track was built to do. But
+both guard conditions FAILED: OVER was predicted to stay ≤6% and is **12.8%**,
+and atomic rows were predicted to stay ≥97% kept-at-1 and are **95.1%**.
+
+**What that means, and it is the finding of this cycle:** the model does not
+have the under-split bias the architecture depends on. The deterministic tiers
+enforce that bias in code — a fragment is refused, a modifier is refused, an
+unconfident boundary does not split. The LLM tier enforces almost none of it:
+its only post-call guard is "no part shorter than two words". So switching the
+lane on trades a cheap error (a merge, recoverable by two later stages) for
+the expensive one (garbage items, immediate and user-visible). Under this
+project's own stated ordering that is not obviously a win, which is exactly
+why the lane had to be measured before anything was aimed at it.
+
+**Where it over-splits is diagnostic, not random** (count-correct · OVER):
+generic_target_complex 37.3% · **62.7%**; date_marking 65.2% · 34.8%; all_day
+66.7% · 33.3%; propose_confirm 72.5% · 27.1%; three_ask 70.4% · 19.7%. These
+are the shapes with no second ask to find — a vague target, a date being
+marked, an all-day event, a question weighing one action. The model invents
+structure when there is none to find, and the families where it does are
+nameable.
+
+**So the next change is not "turn the lane on" — it is to give the LLM tier
+the discipline the deterministic tiers already have.** `intent/asks.py`
+exists and is applied to segment's clause tier and decompose's list tier; the
+LLM tier never got it. That is cycle A part 4.
+
+_(Capture note: I ran the board through `tail -60`, so the M1–M3 block —
+including the headline "compounds atomized correctly" line and the by-ask-count
+table — scrolled off. The numbers above are all from M5/M7/tier sections that
+survived. The next run captures the whole board.)_
