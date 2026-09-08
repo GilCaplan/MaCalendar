@@ -365,6 +365,42 @@ md5s, loop run number. Rules:
   **~1.5 pt are noise** — judge a cycle by its targeted slice, and measure
   twice when the predicted effect is under ~4 rows.
 
+## Two kinds of hypothesis (Gil, 2026-09-07)
+
+A cycle does not have to ask "will this help?". It can ask **"which of these
+two implementations is better?"** — and often should.
+
+**1. The improvement hypothesis.** Predict what one change does to a named
+metric on a named slice, make it, compare actual vs predicted. The default.
+
+**2. The COMPARISON hypothesis.** Build BOTH implementations and let the data
+choose. Better than the first whenever the honest answer to "which approach?"
+is a judgment call, because it converts an opinion into evidence — and it
+controls for everything else, since both arms face the same rows on the same
+day.
+
+Rules that keep a comparison honest:
+
+- **Both arms get built properly.** A lazy arm is not a fair test; if one is
+  cheaper to build, say so and account for it rather than letting effort
+  decide the winner.
+- **A prediction is still registered** — which arm wins, and WHY. When the
+  prediction is wrong, the model of the system was wrong, and that is the
+  finding worth more than the result.
+- **Same boards, same data, same conditions**, reported side by side.
+- **Watch for arms that fail DIFFERENTLY.** Two approaches can score the same
+  and fail in ways that are not equally acceptable. A parser that is unsure
+  DEFERS — visible and recoverable. A rewriter that misreads produces a
+  confident wrong action. When failure modes differ, the harm line decides,
+  not the headline.
+- **A tie is a result**: take the simpler one, and record why.
+- **Complementary is a legitimate verdict** — the answer may be "use A for
+  these shapes and B for the rest", and the cycle should be allowed to say so
+  rather than being forced to crown a winner.
+
+First use: sprint cycle B (teach the models the phrasings vs canonicalise
+them in cleanup) — see `SPRINT_PROPOSAL.md`.
+
 ## The four instruments, and what each is for
 
 | instrument | question it answers | when |
