@@ -145,20 +145,35 @@ new `CHAINS` entry, and update the panel, iOS and the explorer diagram.
 
 ## Status — what is wired TODAY
 
-| the diagram says | today | |
+The chain above **is** the code. Verified by `scripts/engine_pipeline_check`,
+which asserts the shape at every boundary and runs commands end to end.
+
+| box | Stage | module |
 |---|---|---|
-| Ingest & fix | ✅ `Stage("transcript")` → `ingest/repair.py` | wired |
-| Segmentation | ✅ `Stage("segment")` → `segmentation/` (FastSeg; LLMSeg off) | wired |
-| decompose_validate | ⚠️ two Stages, and `validate` runs **twice** — a text pass before FastRule and `validate_objects` after | to fold |
-| FastRule | ⚠️ `Stage("generate")` calls FastRule per item; the stage is not named for it | to promote |
-| LLMJudge | ⚠️ `Stage("crosscheck")`; routes blame to three stages instead of rewriting X1 | to rewire |
-| COMMIT + label | ⚠️ commit is in the orchestrator; `label` is a separate Stage after it | to fold |
-| the loop | ⚠️ re-runs segmentation on **unchanged text** — and since FastSeg is deterministic with LLMSeg off, it cannot return anything new, so the loop is **inert** | the rewire fixes this |
-| the Engine's stage list | ⚠️ still wraps the re-runnable stage list | to delete |
+| Ingest & fix | `Stage("transcript")` | `ingest/repair.py` + `ingest/coalesce.py` |
+| Segmentation | `Stage("segment")` | `segmentation/` — FastSeg, LLMSeg **off** |
+| decompose_validate | `Stage("decompose_validate")` | `decompose_validate/stage.py` |
+| FastRule | `Stage("fastrule")` | `fastrule/stage.py` → `fastrule/objects.py` |
+| LLMJudge | `Stage("llmjudge")` | `llmjudge/llmjudge.py` |
+| COMMIT + label | inside `_commit` | orchestrator + `label/label.py` |
 
-`DOCUMENTATION/ENGINE_REWIRE.md` is the plan that closes that column.
+Two things are wired but **deliberately inert**, and both are named rather than
+hidden:
 
----
+| | state |
+|---|---|
+| **LLMSeg** | off by default (`MACALENDAR_LLMSEG`). Measured net-negative four ways — §6. |
+| **the loop** | `llmjudge.rewrite_for_retry` is a stub returning None, so no loop fires. The contract and its single call site are in place; the rewrite itself wants a model call grounded on `state.raw_text`. |
+
+**Why the loop is gated on a rewrite rather than just re-running.**
+Segmentation is deterministic, so re-entering it with the same text returns the
+same items — the retry can only spend the budget. Real usage, 2026-09-08: *"Let
+an event to go out for a run now"* looped three times to the identical result
+and apologised after 30 seconds. So: **no rewrite, no loop.**
+
+Also still open, recorded in `segmentation/ARCHITECTURE.md` §6b: the month can
+be severed from its ordinal (`the 20th of November`), which is the one NEW test
+failure this rewire introduced.
 
 ## Where to read next
 

@@ -1,5 +1,14 @@
 # The Engine — stage contracts
 
+> **`assistant/engine/ARCHITECTURE.md` is the map** — the chain as a diagram,
+> each stage as a black box, and what is wired versus inert. This file is the
+> contract reference underneath it: what each stage READS and WRITES.
+>
+> Re-cut 2026-09-08 with the rewire. The boxes are now
+> `ingest → segmentation → decompose_validate → fastrule → llmjudge →
+> commit(+label)`; `decompose` and `validate` share a folder, the object-making
+> box is FastRule, and `label` runs inside commit.
+
 > **Stage isolation (2026-09-07):** each stage is being proven on its own
 > dataset before the system is measured end-to-end — see
 > `DOCUMENTATION/STAGE_ISOLATION_PLAN.md`. The contracts below are unchanged;
@@ -78,7 +87,7 @@ channel to mutate state through.
 
 ## The stages
 
-### 0 · ingest (orchestrator — `assistant/engine/__init__.py`)
+### 0 · ingest (`ingest/coalesce.py` + the orchestrator's run lock)
 Two halves, both live. **Serialization**: `run_transcript` holds a lock — one
 command at a time, FIFO, so concurrent requests cannot race the anaphora
 context; the wait shows honestly in the trace total. **Coalescing**:
@@ -88,7 +97,7 @@ deterministically), overflow running sequentially — used by the pending-retry
 loop, where server-side inputs genuinely pile up; the phone's bracket batching
 flows through step 2 as before.
 
-### 1 · transcript (`transcript.py` · trace stage `vocab` · tests `test_engine_flow.py`)
+### 1 · transcript (`ingest/repair.py` · trace stage `vocab` · tests `test_engine_flow.py`)
 Reads `raw_text`; writes `text`, `corrections`, `needs_edit`, `ignored`.
 Stop-word strip → trivial-transcript filter (a false start is ignored AND not
 remembered) → `apply_vocab` (confident fixes, phonetic matching) → the
@@ -102,7 +111,7 @@ confirmations the word is whitelisted and never asked about again. The Mac
 sends `supports_edit`, shows the dialog (`ask_transcript_edit`, real-click
 tested) and has the Settings toggle; the iOS sheet is queued. *Status: live.*
 
-### 2 · segment (`segment.py` · trace `rule` · tests `test_engine_segment.py`)
+### 2 · segment (`segmentation/` — FastSeg → LLMSeg(off) → accept · trace `rule` · tests `test_engine_segment.py`)
 Reads `text`; writes fresh `items` (id, kind, text only). Three tiers, in
 order, **biased to under-split** — a wrong merge gets two more chances (steps
 3 and 6); a wrong split of "meeting with Tal and Ravid" is immediate garbage.
@@ -137,7 +146,7 @@ board: `scripts/kind_board.py` for the kind decision alone.* Exports the reader
 OWN create ("should I", "what if we") — read by step 4's confirm gate and
 step 5's fast-track guard, so the two cannot disagree about what a question is.
 
-### 3 · decompose (`decompose.py` · trace `rule` · tests `test_engine_decompose.py`)
+### 3 · decompose (`decompose_validate/decompose.py` · trace `rule` · tests `test_engine_decompose.py`)
 Reads `items`; may replace an item with sub-items (`item_N-M`, depth ≤ 2) and
 fill `item.slots`. Two times joined by "and" → two events; task lists ride
 `intent/list_split.py` (verb handed down, idioms respected); counts ride
@@ -156,7 +165,7 @@ serves segment's clause tier, so the two cannot drift.
 double-times (two clock-time mentions required; ranges excluded). Gate:
 `engine_stage_check --stage decompose`.*
 
-### 4 · validate (`validate.py` · trace `validate` · tests `test_engine_validate.py`)
+### 4 · validate (`decompose_validate/validate.py` · trace `validate` · tests `test_engine_validate.py`)
 Two passes, both contract:
 - `run` (pre-generation, item level): format hygiene, text repair of garbled
   fragments.
@@ -186,7 +195,7 @@ gym at 7 and should i add yoga?" the question half keeps its pre-ruling
 behaviour and the booking runs. Without `supports_confirm` nothing changes,
 which is what keeps old clients working.
 
-### 5 · generate (`generate.py` · trace `rule`/`llm` · tests `test_engine_generate.py` + integration)
+### 5 · fastrule (`fastrule/stage.py` → `fastrule/objects.py` · trace `rule`/`llm` · tests `test_engine_generate.py` + integration)
 Owns ALL text→intent conversion. **`FastRule`** (`engine/fastrule/fastrule.py`) is the
 deterministic rule parser + its abstention gates + a confidence threshold, as
 a self-contained SELECTIVE CLASSIFIER: `FastRule(threshold).run(prompt)`
@@ -248,13 +257,13 @@ understand"; `TargetNotFound` → the not-found message (empty slots are the
 right answer for a delete; guessing is not). Records `(kind, row_id, action,
 idx)` per item for the command memory and the 24h corrected/rejected hooks.
 
-### 7 · label (`label.py` · trace `validate`)
+### 7 · label (`label/label.py`, run INSIDE commit · trace `validate`)
 Categories/colours and task tags are applied by the actions themselves
 (`categories.py`, `tagging.py`); this stage reads the results back onto
 `item.labels` so reply, trace and audit can see them. The two-level hierarchy
 (row 58) lands here.
 
-### 6 · crosscheck (`crosscheck.py` · trace `verify` · gate: extraction + blame tests)
+### 6 · llmjudge (`llmjudge/llmjudge.py` · trace `verify` · gate: extraction + blame tests)
 1. EXTRACT, don't judge: the LLM lists items the RAW text mentions
    (schema-constrained) — small models extract far better than they
    self-evaluate.

@@ -1,8 +1,13 @@
 # Engine rewire — one flat chain, and a loop that rewrites the input
 
-**Status: PLANNED, not started.** Agreed with Gil 2026-09-08 from his diagram.
-Unlike `ENGINE_RESTRUCTURE.md` this one **does change behaviour** — the chain's
-shape moves, so the trace, the HUD and iOS move with it.
+**Status: DONE, 2026-09-08** — on `engine-component-folders`, not merged.
+The chain is wired and `assistant/engine/ARCHITECTURE.md` is the live map; this
+file is the record of what was decided and what is still open.
+
+Two things shipped deliberately INERT, both named in the architecture doc:
+LLMSeg is off, and `rewrite_for_retry` is a stub returning None so no loop
+fires. The contract and its call site exist; the rewrite itself is the work
+left.
 
 ## The chain
 
@@ -73,26 +78,28 @@ LLMJudge keeps emitting `VERIFY`.
 
 What does change is the chain's SHAPE, so:
 
-- [ ] bump `BRAIN_VERSION` (an old trace must still render in its old format)
-- [ ] add the new version's `CHAINS` entry
-- [ ] update the explorer diagram + iOS `ThinkingView` labels if the wording moves
-- [ ] `test_panel_agreement.py` goes red until these agree — by design
+- [x] bump `BRAIN_VERSION` (an old trace must still render in its old format)
+- [x] add the new version's `CHAINS` entry
+- [x] update the explorer diagram + iOS `ThinkingView` labels if the wording moves
+- [x] `test_panel_agreement.py` goes red until these agree — by design
 
 ## Order of work
 
-- [ ] 1. Branch off `engine-component-folders`.
-- [ ] 2. Delete the stage-list wrapper; flatten to one ordered list on `Engine`.
-- [ ] 3. Give `fastrule/` a stage module (`run(state, cfg) -> state`) that turns
+- [x] 1. Branch off `engine-component-folders`.
+- [x] 2. Delete the stage-list wrapper; flatten to one ordered list on `Engine`.
+- [x] 3. Give `fastrule/` a stage module (`run(state, cfg) -> state`) that turns
       Items into objects. `generate`'s per-item LLM fallback moves inside it —
       the stage is "make the objects", FastRule-first is *how*.
-- [ ] 4. Fold `validate.run_objects` into `decompose_validate`.
-- [ ] 5. Move `label` into the commit step.
-- [ ] 6. `crosscheck` -> `llmjudge`: replace the blame router with
+- [x] 4. Fold `validate.run_objects` into `decompose_validate`.
+- [x] 5. Move `label` into the commit step.
+- [x] 6. `crosscheck` -> `llmjudge`: replace the blame router with
       `rewrite(X4) -> X1'`, re-enter at Segmentation, bounded at 3.
 - [ ] 7. Retraction path on the loop (`state.records` -> delete -> re-commit).
-- [ ] 8. `BRAIN_VERSION` + `CHAINS` + panel/iOS/explorer.
-- [ ] 9. `pytest tests/unit` green. Baseline to beat: **1319 passed**.
-- [ ] 10. Update `CLAUDE.md`, `ENGINE.md`, `CODE_MAP.md`, and each
+      NOT DONE — nothing loops yet, so nothing needs retracting. It becomes
+      necessary the moment `rewrite_for_retry` stops returning None.
+- [x] 8. `BRAIN_VERSION` + `CHAINS` + panel/iOS/explorer.
+- [x] 9. `pytest tests/unit` green. Baseline to beat: **1319 passed**.
+- [x] 10. Update `CLAUDE.md`, `ENGINE.md`, `CODE_MAP.md`, and each
       `ARCHITECTURE.md`; regenerate the API reference if a field moved.
 
 ## Open, for when we design `decompose_validate`

@@ -1,5 +1,10 @@
 # STATUS — where we are
 
+> Naming note (2026-09-08): `crosscheck.py` is now
+> `assistant/engine/llmjudge/llmjudge.py` and `generate.py` is
+> `assistant/engine/fastrule/objects.py`. Older entries below use the
+> old names; the chain is in `assistant/engine/ARCHITECTURE.md`.
+
 **One-screen reference. A fresh conversation reads this first, then CLAUDE.md.**
 Keep it current and short; details live in the files it points to.
 

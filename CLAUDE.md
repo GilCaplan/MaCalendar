@@ -52,32 +52,43 @@ warns at startup if it is above 0.
 
 ## Working on the engine
 
-`assistant/engine/` is the 7-step deep track: transcript repair → segment →
-decompose → validate → generate → crosscheck → label, with a fast track that
-commits a confident rule parse instantly. `DOCUMENTATION/ENGINE.md` is the
-canonical contract reference — open it before touching any stage.
+`assistant/engine/` is the chain, one BOX per stage folder:
 
-**Each component owns a FOLDER, and everything about it lives there** (Gil,
+    X0 -> ingest -X1-> segmentation -X2-> decompose_validate -X3-> fastrule
+       -X4-> llmjudge -> commit(+label)
+
+with a fast track that commits a confident rule parse instantly and lets the
+judge check behind it. **`assistant/engine/ARCHITECTURE.md` is the map** — the
+chain, each stage as a black box, and what is wired versus inert. Open it first;
+`DOCUMENTATION/ENGINE.md` is the per-stage contract reference underneath it.
+
+Two things are wired and deliberately INERT, so do not read their presence as
+working behaviour: **LLMSeg is off** (`MACALENDAR_LLMSEG`), and the judge's
+**loop-back is gated on a rewrite that is still a stub** — no rewrite, no loop.
+Re-entering a DETERMINISTIC segmenter with unchanged text cannot produce a new
+answer, which is why the gate exists rather than a plain re-run.
+
+**Each STAGE owns a FOLDER, and everything about it lives there** (Gil,
 2026-09-08): its code, the datasets used to improve it, the experiments run
-against it, and an `ARCHITECTURE.md` explaining all four. Open that file first.
+against it, and an `ARCHITECTURE.md` explaining all four.
 
-    ingest/  segmentation/  fastrule/  decompose_validate/
-    generate/  llmjudge/  label/          state.py component.py llm.py __init__.py
+    ingest/  segmentation/  decompose_validate/  fastrule/  llmjudge/  label/
+    state.py  component.py  llm.py  __init__.py
 
 Three things this shape is bought with:
 
 - **A folder name is not an import path.** `decompose_validate/` holds two
   stage modules; `segmentation/` holds four packages. `cli.check_engine` keeps
-  `(component, module)` pairs for exactly this reason.
-- **A stage's `Stage("…")` identifier is NOT the folder name.** `trace.py`'s
-  `CHAINS` keys off generic kinds (`vocab`, `rule`, `verify`), so folders rename
-  freely — but renaming a *stage identifier* needs the whole panel procedure
-  below. `llmjudge/` still registers as `Stage("crosscheck")`; that is
-  deliberate.
-- **The datasets moved with their components.** `dataset/` still holds the
-  cross-component verification corpus; the FastRule and Segmentation sets are
-  now under `assistant/engine/<component>/datasets/`.
-
+  `(folder, module)` pairs for exactly this reason.
+- **`Stage` vs `Component`.** A **Stage** is a box in the chain:
+  `run(state, cfg) -> state`, ordered, trace-visible, owns a folder. A
+  **Component** is any runnable unit. `Stage ⊂ Component`, so the pieces INSIDE
+  a stage folder — `FastSeg`, `LLMSeg`, `Atomicity`, `Gatekeeper`, `Scorer` —
+  are Components that are not Stages. Swapping a piece is invisible to the
+  trace; changing the chain's shape is not, and needs the panel procedure below.
+- **The datasets moved with their stages.** `dataset/` still holds the
+  cross-stage verification corpus; the FastRule and Segmentation sets are now
+  under `assistant/engine/<stage>/datasets/`.
 - **Stage I/O contracts are frozen.** `tests/unit/test_engine_contracts.py`
   pins them. Fix a weak stage inside its own module, against its own tests —
   never by reshaping `EngineState`, editing the orchestrator, or reaching into

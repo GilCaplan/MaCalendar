@@ -51,7 +51,7 @@ Voice command
             5 generate    per item: rules first, LLM fills gaps
             → commit      execute via the action registry
             7 label       category / tag read-back
-            6 crosscheck  raw text vs. produced objects → loop back (≤3)
+            6 llmjudge    raw text vs. produced objects → restate & loop (≤3)
 ```
 
 ## Log prefixes
