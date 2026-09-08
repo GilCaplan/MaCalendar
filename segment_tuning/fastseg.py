@@ -32,6 +32,8 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
+from segment_tuning import invariant as _invariant   # noqa: E402
+
 # ---------------------------------------------------------------------------
 # TIME EXPRESSIONS
 #
@@ -87,7 +89,11 @@ _TIME_PATTERNS: "list[tuple[str, str]]" = [
     (rf"\b(?:{_MONTH})\s+\d{{1,2}}(?:st|nd|rd|th)?\b", "date"),
     (r"\bthe\s+\d{1,2}(?:st|nd|rd|th)\b", "date"),
     (r"\bin\s+(?:a|an|one|two|three|four|five|\d+)\s+(?:day|week|month)s?\b", "date"),
-    (r"\ba\s+week\s+from\s+(?:today|tomorrow|now)\b", "date"),
+    # "two weeks from now", "a week from today". Generalised from the original
+    # "a week from (today|tomorrow|now)": the bank renders counted variants too,
+    # and the narrow pattern found only the bare "today" inside them.
+    (r"\b(?:a|an|one|two|three|four|five|six|\d+)\s+(?:day|week|month)s?\s+"
+     r"from\s+(?:today|tomorrow|now)\b", "date"),
     (r"\b(?:this|next)\s+(?:morning|afternoon|evening)\b", "date"),
     (r"\b(?:in\s+the\s+)?(?:morning|afternoon|evening)\b", "date"),
     (r"\bnew\s+year'?s\s+eve\b", "date"),
@@ -114,25 +120,58 @@ def find_time_refs(text: str) -> "list[TimeRef]":
 
     Longest match wins at a given position, which is what keeps "every friday"
     whole instead of yielding the bare date "friday".
+
+    That used to be a claim in this docstring rather than a property of the
+    code: the pattern list is grouped by KIND, and within the date group the
+    bare `today` sits above `a week from today`, so "plan lunch a week from
+    today" yielded `today` and left "a week from" stranded in the action. It
+    cost 31 of the 66 content-loss rows and mis-assigned the time on every one
+    of them. Now the matches are collected first and taken longest-first, so
+    the ordering of `_TIME_PATTERNS` cannot silently decide the answer.
     """
+    candidates: list[tuple[int, int, str]] = []
+    for rx, kind in _COMPILED:
+        for m in rx.finditer(text):
+            candidates.append((m.start(), m.end(), kind))
+    candidates.sort(key=lambda c: (-(c[1] - c[0]), c[0]))
+
     refs: list[TimeRef] = []
     taken = [False] * (len(text) + 1)
-    for rx, kind in _COMPILED:                     # already longest-first
-        for m in rx.finditer(text):
-            if any(taken[m.start():m.end()]):
-                continue                           # inside something already taken
-            # Trim trailing whitespace the pattern swallowed. "at 7 " ended one
-            # character past its own piece, so the reference fell OUTSIDE the
-            # piece that owned it and was treated as an edge — which silently
-            # distributed a clock time across the whole command.
-            s, e = m.start(), m.end()
-            while e > s and text[e - 1].isspace():
-                e -= 1
-            refs.append(TimeRef(s, e, text[s:e].strip(), kind))
-            for i in range(s, e):
-                taken[i] = True
+    for start, end, kind in candidates:
+        if any(taken[start:end]):
+            continue                               # inside something already taken
+        # Trim trailing whitespace the pattern swallowed. "at 7 " ended one
+        # character past its own piece, so the reference fell OUTSIDE the
+        # piece that owned it and was treated as an edge — which silently
+        # distributed a clock time across the whole command.
+        s, e = start, end
+        while e > s and text[e - 1].isspace():
+            e -= 1
+        s = _absorb_preposition(text, s, taken)
+        refs.append(TimeRef(s, e, text[s:e].strip(), kind))
+        for i in range(s, e):
+            taken[i] = True
     refs.sort(key=lambda r: r.start)
     return refs
+
+
+#: SPEC captures the time AS SPOKEN — "by friday", "on the 15th", "for
+#: christmas day" — but only some patterns spell their preposition out, so
+#: `the 15th` and `christmas day` came back bare. That cost twice over: the
+#: preposition was missing from the time AND left stranded in the action
+#: ("schedule flight to Chicago for"). Absorbing it here fixes both at once,
+#: and keeps this list identical to the generator's `_PREP`, so gold and
+#: prediction cannot disagree by convention.
+_LEADING_PREP = re.compile(
+    r"\b(at|on|for|by|from|in|to|starting|until|through|around)\s+$", re.I)
+
+
+def _absorb_preposition(text: str, start: int, taken: "list[bool]") -> int:
+    """Extend a reference left over the preposition it was spoken with."""
+    m = _LEADING_PREP.search(text, 0, start)
+    if not m or any(taken[m.start():start]):
+        return start
+    return m.start()
 
 
 # ---------------------------------------------------------------------------
@@ -159,7 +198,7 @@ def cut(text: str, max_rounds: int = 3) -> "list[str]":
     def once(piece: str) -> "list[str]":
         parts = [q.strip() for q in split_clauses(piece) if q.strip()]
         if len(parts) < 2 or not every_part_is_an_ask(parts):
-            return [piece]
+            return _split_verbless_conjuncts(piece)
         return parts
 
     pieces = [text.strip()]
@@ -171,6 +210,67 @@ def cut(text: str, max_rounds: int = 3) -> "list[str]":
             break                                   # fixed point reached
         pieces = nxt
     return [p for p in pieces if p.strip()]
+
+
+_CUT_JOINER = re.compile(r"\s*,\s*(?:and then|and also|and|then|also|plus)\s+"
+                         r"|\s+(?:and then|and also|as well as|and|then|also|plus)\s+"
+                         r"|\s*,\s*")
+
+
+def _split_verbless_conjuncts(piece: str) -> "list[str]":
+    """Split "set up physical therapy at 9:15 and birthday dinner at midnight".
+
+    The clause splitter cannot see this boundary: the second conjunct is a bare
+    NOUN PHRASE with no verb of its own, so nothing marks it as a clause. It is
+    the single largest cut failure in the corpus — 29 of the 189 under-split
+    rows sit on a plain "and", and another 24 on a bare comma.
+
+    The evidence used instead of a verb is that **both sides carry their own
+    time reference, and the right side has content that is not part of its
+    time**. That second condition is what keeps the must-not-split decoys
+    intact, and it is doing real work:
+
+        set up physical therapy at 9:15 and birthday dinner at midnight
+            right = "birthday dinner at midnight" -> "birthday dinner" left
+            over once its time is removed                        -> SPLIT
+        walk the dog at 9 and 2:30
+            right = "2:30" -> nothing left over                  -> keep
+        take the tablets at noon and at six
+            right = "at six" -> nothing left over                -> keep
+        meeting with Sam and Alex at 8
+            LEFT carries no time at all                          -> keep
+
+    A joiner sitting INSIDE a time reference is never a boundary — "book gym
+    between 2 and 4" would otherwise cut its own range in half.
+    """
+    refs = find_time_refs(piece)
+    if len(refs) < 2:
+        return [piece]
+
+    def timed(span: str) -> bool:
+        return bool(find_time_refs(span))
+
+    def has_own_content(span: str) -> bool:
+        """Content left in the span once its time expressions are removed."""
+        rest = span
+        for ref in sorted(find_time_refs(span), key=lambda r: -r.start):
+            rest = rest[:ref.start] + " " + rest[ref.end:]
+        return bool(_invariant.content(rest))
+
+    out: "list[str]" = []
+    start = 0
+    for m in _CUT_JOINER.finditer(piece):
+        if any(r.start < m.end() and m.start() < r.end for r in refs):
+            continue                                # joiner inside a time span
+        left, right = piece[start:m.start()], piece[m.end():]
+        if not left.strip() or not right.strip():
+            continue
+        if timed(left) and timed(right) and has_own_content(right):
+            out.append(left.strip())
+            start = m.end()
+    out.append(piece[start:].strip())
+    out = [p for p in out if p]
+    return out if len(out) > 1 else [piece]
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +296,8 @@ def assign_times(text: str, pieces: "list[str]") -> "list[tuple[str, str]]":
     refs = find_time_refs(text)
 
     owned: "list[list[TimeRef]]" = [[] for _ in pieces]
-    edge: "list[TimeRef]" = []
+    lead: "list[TimeRef]" = []
+    trail: "list[TimeRef]" = []
     last = len(pieces) - 1
     for ref in refs:
         for i, (s, e) in enumerate(spans):
@@ -205,31 +306,50 @@ def assign_times(text: str, pieces: "list[str]") -> "list[tuple[str, str]]":
                 # EDGE means at the boundary of the whole COMMAND, not outside
                 # every piece — a trailing reference is textually inside the
                 # last piece. So: opening the first piece, or closing the last.
-                opens_command = i == 0 and ref.start <= s + 1
-                closes_command = i == last and ref.end >= e - 1
-                if len(pieces) > 1 and (opens_command or closes_command):
-                    edge.append(ref)
+                if len(pieces) > 1:
+                    if i == 0 and ref.start <= s + 1:
+                        lead.append(ref)
+                    elif i == last and ref.end >= e - 1:
+                        trail.append(ref)
                 break
         else:
-            edge.append(ref)
+            lead.append(ref)
 
     out: "list[tuple[str, str]]" = []
     for i, piece in enumerate(pieces):
         mine = list(owned[i])
-        # An edge reference fills a SLOT the piece left empty, not merely a
-        # piece that named nothing at all. "tomorrow gym at 7 and meeting at
-        # 11": the second piece has a clock but no DATE, so the leading
-        # "tomorrow" still reaches it. Distributing only to time-less pieces
-        # would leave that meeting today.
+        # The two edges do NOT distribute the same way.
+        #
+        # LEADING fills a SLOT the piece left empty, not merely a piece that
+        # named nothing at all: "tomorrow gym at 7 and meeting at 11" — the
+        # second piece has a clock but no DAY, so "tomorrow" still reaches it.
+        # Distributing only to time-less pieces would leave that meeting today.
+        #
+        # TRAILING reaches only a piece with NO time whatsoever. "submit the
+        # grades and prepare the slides by friday" — the first piece has
+        # nothing, so it takes "by friday". But in "do i have anything this
+        # weekend and book the haircut at 3:45" the trailing clock must stay
+        # with the haircut; per-slot distribution gave the question "this
+        # weekend at 3:45", which is wrong. Found by generating gold from the
+        # templates, not by reasoning — see generate.py.
         have = {_slot(r) for r in mine}
-        for r in edge:
+        for r in lead:
             if _slot(r) not in have and r not in mine:
                 mine.append(r)
                 have.add(_slot(r))
+        if not mine:
+            mine = list(trail)
         time_str = " ".join(r.text for r in sorted(mine, key=lambda r: r.start))
         action = _strip_spans(piece, [(r.start - spans[i][0], r.end - spans[i][0])
                                       for r in owned[i]])
-        out.append((action, time_str or "today"))
+        # THE DATE FLOOR (SPEC): the day defaults to today, the clock never
+        # does. An item with a clock and no day is "today at 7", not "at 7".
+        # FastSeg emitted the bare form while the tuned LLMSeg prompt taught
+        # the floored one, so the two halves disagreed on every clock-only
+        # item and the accept step paid for it on each.
+        if not any(_slot(r) == "day" for r in mine):
+            time_str = f"today {time_str}".strip()
+        out.append((action, time_str))
     return out
 
 
@@ -297,13 +417,65 @@ def _tidy(s: str) -> str:
 # PHASE 3 — TAG
 # ---------------------------------------------------------------------------
 
+#: Verbs that put something on the CALENDAR, and verbs that put something on
+#: the TO-DO LIST. Read off TRAIN failures, so this is a train-derived lexicon
+#: and carries the usual overfitting risk — the sealed half is what confirms
+#: it. It is deliberately SMALL: it only has to beat the engine tagger on the
+#: cases that tagger already gets wrong.
+_CALENDAR_VERBS = frozenset("""
+    book schedule plan arrange reschedule rebook cancel move postpone
+    delete clear block
+""".split())
+
+_TASK_VERBS = frozenset("""
+    remind buy call email text pick collect grab wash clean fold pack sort
+    file pay submit prepare print water walk take change top order renew
+    return drop send finish write update fix charge vacuum feed refill
+    restock organize review back
+""".split())
+
+
+def _lexicon_kind(action: str) -> "str | None":
+    for word in action.lower().replace(",", " ").split():
+        word = word.strip(".!?")
+        if word in _CALENDAR_VERBS:
+            return "event"
+        if word in _TASK_VERBS:
+            return "task"
+    return None
+
+
 def tag(action: str, time_str: str) -> str:
-    """event | task | review, reusing segment's own readers so the tuning
-    module and the engine cannot disagree about what a review looks like."""
+    """event | task | review.
+
+    The engine's own reader decides first, so the tuning module and the engine
+    cannot disagree about what a review looks like. Then ONE correction is
+    applied, and only in one direction.
+
+    MEASURED, not assumed (1,383 matched TRAIN items). The engine tagger's
+    `task` verdicts are already good — 89.3% precision — but its `event`
+    verdicts are where the errors live: 159 tasks were being called events, and
+    that number had not moved all session. So the lexicon is consulted ONLY to
+    talk it out of `event`, never into it:
+
+        engine tagger alone            84.7%   task recall 70.7%
+        lexicon overrides everywhere   82.4%   task recall 78.5%   (worse)
+        lexicon only over `event`      87.5%   task recall 87.1%   <- this
+
+    Overriding in both directions loses more events than it gains tasks, which
+    is why the asymmetry is the whole point rather than an implementation
+    detail. A parser was tried here first and was much worse (65.0%) — see
+    `pos_sizing.py`; calendar commands are VERB-rooted imperatives, so a
+    root-POS signal is anti-correlated with the answer.
+    """
     from assistant.engine.segment import _enforce_pinned_kinds, _kind_of
 
     kind = _enforce_pinned_kinds(_kind_of(action), action)
-    return kind if kind in ("event", "task", "review") else "event"
+    if kind not in ("event", "task", "review"):
+        kind = "event"
+    if kind == "event":
+        return _lexicon_kind(action) or kind
+    return kind
 
 
 # ---------------------------------------------------------------------------

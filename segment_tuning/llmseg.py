@@ -39,6 +39,7 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
+from segment_tuning import invariant as _invariant    # noqa: E402
 from segment_tuning.fastseg import fastseg           # noqa: E402
 
 TAGS = ("event", "task", "review")
@@ -93,37 +94,70 @@ def normalise_tag(value, fallback: str = "event") -> str:
 # THE PROMPT (V3, the tuned winner — see segment_tuning/verifier_prompt_v3.txt)
 # ---------------------------------------------------------------------------
 
+#: V4. V3 was measured against gold that has since changed underneath it, and
+#: an audit found FIVE places where it taught something the gold no longer
+#: accepts — the symmetric edge rule (12.2% of rows), a missing date floor in
+#: one example that contradicted another example, a dropped preposition, a
+#: half-stated floor rule, and nothing at all about what the tag means for a
+#: delete. Every one of those graded the model wrong for obeying its
+#: instructions, so no V3 measurement is evidence about the model.
 _RULES = """An item is ONE independent thing the speaker asked for. Each item has three parts:
   action - the item's words with the time reference removed. Keep EVERYTHING else:
            the verb, the object, people, places, quantities ("5 apples").
-  time   - the time reference for this item, copied from the command AS SPOKEN.
+  time   - the time reference for this item, copied from the command AS SPOKEN,
+           INCLUDING the preposition it was said with ("on friday", "by monday",
+           "at 8"). Never a date, never a clock reading, never a range.
   tag    - EXACTLY ONE OF THESE THREE WORDS, never any other:
-             event   - goes on the calendar at a time
-             task    - goes on the to-do list
-             review  - asks what is scheduled; creates nothing
+             event   - belongs to the CALENDAR
+             task    - belongs to the TO-DO LIST
+             review  - only asks a question; changes nothing
+           The tag names WHICH LIST the item is about, NOT what is being done
+           to it. "cancel the dentist" is `event` - it is about the calendar,
+           even though it deletes rather than creates.
 
 HOW TIME IS ASSIGNED
-  - a time reference sitting INSIDE an item belongs to that item alone
-  - a time reference at either END of the command, belonging to no single item,
-    applies to EVERY item that has none of its own
+  - a time reference sitting INSIDE an item belongs to that item ALONE, and
+    does not reach backwards to an earlier item
+  - a time reference that OPENS the command scopes FORWARD over all of it. A
+    day and a clock are separate slots, so a leading day still reaches an item
+    that has a clock but no day.
+  - a time reference that CLOSES the command reaches back ONLY to an item that
+    has no time of its own at all. If an earlier item already has a time, the
+    closing one stays where it is.
   - a repeating time ("every friday") IS the time
-  - an item with no time reference at all gets "today\""""
+
+THE DATE FLOOR
+  - the DAY defaults to "today" when the item names none
+  - the CLOCK is never invented
+  So: nothing said -> "today"; only a clock -> "today at 7"; only a day ->
+  "tomorrow"; both -> "tomorrow at 7\""""
 
 _EXAMPLES = """EXAMPLES
   "tomorrow gym at 7 and meeting at 11"
   {"1": ["gym", "tomorrow at 7", "event"], "2": ["meeting", "tomorrow at 11", "event"]}
+  the leading "tomorrow" reaches item 2, which has a clock but no day
   "gym session at 7, tomorrow meeting at 10"
   {"1": ["gym session", "today at 7", "event"], "2": ["meeting", "tomorrow at 10", "event"]}
+  the interior "tomorrow" does NOT reach back; item 1 floors to today
+  "submit the grades and prepare the slides by friday"
+  {"1": ["submit the grades", "by friday", "task"], "2": ["prepare the slides", "by friday", "task"]}
+  the closing "by friday" reaches item 1, which had no time at all
+  "do i have anything this weekend and book the haircut at 3:45"
+  {"1": ["do i have anything", "this weekend", "review"], "2": ["book the haircut", "today at 3:45", "event"]}
+  the closing clock stays put - item 1 already has a time of its own
   "buy 5 apples"
   {"1": ["buy 5 apples", "today", "task"]}
   "meeting with Sam and Alex at 8"
-  {"1": ["meeting with Sam and Alex", "at 8", "event"]}
+  {"1": ["meeting with Sam and Alex", "today at 8", "event"]}
   the "and" joins two PEOPLE - one item, not two
   "wash and fold the laundry"
   {"1": ["wash and fold the laundry", "today", "task"]}
   two verbs, one object - one item
+  "cancel the dentist tomorrow"
+  {"1": ["cancel the dentist", "tomorrow", "event"]}
+  a delete is still about the CALENDAR, so the tag is event
   "what do i have on friday"
-  {"1": ["what do i have", "friday", "review"]}
+  {"1": ["what do i have", "on friday", "review"]}
   a question about the calendar creates nothing"""
 
 
@@ -146,7 +180,12 @@ explanation, no preamble, no code fence."""
 
 
 def call_model(prompt: str, timeout: int = 180) -> str:
+    # keep_alive matters more than it looks: without it Ollama evicts the model
+    # between calls and every request pays the reload, which is most of the
+    # ~19s/row a scoring pass was showing. It changes latency only — the
+    # sampled answer at temperature 0 is identical either way.
     body = json.dumps({"model": MODEL, "stream": False,
+                       "keep_alive": "30m",
                        "options": {"temperature": 0},
                        "messages": [{"role": "user", "content": prompt}]}).encode()
     req = urllib.request.Request(ENDPOINT, body, {"Content-Type": "application/json"})
@@ -176,35 +215,12 @@ def parse_items(raw: str, proposal: "list[dict]") -> "list[dict] | None":
 # ACCEPT — deterministic, and the model never has the last word
 # ---------------------------------------------------------------------------
 
-_STOP = frozenset("a an the and or then also to of for on at in by with my me "
-                  "i please can you it that this".split())
-
-
-def _content(s: str) -> "set[str]":
-    return {w for w in re.findall(r"[a-z0-9']+", (s or "").lower())
-            if w not in _STOP}
-
-
-def invariant_violations(text: str, items: "list[dict]") -> "list[str]":
-    """Every content token accounted for, and none invented.
-
-    This is the dataset's metric and the runtime guard, deliberately the same
-    function — a rule that is only checked offline is a rule the product does
-    not have.
-    """
-    src = _content(text)
-    out: list[str] = []
-    seen: set[str] = set()
-    for i, it in enumerate(items, 1):
-        got = _content(it.get("action", "")) | _content(it.get("time", ""))
-        invented = got - src
-        if invented:
-            out.append(f"item {i} invented {sorted(invented)}")
-        seen |= got
-    missing = src - seen
-    if missing:
-        out.append(f"lost {sorted(missing)}")
-    return out
+#: The dataset's metric and the runtime guard are deliberately the same
+#: function — a rule that is only checked offline is a rule the product does
+#: not have. It lives in `invariant.py` because three copies disagreed: this
+#: one used to reject a model answer for defaulting an untimed item to
+#: "today", which is exactly what SPEC.md tells it to do.
+invariant_violations = _invariant.violations
 
 
 def accept(text: str, proposal: "list[dict]", candidate) -> "tuple[list[dict], str]":
