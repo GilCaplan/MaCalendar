@@ -79,6 +79,17 @@ digest banner?** Lifestyle call, not engineering.
 
 ## Answered log
 
+**Q14 (2026-09-07, Gil): "buy apples and eggs" is TWO tasks** — same action,
+separate items ("buy eggs", "buy apples"). This settles a contradiction the
+atomizer board found between our own documents: `decompose.py` and
+`list_split.py` split shopping lists; `dataset/fastrule/DATASET.md` labelled
+them one task titled "apples and eggs". The CODE was right. Every over-split
+in the FastRule test half was this disagreement and nothing else — so those
+were never defects. **The dataset's np_decoy families need relabelling**
+(a list of things for one verb = one item PER THING); the genuine
+never-split case is a list of PEOPLE or a shared object ("meeting with Tal
+and Sam", "wash and fold the laundry").
+
 **Q13 (2026-09-07, Gil): non-atomic behaviour is DIAGNOSTIC, not a target.**
 "I just want to see that it succeeds on recognising and executing well on
 atomic items, and we can decide what to do with non-atomic which is run
