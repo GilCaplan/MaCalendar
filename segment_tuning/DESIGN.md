@@ -3,6 +3,53 @@
 **Status: NOT IMPLEMENTED. Gil asked to confirm the design before any
 implementation or testing.** This file is the thing to argue with.
 
+## 0 · THE ARCHITECTURE, settled
+
+```
+INPUT   text : str          (one command, after transcript repair)
+
+╔═ FASTSEG · deterministic · no model · ~ms ═══════════════════╗
+║                                                               ║
+║  1a  CUT                                                      ║
+║      A  literal delimiters   brackets · wrapper · separator   ║
+║      B  clause parse         a VERB conjunct carrying its own ║
+║                              argument is a second ask; a NOUN ║
+║                              conjunct is one ask              ║
+║      ↺  loop A+B to a FIXED POINT        (depth cap 2, → 3)   ║
+║      GUARD  refuse the split if any piece is not an ask       ║
+║                                                               ║
+║  1b  ASSIGN TIME      ← reads the pieces AND the original     ║
+║      interior reference → its own piece                       ║
+║      edge reference     → every piece that has none           ║
+║      repeating time     → IS the time                         ║
+║      nothing at all     → "today"                             ║
+║      captured AS SPOKEN — never resolved, expanded or dated   ║
+║                                                               ║
+║  1c  TAG              event | task | review                   ║
+╚═══════════════════════════════════════════════════════════════╝
+                  ↓  proposed [(action, time, tag), …]
+
+╔═ VERIFIER · one LLM call · EVERY command ════════════════════╗
+║  sees the original string + FastSeg's proposal                ║
+║  "No Change"  → keep FastSeg's answer                         ║
+║  correction   → replace with it, wholesale                    ║
+╚═══════════════════════════════════════════════════════════════╝
+
+OUTPUT  [(action, time, tag), …]
+```
+
+**The invariant, across the whole component:** for every item,
+`tokens(action) ∪ tokens(time)` covers every content token of that item, and
+contains nothing that was not in the input. Nothing invented, nothing lost.
+
+**What changed from the first draft, and why it is simpler now.** The original
+cut had a THIRD tier — a gated LLM call inside the splitter. That is gone: the
+model now sits outside as the verifier, so there is exactly one model call per
+command and one place where the model can act. Two fewer things to reason
+about, one fewer gate to tune, and the failure is easier to attribute — if the
+output is wrong, either FastSeg proposed it and the verifier let it through,
+or the verifier introduced it.
+
 The premise (Gil, 2026-09-08): treat segmentation as a supervised ML problem
 where **the hyper-parameter is the code**. A fixed dataset, fixed metrics, and
 we tune the implementation against them.
