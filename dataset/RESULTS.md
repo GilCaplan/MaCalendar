@@ -1757,3 +1757,33 @@ as the reason it was order-dependent; the kind fix removed the dependency.
 **Still open:** shopping lists ("pick up folders and light bulbs from the
 store") split into two where the dataset says one — that is the pending Q14
 np_decoy relabel, not a defect. 20 reviews still read as events.
+
+## CYCLE A PART 3 — THE UNMEASURED LANE — REGISTERED PREDICTION 2026-09-08
+
+**Chosen by part 2's board, not by the plan.** With kind fixed, the breakdown
+by ask-count is stark on the FastRule test half: **1 ask 98.4% count-correct,
+2 asks 44.1% (UNDER 55.9%), 3 asks 38.0%**. Single-item commands are close to
+solved; compounds are where everything is lost.
+
+**And the number everyone has been reading is from a lane with the model
+switched off.** The atomizer board runs deterministic-only by default. It
+reports 341 of 626 compounds "reaching the call" — a call that never happens
+in that lane. So the deep track's actual splitting ability has NEVER been
+measured, on any dataset. Every compound conclusion so far describes the
+deterministic tier alone.
+
+This cycle measures rather than changes. That is deliberate: the next fix
+would otherwise be aimed at a stage nobody has observed working.
+
+**Predict:**
+- `--llm` lane, FastRule test half: compounds atomized correctly **43.5% →
+  60–75%**. The LLM tier receives 341 compounds the deterministic tier
+  declined and its prompt is built for exactly this job.
+- **2-ask count-correct 44.1% → 65–80%**; 3-ask stays worst.
+- **OVER rises but stays ≤6%** — the model splits more eagerly than the parse,
+  and the under-split bias is enforced in code after the call, not by it.
+- Atomic rows: **kept-at-1 must stay ≥97%**. 30.9% of atomic rows reach the
+  call as pure cost, and a model that splits them is worse than no call.
+- **If the lane does NOT beat the deterministic path**, that is the finding —
+  it would mean the compound ceiling is the prompt or the model rather than
+  the gate, and the next cycle aims there instead of at coverage.
