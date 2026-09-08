@@ -166,7 +166,19 @@ def clause_boundaries(text: str) -> "list[Boundary]":
         # coordinator — "call mom THEN pick up the dry cleaning" tags `pick`
         # dep, not conj, so the conj-only loop never saw it. It is admitted
         # only as a VERB, and everything below still has to hold.
-        if tok.dep_ != "conj" and not (tok.dep_ == "dep" and tok.pos_ == "VERB"):
+        if tok.dep_ not in ("conj", "dep"):
+            continue
+        # On lowercase STT spaCy routinely tags a second imperative's VERB as
+        # a noun COMPOUND of its own object — "…and then BOOK tennis lesson"
+        # makes `book` a compound of `lesson`, and `lesson` the conjunct. The
+        # verb gate below then rejects the whole clause because the conjunct
+        # is a noun. Look through it: a command verb sitting as a compound
+        # modifier IS the second ask's verb.
+        verb = tok if (tok.pos_ in ("VERB", "AUX") or _is_command_verb(tok)) \
+            else _compound_command_verb(tok)
+        if verb is None:
+            continue
+        if tok.dep_ == "dep" and verb is not tok and tok.pos_ not in ("NOUN", "PROPN"):
             continue
         # The head's POS is UNRELIABLE on lowercase STT imperatives — spaCy
         # tags "book the gym…" ROOT as PROPN and "schedule lunch…" as a NOUN
@@ -177,7 +189,7 @@ def clause_boundaries(text: str) -> "list[Boundary]":
         #   • the head carries its own content too ("book THE GYM",
         #     "lunch WITH MARK") — a bare head sharing the conjunct's object
         #     ("wash and fold the laundry") is a serial verb, one ask.
-        if tok.pos_ not in ("VERB", "AUX") and not _is_command_verb(tok):
+        if verb is tok and tok.pos_ not in ("VERB", "AUX") and not _is_command_verb(tok):
             # the conjunct side suffers the same lowercase mis-tag ("…and
             # book a haircut" tags book NOUN): the domain's own verb
             # inventory (INTENT_MAP) resolves what POS cannot — but only a
@@ -323,6 +335,32 @@ def _opens_a_date(doc, i: int) -> bool:
             return word in _TEMPORAL_WORDS or bool(
                 tok.like_num and len(tok.text) <= 4)   # "the 3rd"
     return False
+
+
+def _compound_command_verb(tok):
+    """The command verb hiding as a compound modifier of `tok`, or None.
+
+    "remind me to wash the car and then book tennis lesson" parses with
+    `lesson` as the conjunct and `book` as its compound — the verb is there,
+    just mis-tagged. Only a modifier BEFORE the noun counts, and only one from
+    the parser's own verb inventory, so "tennis lesson" stays one thing.
+    """
+    if tok.pos_ not in ("NOUN", "PROPN"):
+        return None
+    # Only when the conjunct hangs off a VERB. "buy apples and WATER BOTTLES"
+    # coordinates two objects of one verb — `bottles` is a conjunct of
+    # `apples`, a plain noun object — and `water` being in the verb inventory
+    # made a shopping list look like a second clause. NP-coordination is the
+    # exact thing this module exists to refuse, so the rescue must not be able
+    # to override it: a real second imperative attaches to the ROOT verb, not
+    # to another verb's object.
+    head = tok.head
+    if head.pos_ not in ("VERB", "AUX") and head.dep_ != "ROOT":
+        return None
+    for child in tok.children:
+        if child.dep_ == "compound" and child.i < tok.i and _is_command_verb(child):
+            return child
+    return None
 
 
 def _is_command_verb(tok) -> bool:

@@ -1975,3 +1975,37 @@ validated on them.
 cycle:** `remind_then` is 50.0% UNDER-split (14 rows) — "remind me to X and
 then remind me to Y" is a compound the model merges. Under-splitting is the
 cheap error, but 50% of a named family is not noise.
+
+### CYCLE A PART 5b — RESULT — the second half, which WAS train-reachable
+
+`remind_then` was 50% UNDER-split and, unlike the four over-split families,
+its shape is well represented in the training half (167 rows). Mining it
+showed one parse failure, twice: on lowercase STT spaCy tags a second
+imperative's VERB as a noun COMPOUND of its own object — "…and then BOOK
+tennis lesson" makes `book` a compound of `lesson` — so the conjunct is the
+object noun and the verb gate rejects the clause.
+
+**FastRule TRAIN half** (mined for direction, as the protocol requires):
+
+| | before | after |
+|---|---|---|
+| remind_then split correctly | 109/167 | **118/167** |
+| compounds split to the exact count | 511/1399 | **523/1399** |
+| atomic rows over-split | 64/3401 | **64/3401** |
+
+**Test half, deterministic lane:** complex count-correct 76.2% → **76.9%**,
+boundary-clean 41.4% → **43.2%**, OVER unchanged at 2.6%, simple unchanged at
+99.8%. Suite 1311 passed.
+
+**The first cut cost 4 atomic rows and they were all one bug**, worth
+recording because the shape recurs: "buy apples and **water** bottles" split
+into "buy apples" + "water bottles", because `water` is in the verb inventory
+and sits as a compound of `bottles`. The rescue had overridden the very thing
+this module exists to do — refuse NP-coordination. The discriminator is that a
+real second imperative attaches to the ROOT verb, while a coordinated object
+attaches to another verb's object; requiring the former took the cost from 4
+to 0 and kept 12 of the 14 gained compounds.
+
+**I predicted this failure mode in the comment before measuring it** ("book
+club" was the example I wrote down), which is the argument for measuring the
+guard rather than trusting the reasoning that produced it.
