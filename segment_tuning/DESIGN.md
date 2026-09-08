@@ -483,68 +483,12 @@ deterministic parse does better than one starting cold.
 
 ## The prompt
 
-```
-The command, exactly as the speaker said it:
-{prompt}
+**Superseded — see §10.** The prompt drafted here used a "No Change" protocol
+and measured **5/14** against llama3.1:8b. The tested winner is V3 in §10,
+which scores **11/14** by removing the judgement entirely: the model always
+emits a decomposition and deterministic code diffs it.
 
-A deterministic parser has already decomposed it into independent items:
-{fastseg_output}
-
-YOUR JOB: check that decomposition and correct it only if it is wrong.
-
-An item is ONE independent thing the speaker asked for. Each item has three
-parts:
-
-  action - the item's words with the time reference removed. Keep EVERYTHING
-           else: the verb, the object, people, places, quantities ("5 apples")
-           and any repetition that is not temporal.
-  time   - the time reference that applies to this item, copied from the
-           command AS SPOKEN. Do not resolve it into a date, do not add a
-           duration, do not turn it into a range.
-  tag    - one of: event, task, review
-
-HOW TIME IS ASSIGNED
-  - a time reference sitting INSIDE an item belongs to that item alone
-  - a time reference at either END of the command, belonging to no single
-    item, applies to EVERY item that has none of its own
-  - a repeating time ("every friday") IS the time
-  - an item with no time reference at all gets "today"
-
-EXAMPLES
-
-  "tomorrow gym at 7 and meeting at 11"
-  {"1": ["gym", "tomorrow at 7", "event"],
-   "2": ["meeting", "tomorrow at 11", "event"]}
-
-  "gym session at 7, tomorrow meeting at 10"
-  {"1": ["gym session", "today at 7", "event"],
-   "2": ["meeting", "tomorrow at 10", "event"]}
-  the later "tomorrow" does NOT reach back to the gym
-
-  "submit the grades and prepare the slides by friday"
-  {"1": ["submit the grades", "by friday", "task"],
-   "2": ["prepare the slides", "by friday", "task"]}
-
-  "buy 5 apples"
-  {"1": ["buy 5 apples", "today", "task"]}
-  a quantity is not a time - it stays in the action
-
-  "every friday buy groceries"
-  {"1": ["buy groceries", "every friday", "task"]}
-
-  "meeting with Sam and Alex at 8"
-  {"1": ["meeting with Sam and Alex", "at 8", "event"]}
-  the "and" joins two PEOPLE - one item, not two
-
-  "wash and fold the laundry"
-  {"1": ["wash and fold the laundry", "today", "task"]}
-  two verbs, one object - one item
-
-OUTPUT
-  If the decomposition above is correct, output exactly: No Change
-  Otherwise output ONLY the corrected JSON object - no explanation, no
-  preamble, no code fence.
-```
+The exact tested text lives in `segment_tuning/verifier_prompt_v3.txt`.
 
 ## The one risk, named up front
 
