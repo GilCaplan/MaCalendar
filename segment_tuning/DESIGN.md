@@ -418,3 +418,104 @@ falling to **47.2%** at 3.6% CER and **35.5%** at 10.4% CER. So an
 LLM-does-everything decompose tops out around 60% even before ASR damage,
 which is the quantitative case for deterministic-first. It also prices the
 transcript stage: ~7 points of CER costs ~12 points of end-to-end accuracy.
+
+---
+
+# 9 · FastSeg + the verifier (Gil, 2026-09-08)
+
+The deterministic part is called **FastSeg**. The model is not asked to
+decompose — it is asked to **audit FastSeg's answer and correct it only if it
+is wrong**. When FastSeg is right the reply is two words, so the common case
+is cheap.
+
+This is the right way round on our hardware. MAC-SLU measures Qwen3-8B — our
+model's class — at **60.7%** doing multi-intent decomposition from scratch on
+clean text. Judging a proposed answer is a much easier task than producing
+one, and DialogUSR's grounding result says the same: a model handed the
+deterministic parse does better than one starting cold.
+
+## The prompt
+
+```
+The command, exactly as the speaker said it:
+{prompt}
+
+A deterministic parser has already decomposed it into independent items:
+{fastseg_output}
+
+YOUR JOB: check that decomposition and correct it only if it is wrong.
+
+An item is ONE independent thing the speaker asked for. Each item has three
+parts:
+
+  action - the item's words with the time reference removed. Keep EVERYTHING
+           else: the verb, the object, people, places, quantities ("5 apples")
+           and any repetition that is not temporal.
+  time   - the time reference that applies to this item, copied from the
+           command AS SPOKEN. Do not resolve it into a date, do not add a
+           duration, do not turn it into a range.
+  tag    - one of: event, task, review
+
+HOW TIME IS ASSIGNED
+  - a time reference sitting INSIDE an item belongs to that item alone
+  - a time reference at either END of the command, belonging to no single
+    item, applies to EVERY item that has none of its own
+  - a repeating time ("every friday") IS the time
+  - an item with no time reference at all gets "today"
+
+EXAMPLES
+
+  "tomorrow gym at 7 and meeting at 11"
+  {"1": ["gym", "tomorrow at 7", "event"],
+   "2": ["meeting", "tomorrow at 11", "event"]}
+
+  "gym session at 7, tomorrow meeting at 10"
+  {"1": ["gym session", "today at 7", "event"],
+   "2": ["meeting", "tomorrow at 10", "event"]}
+  the later "tomorrow" does NOT reach back to the gym
+
+  "submit the grades and prepare the slides by friday"
+  {"1": ["submit the grades", "by friday", "task"],
+   "2": ["prepare the slides", "by friday", "task"]}
+
+  "buy 5 apples"
+  {"1": ["buy 5 apples", "today", "task"]}
+  a quantity is not a time - it stays in the action
+
+  "every friday buy groceries"
+  {"1": ["buy groceries", "every friday", "task"]}
+
+  "meeting with Sam and Alex at 8"
+  {"1": ["meeting with Sam and Alex", "at 8", "event"]}
+  the "and" joins two PEOPLE - one item, not two
+
+  "wash and fold the laundry"
+  {"1": ["wash and fold the laundry", "today", "task"]}
+  two verbs, one object - one item
+
+OUTPUT
+  If the decomposition above is correct, output exactly: No Change
+  Otherwise output ONLY the corrected JSON object - no explanation, no
+  preamble, no code fence.
+```
+
+## The one risk, named up front
+
+**A model asked "is this right?" says yes too readily.** ADaPT (NAACL Findings
+2024) measured exactly this: their executor's self-assessment over-estimated
+success by **more than 30 points**, terminating recursion early. So this
+verifier will be biased toward "No Change", and that bias is in the SAFE
+direction for us — a missed correction leaves FastSeg's answer, which is the
+under-split-by-default behaviour we already want — but it must be MEASURED,
+not assumed.
+
+The dataset makes it measurable directly: run the verifier over rows where
+FastSeg is known-wrong and count how often it says "No Change" anyway. That
+number is the verifier's real value, and it belongs on the board next to
+the deterministic scores.
+
+Two cheap mitigations if the bias proves large:
+1. Ask for the checks explicitly rather than a global judgement — the shapes
+   it should test are known and listed above.
+2. Show it FastSeg's answer only AFTER asking it to decompose, so it commits
+   first. Costs more tokens; only worth it if the bias is bad.
