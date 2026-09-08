@@ -204,11 +204,27 @@ def run(state: EngineState, cfg) -> EngineState:
             unmatched_asks.append((kind, words))
 
     findings: list = []
+    # A missing ask blames SEGMENT only when segment could plausibly be at
+    # fault — when there are FEWER items than asks, i.e. it merged two asks
+    # into one item. When the items already cover the asks, segment did its
+    # job and re-running it is a guaranteed no-op: it returns the same items,
+    # generate fails the same way, and the budget burns.
+    #
+    # Real usage, 2026-09-08: "Let an event to go out for a run now" (Whisper
+    # heard "Let" for a create verb). One ask extracted, ONE item segmented,
+    # no action produced — and the loop re-ran segment three times, the trace
+    # saying "unchanged since the last attempt" each round, ~23 s of the 30 s
+    # the command took. The atomicity model called it atomic at margin 9.20
+    # against a floor of 0.25; nothing about segmentation was ever in doubt.
+    #
+    # This is ENGINE.md's own stated default, applied where it was missing:
+    # generate when the blame is ambiguous, because most errors live there.
+    blame_missing = "segment" if len(state.items) < len(asks) else "generate"
     for kind, words in unmatched_asks:
         findings.append(CheckFinding(
             type="missing", item_id=None,
             detail=f"the words ask for a {kind} — “{words}” — but nothing produced covers it",
-            blamed_stage=BLAME["missing"]))
+            blamed_stage=blame_missing))
     for it, pkind, _ptoks, removable, cap in produced:
         if removable and capacity[id(it)] >= cap:   # nothing matched it at all
             title = getattr(it.intent, "title", None) or it.text

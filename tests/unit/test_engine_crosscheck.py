@@ -309,3 +309,43 @@ def test_revert_spec_shapes_a_post_ready_body():
     assert spec["body"]["list_name"] == "today"       # the `list` column → POST `list_name`
     assert spec["body"]["tags"] == ["Groceries"]
     assert spec["body"]["quantity"] == 3
+
+
+def test_the_loop_stops_when_a_rerun_cannot_change_anything(cfg, monkeypatch):
+    """A re-run starts from the same transcript and runs the same stages, so
+    if it would begin from the SAME items with the SAME complaint it produces
+    the same answer. Looping again only spends the budget.
+
+    Real usage (2026-09-08): "Let an event to go out for a run now" — one ask,
+    ONE item, segment never in doubt — looped three times to the identical
+    result, its own trace saying "unchanged since the last attempt" each
+    round, and apologised after 30 seconds.
+    """
+    def scripted_llm(cfg_, system, user, schema=None):
+        if "split ONE voice command" in system:
+            return {"items": []}, 1                    # segment never splits
+        return {"asks": [{"kind": "event", "words": "gym at 7"},
+                         {"kind": "task", "words": "buy milk"}]}, 1
+
+    monkeypatch.setattr(engine_llm, "call_json", scripted_llm)
+    monkeypatch.setattr(generate, "_get_rule_parser", lambda: None)
+    parser = MagicMock()
+    parser.parse.return_value = [("create_event", SimpleNamespace(
+        title="gym", date=None, start_time=None, end_time=None,
+        recurrence=None, recur_until=None, description=""))]
+    parser.last_llm_ms = 1
+    parser.last_examples_used = 0
+    parser.last_raw_response = ""
+    monkeypatch.setattr(generate, "_get_parser", lambda c: parser)
+    registry = MagicMock()
+    registry.get.side_effect = lambda name: MagicMock(
+        **{"return_value.execute.return_value": "did it"})
+    monkeypatch.setattr(generate, "get_registry", lambda: registry)
+
+    out = engine.run_transcript("tomorrow gym at 7 am and a meeting with Tal at 11",
+                                source="test")
+    loops = [s for s in out["trace"] if s["title"] == "Looping back"]
+    assert len(loops) < crosscheck.MAX_REENTRIES, (
+        f"burned every retry on an unchanging parse: {[s['detail'] for s in loops]}")
+    # and it still admits it could not finish the job
+    assert "not sure I caught every part" in out["message"]

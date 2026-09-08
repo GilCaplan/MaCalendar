@@ -841,7 +841,13 @@ def _extract_temporal(span_text: str, today: datetime.date) -> dict:
         elif re.search(r"\btomorrow\b", lower):
             result["date"] = (today + datetime.timedelta(days=1)).isoformat()
 
-    # Regex fallback: "noon" → 12:00, "midnight" → 00:00
+    # Regex fallback: "noon" → 12:00, "midnight" → 00:00, "now" → the clock.
+    #
+    # "now" belongs here with the other spoken time words. Without it, "create
+    # an event NOW to go out for a run" carried no time at all and defaulted
+    # to midnight — real usage, 2026-09-08, and the user got a run booked for
+    # 12 AM. It is the same class of word as noon: a time the speaker gave in
+    # words rather than digits.
     if not result["start_time"]:
         lower = span_text.lower()
         if re.search(r"\bnoon\b", lower):
@@ -849,6 +855,9 @@ def _extract_temporal(span_text: str, today: datetime.date) -> dict:
             result["_source"] = "regex_fallback"
         elif re.search(r"\bmidnight\b", lower):
             result["start_time"] = "00:00"
+            result["_source"] = "regex_fallback"
+        elif re.search(r"\b(?:right now|now|immediately|asap)\b", lower):
+            result["start_time"] = datetime.datetime.now().strftime("%H:%M")
             result["_source"] = "regex_fallback"
 
     # Regex fallback for bare time like "at 3" or "at 3pm" if recognizer missed
@@ -1640,6 +1649,15 @@ def _resolve_anaphora(slots: dict, action_name: str, memory) -> tuple[dict, bool
 
 #: a spoken clock time — if one is present but unparsed, the parse really IS
 #: incomplete and must defer; if absent, "no time" is the answer, not a gap.
+#: Does the speaker name a clock time at all? Used by the all-day rule below
+#: to tell "add the interview on friday" (all-day, legitimately) from a
+#: command whose time we simply failed to read (which must defer).
+#:
+#: "now" is deliberately NOT here. Adding it was tried on 2026-09-08 and made
+#: things worse: it stopped the all-day rule claiming the row, which changed
+#: the grounding the deep track received and cost the correct title. The
+#: right place to resolve "now" is where the time is READ, not where its
+#: absence is judged.
 _CLOCK_MENTION_RE = re.compile(
     r"\b\d{1,2}\s*(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)\b|\b\d{1,2}:\d{2}\b"
     r"|\bat\s+\d{1,2}\b|\b(?:noon|midnight|o'?clock)\b", re.I)

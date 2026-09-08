@@ -144,6 +144,19 @@ class DeepSystem(Component):
         orchestrator placed it (judging a parse that will only be OFFERED is
         wasted work and can loop-back for no reason)."""
         reentries = 0
+        # A re-run starts from the same transcript and runs the same stages,
+        # so if it would begin from the SAME items with the SAME complaint, it
+        # produces the same answer. Looping again cannot help; it only spends
+        # the budget and the user's seconds.
+        #
+        # Real usage, 2026-09-08: "Let an event to go out for a run now" —
+        # one ask, ONE item, and segment was never in doubt (the atomicity
+        # model scored it atomic at margin 9.20 against a floor of 0.25). The
+        # loop re-ran the whole chain three times to the identical result, its
+        # own trace saying "unchanged since the last attempt" each round, and
+        # apologised after 30 seconds. Gil: "if it classified as one item, why
+        # is it iterating?"
+        seen_rounds: set = set()
         while reentries < _crosscheck.MAX_REENTRIES:
             # Fresh findings each round. Carrying earlier rounds' lists
             # forward tells the re-run's prompt not to repeat things it
@@ -156,6 +169,11 @@ class DeepSystem(Component):
             loop_to = _loop_target(state)
             if loop_to is None:
                 return                      # judged and clean — commit it
+            signature = (tuple(i.text for i in state.items),
+                         tuple(sorted(f.detail for f in state.findings)))
+            if signature in seen_rounds:
+                break            # nothing changed and nothing will — say so
+            seen_rounds.add(signature)
             reentries += 1
             state.retries[loop_to] = state.retries.get(loop_to, 0) + 1
             if state.trace:

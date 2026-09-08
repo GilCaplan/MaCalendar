@@ -424,6 +424,7 @@ def run_objects(state: EngineState, cfg) -> EngineState:
             _rule_until_exclusive(state, intent, tl)
             _rule_weekly_start_day(state, intent, tl, today)
             _rule_at_time_is_start(state, intent, transcript)
+            _rule_now_means_now(state, intent, transcript)
             _rule_morning_title_guard(state, intent, transcript)
             _rule_bare_hour_pm(state, intent, transcript, tl)
             _rule_junk_event_drop(state, item, intent, n_events, pairs)
@@ -566,6 +567,41 @@ def _rule_at_time_is_start(state, intent, transcript) -> None:
         intent.start_time = e
         intent.end_time = f"{(hh + 1) % 24:02d}:{mm:02d}"
         state.add_fix("validate", "at_time_is_start", s, e, note=f"'at {e}' is when it starts")
+
+
+_NOW_RE = re.compile(r"\b(?:right\s+now|now|immediately|asap)\b", re.I)
+
+
+def _rule_now_means_now(state, intent, transcript) -> None:
+    """"now" is a time the speaker gave — book it at the clock, not midnight.
+
+    Real usage, 2026-09-08: "create an event NOW to go out for a run" was
+    booked 12 AM–1 AM. The word carries no digits, so the temporal reader
+    found nothing, the event fell to the 00:00 default, and both the fast
+    parse and the model that inherited it kept it.
+
+    It lives here rather than in the reader because BOTH paths have to be
+    caught — FastRule's partial parse and the model's own answer — and this
+    stage is the one that sees the produced object either way. Guarded three
+    ways: the speaker must actually have said "now", must NOT have said
+    midnight, and the object must be sitting on exactly the 00:00 default.
+    """
+    if not _NOW_RE.search(transcript or ""):
+        return
+    if re.search(r"\bmidnight\b", (transcript or ""), re.I):
+        return
+    start = getattr(intent, "start_time", None)
+    if start != "00:00":
+        return                       # a real time was read; leave it alone
+    import datetime as _dt
+    now = _dt.datetime.now()
+    fresh = f"{now.hour:02d}:{now.minute:02d}"
+    intent.start_time = fresh
+    end = getattr(intent, "end_time", None)
+    if end in ("01:00", "23:59", None, ""):
+        intent.end_time = f"{(now.hour + 1) % 24:02d}:{now.minute:02d}"
+    state.add_fix("validate", "now_means_now", start, fresh,
+                  note="\"now\" is the clock, not midnight")
 
 
 def _rule_morning_title_guard(state, intent, transcript) -> None:

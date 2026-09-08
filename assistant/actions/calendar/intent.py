@@ -110,6 +110,17 @@ class CalendarIntent(BaseIntent):
             return None
         import re as _re
         t = str(v).strip().lower().replace(".", ":")
+        # "now" is a time the speaker gave, not a missing one — resolve it
+        # rather than rejecting the whole item. Real usage, 2026-09-08: "an
+        # event to go out for a run NOW" produced a correct create_event from
+        # the model, which was thrown away here because `now` is not HH:MM.
+        # The engine then blamed segmentation, re-ran it three times to the
+        # same answer, and apologised after 30 seconds — for a command it had
+        # actually understood.
+        if t in ("now", "right now", "immediately", "asap",
+                 "straight away", "right away", "at once"):
+            import datetime as _dt
+            return _dt.datetime.now().strftime("%H:%M")
         m = (_re.fullmatch(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm|a:m|p:m)?", t)
              or _re.fullmatch(r"(\d{2})(\d{2})()", t)
              or _re.fullmatch(r"(\d{1,2})(\d{2})\s*(am|pm|a:m|p:m)", t))
@@ -136,8 +147,11 @@ class CalendarIntent(BaseIntent):
             now = datetime.datetime.now()
             self.start_time = f"{now.hour:02d}:00"
 
-        # 3. End time defaults to start_time + 1 hour
-        if not self.end_time:
+        # 3. End time defaults to start_time + 1 hour.
+        #    An end EQUAL to the start counts as missing: a zero-length event
+        #    is not something a speaker asks for, and it is what "go for a run
+        #    NOW" produces once both ends resolve to the same clock reading.
+        if not self.end_time or self.end_time == self.start_time:
             try:
                 h, m = map(int, self.start_time.split(":"))
                 end_min = h * 60 + m + 60

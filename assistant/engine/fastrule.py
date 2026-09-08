@@ -109,6 +109,7 @@ STRUCTURE = "structure"    # "this is more than one item" — atomize, then
 
 _REASON_CLASS = {
     "generic-target": REFUSAL,
+    "generic-title": REFUSAL,
     "rename-misroute": REFUSAL,
     "interrogative-create": REFUSAL,
     "strong-compound": STRUCTURE,
@@ -310,6 +311,32 @@ class Gatekeeper:
                 pass                    # data and parse agree — resolvable
             else:
                 return "rename-misroute"
+        # The same veto on the CREATE side, which it never had. "Create an
+        # event now to go out for a run" parses to a create_event titled
+        # "event" — the word for a calendar entry, not a name for one — and
+        # FastRule committed it at confidence 1.00. Real usage, 2026-09-08:
+        # the user got an event called "event" at midnight.
+        #
+        # A generic TARGET on a mutation and a generic TITLE on a create are
+        # the same failure: the rules found a shape and no subject. It is a
+        # REFUSAL, so the deep track may RESOLVE it — the model reads "go out
+        # for a run" as the title, which it does — but must not re-commit the
+        # empty one.
+        #
+        # Deliberately `_GENERIC_TARGET_RE`, NOT validate's
+        # `is_placeholder_title`: that one answers "could this title be
+        # improved?" and flags "meeting with Tal", a perfectly good event to
+        # create. Using it as a commit veto broke 14 tests. The question here
+        # is the narrow one — is the title ONLY the generic noun, no subject.
+        for name, intent in intents:
+            if not name.startswith("create_"):
+                continue
+            titles = [str(getattr(intent, "title", "") or "")]
+            titles += [str(x) for x in (getattr(intent, "titles", None) or [])]
+            for title in titles:
+                title = title.strip()
+                if title and _GENERIC_TARGET_RE.match(title):
+                    return f"generic-title:{title}"
         for name, intent in intents:
             if name.startswith(("update_", "delete_", "complete_")):
                 target = str(getattr(intent, "match_title", "") or "").strip()
