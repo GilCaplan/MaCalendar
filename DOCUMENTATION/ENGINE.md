@@ -103,15 +103,36 @@ sends `supports_edit`, shows the dialog (`ask_transcript_edit`, real-click
 tested) and has the Settings toggle; the iOS sheet is queued. *Status: live.*
 
 ### 2 · segment (`segment.py` · trace `rule` · tests `test_engine_segment.py`)
-Reads `text`; writes fresh `items` (id, kind, text only). Deterministic
-delimiters first (brackets, coalescing wrapper, configured separator), LLM
-segmentation only after they found nothing, **biased to under-split** — a
-wrong merge gets two more chances (steps 3 and 6); a wrong split of "meeting
-with Tal and Ravid" is immediate garbage. This is the pipeline's single point
-of failure and carries the densest tests. *Status: live — deterministic splits
-plus self-skipping LLM segmentation (a compound hint in the words is required
-before the model is consulted; a split producing a fragment is refused). Gate:
-`engine_stage_check --stage segment`.* Exports the reader
+Reads `text`; writes fresh `items` (id, kind, text only). Three tiers, in
+order, **biased to under-split** — a wrong merge gets two more chances (steps
+3 and 6); a wrong split of "meeting with Tal and Ravid" is immediate garbage.
+This is the pipeline's single point of failure and carries the densest tests.
+
+1. **Literal delimiters** — brackets, the coalescing wrapper, the configured
+   separator. Free and cannot be wrong, but every one of them is inserted by
+   the PHONE: none can occur in dictated speech, and on the persona corpus
+   they split nothing in 4,920 rows.
+2. **The clause tier** (2026-09-07) — `intent/coordination.clause_boundaries`
+   returns the position the coordination check already computed, and segment
+   splits there. A VERB conjunct with its own argument is a second ask; a
+   NOUN conjunct is a longer noun phrase, so names, lists and shared objects
+   ("buy chicken and rice", "wash and fold the laundry") are never split.
+   Refused whole when any part is not an ask, when the shape is an
+   enumeration with a header, or when a wrapper phrase spans both items.
+   Only a date the utterance OPENS with is shared into later parts — a date
+   inside the first ask belongs to that ask.
+3. **One gated LLM call** when neither tier fired and the words carry a
+   compound hint. A split producing a fragment is refused.
+
+Kind is decided here too (`_kind_of` → `_enforce_pinned_kinds`) and matters
+more than it looks: step 3 branches ENTIRELY on kind, so a wrong label costs
+the decomposition as well. Signals, in precedence order: a review question; the
+calendar named as destination or a gathering ("get X and me together"); then
+the to-do signals — an explicit list destination ("on my list", "from my
+tasks"), completion wording, a named to-do, an errand opener, a chore verb.
+
+*Status: live — three tiers. Gate: `engine_stage_check --stage segment`;
+board: `scripts/kind_board.py` for the kind decision alone.* Exports the reader
 `is_interrogative_create(text)` — a question in which the speaker weighs their
 OWN create ("should I", "what if we") — read by step 4's confirm gate and
 step 5's fast-track guard, so the two cannot disagree about what a question is.
@@ -120,9 +141,19 @@ step 5's fast-track guard, so the two cannot disagree about what a question is.
 Reads `items`; may replace an item with sub-items (`item_N-M`, depth ≤ 2) and
 fill `item.slots`. Two times joined by "and" → two events; task lists ride
 `intent/list_split.py` (verb handed down, idioms respected); counts ride
-`intent/quantity.py` — "buy 5 apples" is ONE task of (apples, 5). *Status: live —
-deterministic shapes plus a self-skipping LLM pass for wordier double-times
-(two clock-time mentions required; ranges excluded). Gate:
+`intent/quantity.py` — "buy 5 apples" is ONE task of (apples, 5).
+
+**Every list split must survive `intent/asks.is_an_ask`** (2026-09-08).
+`list_split` is pure string work and cuts at "and" without being able to tell
+a request from the words around one, so it produced items like "wash done"
+(from "wash the car, done and dusted"), a task called "pack" (from "pack and
+label the boxes"), and tag questions as items. The whole split is refused
+rather than the bad piece dropped: those words still belong to the command,
+and a merged item is recoverable where deleted words are not. The same reader
+serves segment's clause tier, so the two cannot drift.
+
+*Status: live — deterministic shapes plus a self-skipping LLM pass for wordier
+double-times (two clock-time mentions required; ranges excluded). Gate:
 `engine_stage_check --stage decompose`.*
 
 ### 4 · validate (`validate.py` · trace `validate` · tests `test_engine_validate.py`)

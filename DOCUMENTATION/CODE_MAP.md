@@ -31,7 +31,8 @@
 | Spoken-noise cleanup — filler, courtesy, hedges, self-corrections (transcript stage + FastRule) | `intent/cleanup.py` |
 | Lead-time reader (shared by FastRule AND decompose — one copy) | `intent/lead_time.py` |
 | Recurrence as a SLOT (cadence, rounding, series anchor) | `intent/recurrence.py` |
-| NP- vs clause-coordination (a feature, and a gate) | `intent/coordination.py` |
+| NP- vs clause-coordination — a feature, a gate, AND the split boundary | `intent/coordination.py` |
+| Is this fragment an ASK? (shared by segment's clause tier and decompose's list tier) | `intent/asks.py` |
 | FastRule's product-shape board / atomicity board / persona board | `scripts/fastrule_shape.py`, `scripts/atomicity_board.py`, `scripts/persona_board.py` |
 | Fit the routing models (train halves only, deterministic) | `scripts/fit_route_models.py` |
 | Per-stage live gates | `scripts/engine_stage_check.py` |

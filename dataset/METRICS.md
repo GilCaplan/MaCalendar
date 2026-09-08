@@ -53,6 +53,33 @@ that is what revealed the layer scoring worse than the model inside it.
 Error COUNTS not just rates: a wrong "compound" costs a slow path, a wrong
 "atomic" half-executes a command.
 
+## Level 3b — the KIND decision (`scripts/kind_board.py`)
+
+Added 2026-09-08, because the failure was invisible without it. Segment labels
+every item event / task / review and `decompose.run()` branches ENTIRELY on
+that label, so one wrong kind costs the decomposition as well. The atomizer
+board reported "mis-typed" as a single undirected number — which cannot tell
+tasks-read-as-events from the reverse, and the failure turned out to be almost
+entirely one direction (task recall 0.341 against event recall 0.978).
+
+Reports, per dataset and split: kind accuracy, per-class precision / recall /
+F1 with support, the confusion matrix (errors only), and four slices chosen to
+test named mechanisms — non-create to-do operations, daypart-without-clock
+rows, create-todo and create-event.
+
+Two things it must keep doing, both learned by getting them wrong:
+
+* **it applies the transcript stage's cleanup before predicting.** Several
+  kind regexes are `^`-anchored, so feeding raw dataset text invents misses the
+  pipeline never has ("um i need to do the laundry"). Leaving it out moved the
+  measured baseline by 3 points and would have sent a cycle after the wrong
+  stage.
+* **the held-back half prints aggregates only.** Row detail is train-only, by
+  the leakage rule.
+
+Scores only rows whose gold `action` names a single kind — "mixed" and
+"propose" have no one answer and are excluded rather than guessed at.
+
 ## Level 4 — SPEAKERS (`scripts/persona_board.py`)
 
 Per-persona boards plus the SPREAD between best and worst — the spread is

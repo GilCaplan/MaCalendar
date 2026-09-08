@@ -145,7 +145,7 @@ protect real, reviewed examples; bulk data has no measured value), the
 confidence weights (row 57, waiting on a week of real use), whether labelling
 should move to the LLM.
 
-## Open bug — a unit test that is order-dependent, not flaky (2026-09-07)
+## CLOSED 2026-09-08 — the order-dependent unit test (was: open bug)
 
 `tests/unit/test_mixed_commands.py::test_a_list_of_things_to_buy_makes_exactly_its_items`
 fails in the full suite and passes on its own. It had been dismissed as an
@@ -175,6 +175,19 @@ hypothesis, not a finding.
 Why it matters beyond the red tick: if prior traffic in the same process can
 change a later parse of the same words, that is worth knowing about the
 product, not just the suite.
+
+**Closed by the kind fix (bb2b80c), not by touching the test.** "add buy milk
+and buy bread to my list" now reads as a TASK — `_TASK_RE` recognises the list
+destination — so decompose's list splitter runs on it, instead of generate
+failing to route an event and returning no actions. The suite is 1311 passed,
+0 failed, in full-suite order.
+
+The diagnosis above still stands as the reason it was order-dependent, and the
+underlying question is NOT answered: it remains unexplained why the model
+returned a different segmentation for the same prompt after earlier commands
+had gone through the same process. That row was removed from the failing path
+rather than the mechanism being understood, so if a later cycle sees the same
+shape again, start from here.
 
 ## Working agreements
 - Everything on the phone is local: no third-party services; the only network peer is the Mac over Tailscale.
