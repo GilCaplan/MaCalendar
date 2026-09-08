@@ -145,6 +145,37 @@ protect real, reviewed examples; bulk data has no measured value), the
 confidence weights (row 57, waiting on a week of real use), whether labelling
 should move to the LLM.
 
+## Open bug — a unit test that is order-dependent, not flaky (2026-09-07)
+
+`tests/unit/test_mixed_commands.py::test_a_list_of_things_to_buy_makes_exactly_its_items`
+fails in the full suite and passes on its own. It had been dismissed as an
+Ollama flake in chat more than once, including by me; it is not.
+
+What the bisect establishes:
+
+- **Deterministic, not random.** 4/4 failures inside `pytest tests/unit`,
+  8/8 passes running the test alone.
+- **Not caused by the segment splitter** (a222f60). It reproduces identically
+  with `segment.py` and `coordination.py` checked out at `a222f60~1`.
+- **The trigger is `tests/unit/test_command_source.py` running first** —
+  that file alone, before this test, reproduces it. Files 1-11 of the suite
+  before it do not.
+- **Ruled out**: few-shot memory injection (`nlu.memory_examples` is 0);
+  background verify threads (`_no_bg()` gates them and conftest sets
+  `MACALENDAR_NO_WARMUP=1`); an LLM exception swallowed by `_llm_segments`
+  (Ollama returns 200 on every call in the failing run).
+
+What is left: the model gives a different segmentation for the same prompt
+after `test_command_source` has posted six commands through `/voice/text` in
+the same process. The remaining suspect is Ollama-side session state (the
+project already has a `keep_alive` gotcha on record), which would make this a
+test-isolation problem rather than an engine defect — but that is a
+hypothesis, not a finding.
+
+Why it matters beyond the red tick: if prior traffic in the same process can
+change a later parse of the same words, that is worth knowing about the
+product, not just the suite.
+
 ## Working agreements
 - Everything on the phone is local: no third-party services; the only network peer is the Mac over Tailscale.
 - Prefer doing work directly over spawning sub-agents; keep context small (`/compact` between big tasks).
