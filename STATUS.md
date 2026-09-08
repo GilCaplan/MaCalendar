@@ -3,38 +3,49 @@
 **One-screen reference. A fresh conversation reads this first, then CLAUDE.md.**
 Keep it current and short; details live in the files it points to.
 
-_Updated 2026-09-06 10:10 — cycles 1–6 closed (C6 graduated); notifications
-shipped (phases 1+2+4); branches merged at afc8c80._
+_Updated 2026-09-08 — sprint cycle A parts 1 and 2 closed and banked; part 3
+(the never-measured LLM lane) is in flight._
 
-**Next session picks up here (paused 2026-09-06 ~18:00 on Gil's token call):**
-1. **Cycle 8 run is IN FLIGHT** (spoken lead-times @ 48b9ac9, prediction in
-   RESULTS.md: full board flat, judged on stage tests + alert-before rows).
-   The local run survives the session: results in scratchpad
-   cycle8_devfast.log + auto-archived to dataset/runs/x_auto-*. Close it
-   with `python -m scripts.run_board` after renaming the archive to
-   run14_cycle8-fix (manifest loop_run=14).
-2. **Simple-tier fieldq anomaly SOLVED — fix not yet written**: two scorer
-   artifacts in scripts/field_quality.py: (a) `_content_words` regex
-   `[a-z0-9']+` keeps quote-apostrophes, so `'christmas'` ≠ `christmas`
-   (title scored 0 on verbatim quotes); (b) a title whose words are all
-   STOPWORDS ("Reminder", the fallbacks' honest default) hits
-   `if not words: return 0.0` in `_title_sim` — should score by verbatim
-   containment in the transcript instead. Fix in the WORKTREE copy, test
-   with run-12's worst-12 rows (analysis printout in this session's log),
-   merge, then manually recompute fieldq for runs 12–13 for comparability.
-3. Then cycle 9 = HYPOTHESES #4 ungated half ("update X with new items" ⇒
-   create) + the dentist query-mutation bug fix riding along.
-4. Unnamed localhost duplicate-maker: fingerprint log now on POST /todos —
-   check launch.log for `ua=` on its next appearance.
- loop = hypothesis **#5 invention guard**
-(validate stage; fresh evidence: cycle 5's loose "in the future" groundings
-+ the garble-row "New Event" fabrication; judge with the adjusted metric +
-precision, count-correct expected ~flat). Also open: notifications phase 3
-(voice lead-time phrase — engine files, now unblocked by the merge; per
-Gil's model-budget rule, weigh delegating vs. loop time), the dentist
-query-mutation bug (queued in HYPOTHESES.md), and DEVQA Q1/Q4–Q6 await Gil.
-Per Gil (2026-09-06): Fable works ONLY the self-improvement cycles; feature
-work goes to Sonnet/Opus subagents.
+**The loop is self-driving.** A cycle ends by STARTING THE NEXT ONE — banking
+the result in `dataset/RESULTS.md` is the report, and the next prediction is
+registered in the same breath (CLAUDE.md, and the rule in
+`ITERATION_PROTOCOL.md`). Implementation fixes and cleanups between cycles
+need no permission. Stop only for a DESIGN decision, or when three cycles
+running move nothing past the noise floor.
+
+**Where the sprint is (`DOCUMENTATION/experiments/SPRINT_PROPOSAL.md`):**
+
+1. **Cycle A part 1 — the atomizer, DONE** (a222f60). Segment could only split
+   on delimiters the PHONE inserts, so it split nothing in 4,920 rows of
+   speech. It now splits at the clause boundary the coordination check was
+   already computing and discarding. Boundary-clean 5.8%→41.7% and 0%→43.2%;
+   complex count-correct 60.4%→75.1% and 49.8%→70.5%; all six personas up
+   4.5–12.6 pt; ~25–30% fewer model calls.
+2. **Cycle A part 2 — the kind decision, DONE** (bb2b80c). Part 1 promoted it
+   to the binding constraint: splitting exposes second items, and each needs a
+   kind. `_TASK_RE` recognised only CREATE-shaped to-do wording, so completing,
+   editing and un-listing a task all fell through to "event". Held-out kind
+   accuracy 59.4%→73.7%, 79.1%→87.7%, 93.8%→97.8%. New instrument:
+   `scripts/kind_board.py`.
+3. **Cycle A part 3 — IN FLIGHT.** The atomizer board's default lane runs with
+   the model OFF, so the deep track's actual splitting ability has never been
+   measured. Prediction registered in RESULTS.md. Run:
+   `python -m scripts.atomizer_board --split test --dataset B --llm`.
+
+**The next constraint is already named by part 2's board:** 1-ask rows are at
+98.4% count-correct, 2-ask rows at 44.1% (UNDER 55.9%). Compounds are the
+whole remaining gap. Part 3 decides whether the fix belongs in coverage (more
+compounds reaching the model) or in the prompt/model itself.
+
+**Two lessons this sprint keeps re-teaching, worth reading before starting:**
+
+- **Fixing a stage exposes the next one.** Part 1's splitter made the kind
+  decision the ceiling; part 2's kind fix routed hundreds of items into
+  `_split_tasks` for the first time and surfaced its tearing. Expect the
+  measurement after a win to look worse somewhere, and check downstream first.
+- **Look at the rows, not the headline.** Part 1's first cut over-split 139
+  atomic rows; part 2's first cut destroyed words. Both were caught by reading
+  failures, and neither by the top-line number, which had improved.
 
 ## The state
 
