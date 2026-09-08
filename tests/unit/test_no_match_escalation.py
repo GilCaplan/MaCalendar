@@ -22,7 +22,7 @@ from assistant.actions.calendar.intent import CalendarIntent
 from assistant.actions.todo.intent import CompleteTodoIntent
 from assistant.exceptions import TargetNotFound
 import assistant.api.server as server
-import assistant.engine.generate.generate as generate
+import assistant.engine.fastrule.objects as generate
 
 SAID = "Walk Mark Stalk today at 230PM"
 

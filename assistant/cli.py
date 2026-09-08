@@ -201,7 +201,7 @@ def check_engine(deep: bool = False) -> Check:
         ("segmentation",       "assistant.engine.segmentation.old_seg.segment"),
         ("decompose_validate", "assistant.engine.decompose_validate.decompose"),
         ("decompose_validate", "assistant.engine.decompose_validate.validate"),
-        ("generate",           "assistant.engine.generate.generate"),
+        ("generate",           "assistant.engine.fastrule.objects"),
         ("llmjudge",           "assistant.engine.llmjudge.llmjudge"),
         ("label",              "assistant.engine.label.label"),
     ]

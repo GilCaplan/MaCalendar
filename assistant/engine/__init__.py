@@ -5,7 +5,7 @@
 logic). The API server hands it text (from the phone, the Mac GUI, the
 audit, the pending-retry loop) and gets back the response dict every client
 already understands. `Engine` holds the once-per-command stages and a
-`DeepSystem`, whose ordered Stage list is the 7-step deep track (`DOCUMENTATION/ENGINE.md` is the canonical contract
+`Engine`, whose ordered Stage list is the 7-step deep track (`DOCUMENTATION/ENGINE.md` is the canonical contract
 reference):
 
     0 ingest      (here)            queueing + coalescing
@@ -32,16 +32,19 @@ import os
 import threading
 from typing import Any
 
-# Stages live in component folders (see each ARCHITECTURE.md). The local
-# aliases below are unchanged, and so are the Stage("...") identifiers — the
-# trace-visible stage set is pinned by trace.py's CHAINS and
-# test_panel_agreement, so this move is a relocation, not a shape change.
+# ONE ALIAS PER BOX in the chain (DOCUMENTATION/ENGINE_REWIRE.md):
+#
+#   X0 -> ingest -X1-> segmentation -X2-> decompose_validate -X3-> fastrule
+#      -X4-> llmjudge -> commit(+label)
+#
+# Each is a stage module with the frozen `run(state, cfg) -> state`.
 from assistant.engine import segmentation as _segment
+from assistant.engine.decompose_validate import stage as _decompose_validate
+from assistant.engine.decompose_validate import validate as _validate
+from assistant.engine.fastrule import objects as _generate   # registry + commit helpers
+from assistant.engine.fastrule import stage as _fastrule
 from assistant.engine.ingest import repair as _transcript
 from assistant.engine.ingest.coalesce import coalesce  # noqa: F401  (re-exported: server.py and tests import it from here)
-from assistant.engine.decompose_validate import decompose as _decompose
-from assistant.engine.decompose_validate import validate as _validate
-from assistant.engine.generate import generate as _generate
 from assistant.engine.label import label as _label
 from assistant.engine.llmjudge import llmjudge as _crosscheck
 from assistant.engine.component import Component, Stage
@@ -81,23 +84,36 @@ def _no_bg() -> bool:
     return os.environ.get("MACALENDAR_NO_WARMUP") == "1"
 
 
-class DeepSystem(Component):
-    """The deep track as an object (Q7): the re-runnable parse half is an
-    ordered Stage list; the judge and its loop-back live in run(). The logic
-    is the function orchestrator's, verbatim — this class only names it."""
+class Engine(Component):
+    """The brain as an object (Q7, Gil-approved 2026-09-06: "the logic
+    doesn't change at all nor should the results, should just be cleaner").
+
+    ONE FLAT CHAIN (Gil, 2026-09-08). A wrapper class used to hold the
+    re-runnable stages; it carried no logic of its own and only marked a
+    boundary that `judge`'s loop now makes explicit, so it is gone and its two
+    methods live here.
+
+        X0 -> ingest -X1-> segmentation -X2-> decompose_validate
+           -X3-> fastrule -X4-> llmjudge -> commit(+label)
+
+    `transcript` is deliberately OUTSIDE `stages`: it runs once, before the
+    fast/deep decision, and re-running it would re-repair repaired words.
+    Config is loaded per run — an Engine never caches what the user can edit
+    between commands."""
 
     def __init__(self) -> None:
-        # The re-runnable parse half (items rebuilt from scratch each pass —
-        # fresh intents, so no field rule can apply twice). Transcript repair
-        # is NOT here: it runs once, before track selection, in Engine.
+        self.transcript = Stage("transcript", _transcript)
+        # The RE-RUNNABLE half: items are rebuilt from scratch on every pass,
+        # so no field rule can apply twice.
         self.stages: "list[Stage]" = [
             Stage("segment", _segment),
-            Stage("decompose", _decompose),
-            Stage("validate", _validate),                          # text pass
-            Stage("generate", _generate),
-            Stage("validate_objects", _validate, attr="run_objects"),
+            Stage("decompose_validate", _decompose_validate),
+            Stage("fastrule", _fastrule),
         ]
-        self.crosscheck = Stage("crosscheck", _crosscheck)
+        self.llmjudge = Stage("llmjudge", _crosscheck)
+        # label is part of COMMIT now (Gil): a row is written and categorised
+        # in one step, so nothing can be committed and left unlabelled.
+        self.label = Stage("label", _label)
 
     def parse(self, state: EngineState, cfg) -> None:
         """Steps 2→5 + the field rules — re-runnable (fresh items each time;
@@ -105,12 +121,6 @@ class DeepSystem(Component):
         state.items = []
         for stage in self.stages:
             stage.run(state, cfg)
-
-    def run(self, state: EngineState, cfg) -> None:
-        """Foreground deep track: parse, then the judge BEFORE anything is
-        written — findings loop execution back (at most MAX_REENTRIES)."""
-        self.parse(state, cfg)
-        self.judge(state, cfg)
 
     def judge(self, state: EngineState, cfg) -> None:
         """The crosscheck loop alone — split from run() so the Q9 confirm
@@ -139,10 +149,17 @@ class DeepSystem(Component):
             # the re-parse, which would throw away the mistake the re-parse
             # is supposed to learn from.
             state.mistakes = []
-            self.crosscheck.run(state, cfg)
+            self.llmjudge.run(state, cfg)
             loop_to = _loop_target(state)
             if loop_to is None:
                 return                      # judged and clean — commit it
+            # X1' — the judge rewrites the utterance rather than handing the
+            # same string back. Re-running a DETERMINISTIC Segmentation on
+            # unchanged text returns the identical items, so without a rewrite
+            # the loop can only spend the budget. No rewrite, no loop.
+            rewritten = _crosscheck.rewrite_for_retry(state, cfg)
+            if rewritten is None:
+                break
             signature = (tuple(i.text for i in state.items),
                          tuple(sorted(f.detail for f in state.findings)))
             if signature in seen_rounds:
@@ -153,8 +170,10 @@ class DeepSystem(Component):
             if state.trace:
                 from assistant.trace import VERIFY
                 state.trace.step(VERIFY, "Looping back",
-                                 f"re-running from {loop_to} "
+                                 f"rewrote the command and re-entered at "
+                                 f"segmentation "
                                  f"({reentries}/{_crosscheck.MAX_REENTRIES})")
+            state.text = rewritten          # re-enter Segmentation on X1'
             self.parse(state, cfg)
 
         # Budget spent. The parse that will actually be committed is the one
@@ -162,27 +181,13 @@ class DeepSystem(Component):
         # exited straight into this message, which was written from findings
         # describing objects that no longer existed. Judge what we are about
         # to commit, then speak from THAT.
-        self.crosscheck.run(state, cfg)
+        self.llmjudge.run(state, cfg)
         if any(f.type == "missing" for f in state.findings):
             state.messages.append(
                 "I'm not sure I caught every part of that — worth a glance.")
 
 
-class Engine(Component):
-    """The brain as an object (Q7, Gil-approved 2026-09-06: "the logic
-    doesn't change at all nor should the results, should just be cleaner").
 
-    Members: `deep` (the 7-step track), `transcript`/`label` (the once-per-
-    command stages), and the fast front door reached through
-    `generate.fast_propose` (its FastRule instance and gates live there —
-    fast_sandbox drives the same entry). Config is loaded per run, exactly as
-    the function version did — an Engine never caches what the user can edit
-    between commands."""
-
-    def __init__(self) -> None:
-        self.transcript = Stage("transcript", _transcript)
-        self.label = Stage("label", _label)
-        self.deep = DeepSystem()
 
     def run(self, text: str, trace: Any = None, source: str = "ios",
             current_view: str = "month", trace_run: "str | None" = None,
@@ -241,14 +246,13 @@ class Engine(Component):
             fast = cfg.engine.fast_track and _generate.fast_propose(state, cfg)
             if fast:
                 _validate.run_objects(state, cfg)
-                _commit(state, cfg)
-                self.label.run(state, cfg)
+                _commit(state, cfg)      # labels inside
                 # The deep track runs BEHIND the instant answer: extraction-
                 # based cross-check against what was just committed, patched
                 # through the verify-token contract the clients already speak.
                 _start_background_verify(state, cfg)
             else:
-                self.deep.parse(state, cfg)
+                self.parse(state, cfg)
                 # The confirm gate (Q9), the same shape as the needs_edit
                 # gate: parse finished and validated, nothing written, the
                 # client said it can ask. Step 4 flagged the item
@@ -256,9 +260,8 @@ class Engine(Component):
                 proposal = _confirm_proposal(state)
                 if proposal:
                     return _confirm_response(state, cfg, proposal, trace_run)
-                self.deep.judge(state, cfg)
-                _commit(state, cfg)
-                self.label.run(state, cfg)
+                self.judge(state, cfg)
+                _commit(state, cfg)      # labels inside
         except AssistantError as e:
             return _parse_error_response(state, cfg, e)
 
@@ -338,6 +341,12 @@ def run_transcript(text: str, trace: Any = None, source: str = "ios",
 # ---------------------------------------------------------------------------
 
 def _commit(state: EngineState, cfg) -> None:
+    """Write the objects, then LABEL them — one step (Gil, 2026-09-08).
+
+    Labelling used to be a separate stage after commit, which meant a row could
+    be written and left uncategorised if anything between the two raised. A row
+    is now written and categorised together, or not at all.
+    """
     from assistant.intent.context import ContextMemory
     from assistant.trace import EXECUTE
 
@@ -431,6 +440,10 @@ def _commit(state: EngineState, cfg) -> None:
     elif refresh_set:
         state.refresh = refresh_set.pop()
 
+    # LABEL, in the same step as the write (Gil): category + colour for events,
+    # tags for tasks. Never left for a later stage, so a committed row is never
+    # an uncategorised one.
+    _label.run(state, cfg)
 
 def _loop_target(state: EngineState) -> "str | None":
     """The earliest stage the findings blame, or None when there is nothing
@@ -442,7 +455,7 @@ def _loop_target(state: EngineState) -> "str | None":
     re-run rebuilds intents are loopable — re-running the field rules on the
     SAME objects would double-apply them."""
     for f in state.findings:
-        if f.type == "missing" and f.blamed_stage in ("segment", "generate"):
+        if f.type == "missing" and f.blamed_stage in ("segment", "fastrule"):
             return "segment"   # a segment re-run rebuilds everything after it
     return None
 

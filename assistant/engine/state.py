@@ -19,15 +19,18 @@ from typing import Any
 # Stage names, in pipeline order. The orchestrator wires them; step 6 may jump
 # execution back to one of them by name (its blame router only ever names one
 # of these).
+# One entry per BOX in the chain (assistant/engine/ARCHITECTURE.md).
+# Re-cut 2026-09-08 with the rewire: decompose+validate became one box,
+# generate became fastrule (the stage IS object-making), crosscheck became
+# llmjudge, and label moved inside commit.
 STAGES = (
-    "ingest",      # step 0 — queue + coalescing (lives in the orchestrator)
-    "transcript",  # step 1 — vocabulary repair + confidence gate
-    "segment",     # step 2 — split into typed items (events / tasks / review)
-    "decompose",   # step 3 — recursive per-item breakdown
-    "validate",    # step 4 — format rules, text repair, observance gate
-    "generate",    # step 5 — items → concrete intents (rule parser else LLM)
-    "crosscheck",  # step 6 — raw text vs. produced objects, loop-back
-    "label",       # step 7 — category / tag consistency
+    "ingest",              # X0 → X1  queue + coalescing + vocabulary repair
+    "transcript",          #          the repair half, still its own Stage
+    "segment",             # X1 → X2  split into (action, time, tag) items
+    "decompose_validate",  # X2 → X3  atomise, repair, observance gate
+    "fastrule",            # X3 → X4  items → calendar / to-do objects
+    "llmjudge",            # X4 →     judge, and rewrite-and-loop if unhappy
+    "commit",              #          write + label, one step
 )
 
 # What an item is *about*. Edits and deletes of an event are kind "event" —

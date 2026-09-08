@@ -191,7 +191,7 @@ or "not yet integrated" predates that. Era 2: new baseline = the joint
 confirmation run. The FastRule lane keeps iterating in parallel on full-3000
 in its worktree; graduates integrate every 2–3 cycles. Order of play:
 (1) joint confirmation lands → era-2 baseline; (2) Gil reviews the
-DeepSystem structure [his checkpoint — cycle 10 blocked on it]; (3) cycle 10
+the Engine's stage list structure [his checkpoint — cycle 10 blocked on it]; (3) cycle 10
 full rules-first-per-fragment [DESIGN CHANGE, Gil-authorized if step 1 paid,
 which cycle 9 confirmed]; (4) path-B crosscheck precision; (5) F4+ sandbox
 batches ride alongside throughout.)*

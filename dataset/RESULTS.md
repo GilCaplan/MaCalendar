@@ -446,7 +446,7 @@ input).
 
 ## Q7 object refactor — CONFIRMED behavior-identical (2026-09-07, merged)
 
-Confirmation run on the refactored Engine/DeepSystem objects, dev-fast 250:
+Confirmation run on the refactored Engine/the Engine's stage list objects, dev-fast 250:
 **routing fingerprint identical** (163 deep / 87 fast — the deterministic
 path decided every row the same way), board within noise of run 17 (raw
 77.0 · adjusted 80.0 · F1 81.2 · fieldq 85.9 · fast 90% · garbage 0%). Not

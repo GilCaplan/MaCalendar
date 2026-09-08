@@ -176,7 +176,7 @@ def warm_up_components() -> None:
     def _go() -> None:
         import time as _t
         from assistant.engine import load_config as _engine_cfg
-        from assistant.engine.generate import generate as _gen
+        from assistant.engine.fastrule import objects as _gen
         t0 = _t.perf_counter()
         for name, fn in (("rule parser", _gen._get_rule_parser),
                          ("whisper", _get_stt),

@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import assistant.engine as engine
-import assistant.engine.generate.generate as generate
+import assistant.engine.fastrule.objects as generate
 import assistant.stt.vocab as vocab_mod
 from assistant.engine.state import EngineState, Item
 from assistant.exceptions import OllamaUnavailableError
@@ -395,7 +395,7 @@ def test_fastrule_work_travels_forward_when_it_declines(registry_with_real_actio
     context for the LLM stages. It used to be discarded on defer, so the
     deep track started cold on a command that had already been read once."""
     from assistant.engine import load_config
-    from assistant.engine.generate import generate
+    from assistant.engine.fastrule import objects as generate
     from assistant.engine.state import EngineState
 
     st = EngineState(raw_text="book the gym at 6 and remind me to buy milk",

@@ -137,7 +137,7 @@ def predictions(rows, floor: "float | None" = None):
     all three predictors come out of the same pass.
     """
     from freezegun import freeze_time
-    from assistant.engine.generate import generate as _generate
+    from assistant.engine.fastrule import objects as _generate
     from assistant.engine.fastrule.fastrule import Atomicity
     from assistant.intent.classifier import ROUTER
 

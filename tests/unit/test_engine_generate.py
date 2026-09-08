@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-import assistant.engine.generate.generate as generate
+import assistant.engine.fastrule.objects as generate
 from assistant.engine import load_config
 from assistant.engine.state import EngineState, Item
 

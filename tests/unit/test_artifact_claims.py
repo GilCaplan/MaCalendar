@@ -581,7 +581,7 @@ _STAGE_FILES = {
     "segment":    "segmentation/old_seg/segment.py",
     "decompose":  "decompose_validate/decompose.py",
     "validate":   "decompose_validate/validate.py",
-    "generate":   "generate/generate.py",
+    "fastrule":   "fastrule/objects.py",
     "crosscheck": "llmjudge/llmjudge.py",
     "label":      "label/label.py",
 }
@@ -607,17 +607,26 @@ def test_the_fastrule_components_named_on_the_page_exist(all_prose):
 
 
 def test_the_engine_objects_named_on_the_page_exist(all_prose):
-    """Engine / DeepSystem / Stage / Component / EngineState."""
+    """Engine / Stage / Component / EngineState.
+
+    The stage-list wrapper class was REMOVED 2026-09-08 — it held no logic of
+    its own, and the loop that rewrites the utterance makes the boundary it
+    marked explicit instead. A page that still names it is describing an object
+    that is gone, which is exactly what this file exists to catch.
+    """
     orchestrator = _classes(ROOT / "assistant" / "engine" / "__init__.py")
     component = _classes(ROOT / "assistant" / "engine" / "component.py")
     state = _classes(ROOT / "assistant" / "engine" / "state.py")
-    assert {"Engine", "DeepSystem"} <= orchestrator, "the orchestrator's classes moved"
+    assert {"Engine"} <= orchestrator, "the orchestrator's classes moved"
+    assert "DeepSystem" not in orchestrator, (
+        "the stage-list wrapper was removed; if it is back, the pages and this "
+        "test need it again")
     assert {"Component", "Stage"} <= component, "component.py's classes moved"
     assert "EngineState" in state, "EngineState is no longer defined in state.py"
     for name, text in all_prose.items():
         if _ENGINE_MARK not in text:
             continue
-        for ident in ("DeepSystem", "EngineState", "Component", "Stage"):
+        for ident in ("EngineState", "Component", "Stage"):
             assert ident in text, f"{name} draws the engine but never names {ident}"
 
 
@@ -651,7 +660,7 @@ def test_the_deferral_reason_classes_are_current(all_prose):
 
 def test_the_two_fastrule_thresholds_are_current(all_prose):
     """The front door's bar and the per-fragment bar are different numbers."""
-    from assistant.engine.generate.generate import SUBITEM_RULE_THRESHOLD
+    from assistant.engine.fastrule.objects import SUBITEM_RULE_THRESHOLD
     from assistant.intent.rule_parser import RULE_THRESHOLD
     for name, text in all_prose.items():
         if "per fragment" not in text:

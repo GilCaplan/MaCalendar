@@ -371,7 +371,7 @@ class FastRule:
         self.scorer = Scorer(threshold)
 
     def run(self, text: str, current_view: str = "month") -> FastRuleResult:
-        from assistant.engine.generate import generate as _generate
+        from assistant.engine.fastrule import objects as _generate
         from assistant.intent.rule_parser import RuleParserSkip
 
         rp = _generate._get_rule_parser()

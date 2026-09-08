@@ -2,7 +2,7 @@
 
 `Component` is the one interface: a worker exposes `run()` and nothing else
 is assumed about it. `FastRule` (fastrule.py) already has this shape;
-`Engine` and `DeepSystem` (engine/__init__.py) adopt it; `Stage` gives it to
+`Engine` (engine/__init__.py) adopts it; `Stage` gives it to
 the seven stage modules without touching them — each module keeps its frozen
 `run(state, cfg) -> state` contract (test_engine_contracts.py pins them) and
 the Stage object is a named handle around exactly that function.

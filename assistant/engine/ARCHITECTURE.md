@@ -154,7 +154,7 @@ new `CHAINS` entry, and update the panel, iOS and the explorer diagram.
 | LLMJudge | ⚠️ `Stage("crosscheck")`; routes blame to three stages instead of rewriting X1 | to rewire |
 | COMMIT + label | ⚠️ commit is in the orchestrator; `label` is a separate Stage after it | to fold |
 | the loop | ⚠️ re-runs segmentation on **unchanged text** — and since FastSeg is deterministic with LLMSeg off, it cannot return anything new, so the loop is **inert** | the rewire fixes this |
-| `DeepSystem` | ⚠️ still wraps the re-runnable stage list | to delete |
+| the Engine's stage list | ⚠️ still wraps the re-runnable stage list | to delete |
 
 `DOCUMENTATION/ENGINE_REWIRE.md` is the plan that closes that column.
 

@@ -424,8 +424,10 @@ def test_the_rail_lights_the_chain_in_order_as_steps_arrive(hud):
 
 
 def test_the_rail_maps_the_two_rule_slots_in_chain_order(hud):
-    # segment/decompose also trace as `rule`; the second `rule` step must land
-    # on the second `rule` slot, not re-light the first.
+    # segmentation and the object-making box also trace as `rule`; the second
+    # `rule` step must land on the SECOND `rule` slot, not re-light the first.
+    # v3 has three `rule` slots (rules first · split into asks · make each
+    # object), which is what makes the ordering matter.
     widget, _, _ = hud
     p = widget.panel
     p.begin("Mac")
@@ -433,7 +435,7 @@ def test_the_rail_maps_the_two_rule_slots_in_chain_order(hud):
     p.add_step(_step("rule", "Split"))
     done, active = _rail_state(p._rail)
     assert "rules first" in done
-    assert active == "split · split again"
+    assert active == "split into asks"
 
 
 def test_a_finished_run_leaves_no_slot_active(hud):
@@ -508,7 +510,7 @@ def test_the_active_row_gets_a_live_increasing_timer_and_a_spinner(hud):
     assert second > first, f"live counter did not advance: {first} -> {second}"
 
     # A slot the run hasn't reached yet shows neither a mark nor a time.
-    untouched = _row_for(rail, "compare")
+    untouched = _row_for(rail, "judge")
     assert untouched[6].text() == ""            # state label
     assert untouched[4].text() == ""            # time label
 
@@ -549,7 +551,7 @@ def test_finishing_freezes_the_time_and_stops_the_spinner(hud):
 
     # Never reached at all: "skipped", no time — unchanged from before this
     # feature, and not accidentally given a duration.
-    _, _, _, _, skip_time, _sstack, skip_state, skip_spinner = _row_for(rail, "compare")
+    _, _, _, _, skip_time, _sstack, skip_state, skip_spinner = _row_for(rail, "judge")
     assert skip_state.text() == "skipped"
     assert skip_time.text() == ""
     assert not skip_spinner._timer.isActive()

@@ -24,8 +24,39 @@ enum EngineChain {
     /// The chain for a brain version. An unknown version shows no scaffold —
     /// the timeline falls back to the raw steps, exactly as before.
     static func scaffold(for brain: String) -> [ChainSlot] {
-        guard brain == "engine-v2" else { return [] }
-        return [
+        // A trace carries the brain version it was RECORDED under, so an old
+        // run still renders in the shape it actually ran. Unknown version =>
+        // no scaffold, and the timeline falls back to the raw steps.
+        switch brain {
+        case "engine-v3": return v3
+        case "engine-v2": return v2
+        default: return []
+        }
+    }
+
+    /// v3 — the rewire (2026-09-08): decompose and validate are one box, the
+    /// object-making box is FastRule (rules-first, so its slot is `rule`), and
+    /// the judge can restate the command and send it back through.
+    private static let v3: [ChainSlot] = [
+            ChainSlot(stage: "vocab", label: "fix words", heading: "Fix words",
+                      body: "The transcript is corrected against your personal vocabulary — the names, places and phrases the speech model mishears — and several queued recordings are joined into one command. A word the vocabulary itself doubts can be checked with you before anything runs."),
+            ChainSlot(stage: "rule", label: "rules first", heading: "Rules first",
+                      body: "A deterministic rule parser reads the whole command first and scores its own confidence. When it is sure it answers in milliseconds without ever calling the language model. That is the fast lane; the judge keeps checking behind it."),
+            ChainSlot(stage: "rule", label: "split into asks", heading: "Split into asks",
+                      body: "The command is cut into the separate things you asked for. Each becomes an action, the time you said for it, and whether it belongs on the calendar, on the to-do list, or is only a question. The time is kept as you said it — “next friday” stays “next friday” until a later step works out the date."),
+            ChainSlot(stage: "validate", label: "atomise · repair", heading: "Atomise and repair",
+                      body: "Each ask is broken down until it is a single thing — two times is two events, a list is one task per thing, a recurrence becomes a series — and then repaired by named rules: dates, am/pm, end-before-start, until/through, and rounding a recurrence to daily, weekly or monthly (announced, never silent). The observance gate lives here: what the assistant may book on Shabbat, yom tov and fast days."),
+            ChainSlot(stage: "rule", label: "make each object", heading: "Make each object",
+                      body: "Every ask becomes the actual thing to write — this event, that task, this question to answer. Rules do it wherever they can; one schema-constrained model call is made only where they cannot decide, grounded on your raw words."),
+            ChainSlot(stage: "execute", label: "write · label", heading: "Write and label",
+                      body: "The objects are written to the local database and categorised in the same step — an event gets its colour, a task its tags — so nothing is ever saved uncategorised. Nothing here reaches the internet; the database is a file on the machine."),
+            ChainSlot(stage: "verify", label: "judge", heading: "Judge",
+                      body: "Before the answer is trusted, the model lists what your words actually asked for and deterministic code compares that against what was produced. If something is missing, the judge can restate your command more clearly and send it back through — at most three times."),
+            ChainSlot(stage: "done", label: "done", heading: "Done",
+                      body: "The command is finished. A fast-lane answer committed instantly and the judge kept checking behind it; a deep answer ran the whole chain in front of you. Every step above, and its timing, is this run."),
+    ]
+
+    private static let v2: [ChainSlot] = [
             ChainSlot(stage: "vocab", label: "fix words", heading: "Fix words",
                       body: "The transcript is corrected against your personal vocabulary — the names, places and phrases the speech model mishears. A word the vocabulary itself doubts can be checked with you before anything runs, so a mishearing never becomes a wrong event."),
             ChainSlot(stage: "rule", label: "rules first", heading: "Rules first",
@@ -43,7 +74,6 @@ enum EngineChain {
             ChainSlot(stage: "done", label: "done", heading: "Done",
                       body: "The command is finished. A fast-lane answer committed instantly and the deep track keeps checking behind it; a deep-track answer ran the whole pipeline in front of you. Every step above, and its timing, is this run."),
         ]
-    }
 }
 
 /// Shown by VoiceButton while a command is in flight (Settings › Voice › Show

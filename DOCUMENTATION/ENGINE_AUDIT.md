@@ -25,7 +25,7 @@ number looks wrong.)
 
 The architecture Gil settled on is **written down in three places and built in
 one and a half.** `FASTRULE2_DESIGN.md` §"division of labor" and
-`DEEPSYSTEM_DESIGN.md` §3.3/§5.1 both say the deep track calls
+`../retired/deepsystem/OBJECT_BRAIN_DESIGN.md` §3.3/§5.1 both say the deep track calls
 `FastRule(0.60)` per fragment and routes its abstain-reason back to decompose.
 That code does not exist. `FastRule` is instantiated **exactly once** in
 production:
@@ -175,8 +175,8 @@ Not code, but it costs the same thing: the next agent trusts it.
 | `ENGINE.md:75` | `retries` read by orchestrator | write-only (§1.3) |
 | `SYSTEM.md:94` | "`_normalise_intents` in `assistant/api/server.py`" | that function no longer exists anywhere outside `retired/` |
 | `FASTRULE2_DESIGN.md:136-139` | "Retired: semantic rewrites in the normalization list" | still present at `rule_parser.py:179-209`, and **F16/F18 added more of them** — as did F19 *while this audit was being written* (`note to self, X` → `add X`; `put a marker on ‹date› for ‹X›` → `add X on ‹date›`; `i should ‹encounter›` → `i need to ‹encounter›`). These are semantic rewrites by the design doc's own definition, in the list the design doc says was retired |
-| `DEEPSYSTEM_DESIGN.md:182-188, 270-273` | `Generate.fragment = FastRule(0.60)`, atomicity re-entry to Decompose | not built (§0) |
-| `DEEPSYSTEM_DESIGN.md:254-258` | `Stage.can_skip` / `Stage.metric` | not in `component.py`; `grep -rn "can_skip\|def metric"` → no hits |
+| `../retired/deepsystem/OBJECT_BRAIN_DESIGN.md:182-188, 270-273` | `Generate.fragment = FastRule(0.60)`, atomicity re-entry to Decompose | not built (§0) |
+| `../retired/deepsystem/OBJECT_BRAIN_DESIGN.md:254-258` | `Stage.can_skip` / `Stage.metric` | not in `component.py`; `grep -rn "can_skip\|def metric"` → no hits |
 | `TASKS.md:106-130` | "cycle 5 in flight 2026-09-06", branch `loop-cycle-1` | superseded by `STAGE_ISOLATION_PLAN.md` (cycles PAUSED) |
 | `STATUS.md` | dated 2026-09-06 | `CLAUDE.md` says read it first; it predates the plan of record |
 
@@ -374,7 +374,7 @@ fixes added during that pass, mirroring validate's block. Five lines.
 
 ### P7 · The loop-back commits an unjudged parse and feeds stale mistakes back in
 
-`DeepSystem.judge` (`__init__.py:141-165`):
+`the Engine's stage list.judge` (`__init__.py:141-165`):
 
 ```python
 while reentries < MAX_REENTRIES:
@@ -405,7 +405,7 @@ Cost: up to 3 extra LLM segment calls + 3 rounds of generate per command, and
 the run-8 comment in `_loop_target` records that this already produced "39
 loop storms" once. **Smallest fix:** run the crosscheck once more after the
 final re-parse (or judge before deciding to loop again), and reset
-`state.mistakes` at the top of `DeepSystem.parse`.
+`state.mistakes` at the top of `the Engine's stage list.parse`.
 
 ### P8 · Background threads are not gated by `MACALENDAR_NO_WARMUP`, and one writes to the DB during measurement
 

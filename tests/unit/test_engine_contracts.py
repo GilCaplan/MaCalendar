@@ -27,9 +27,13 @@ def _field_names(cls) -> set:
 
 
 def test_stage_roster_is_fixed():
+    # Re-cut 2026-09-08 with the rewire (Gil's chain) — a DESIGN change, made
+    # deliberately and recorded, not drift: decompose+validate became one box,
+    # generate became fastrule, crosscheck became llmjudge, label moved into
+    # commit. See assistant/engine/ARCHITECTURE.md.
     assert STAGES == (
-        "ingest", "transcript", "segment", "decompose",
-        "validate", "generate", "crosscheck", "label",
+        "ingest", "transcript", "segment", "decompose_validate",
+        "fastrule", "llmjudge", "commit",
     ), FROZEN
 
 
@@ -88,7 +92,7 @@ def test_every_stage_module_exposes_run():
     (ingest lives inside the orchestrator, so it has no module.)"""
     import assistant.engine.llmjudge.llmjudge
     import assistant.engine.decompose_validate.decompose
-    import assistant.engine.generate.generate
+    import assistant.engine.fastrule.objects
     import assistant.engine.label.label
     import assistant.engine.segmentation.old_seg.segment
     import assistant.engine.ingest.repair
@@ -96,7 +100,7 @@ def test_every_stage_module_exposes_run():
 
     for mod in (assistant.engine.ingest.repair, assistant.engine.segmentation.old_seg.segment,
                 assistant.engine.decompose_validate.decompose, assistant.engine.decompose_validate.validate,
-                assistant.engine.generate.generate, assistant.engine.llmjudge.llmjudge,
+                assistant.engine.fastrule.objects, assistant.engine.llmjudge.llmjudge,
                 assistant.engine.label.label):
         run = getattr(mod, "run", None)
         assert callable(run), f"{mod.__name__}.run missing — {FROZEN}"
@@ -113,7 +117,7 @@ def test_validate_has_object_pass():
 
 
 def test_generate_owns_the_fast_track():
-    import assistant.engine.generate.generate as g
+    import assistant.engine.fastrule.objects as g
     params = list(inspect.signature(g.fast_propose).parameters)
     assert params == ["state", "cfg"], FROZEN
 

@@ -114,7 +114,7 @@ One brain, two tracks, every worker an object:
 ```
 Engine(config)                              # replaces the run_transcript() function
   ├── front  : FastRule(0.80)               # the fast-track front door
-  ├── deep   : DeepSystem(config)           # the 7-stage pipeline, as an object
+  ├── deep   : the Engine's stage list(config)           # the 7-stage pipeline, as an object
   └── verify : Verifier(deep.crosscheck)    # path-B background judge
 ```
 
@@ -152,7 +152,7 @@ Engine.run(prompt, source, trace, view):
 ### 3.2 The deep pipeline — ordered stages + loop-back
 
 ```
-DeepSystem.run(state):
+the Engine's stage list.run(state):
     reentries = 0
     for stage in self.stages:          # Transcript→Segment→Decompose→Validate(text)
                                        # →Generate→Validate(objects)→Crosscheck→Label
@@ -230,15 +230,15 @@ uniformly composable.
 class Engine:
     def __init__(self, config):
         self.front  = FastRule(config.fast.threshold)      # 0.80
-        self.deep   = DeepSystem(config)
+        self.deep   = the Engine's stage list(config)
         self.verify = Verifier(self.deep.crosscheck, config)
     def run(self, prompt, source, trace, view) -> Response   # §2.1
 ```
 
-### 4.3 DeepSystem — the deep track as an object
+### 4.3 the Engine's stage list — the deep track as an object
 
 ```
-class DeepSystem:
+class the Engine's stage list:
     def __init__(self, config):
         self.stages = [Transcript(cfg), Segment(cfg), Decompose(cfg),
                        Validate(cfg), Generate(cfg), Crosscheck(cfg), Label(cfg)]
@@ -315,7 +315,7 @@ memory_id/verify_token) · the offline + pending rules.
 
 1. **Refactor, no behaviour change:** add `Component`/`Stage`, wrap the 7 stage
    functions as classes (pure delegation), wrap `run_transcript` as
-   `Engine`/`DeepSystem`. Gate: the dataset board is **byte-identical** (the
+   `Engine`/the Engine's stage list. Gate: the dataset board is **byte-identical** (the
    FastRule-refactor discipline).
 2. **Measured design changes, each its own cycle:** cycle-10
    rules-first-per-fragment + atomicity routing; then the path-B `Verifier`.

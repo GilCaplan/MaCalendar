@@ -239,7 +239,7 @@
     <line x1="352" y1="219" x2="352" y2="223" stroke="var(--muted)" marker-end="url(#mi)"/>
     <g data-panel="deepsystem" role="button" tabindex="0" aria-label="The deep system, the atomizer: it breaks a command into atomic items and hands each one back to FastRule. Seven stages and a judge."><title>The deep system, the atomizer: it breaks a command into atomic items and hands each one back to FastRule. Seven stages and a judge.</title>
       <rect class="frame" x="262" y="224" width="181" height="18" rx="3" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="352" y="236" text-anchor="middle" font-size="9.5">DeepSystem — the deep track</text>
+      <text x="352" y="236" text-anchor="middle" font-size="9.5">The deep track</text>
     </g>
     <line x1="248" y1="233" x2="212" y2="233" stroke="var(--muted)" marker-start="url(#mi)" marker-end="url(#mi)"/>
     <text x="229" y="224" text-anchor="middle" font-size="8" fill="var(--muted)">asks it</text>
@@ -511,9 +511,9 @@
 
     <!-- ============ THE DEEP SYSTEM ============ -->
     <rect x="500" y="176" width="470" height="330" rx="8" fill="none" stroke="var(--line)" stroke-width="1.6"/>
-    <g data-panel="deepsystem" role="button" tabindex="0" aria-label="DeepSystem: the atomizer. It breaks a command down to atomic items so FastRule can create the right record per item, and it re-runs itself when the judge finds something missing."><title>DeepSystem: the atomizer. It breaks a command down to atomic items so FastRule can create the right record per item, and it re-runs itself when the judge finds something missing.</title>
+    <g data-panel="deepsystem" role="button" tabindex="0" aria-label="The deep track: the atomizer. It breaks a command down to atomic items so FastRule can create the right record per item, and it re-runs itself when the judge finds something missing."><title>The deep track: the atomizer. It breaks a command down to atomic items so FastRule can create the right record per item, and it re-runs itself when the judge finds something missing.</title>
       <rect class="frame" x="504" y="180" width="462" height="42" rx="6" fill="transparent" stroke="transparent"/>
-      <text x="765" y="198" text-anchor="middle" font-size="11.5" font-weight="600">DeepSystem — the atomizer</text>
+      <text x="765" y="198" text-anchor="middle" font-size="11.5" font-weight="600">The deep track — the atomizer</text>
       <text x="765" y="213" text-anchor="middle" font-size="8" fill="var(--muted)">an ordered, re-runnable list of Stage objects</text>
     </g>
 
@@ -1757,9 +1757,9 @@ series_id   NULL
     <p>Loading refuses a weights file whose vectors do not match the featurizer, because a dot product over mismatched lists truncates silently — a wrong answer with no error anywhere.</p>`
   },
   deepsystem: {
-    view:"engine", tag:"the deep track", name:"DeepSystem", rl:"◆ DeepSystem", title:"DeepSystem — the atomizer",
+    view:"engine", tag:"the deep track", name:"the deep track", rl:"◆ the deep track", title:"The deep track — the atomizer",
     z:[735,370,1.9],
-    sum:`<p>Its main idea is <strong>breaking a command down to atomic items</strong>, so FastRule can then create the right event or task for each one. <code>DeepSystem</code> is an ordered, re-runnable list of <code>Stage</code> objects, plus the judge and its loop-back.</p>
+    sum:`<p>Its main idea is <strong>breaking a command down to atomic items</strong>, so FastRule can then create the right event or task for each one. <code>the deep track</code> is an ordered, re-runnable list of <code>Stage</code> objects, plus the judge and its loop-back.</p>
     <p class="figs">segment · decompose · validate · generate · the field rules · crosscheck</p>`,
     more:`<p>The parse half is re-runnable, and that is a design decision with teeth: when the judge sends
     the command back, the items are rebuilt <em>from scratch</em> rather than patched. Fresh items mean

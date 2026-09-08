@@ -61,7 +61,7 @@ def main() -> int:
 
     from assistant.config import load_config
     from assistant.intent.rule_parser import RULE_THRESHOLD
-    from assistant.engine.generate import generate
+    from assistant.engine.fastrule import objects as generate
     from assistant.engine.state import EngineState
     from scripts.score_dataset_run import load_overrides, load_provenance
 

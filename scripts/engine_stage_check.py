@@ -189,7 +189,7 @@ def _cases_validate(cfg):
 
 
 def _cases_generate(cfg):
-    from assistant.engine.generate import generate
+    from assistant.engine.fastrule import objects as generate
 
     def case(text, kind, want_actions, needs_llm):
         def run():

@@ -33,8 +33,8 @@ from assistant.engine.state import CheckFinding, EngineState
 BLAME = {
     "missing": "segment",
     "extra": "segment",
-    "wrong_fields": "generate",
-    "format": "validate",
+    "wrong_fields": "fastrule",
+    "format": "decompose_validate",
 }
 MAX_REENTRIES = 3   # total per command, all stages combined
 
@@ -219,7 +219,7 @@ def run(state: EngineState, cfg) -> EngineState:
     #
     # This is ENGINE.md's own stated default, applied where it was missing:
     # generate when the blame is ambiguous, because most errors live there.
-    blame_missing = "segment" if len(state.items) < len(asks) else "generate"
+    blame_missing = "segment" if len(state.items) < len(asks) else "fastrule"
     for kind, words in unmatched_asks:
         findings.append(CheckFinding(
             type="missing", item_id=None,
@@ -245,3 +245,38 @@ def run(state: EngineState, cfg) -> EngineState:
             state.trace.step(VERIFY, "Cross-check",
                              f"{len(asks)} ask(s) in the words — all covered")
     return state
+
+
+# ---------------------------------------------------------------------------
+# THE LOOP-BACK CONTRACT (Gil, 2026-09-08) — rewrite, do not re-run
+# ---------------------------------------------------------------------------
+
+def rewrite_for_retry(state: EngineState, cfg) -> "str | None":
+    """X4 + the findings -> X1', a clearer utterance for Segmentation.
+
+    THE CONTRACT (Gil, 2026-09-08). The loop used to re-enter Segmentation with
+    the SAME text, which cannot work: Segmentation is deterministic (FastSeg,
+    LLMSeg off), so the same string yields the same items and the retry burns
+    the budget to reach the identical answer. Real usage, 2026-09-08: "Let an
+    event to go out for a run now" looped three times to the same result and
+    apologised after 30 seconds.
+
+    So the judge must REWRITE — restate the command, same meaning, clearer
+    boundaries — and the chain re-enters at Segmentation on that string.
+
+    NOT IMPLEMENTED YET, and it returns None on purpose rather than guessing.
+
+    The first attempt built X1' out of `finding.detail`, which is the
+    human-readable EXPLANATION ("the words ask for a task — “buy milk” — but
+    nothing produced covers it"), not the command. Segmentation then parsed the
+    explanation. A rewrite that invents text is worse than no rewrite: it
+    replaces the user's words with the machine's.
+
+    Returning None means "no rewrite, so no loop", which leaves today's
+    behaviour exactly as it was — the loop was already inert for the same
+    deterministic reason. What this adds is the CONTRACT and its single call
+    site, so implementing it later is filling in one function rather than
+    rewiring the chain. It wants a model call grounded on `state.raw_text`.
+    See DOCUMENTATION/ENGINE_REWIRE.md.
+    """
+    return None

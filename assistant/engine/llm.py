@@ -20,7 +20,7 @@ _parser = None
 def _get_parser(cfg):
     global _parser
     if _parser is None:
-        from assistant.engine.generate.generate import get_registry
+        from assistant.engine.fastrule.objects import get_registry
         from assistant.intent.parser import IntentParser
         _parser = IntentParser(cfg, get_registry())
     return _parser

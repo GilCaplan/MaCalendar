@@ -28,16 +28,16 @@ X0 ─► Ingest&fix ─X1─► Segmentation ─X2─► decompose_validate ─
 *inside* a stage folder are Components that are not Stages — `FastSeg`,
 `LLMSeg`, `old_seg`, and FastRule's `Atomicity` / `Gatekeeper` / `Scorer`.
 
-**This is the meaning `Component` did not previously have.** Only `DeepSystem`
-and `Engine` declared it and nothing consumed it polymorphically, so it was
-documentation. With `DeepSystem` deleted it needs the definition above or it
+**This is the meaning `Component` did not previously have.** Only `Engine`
+and the now-removed stage-list wrapper declared it, and nothing consumed it
+polymorphically, so it was documentation. It needs the definition above or it
 should be deleted too.
 
 ## What changes
 
 | today | after |
 |---|---|
-| `DeepSystem` holds the re-runnable stage list | **deleted** — one flat ordered list on `Engine` |
+| a wrapper class holds the re-runnable stage list | **deleted** — one flat ordered list on `Engine` |
 | `Stage("generate")` calls `FastRule` per item | **`Stage("fastrule")`** — the stage IS object-making |
 | `Stage("validate_objects")` runs after generate | **folded into `decompose_validate`** |
 | `Stage("crosscheck")` routes blame to 3 stages | **`Stage("llmjudge")`** — always rewrite X1 and re-enter at Segmentation |
@@ -81,7 +81,7 @@ What does change is the chain's SHAPE, so:
 ## Order of work
 
 - [ ] 1. Branch off `engine-component-folders`.
-- [ ] 2. Delete `DeepSystem`; flatten to one ordered list on `Engine`.
+- [ ] 2. Delete the stage-list wrapper; flatten to one ordered list on `Engine`.
 - [ ] 3. Give `fastrule/` a stage module (`run(state, cfg) -> state`) that turns
       Items into objects. `generate`'s per-item LLM fallback moves inside it —
       the stage is "make the objects", FastRule-first is *how*.
