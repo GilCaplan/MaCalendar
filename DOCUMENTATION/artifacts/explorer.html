@@ -22,7 +22,7 @@
   *{box-sizing:border-box}
   body{background:var(--bg); color:var(--ink);
        font:16px/1.62 'IBM Plex Serif',Georgia,'Times New Roman',serif;
-       margin:0; padding:0 0 116px 0;}
+       margin:0; padding:0 0 40px 0;}
   header{max-width:1080px; margin:0 auto; padding:34px 20px 8px;}
   .eyebrow{font:500 11px/1 'IBM Plex Mono',ui-monospace,monospace; letter-spacing:.22em;
            text-transform:uppercase; color:var(--muted); margin:0 0 10px;}
@@ -47,7 +47,7 @@
   #tip b{color:var(--amber);}
   .client{transition:transform .5s cubic-bezier(.22,.85,.3,1), opacity .35s;}
   svg.stage{width:100%; height:auto; display:block;}
-  svg.stage[hidden]{display:none;}
+  svg.stage.off{display:none;}
   .world{transition:transform .55s cubic-bezier(.22,.85,.3,1); transform-origin:0 0; will-change:transform;}
   svg.stage text{font-family:'IBM Plex Mono',ui-monospace,monospace; fill:var(--ink); user-select:none;}
   svg.stage [data-panel]{cursor:pointer; outline:none;}
@@ -65,12 +65,12 @@
 
   /* ------- the panel: a window ------- */
   #panel{position:fixed; right:16px; top:16px; z-index:50;
-         width:min(432px, calc(100vw - 32px)); max-height:calc(100vh - 140px);
+         width:min(432px, calc(100vw - 32px)); max-height:calc(100vh - 40px);
          background:var(--panel); border:1px solid var(--line); border-radius:10px;
          box-shadow:0 20px 52px var(--shadow); display:flex; flex-direction:column;
          animation:pin .28s cubic-bezier(.2,.8,.3,1);}
   @keyframes pin{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:none;}}
-  #panel.full{top:12px; left:12px; right:12px; bottom:112px; width:auto; max-height:none;}
+  #panel.full{top:12px; left:12px; right:12px; bottom:12px; width:auto; max-height:none;}
   #panel[hidden]{display:none;}
   .pbar{display:flex; align-items:center; gap:10px; padding:9px 10px 9px 15px;
         border-bottom:1px solid var(--line); flex:none;}
@@ -103,6 +103,9 @@
   #pbody pre code{background:none; border:0; padding:0; font-size:12px; line-height:1.65;
                   white-space:pre; display:block;}
   #pbody svg{width:100%; max-width:430px; height:auto; display:block; margin:2px 0 14px;}
+  #panel.full #pbody{max-width:980px; margin:0 auto;}
+  #panel.full #pbody svg{max-width:700px;}
+  #panel.full #pbody figcaption{max-width:700px;}
   #pbody svg text{font-family:'IBM Plex Mono',ui-monospace,monospace; fill:var(--ink);}
   #pbody figcaption{font:400 11.5px/1.5 'IBM Plex Mono',monospace; color:var(--muted);
                     margin:-8px 0 14px;}
@@ -120,30 +123,24 @@
   #pnext{flex:1; text-align:right;}
   #pprev{flex:1; text-align:left;}
 
-  /* ------- bottom rails: views, then the boxes inside a view ------- */
-  #nav{position:fixed; left:0; right:0; bottom:0; z-index:40;
-       background:var(--panel); border-top:1px solid var(--line);}
-  #views{display:flex; gap:6px; padding:8px 12px 0; overflow-x:auto;}
-  #views button{flex:none; border:1px solid var(--line); border-bottom:none; border-radius:6px 6px 0 0;
-        background:transparent; color:var(--muted); font:600 11.5px/1 'IBM Plex Mono',monospace;
-        letter-spacing:.1em; text-transform:uppercase; padding:9px 13px; cursor:pointer;}
-  #views button:hover{color:var(--ink); border-color:var(--amber);}
-  #views button.on{color:var(--amber); background:var(--amber-soft); border-color:var(--amber);}
-  #rail{display:flex; gap:6px; padding:7px 12px 9px; overflow-x:auto; -webkit-overflow-scrolling:touch;
-        border-top:1px solid var(--line);}
-  #rail button{flex:none; border:1px solid var(--line); border-radius:6px; background:transparent;
-        color:var(--muted); font:500 11.5px/1 'IBM Plex Mono',monospace; letter-spacing:.03em;
-        padding:8px 11px; cursor:pointer;}
-  #rail button b{color:var(--amber); font-weight:600; margin-right:4px;}
-  #rail button:hover{border-color:var(--amber); color:var(--ink);}
-  #rail button.on{border-color:var(--amber); color:var(--ink); background:var(--amber-soft);}
+  /* ------- the four views, as tabs above the drawing ------- */
+  #views{display:flex; gap:0; max-width:1120px; margin:18px auto 0; padding:0 12px;
+         border-bottom:1px solid var(--line); flex-wrap:wrap;}
+  #views button{flex:none; border:1px solid transparent; border-bottom:none; border-radius:7px 7px 0 0;
+        background:transparent; color:var(--muted); font:600 13px/1 'IBM Plex Mono',monospace;
+        letter-spacing:.12em; text-transform:uppercase; padding:13px 20px; cursor:pointer;
+        margin-bottom:-1px;}
+  #views button:hover{color:var(--ink);}
+  #views button.on{color:var(--amber); background:var(--panel);
+        border-color:var(--line); border-bottom:1px solid var(--panel);}
+  .canvas{position:relative;}
   button:focus-visible, [data-panel]:focus-visible{outline:2px solid var(--amber); outline-offset:2px;}
 
   @media (max-width:760px){
     #devctl{position:static; justify-content:flex-end; margin:0 4px 6px 0;}
-    #panel{left:0; right:0; bottom:96px; top:auto; width:auto; max-height:56vh;
+    #panel{left:0; right:0; bottom:0; top:auto; width:auto; max-height:62vh;
            border-radius:12px 12px 0 0; border-left:none; border-right:none; border-bottom:none;}
-    #panel.full{top:8px; bottom:96px; left:0; right:0; border-radius:12px;}
+    #panel.full{top:8px; bottom:0; left:0; right:0; border-radius:12px;}
   }
   @media (prefers-reduced-motion: reduce){
     *{transition:none !important; animation:none !important;}
@@ -153,20 +150,24 @@
 <header>
   <p class="eyebrow">an explorable of one small machine</p>
   <h1>Under the Lid</h1>
-  <p class="lede">A voice-driven calendar assistant that runs entirely on one host laptop, with thin
-  surfaces attached over a private link &mdash; a phone in practice, as many as you like in principle.
-  You speak and an event appears &mdash; or you type it, which works just as well. No account, no API
-  key, nothing sent to any company &mdash; and <strong>one brain</strong>: every command, from every
-  surface, is understood and executed by a single process on the host. Everything else in the drawing
-  is thin.</p>
+  <p class="lede">You speak; an event appears. It all runs on one host laptop, where <strong>one
+  brain</strong> understands and executes every command from every surface.</p>
   <p class="stats">
     <b>3</b> local models &nbsp;&#183;&nbsp; <b>3</b> fitted classifiers &nbsp;&#183;&nbsp;
     <b>0</b> accounts, keys or services &nbsp;&#183;&nbsp; the only traffic is between your own devices
   </p>
 </header>
 
+<nav id="views" role="tablist" aria-label="Views"></nav>
 <div class="stagewrap">
-<svg id="view-system" class="stage" viewBox="0 0 1000 664" aria-label="The system: one host laptop running four processes, thin client surfaces attached over a private link, a crossed-out internet, and the sun. Every framed part can be opened; the plus and minus buttons attach and remove surfaces." role="group">
+<!-- The arrowheads every view shares. They live OUTSIDE the four stages on
+     purpose: while they sat in <defs> inside #view-system, switching to any
+     other tab put that svg under display:none and the browser resolved
+     url(#mA) to nothing — the loop's whole cycle drew as six headless arcs,
+     and the engine and evaluation views lost every arrow they had. A hidden
+     zero-size svg is always in the render tree, so the references hold. -->
+<svg width="0" height="0" aria-hidden="true" focusable="false"
+     style="position:absolute; width:0; height:0; overflow:hidden;">
   <defs>
     <marker id="mi" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M0 0 L8 4 L0 8 z" fill="var(--muted)"/>
@@ -174,8 +175,17 @@
     <marker id="ma" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M0 0 L8 4 L0 8 z" fill="var(--amber)"/>
     </marker>
+    <marker id="mA" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="var(--amber)"/>
+    </marker>
+    <marker id="mI" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="var(--muted)"/>
+    </marker>
   </defs>
+</svg>
 
+<div class="canvas" data-canvas>
+<svg id="view-system" class="stage" viewBox="0 0 1000 560" aria-label="The system: one host laptop running four processes, thin client surfaces attached over a private link, a crossed-out internet, and the sun. Every framed part can be opened; the plus and minus buttons attach and remove surfaces." role="group">
   <g class="world">
     <line x1="24" y1="512" x2="976" y2="512" stroke="var(--line)" stroke-width="1.5"/>
 
@@ -224,7 +234,6 @@
     <line x1="248" y1="233" x2="212" y2="233" stroke="var(--muted)" marker-start="url(#mi)" marker-end="url(#mi)"/>
     <text x="229" y="224" text-anchor="middle" font-size="8" fill="var(--muted)">asks it</text>
     <line x1="352" y1="243" x2="352" y2="247" stroke="var(--muted)" marker-end="url(#mi)"/>
-    <text x="735" y="491" text-anchor="middle" font-size="7" fill="var(--muted)">back out to the orchestrator — Engine owns the write and the labels</text>
     <g data-panel="commit" role="button" tabindex="0" aria-label="Commit and label: the only place the engine touches the database, through the action classes; then category, colour and tags are read back.">
       <rect class="frame" x="262" y="248" width="181" height="18" rx="3" fill="var(--screen)" stroke="var(--line)"/>
       <text x="352" y="260" text-anchor="middle" font-size="9.5">commit · label</text>
@@ -387,44 +396,10 @@
       <text x="708" y="534" text-anchor="middle" font-size="9.5" fill="var(--muted)">sun &amp; sky</text>
     </g>
 
-    <!-- ================= beside the machine ============ -->
-    <line x1="40" y1="566" x2="960" y2="566" stroke="var(--line)" stroke-dasharray="2 4" opacity=".8"/>
-    <text x="40" y="586" font-size="10" fill="var(--muted)" letter-spacing="1.6">BESIDE THE MACHINE · NONE OF THIS RUNS</text>
-
-    <g data-panel="bench" role="button" tabindex="0"
-       aria-label="The workflow beside the machine: written notes that record decisions, and tests that fail the build when the code and the notes disagree. None of it runs at command time.">
-      <rect class="frame" x="40" y="596" width="920" height="52" rx="6" fill="none"
-            stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 3"/>
-      <g font-size="8.5">
-        <rect x="56" y="608" width="86" height="28" rx="3" fill="none" stroke="var(--line)"/>
-        <text x="99" y="619" text-anchor="middle" font-weight="600" font-size="8.5">CLAUDE.md</text>
-        <text x="99" y="630" text-anchor="middle" fill="var(--muted)" font-size="8.5">the rules</text>
-        <rect x="150" y="608" width="86" height="28" rx="3" fill="none" stroke="var(--line)"/>
-        <text x="193" y="619" text-anchor="middle" font-weight="600" font-size="8.5">ENGINE.md</text>
-        <text x="193" y="630" text-anchor="middle" fill="var(--muted)" font-size="8.5">contracts</text>
-        <rect x="244" y="608" width="86" height="28" rx="3" fill="none" stroke="var(--line)"/>
-        <text x="287" y="619" text-anchor="middle" font-weight="600" font-size="8.5">RESULTS.md</text>
-        <text x="287" y="630" text-anchor="middle" fill="var(--muted)" font-size="8.5">what moved</text>
-        <rect x="338" y="608" width="96" height="28" rx="3" fill="none" stroke="var(--line)"/>
-        <text x="386" y="619" text-anchor="middle" font-weight="600" font-size="8.5">ARTIFACT.md</text>
-        <text x="386" y="630" text-anchor="middle" fill="var(--muted)" font-size="8.5">this page</text>
-      </g>
-      <path d="M 442 622 L 486 622" stroke="var(--amber)" stroke-width="1.2" marker-end="url(#ma)"/>
-      <text x="464" y="616" text-anchor="middle" font-size="7.5" fill="var(--amber)">checked by</text>
-      <rect x="492" y="606" width="150" height="32" rx="4" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.2"/>
-      <text x="567" y="618" text-anchor="middle" font-size="9" font-weight="600">the tests</text>
-      <text x="567" y="629" text-anchor="middle" font-size="7.5" fill="var(--muted)">red when they disagree</text>
-      <path d="M 650 622 L 694 622" stroke="var(--line)" stroke-width="1.2" marker-end="url(#mi)"/>
-      <rect x="700" y="606" width="112" height="32" rx="4" fill="none" stroke="var(--line)"/>
-      <text x="756" y="618" text-anchor="middle" font-size="9" font-weight="600">the code</text>
-      <text x="756" y="629" text-anchor="middle" font-size="7.5" fill="var(--muted)">everything above</text>
-      <text x="828" y="616" font-size="8" fill="var(--muted)">no model runs here</text>
-      <text x="828" y="628" font-size="8" fill="var(--muted)">no user is present</text>
-    </g>
   </g>
 </svg>
 
-<svg id="view-engine" class="stage" hidden viewBox="0 0 1000 860" role="group"
+<svg id="view-engine" class="stage off" viewBox="0 0 1000 872" role="group"
      aria-label="The engine: the orchestrator, the transcript stage, then two tracks — FastRule the atomic-item executor on the left with its four inner components, and the deep system the atomizer on the right with its seven stages. Below them the three trained classifiers, the deferral contract, and the shared readers. Every box opens.">
   <g class="world">
     <text x="30" y="26" font-size="10.5" letter-spacing="1.4" fill="var(--muted)">THE ENGINE · assistant/engine · every box is a door</text>
@@ -445,7 +420,7 @@
     <path d="M 500 164 L 735 164 L 735 174" stroke="var(--muted)" fill="none" marker-end="url(#mi)"/>
 
     <!-- ============ FASTRULE ============ -->
-    <rect x="30" y="176" width="430" height="306" rx="8" fill="none" stroke="var(--amber)" stroke-width="1.6"/>
+    <rect x="30" y="176" width="430" height="298" rx="8" fill="none" stroke="var(--amber)" stroke-width="1.6"/>
     <g data-panel="fastrule" role="button" tabindex="0" aria-label="FastRule: the atomic-item executor. It handles exactly one event or task and defers anything else.">
       <rect class="frame" x="34" y="180" width="422" height="42" rx="6" fill="transparent" stroke="transparent"/>
       <text x="245" y="198" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--amber)">FastRule — the atomic-item executor</text>
@@ -490,12 +465,18 @@
       <text x="344" y="456" text-anchor="middle" font-size="7.5" fill="var(--muted)">with a reason, and its class</text>
     </g>
 
+    <path d="M 146 468 L 146 490 L 496 490 L 496 453 L 566 453" fill="none"
+          stroke="var(--amber)" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#ma)"/>
+    <text x="316" y="486" text-anchor="middle" font-size="7" fill="var(--amber)">a fast commit is judged behind the answer — the same crosscheck</text>
+
     <!-- ============ THE MODELS ============ -->
     <g data-panel="router" role="button" tabindex="0" aria-label="ModelRouter and LogisticModel: three small logistic classifiers fitted offline and shipped as JSON weights, with inference a hand-written dot product.">
       <rect class="frame" x="30" y="498" width="430" height="132" rx="8" fill="none" stroke="var(--model)" stroke-width="1.5"/>
       <text x="245" y="520" text-anchor="middle" font-size="11" font-weight="600" fill="var(--model)">ModelRouter — three LogisticModel</text>
-      <text x="245" y="534" text-anchor="middle" font-size="8" fill="var(--muted)">intent/classifier.py · JSON weights · a dot product</text>
+      <text x="245" y="534" text-anchor="middle" font-size="8" fill="var(--muted)">intent/classifier.py · read by Atomicity above, and by the router</text>
     </g>
+    <path d="M 36 496 L 18 496 L 18 297 L 44 297" fill="none" stroke="var(--model)"
+          stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#mi)"/>
     <g data-panel="router" role="button" tabindex="0" aria-label="The atomicity classifier reads the shape of the whole utterance.">
       <rect class="frame" x="44" y="546" width="126" height="72" rx="5" fill="var(--screen)" stroke="var(--line)"/>
       <text x="107" y="562" text-anchor="middle" font-size="9" font-weight="600">atomicity</text>
@@ -519,344 +500,460 @@
     </g>
 
     <!-- ============ THE DEEP SYSTEM ============ -->
-    <rect x="500" y="176" width="470" height="306" rx="8" fill="none" stroke="var(--line)" stroke-width="1.6"/>
-    <g data-panel="deepsystem" role="button" tabindex="0" aria-label="DeepSystem: the atomizer. It breaks a command down to atomic items so FastRule can create the right record per item.">
+    <rect x="500" y="176" width="470" height="330" rx="8" fill="none" stroke="var(--line)" stroke-width="1.6"/>
+    <g data-panel="deepsystem" role="button" tabindex="0" aria-label="DeepSystem: the atomizer. It breaks a command down to atomic items so FastRule can create the right record per item, and it re-runs itself when the judge finds something missing.">
       <rect class="frame" x="504" y="180" width="462" height="42" rx="6" fill="transparent" stroke="transparent"/>
-      <text x="735" y="198" text-anchor="middle" font-size="11.5" font-weight="600">DeepSystem — the atomizer</text>
-      <text x="735" y="213" text-anchor="middle" font-size="8" fill="var(--muted)">an ordered, re-runnable list of Stage objects</text>
+      <text x="765" y="198" text-anchor="middle" font-size="11.5" font-weight="600">DeepSystem — the atomizer</text>
+      <text x="765" y="213" text-anchor="middle" font-size="8" fill="var(--muted)">an ordered, re-runnable list of Stage objects</text>
     </g>
 
-    <g data-panel="segment" role="button" tabindex="0" aria-label="Stage two, segment: split the transcript into typed items, biased to under-split.">
-      <rect class="frame" x="518" y="226" width="434" height="36" rx="5" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="735" y="243" text-anchor="middle" font-size="9.5" font-weight="600">2 · segment — into independent asks</text>
-      <text x="735" y="256" text-anchor="middle" font-size="7.5" fill="var(--muted)">delimiters first, then one model call, biased to under-split</text>
+    <!-- the loop lane: the retry is the shape, not a footnote -->
+    <path d="M 571 453 L 514 453 L 514 243 L 571 243" fill="none" stroke="var(--amber)"
+          stroke-width="2" stroke-dasharray="5 3" marker-end="url(#mA)"/>
+    <text x="546" y="316" text-anchor="middle" font-size="7.5" font-weight="600" fill="var(--amber)">blame</text>
+    <text x="546" y="328" text-anchor="middle" font-size="7.5" font-weight="600" fill="var(--amber)">sends it</text>
+    <text x="546" y="340" text-anchor="middle" font-size="7.5" font-weight="600" fill="var(--amber)">back</text>
+    <text x="546" y="356" text-anchor="middle" font-size="8" font-weight="600" fill="var(--amber)">≤ 3</text>
+
+    <g data-panel="segment" role="button" tabindex="0" aria-label="Stage two, segment: split the transcript into typed items, biased to under-split. This is where a missing ask is re-run from.">
+      <rect class="frame" x="575" y="226" width="377" height="34" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="764" y="241" text-anchor="middle" font-size="9.5" font-weight="600">2 · segment — into independent asks</text>
+      <text x="764" y="254" text-anchor="middle" font-size="7.5" fill="var(--muted)">delimiters first, then one gated model call</text>
     </g>
     <g data-panel="decompose" role="button" tabindex="0" aria-label="Stage three, decompose: one bounded pass breaking an item into atomic pieces.">
-      <rect class="frame" x="518" y="268" width="434" height="36" rx="5" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="735" y="285" text-anchor="middle" font-size="9.5" font-weight="600">3 · decompose — into atomic pieces</text>
-      <text x="735" y="298" text-anchor="middle" font-size="7.5" fill="var(--muted)">two times, a list, a count — one bounded pass, depth 2</text>
+      <rect class="frame" x="575" y="264" width="377" height="34" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="764" y="279" text-anchor="middle" font-size="9.5" font-weight="600">3 · decompose — into atomic pieces</text>
+      <text x="764" y="292" text-anchor="middle" font-size="7.5" fill="var(--muted)">two times · a list · a count — one bounded pass</text>
     </g>
     <g data-panel="validate" role="button" tabindex="0" aria-label="Stage four, validate: format hygiene and text repair before anything becomes an action.">
-      <rect class="frame" x="518" y="310" width="434" height="36" rx="5" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="735" y="327" text-anchor="middle" font-size="9.5" font-weight="600">4 · validate — tidy the words</text>
-      <text x="735" y="340" text-anchor="middle" font-size="7.5" fill="var(--muted)">brackets, stray quotes, one guarded rewrite when garbled</text>
+      <rect class="frame" x="575" y="302" width="377" height="34" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="764" y="317" text-anchor="middle" font-size="9.5" font-weight="600">4 · validate — tidy the words</text>
+      <text x="764" y="330" text-anchor="middle" font-size="7.5" fill="var(--muted)">brackets, stray quotes, one guarded rewrite</text>
     </g>
-    <g data-panel="generate" role="button" tabindex="0" aria-label="Stage five, generate: items become intents. FastRule per item first, the model for what it cannot read.">
-      <rect class="frame" x="518" y="352" width="434" height="36" rx="5" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.3"/>
-      <text x="735" y="369" text-anchor="middle" font-size="9.5" font-weight="600" fill="var(--amber)">5 · generate — each item back to FastRule</text>
-      <text x="735" y="382" text-anchor="middle" font-size="7.5" fill="var(--muted)">the model only fills what the rules could not read</text>
+    <g data-panel="generate" role="button" tabindex="0" aria-label="Stage five, generate: it runs once per atomic item. Each item goes back to FastRule first, and the model fills only what the rules could not read.">
+      <rect class="frame" x="575" y="340" width="377" height="52" rx="5" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.3"/>
+      <text x="764" y="357" text-anchor="middle" font-size="9.5" font-weight="600" fill="var(--amber)">5 · generate — each item back to FastRule</text>
+      <text x="764" y="369" text-anchor="middle" font-size="7.5" fill="var(--muted)">the model only fills what the rules could not read</text>
+      <text x="580" y="385" font-size="6.5" font-weight="600" fill="var(--amber)">FOR EACH ITEM</text>
+      <rect x="660" y="376" width="90" height="12" rx="2" fill="none" stroke="var(--amber)" stroke-width=".8"/>
+      <text x="705" y="385" text-anchor="middle" font-size="6.5" fill="var(--muted)">item 1</text>
+      <rect x="760" y="376" width="90" height="12" rx="2" fill="none" stroke="var(--amber)" stroke-width=".8"/>
+      <text x="805" y="385" text-anchor="middle" font-size="6.5" fill="var(--muted)">item 2</text>
+      <rect x="860" y="376" width="90" height="12" rx="2" fill="none" stroke="var(--amber)" stroke-width=".8"/>
+      <text x="905" y="385" text-anchor="middle" font-size="6.5" fill="var(--muted)">item n</text>
     </g>
     <g data-panel="validateobj" role="button" tabindex="0" aria-label="Stage four again, on the finished objects: the sixteen named field rules and the observance gate.">
-      <rect class="frame" x="518" y="394" width="434" height="36" rx="5" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="735" y="411" text-anchor="middle" font-size="9.5" font-weight="600">4′ · validate.run_objects — the field rules</text>
-      <text x="735" y="424" text-anchor="middle" font-size="7.5" fill="var(--muted)">sixteen named rules, in a fixed order, plus the observance gate</text>
+      <rect class="frame" x="575" y="398" width="377" height="34" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="764" y="413" text-anchor="middle" font-size="9.5" font-weight="600">4′ · the field rules</text>
+      <text x="764" y="426" text-anchor="middle" font-size="7.5" fill="var(--muted)">sixteen named rules, fixed order, plus the observance gate</text>
     </g>
     <g data-panel="crosscheck" role="button" tabindex="0" aria-label="Stage six, crosscheck: the model extracts what the raw words asked for, code diffs it against what was produced, and a fixed map decides which stage re-runs.">
-      <rect class="frame" x="518" y="436" width="434" height="36" rx="5" fill="var(--screen)" stroke="var(--line)" stroke-dasharray="4 3"/>
-      <text x="735" y="453" text-anchor="middle" font-size="9.5" font-weight="600">6 · crosscheck — extract, then diff</text>
-      <text x="735" y="466" text-anchor="middle" font-size="7.5" fill="var(--muted)">loops back at most 3 times · the model never picks the stage</text>
+      <rect class="frame" x="575" y="436" width="377" height="34" rx="5" fill="var(--screen)" stroke="var(--line)" stroke-dasharray="4 3"/>
+      <text x="764" y="451" text-anchor="middle" font-size="9.5" font-weight="600">6 · crosscheck — extract, then diff</text>
+      <text x="764" y="464" text-anchor="middle" font-size="7.5" fill="var(--muted)">a mismatch names the stage that must run again</text>
     </g>
-    <g data-panel="commit" role="button" tabindex="0" aria-label="Commit: the only place the engine touches the database, through the action classes.">
-      <rect class="frame" x="518" y="496" width="434" height="36" rx="5" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="735" y="513" text-anchor="middle" font-size="9.5" font-weight="600">commit — the only write</text>
-      <text x="735" y="526" text-anchor="middle" font-size="7.5" fill="var(--muted)">a blocked item is refused out loud, never dropped quietly</text>
+    <g data-panel="crosscheck" role="button" tabindex="0" aria-label="On exhaustion: the fourth parse is judged before it is committed, and the reply admits the budget ran out.">
+      <rect class="frame" x="575" y="476" width="377" height="26" rx="4" fill="none" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 2"/>
+      <text x="764" y="492" text-anchor="middle" font-size="7" fill="var(--muted)">budget spent → judge the last parse anyway, commit it, and say so</text>
     </g>
-    <g data-panel="label" role="button" tabindex="0" aria-label="Stage seven, label: category, colour and tags are read back onto the items for the reply, the trace and the audit.">
-      <rect class="frame" x="518" y="538" width="434" height="36" rx="5" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="735" y="555" text-anchor="middle" font-size="9.5" font-weight="600">7 · label — read the labels back</text>
-      <text x="735" y="568" text-anchor="middle" font-size="7.5" fill="var(--muted)">the actions labelled it; this stage reports what they chose</text>
+
+    <text x="764" y="518" text-anchor="middle" font-size="7" fill="var(--muted)">back out to the orchestrator — Engine owns the write and the labels</text>
+    <g data-panel="commit" role="button" tabindex="0" aria-label="Commit: the only place the engine touches the database, through the same action classes the calendar window uses.">
+      <rect class="frame" x="575" y="526" width="377" height="34" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="764" y="541" text-anchor="middle" font-size="9.5" font-weight="600">commit — the only write</text>
+      <text x="764" y="554" text-anchor="middle" font-size="7.5" fill="var(--muted)">a blocked item is refused out loud, never dropped quietly</text>
     </g>
-    <path d="M 512 454 L 506 454 L 506 244 L 512 244" fill="none" stroke="var(--muted)" stroke-dasharray="3 2" marker-end="url(#mi)"/>
+    <g data-panel="label" role="button" tabindex="0" aria-label="Stage seven, label: category, colour and tags read back onto the items for the reply, the trace and the audit.">
+      <rect class="frame" x="575" y="564" width="377" height="34" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="764" y="579" text-anchor="middle" font-size="9.5" font-weight="600">7 · label — read the labels back</text>
+      <text x="764" y="592" text-anchor="middle" font-size="7.5" fill="var(--muted)">the actions labelled it; this stage reports what they chose</text>
+    </g>
 
     <!-- ============ THE DEFERRAL CONTRACT ============ -->
     <g data-panel="reasons" role="button" tabindex="0" aria-label="The deferral contract: three reason classes, each with a different handoff to the deep track.">
-      <rect class="frame" x="30" y="646" width="940" height="86" rx="8" fill="none" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <rect class="frame" x="30" y="646" width="940" height="98" rx="8" fill="none" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="5 4"/>
       <text x="500" y="666" text-anchor="middle" font-size="10" font-weight="600">a deferral carries a REASON — and its CLASS decides the handoff</text>
       <text x="500" y="680" text-anchor="middle" font-size="7.5" fill="var(--muted)">before this, every reason read the same downstream, and the deep track re-committed what the front door had refused</text>
-      <rect x="48" y="688" width="300" height="38" rx="5" fill="none" stroke="var(--line)"/>
+      <rect x="48" y="688" width="300" height="46" rx="5" fill="none" stroke="var(--line)"/>
       <text x="198" y="703" text-anchor="middle" font-size="8.5" font-weight="600">REFUSAL</text>
-      <text x="198" y="717" text-anchor="middle" font-size="7.5" fill="var(--muted)">deep may resolve it, never overturn it</text>
-      <rect x="366" y="688" width="300" height="38" rx="5" fill="none" stroke="var(--line)"/>
+      <text x="198" y="714" text-anchor="middle" font-size="7.5" fill="var(--muted)">deep may resolve it, never overturn it</text>
+      <text x="198" y="726" text-anchor="middle" font-size="7" fill="var(--amber)">→ generate honours the veto</text>
+      <rect x="366" y="688" width="300" height="46" rx="5" fill="none" stroke="var(--line)"/>
       <text x="516" y="703" text-anchor="middle" font-size="8.5" font-weight="600">STRUCTURE</text>
-      <text x="516" y="717" text-anchor="middle" font-size="7.5" fill="var(--muted)">more than one item — atomize and re-ask</text>
-      <rect x="684" y="688" width="300" height="38" rx="5" fill="none" stroke="var(--line)"/>
+      <text x="516" y="714" text-anchor="middle" font-size="7.5" fill="var(--muted)">more than one item — atomize and re-ask</text>
+      <text x="516" y="726" text-anchor="middle" font-size="7" fill="var(--amber)">→ segment splits it again</text>
+      <rect x="684" y="688" width="300" height="46" rx="5" fill="none" stroke="var(--line)"/>
       <text x="834" y="703" text-anchor="middle" font-size="8.5" font-weight="600">INCAPACITY</text>
-      <text x="834" y="717" text-anchor="middle" font-size="7.5" fill="var(--muted)">the model takes over, from the partial parse</text>
+      <text x="834" y="714" text-anchor="middle" font-size="7.5" fill="var(--muted)">the model takes over, from the partial parse</text>
+      <text x="834" y="726" text-anchor="middle" font-size="7" fill="var(--amber)">→ generate asks the model</text>
     </g>
 
     <!-- ============ SHARED READERS ============ -->
-    <text x="30" y="768" font-size="10.5" letter-spacing="1.4" fill="var(--muted)">SHARED READERS · one copy, two callers · assistant/intent</text>
+    <text x="30" y="776" font-size="10.5" letter-spacing="1.4" fill="var(--muted)">SHARED READERS · one copy, two callers · assistant/intent</text>
     <g data-panel="readers" role="button" tabindex="0" aria-label="cleanup: the spoken noise that carries no request, stripped once so everything downstream is generic.">
-      <rect class="frame" x="48" y="780" width="140" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="118" y="800" text-anchor="middle" font-size="9" font-weight="600">cleanup</text>
-      <text x="118" y="814" text-anchor="middle" font-size="7.5" fill="var(--muted)">umm · please · or so</text>
-      <text x="118" y="826" text-anchor="middle" font-size="7.5" fill="var(--muted)">the person-specific bit</text>
+      <rect class="frame" x="48" y="788" width="140" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="118" y="808" text-anchor="middle" font-size="9" font-weight="600">cleanup</text>
+      <text x="118" y="822" text-anchor="middle" font-size="7.5" fill="var(--muted)">umm · please · or so</text>
+      <text x="118" y="834" text-anchor="middle" font-size="7.5" fill="var(--muted)">the person-specific bit</text>
     </g>
     <g data-panel="readers" role="button" tabindex="0" aria-label="lead_time: a spoken lead time pulled out of the command into a number of minutes.">
-      <rect class="frame" x="196" y="780" width="140" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="266" y="800" text-anchor="middle" font-size="9" font-weight="600">lead_time</text>
-      <text x="266" y="814" text-anchor="middle" font-size="7.5" fill="var(--muted)">30 minutes before</text>
-      <text x="266" y="826" text-anchor="middle" font-size="7.5" fill="var(--muted)">it used to eat titles</text>
+      <rect class="frame" x="196" y="788" width="140" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="266" y="808" text-anchor="middle" font-size="9" font-weight="600">lead_time</text>
+      <text x="266" y="822" text-anchor="middle" font-size="7.5" fill="var(--muted)">30 minutes before</text>
+      <text x="266" y="834" text-anchor="middle" font-size="7.5" fill="var(--muted)">it used to eat titles</text>
     </g>
     <g data-panel="readers" role="button" tabindex="0" aria-label="recurrence: the cadence as a slot of one atomic item, rounded to daily, weekly or monthly and announced.">
-      <rect class="frame" x="344" y="780" width="140" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="414" y="800" text-anchor="middle" font-size="9" font-weight="600">recurrence</text>
-      <text x="414" y="814" text-anchor="middle" font-size="7.5" fill="var(--muted)">daily · weekly · monthly</text>
-      <text x="414" y="826" text-anchor="middle" font-size="7.5" fill="var(--muted)">a slot, never N items</text>
+      <rect class="frame" x="344" y="788" width="140" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="414" y="808" text-anchor="middle" font-size="9" font-weight="600">recurrence</text>
+      <text x="414" y="822" text-anchor="middle" font-size="7.5" fill="var(--muted)">daily · weekly · monthly</text>
+      <text x="414" y="834" text-anchor="middle" font-size="7.5" fill="var(--muted)">a slot, never N items</text>
     </g>
     <g data-panel="readers" role="button" tabindex="0" aria-label="coordination: does this and join two things or two asks? The dependency parse answers.">
-      <rect class="frame" x="492" y="780" width="140" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="562" y="800" text-anchor="middle" font-size="9" font-weight="600">coordination</text>
-      <text x="562" y="814" text-anchor="middle" font-size="7.5" fill="var(--muted)">two things, or two asks</text>
-      <text x="562" y="826" text-anchor="middle" font-size="7.5" fill="var(--muted)">one memoised parse</text>
+      <rect class="frame" x="492" y="788" width="140" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="562" y="808" text-anchor="middle" font-size="9" font-weight="600">coordination</text>
+      <text x="562" y="822" text-anchor="middle" font-size="7.5" fill="var(--muted)">two things, or two asks</text>
+      <text x="562" y="834" text-anchor="middle" font-size="7.5" fill="var(--muted)">one memoised parse</text>
     </g>
     <g data-panel="readers" role="button" tabindex="0" aria-label="list_split and quantity: a title split into items by string rules, and a spoken count kept as a number.">
-      <rect class="frame" x="640" y="780" width="140" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="710" y="800" text-anchor="middle" font-size="9" font-weight="600">list_split · quantity</text>
-      <text x="710" y="814" text-anchor="middle" font-size="7.5" fill="var(--muted)">commas always split</text>
-      <text x="710" y="826" text-anchor="middle" font-size="7.5" fill="var(--muted)">and sometimes does not</text>
+      <rect class="frame" x="640" y="788" width="140" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="710" y="808" text-anchor="middle" font-size="9" font-weight="600">list_split · quantity</text>
+      <text x="710" y="822" text-anchor="middle" font-size="7.5" fill="var(--muted)">commas always split</text>
+      <text x="710" y="834" text-anchor="middle" font-size="7.5" fill="var(--muted)">and sometimes does not</text>
     </g>
     <g data-panel="plumbing" role="button" tabindex="0" aria-label="EngineState, Stage and Component: the frozen contract stages exchange, and the one interface every worker has.">
-      <rect class="frame" x="788" y="780" width="140" height="52" rx="5" fill="none" stroke="var(--line)" stroke-dasharray="3 2"/>
-      <text x="858" y="800" text-anchor="middle" font-size="9" font-weight="600">the plumbing</text>
-      <text x="858" y="814" text-anchor="middle" font-size="7.5" fill="var(--muted)">EngineState · Stage</text>
-      <text x="858" y="826" text-anchor="middle" font-size="7.5" fill="var(--muted)">Component</text>
+      <rect class="frame" x="788" y="788" width="140" height="52" rx="5" fill="none" stroke="var(--line)" stroke-dasharray="3 2"/>
+      <text x="858" y="808" text-anchor="middle" font-size="9" font-weight="600">the plumbing</text>
+      <text x="858" y="822" text-anchor="middle" font-size="7.5" fill="var(--muted)">EngineState · Stage</text>
+      <text x="858" y="834" text-anchor="middle" font-size="7.5" fill="var(--muted)">Component</text>
     </g>
   </g>
 </svg>
 
-<svg id="view-loop" class="stage" hidden viewBox="0 0 1000 700" role="group"
+<svg id="view-loop" class="stage off" viewBox="0 0 1000 778" role="group"
      aria-label="The self-improvement loop: a six-step cycle from the ranked queue through a registered prediction, one component change, a measurement and a comparison, to a banked result that re-ranks the queue. Below it the guards that make it trustworthy, the four instruments, the banked negatives, and the era rule.">
   <g class="world">
-    <text x="30" y="26" font-size="10.5" letter-spacing="1.4" fill="var(--muted)">THE LOOP · one cycle is one hypothesis, tested · DOCUMENTATION/experiments/ITERATION_PROTOCOL.md</text>
-
-    <g data-panel="backlog" role="button" tabindex="0" aria-label="Step one: take the top unblocked entry from the ranked queue of hypotheses.">
-      <rect class="frame" x="30" y="48" width="145" height="76" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
-      <text x="102" y="68" text-anchor="middle" font-size="9" font-weight="600">1 · the queue</text>
-      <text x="102" y="82" text-anchor="middle" font-size="7.5" fill="var(--muted)">ranked, not a wish list</text>
-      <text x="102" y="95" text-anchor="middle" font-size="7.5" fill="var(--muted)">take the top one</text>
-      <text x="102" y="108" text-anchor="middle" font-size="7.5" fill="var(--muted)">HYPOTHESES.md</text>
+    <text x="30" y="26" font-size="10.5" letter-spacing="1.4" fill="var(--muted)">THE LOOP · one cycle is one hypothesis, tested</text>
+    <circle cx="280" cy="280" r="190" fill="none" stroke="var(--amber)" stroke-width="1.2" stroke-dasharray="3 6" opacity=".5"/>
+    <path d="M 329.2 96.5 A 190 190 0 0 1 414.4 145.6" fill="none" stroke="var(--amber)" stroke-width="2.2" marker-end="url(#mA)"/>
+    <path d="M 463.5 230.8 A 190 190 0 0 1 463.5 329.2" fill="none" stroke="var(--amber)" stroke-width="2.2" marker-end="url(#mA)"/>
+    <path d="M 414.4 414.4 A 190 190 0 0 1 329.2 463.5" fill="none" stroke="var(--amber)" stroke-width="2.2" marker-end="url(#mA)"/>
+    <path d="M 230.8 463.5 A 190 190 0 0 1 145.6 414.4" fill="none" stroke="var(--amber)" stroke-width="2.2" marker-end="url(#mA)"/>
+    <path d="M 96.5 329.2 A 190 190 0 0 1 96.5 230.8" fill="none" stroke="var(--amber)" stroke-width="2.2" marker-end="url(#mA)"/>
+    <path d="M 145.6 145.6 A 190 190 0 0 1 230.8 96.5" fill="none" stroke="var(--amber)" stroke-width="2.2" marker-end="url(#mA)"/>
+    <g data-panel="backlog" role="button" tabindex="0" aria-label="Step 1 of the cycle: the queue.">
+      <rect class="frame" x="204.0" y="61.0" width="152" height="58" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
+      <text x="280.0" y="78.0" text-anchor="middle" font-size="9" font-weight="600">1 · the queue</text>
+      <text x="280.0" y="91.0" text-anchor="middle" font-size="6.8" fill="var(--muted)">ranked, not a wish list</text>
+      <text x="280.0" y="102.0" text-anchor="middle" font-size="6.8" fill="var(--muted)">cluster the last run's</text>
+      <text x="280.0" y="113.0" text-anchor="middle" font-size="6.8" fill="var(--muted)">failures by their cause</text>
     </g>
-    <path d="M 178 86 L 187 86" stroke="var(--amber)" fill="none" marker-end="url(#ma)"/>
-
-    <g data-panel="predict" role="button" tabindex="0" aria-label="Step two: register the prediction first — which component, which metric, which slice, which direction, how much.">
-      <rect class="frame" x="190" y="48" width="145" height="76" rx="6" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.5"/>
-      <text x="262" y="68" text-anchor="middle" font-size="9" font-weight="600" fill="var(--amber)">2 · predict</text>
-      <text x="262" y="82" text-anchor="middle" font-size="7.5" fill="var(--muted)">BEFORE the code</text>
-      <text x="262" y="95" text-anchor="middle" font-size="7.5" fill="var(--muted)">component · metric</text>
-      <text x="262" y="108" text-anchor="middle" font-size="7.5" fill="var(--muted)">slice · direction · size</text>
+    <g data-panel="predict" role="button" tabindex="0" aria-label="Step 2 of the cycle: predict.">
+      <rect class="frame" x="368.5" y="156.0" width="152" height="58" rx="6" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.5"/>
+      <text x="444.5" y="173.0" text-anchor="middle" font-size="9" font-weight="600" fill="var(--amber)">2 · predict</text>
+      <text x="444.5" y="186.0" text-anchor="middle" font-size="6.8" fill="var(--muted)">BEFORE the code:</text>
+      <text x="444.5" y="197.0" text-anchor="middle" font-size="6.8" fill="var(--muted)">component · metric · slice</text>
+      <text x="444.5" y="208.0" text-anchor="middle" font-size="6.8" fill="var(--muted)">direction · how much</text>
     </g>
-    <path d="M 338 86 L 347 86" stroke="var(--amber)" fill="none" marker-end="url(#ma)"/>
-
-    <g data-panel="change" role="button" tabindex="0" aria-label="Step three: change exactly one component's implementation. The design and the stage contracts are frozen.">
-      <rect class="frame" x="350" y="48" width="145" height="76" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
-      <text x="422" y="68" text-anchor="middle" font-size="9" font-weight="600">3 · change ONE</text>
-      <text x="422" y="82" text-anchor="middle" font-size="7.5" fill="var(--muted)">one component</text>
-      <text x="422" y="95" text-anchor="middle" font-size="7.5" fill="var(--muted)">implementation only</text>
-      <text x="422" y="108" text-anchor="middle" font-size="7.5" fill="var(--muted)">no bundling</text>
+    <g data-panel="change" role="button" tabindex="0" aria-label="Step 3 of the cycle: change ONE.">
+      <rect class="frame" x="368.5" y="346.0" width="152" height="58" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
+      <text x="444.5" y="363.0" text-anchor="middle" font-size="9" font-weight="600">3 · change ONE</text>
+      <text x="444.5" y="376.0" text-anchor="middle" font-size="6.8" fill="var(--muted)">one component,</text>
+      <text x="444.5" y="387.0" text-anchor="middle" font-size="6.8" fill="var(--muted)">its implementation only</text>
+      <text x="444.5" y="398.0" text-anchor="middle" font-size="6.8" fill="var(--muted)">no bundling</text>
     </g>
-    <path d="M 498 86 L 507 86" stroke="var(--amber)" fill="none" marker-end="url(#ma)"/>
-
-    <g data-panel="measure" role="button" tabindex="0" aria-label="Step four: measure on the smallest slice rich enough to show the failure, and upsize only as the gains slow.">
-      <rect class="frame" x="510" y="48" width="145" height="76" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
-      <text x="582" y="68" text-anchor="middle" font-size="9" font-weight="600">4 · measure</text>
-      <text x="582" y="82" text-anchor="middle" font-size="7.5" fill="var(--muted)">smallest rich slice</text>
-      <text x="582" y="95" text-anchor="middle" font-size="7.5" fill="var(--muted)">upsize as gains slow</text>
-      <text x="582" y="108" text-anchor="middle" font-size="7.5" fill="var(--muted)">named metric, named set</text>
+    <g data-panel="measure" role="button" tabindex="0" aria-label="Step 4 of the cycle: measure.">
+      <rect class="frame" x="204.0" y="441.0" width="152" height="58" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
+      <text x="280.0" y="458.0" text-anchor="middle" font-size="9" font-weight="600">4 · measure</text>
+      <text x="280.0" y="471.0" text-anchor="middle" font-size="6.8" fill="var(--muted)">the smallest slice</text>
+      <text x="280.0" y="482.0" text-anchor="middle" font-size="6.8" fill="var(--muted)">rich enough to show it</text>
+      <text x="280.0" y="493.0" text-anchor="middle" font-size="6.8" fill="var(--muted)">fixed, so deltas compare</text>
     </g>
-    <path d="M 658 86 L 667 86" stroke="var(--amber)" fill="none" marker-end="url(#ma)"/>
-
-    <g data-panel="compare" role="button" tabindex="0" aria-label="Step five: compare actual against predicted, and read the rows behind the number.">
-      <rect class="frame" x="670" y="48" width="145" height="76" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
-      <text x="742" y="68" text-anchor="middle" font-size="9" font-weight="600">5 · compare</text>
-      <text x="742" y="82" text-anchor="middle" font-size="7.5" fill="var(--muted)">actual vs predicted</text>
-      <text x="742" y="95" text-anchor="middle" font-size="7.5" fill="var(--muted)">and WHY it moved</text>
-      <text x="742" y="108" text-anchor="middle" font-size="7.5" fill="var(--muted)">surprises count too</text>
+    <g data-panel="compare" role="button" tabindex="0" aria-label="Step 5 of the cycle: compare.">
+      <rect class="frame" x="39.5" y="346.0" width="152" height="58" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
+      <text x="115.5" y="363.0" text-anchor="middle" font-size="9" font-weight="600">5 · compare</text>
+      <text x="115.5" y="376.0" text-anchor="middle" font-size="6.8" fill="var(--muted)">actual vs predicted</text>
+      <text x="115.5" y="387.0" text-anchor="middle" font-size="6.8" fill="var(--muted)">and read the rows</text>
+      <text x="115.5" y="398.0" text-anchor="middle" font-size="6.8" fill="var(--muted)">surprises count too</text>
     </g>
-    <path d="M 818 86 L 827 86" stroke="var(--amber)" fill="none" marker-end="url(#ma)"/>
-
-    <g data-panel="bank" role="button" tabindex="0" aria-label="Step six: bank the result — prose, a metrics row, and a change-ledger row — negatives included.">
-      <rect class="frame" x="830" y="48" width="145" height="76" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
-      <text x="902" y="68" text-anchor="middle" font-size="9" font-weight="600">6 · bank it</text>
-      <text x="902" y="82" text-anchor="middle" font-size="7.5" fill="var(--muted)">RESULTS.md · prose</text>
-      <text x="902" y="95" text-anchor="middle" font-size="7.5" fill="var(--muted)">loop_log.csv · numbers</text>
-      <text x="902" y="108" text-anchor="middle" font-size="7.5" fill="var(--muted)">negatives included</text>
+    <g data-panel="bank" role="button" tabindex="0" aria-label="Step 6 of the cycle: bank it.">
+      <rect class="frame" x="39.5" y="156.0" width="152" height="58" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
+      <text x="115.5" y="173.0" text-anchor="middle" font-size="9" font-weight="600">6 · bank it</text>
+      <text x="115.5" y="186.0" text-anchor="middle" font-size="6.8" fill="var(--muted)">prose · metrics · ledger</text>
+      <text x="115.5" y="197.0" text-anchor="middle" font-size="6.8" fill="var(--muted)">negatives included</text>
+      <text x="115.5" y="208.0" text-anchor="middle" font-size="6.8" fill="var(--muted)">a run unlogged didn't happen</text>
     </g>
-
-    <path d="M 902 127 L 902 140 L 102 140 L 102 127" fill="none" stroke="var(--amber)" stroke-dasharray="4 3" marker-end="url(#ma)"/>
-    <text x="500" y="158" text-anchor="middle" font-size="8" fill="var(--amber)">the rerun's fresh failures go back into the queue, and it is re-ranked</text>
-
-    <text x="30" y="186" font-size="10.5" letter-spacing="1.4" fill="var(--muted)">THE GUARDS · what stops the loop from fooling itself</text>
-
-    <g data-panel="seal" role="button" tabindex="0" aria-label="The seal: a train and test split on every dataset, with the test side never mined and reported as aggregates only, enforced by the tooling.">
-      <rect class="frame" x="30" y="198" width="300" height="104" rx="6" fill="none" stroke="var(--line)" stroke-width="1.4"/>
-      <text x="180" y="218" text-anchor="middle" font-size="9.5" font-weight="600">the seal</text>
-      <text x="180" y="234" text-anchor="middle" font-size="7.5" fill="var(--muted)">every set has a train half and a test half</text>
-      <text x="180" y="248" text-anchor="middle" font-size="7.5" fill="var(--muted)">hypotheses come from train, only ever</text>
-      <text x="180" y="262" text-anchor="middle" font-size="7.5" fill="var(--muted)">test reports aggregates — no row is printed</text>
-      <text x="180" y="276" text-anchor="middle" font-size="7.5" fill="var(--muted)">and the tooling enforces that, not a promise</text>
-      <text x="180" y="290" text-anchor="middle" font-size="7.5" fill="var(--muted)">a bad test number means: mine train harder</text>
+    <text x="280" y="274" text-anchor="middle" font-size="9" font-weight="600">the cycle closes</text>
+    <text x="280" y="288" text-anchor="middle" font-size="7.5" fill="var(--muted)">the rerun's fresh failures</text>
+    <text x="280" y="300" text-anchor="middle" font-size="7.5" fill="var(--muted)">re-rank the queue</text>
+    <path d="M 280 512 L 280 528 L 176 528 L 176 546" fill="none" stroke="var(--muted)" stroke-dasharray="4 3" marker-end="url(#mi)"/>
+    <text x="300" y="527" font-size="7" fill="var(--muted)">every 10th cycle only</text>
+    <g data-panel="seal" role="button" tabindex="0" aria-label="The sealed evaluation hangs off the cycle as a rare spur: it is reported, never analysed for direction.">
+      <rect class="frame" x="40" y="548" width="272" height="56" rx="6" fill="none" stroke="var(--muted)" stroke-width="1.3" stroke-dasharray="5 4"/>
+      <text x="176" y="566" text-anchor="middle" font-size="8.5" font-weight="600">the sealed run — a spur, not a step</text>
+      <text x="176" y="580" text-anchor="middle" font-size="7" fill="var(--muted)">aggregates only · reported, never analysed</text>
+      <text x="176" y="592" text-anchor="middle" font-size="7" fill="var(--muted)">a bad number means: mine the train half harder</text>
     </g>
-    <g data-panel="dualgate" role="button" tabindex="0" aria-label="The dual gate: a change must win on the generated set's training half and must not regress the real-usage pool.">
-      <rect class="frame" x="350" y="198" width="300" height="104" rx="6" fill="none" stroke="var(--line)" stroke-width="1.4"/>
-      <text x="500" y="218" text-anchor="middle" font-size="9.5" font-weight="600">the dual gate</text>
-      <text x="500" y="234" text-anchor="middle" font-size="7.5" fill="var(--muted)">a win on the generated set is not enough</text>
-      <text x="500" y="248" text-anchor="middle" font-size="7.5" fill="var(--muted)">it must also hold on real recorded speech</text>
-      <text x="500" y="262" text-anchor="middle" font-size="7.5" fill="var(--muted)">one strong feature nearly halved the error</text>
-      <text x="500" y="276" text-anchor="middle" font-size="7.5" fill="var(--muted)">on one set and clearly hurt the other</text>
-      <text x="500" y="290" text-anchor="middle" font-size="7.5" fill="var(--muted)">it was rejected — that is what the gate is for</text>
-    </g>
-    <g data-panel="designline" role="button" tabindex="0" aria-label="The line between implementation and design: a cycle improves one component's implementation; changing the design is a person's decision, taken at a cycle boundary.">
-      <rect class="frame" x="670" y="198" width="300" height="104" rx="6" fill="none" stroke="var(--line)" stroke-width="1.4"/>
-      <text x="820" y="218" text-anchor="middle" font-size="9.5" font-weight="600">implementation vs design</text>
-      <text x="820" y="234" text-anchor="middle" font-size="7.5" fill="var(--muted)">a cycle may re-implement a component</text>
-      <text x="820" y="248" text-anchor="middle" font-size="7.5" fill="var(--muted)">inside its frozen stage contract</text>
-      <text x="820" y="262" text-anchor="middle" font-size="7.5" fill="var(--muted)">changing WHEN rules are trusted, or how</text>
-      <text x="820" y="276" text-anchor="middle" font-size="7.5" fill="var(--muted)">stages relate, is a design change</text>
-      <text x="820" y="290" text-anchor="middle" font-size="7.5" fill="var(--muted)">a person authorises those, at a boundary</text>
+    <text x="560" y="40" font-size="10.5" letter-spacing="1.4" fill="var(--muted)">THE GUARDS · what stops the loop from fooling itself</text>
+    <!-- ---- guard 1: THE SEAL, drawn as the wall the loop cannot cross ---- -->
+    <g data-panel="seal" data-claim="seal-split" role="button" tabindex="0"
+       aria-label="the seal: the verification pool drawn as a bar split into a training half the loop mines freely and a sealed 300 rows behind a wall, with the loop's arrow to the sealed side crossed out.">
+      <rect class="frame" x="560" y="60" width="410" height="112" rx="6" fill="none" stroke="var(--line)" stroke-width="1.4"/>
+      <text x="765" y="79" text-anchor="middle" font-size="9.5" font-weight="600">the seal</text>
+      <text x="735" y="97" text-anchor="middle" font-size="6.6" fill="var(--muted)">never — no row, no number, no delta</text>
+      <path d="M 597 118 L 597 105 L 852 105" fill="none" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#mI)"/>
+      <rect x="572" y="118" width="50" height="26" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="597" y="134" text-anchor="middle" font-size="7" fill="var(--muted)">the loop</text>
+      <path d="M 624 131 L 651 131" fill="none" stroke="var(--amber)" stroke-width="1.4" marker-end="url(#mA)"/>
+      <rect x="656" y="118" width="216" height="26" rx="2" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="764" y="130" text-anchor="middle" font-size="7" fill="var(--ink)">train · 2,700</text>
+      <text x="764" y="140" text-anchor="middle" font-size="6.4" fill="var(--amber)">mine it freely</text>
+      <rect x="872" y="118" width="24" height="26" rx="2" fill="var(--amber-soft)" stroke="var(--amber)"/>
+      <line x1="872" y1="92" x2="872" y2="150" stroke="var(--amber)" stroke-width="1.8"/>
+      <circle cx="872" cy="105" r="6.5" fill="var(--bg)" stroke="var(--amber)" stroke-width="1.3"/>
+      <path d="M 869 102 L 875 108 M 875 102 L 869 108" stroke="var(--amber)" stroke-width="1.3"/>
+      <text x="902" y="128" font-size="7" fill="var(--amber)">sealed · 300</text>
+      <text x="902" y="139" font-size="6.4" fill="var(--muted)">aggregates only</text>
+      <text x="765" y="162" text-anchor="middle" font-size="6.8" fill="var(--muted)">the wall is in the TOOLING, not in a promise</text>
     </g>
 
-    <text x="30" y="330" font-size="10.5" letter-spacing="1.4" fill="var(--muted)">THE FOUR INSTRUMENTS · and the one that outranks the rest</text>
-
-    <g data-panel="instruments" role="button" tabindex="0" aria-label="The FastRule product-shape board: does it handle atomic items and defer the rest?">
-      <rect class="frame" x="30" y="342" width="220" height="86" rx="6" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="140" y="360" text-anchor="middle" font-size="8.5" font-weight="600">fastrule_shape</text>
-      <text x="140" y="374" text-anchor="middle" font-size="7.5" fill="var(--muted)">the generated set</text>
-      <text x="140" y="388" text-anchor="middle" font-size="7.5" fill="var(--muted)">handled? and right?</text>
-      <text x="140" y="402" text-anchor="middle" font-size="7.5" fill="var(--muted)">every fast batch</text>
-    </g>
-    <g data-panel="instruments" role="button" tabindex="0" aria-label="The persona board: does quality hold for speakers who are not the author?">
-      <rect class="frame" x="270" y="342" width="220" height="86" rx="6" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="380" y="360" text-anchor="middle" font-size="8.5" font-weight="600">persona_board</text>
-      <text x="380" y="374" text-anchor="middle" font-size="7.5" fill="var(--muted)">six invented speakers</text>
-      <text x="380" y="388" text-anchor="middle" font-size="7.5" fill="var(--muted)">does it work for them?</text>
-      <text x="380" y="402" text-anchor="middle" font-size="7.5" fill="var(--muted)">every routing batch</text>
-    </g>
-    <g data-panel="instruments" role="button" tabindex="0" aria-label="The sealed milestone run: the objective engine number, taken rarely and never mined.">
-      <rect class="frame" x="510" y="342" width="220" height="86" rx="6" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="620" y="360" text-anchor="middle" font-size="8.5" font-weight="600">the sealed run</text>
-      <text x="620" y="374" text-anchor="middle" font-size="7.5" fill="var(--muted)">the real pool, sealed</text>
-      <text x="620" y="388" text-anchor="middle" font-size="7.5" fill="var(--muted)">the objective number</text>
-      <text x="620" y="402" text-anchor="middle" font-size="7.5" fill="var(--muted)">milestones only</text>
-    </g>
-    <g data-panel="instruments" role="button" tabindex="0" aria-label="The weekly review of real usage: the outer gate, and the only instrument measuring real speech.">
-      <rect class="frame" x="750" y="342" width="220" height="86" rx="6" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.5"/>
-      <text x="860" y="360" text-anchor="middle" font-size="8.5" font-weight="600" fill="var(--amber)">weekly_review</text>
-      <text x="860" y="374" text-anchor="middle" font-size="7.5" fill="var(--muted)">real usage, real speech</text>
-      <text x="860" y="388" text-anchor="middle" font-size="7.5" fill="var(--muted)">THE OUTER GATE</text>
-      <text x="860" y="402" text-anchor="middle" font-size="7.5" fill="var(--muted)">it outranks the rest</text>
+    <!-- ---- guard 2: THE DUAL GATE, two gates in series ---- -->
+    <g data-panel="dualgate" role="button" tabindex="0"
+       aria-label="the dual gate: a change passes an open gate marked generated, where the error nearly halved, and is stopped at a shut gate marked real speech, where it got clearly worse — so it was rejected.">
+      <rect class="frame" x="560" y="184" width="410" height="112" rx="6" fill="none" stroke="var(--line)" stroke-width="1.4"/>
+      <text x="765" y="203" text-anchor="middle" font-size="9.5" font-weight="600">the dual gate — it has to win twice</text>
+      <text x="700" y="222" text-anchor="middle" font-size="7" fill="var(--ink)">generated</text>
+      <text x="830" y="222" text-anchor="middle" font-size="7" fill="var(--ink)">real speech</text>
+      <rect x="572" y="234" width="56" height="24" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="600" y="249" text-anchor="middle" font-size="7" fill="var(--muted)">a change</text>
+      <path d="M 632 246 L 818 246" fill="none" stroke="var(--amber)" stroke-width="1.8" marker-end="url(#mA)"/>
+      <rect x="697" y="226" width="6" height="16" fill="var(--amber)"/>
+      <rect x="697" y="250" width="6" height="16" fill="var(--amber)"/>
+      <path d="M 712 240 L 716 244 L 724 234" fill="none" stroke="var(--good)" stroke-width="1.8" stroke-linecap="round"/>
+      <rect x="827" y="226" width="6" height="40" fill="var(--amber)"/>
+      <circle cx="830" cy="246" r="7.5" fill="var(--bg)" stroke="var(--amber)" stroke-width="1.4"/>
+      <path d="M 826.5 242.5 L 833.5 249.5 M 833.5 242.5 L 826.5 249.5" stroke="var(--amber)" stroke-width="1.4"/>
+      <path d="M 843 246 L 884 246" fill="none" stroke="var(--muted)" stroke-width="1.1" stroke-dasharray="3 3" opacity=".5"/>
+      <text x="890" y="249" font-size="7" fill="var(--muted)">rejected</text>
+      <text x="700" y="277" text-anchor="middle" font-size="6.6" fill="var(--muted)">error nearly halved</text>
+      <text x="700" y="287" text-anchor="middle" font-size="6.6" fill="var(--muted)">347 → 174</text>
+      <text x="830" y="277" text-anchor="middle" font-size="6.6" fill="var(--muted)">clearly worse</text>
+      <text x="830" y="287" text-anchor="middle" font-size="6.6" fill="var(--muted)">29 → 51</text>
     </g>
 
-    <g data-panel="negatives" role="button" tabindex="0" aria-label="Negatives are results: several were banked in a single day, and each one stops a future cycle from retrying it blind.">
-      <rect class="frame" x="30" y="452" width="940" height="112" rx="6" fill="none" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="5 4"/>
-      <text x="500" y="472" text-anchor="middle" font-size="10" font-weight="600">a negative is a result — it is banked, not buried</text>
-      <text x="500" y="490" text-anchor="middle" font-size="8" fill="var(--muted)">a doubt signal is only worth having when the doubter is the better judge</text>
-      <text x="500" y="506" text-anchor="middle" font-size="8" fill="var(--muted)">letting the trained models second-guess a confident rule LOST at every weight tried — their accuracy is not better than a confident rule</text>
-      <text x="500" y="522" text-anchor="middle" font-size="8" fill="var(--muted)">a block of fifteen structural features, added together, was worse than none of them on BOTH datasets; two of the fifteen, alone, helped</text>
-      <text x="500" y="538" text-anchor="middle" font-size="8" fill="var(--muted)">and twice in a row a prediction named the right total and the wrong half of it — written down as a limit, not rounded off as a hit</text>
-      <text x="500" y="554" text-anchor="middle" font-size="8" fill="var(--amber)">every one of these is in the log with the numbers that killed it, so no later cycle retries it blind</text>
+    <!-- ---- guard 3: THE DESIGN LINE, a frozen box with a door out ---- -->
+    <g data-panel="designline" role="button" tabindex="0"
+       aria-label="implementation or design: a frozen contract drawn as a box whose interior parts may be swapped freely, with one door in its wall through which a design change may only leave when a person opens it.">
+      <rect class="frame" x="560" y="308" width="410" height="112" rx="6" fill="none" stroke="var(--line)" stroke-width="1.4"/>
+      <text x="765" y="327" text-anchor="middle" font-size="9.5" font-weight="600">implementation, or design?</text>
+      <rect x="586" y="338" width="236" height="66" rx="4" fill="none" stroke="var(--line)" stroke-width="1.6"/>
+      <text x="704" y="352" text-anchor="middle" font-size="7" fill="var(--amber)">the contract — frozen</text>
+      <rect x="624" y="362" width="44" height="16" rx="2" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="646" y="373" text-anchor="middle" font-size="6" fill="var(--muted)">rules</text>
+      <rect x="682" y="362" width="44" height="16" rx="2" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="704" y="373" text-anchor="middle" font-size="6" fill="var(--muted)">models</text>
+      <rect x="740" y="362" width="44" height="16" rx="2" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="762" y="373" text-anchor="middle" font-size="6" fill="var(--muted)">gates</text>
+      <text x="704" y="392" text-anchor="middle" font-size="6.6" fill="var(--muted)">swap these as often as you like</text>
+      <rect x="818" y="356" width="8" height="38" fill="var(--bg)"/>
+      <rect x="818" y="349" width="8" height="8" fill="var(--amber)"/>
+      <rect x="818" y="393" width="8" height="8" fill="var(--amber)"/>
+      <path d="M 822 393 L 846 383" fill="none" stroke="var(--amber)" stroke-width="2.4"/>
+      <path d="M 828 368 L 858 368" fill="none" stroke="var(--amber)" stroke-width="1.3" marker-end="url(#mA)"/>
+      <text x="864" y="366" font-size="6.8" fill="var(--ink)">a design change</text>
+      <text x="864" y="377" font-size="6.4" fill="var(--muted)">a person opens it</text>
     </g>
 
-    <g data-panel="eras" role="button" tabindex="0" aria-label="Eras: when the system changes structurally the history is kept but the comparison baseline resets, because the two boards do not measure the same machine.">
-      <rect class="frame" x="30" y="584" width="940" height="96" rx="6" fill="none" stroke="var(--line)" stroke-width="1.4"/>
-      <text x="500" y="604" text-anchor="middle" font-size="10" font-weight="600">eras — history kept, comparisons reset</text>
-      <text x="500" y="622" text-anchor="middle" font-size="8" fill="var(--muted)">a large structural change makes a before-and-after number a comparison of two different machines</text>
-      <text x="500" y="638" text-anchor="middle" font-size="8" fill="var(--muted)">so every run stays archived and re-scorable, and the BASELINE resets: cycles are judged against their own era</text>
-      <text x="500" y="654" text-anchor="middle" font-size="8" fill="var(--muted)">cross-era reads are allowed as trend lines, labelled as such — never as one cycle against another</text>
-      <text x="500" y="670" text-anchor="middle" font-size="8" fill="var(--muted)">when a metric is added or fixed, the current scorer is replayed over the whole archive; as-logged numbers are never rewritten</text>
+    <!-- ---- guard 4: FOUR INSTRUMENTS, three dials and a bigger one ---- -->
+    <g data-panel="instruments" role="button" tabindex="0"
+       aria-label="four instruments, one boss: three small dials for the product-shape board, the personas and the sealed run, and one larger dial for real usage that outranks all three.">
+      <rect class="frame" x="560" y="432" width="410" height="112" rx="6" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.4"/>
+      <text x="765" y="451" text-anchor="middle" font-size="9.5" font-weight="600" fill="var(--amber)">four instruments, one boss</text>
+      <path d="M 592 500 A 16 16 0 0 1 624 500" fill="none" stroke="var(--line)" stroke-width="1.6"/>
+      <line x1="592" y1="500" x2="624" y2="500" stroke="var(--line)" stroke-width="1.2"/>
+      <line x1="608" y1="500" x2="599.6" y2="490" stroke="var(--muted)" stroke-width="1.9" stroke-linecap="round"/>
+      <circle cx="608" cy="500" r="1.9" fill="var(--muted)"/>
+      <text x="608" y="512" text-anchor="middle" font-size="6" fill="var(--muted)">product</text>
+      <text x="608" y="521" text-anchor="middle" font-size="6" fill="var(--muted)">shape</text>
+      <path d="M 652 500 A 16 16 0 0 1 684 500" fill="none" stroke="var(--line)" stroke-width="1.6"/>
+      <line x1="652" y1="500" x2="684" y2="500" stroke="var(--line)" stroke-width="1.2"/>
+      <line x1="668" y1="500" x2="668" y2="487" stroke="var(--muted)" stroke-width="1.9" stroke-linecap="round"/>
+      <circle cx="668" cy="500" r="1.9" fill="var(--muted)"/>
+      <text x="668" y="512" text-anchor="middle" font-size="6" fill="var(--muted)">personas</text>
+      <path d="M 712 500 A 16 16 0 0 1 744 500" fill="none" stroke="var(--line)" stroke-width="1.6"/>
+      <line x1="712" y1="500" x2="744" y2="500" stroke="var(--line)" stroke-width="1.2"/>
+      <line x1="728" y1="500" x2="737.2" y2="490.8" stroke="var(--muted)" stroke-width="1.9" stroke-linecap="round"/>
+      <circle cx="728" cy="500" r="1.9" fill="var(--muted)"/>
+      <text x="728" y="512" text-anchor="middle" font-size="6" fill="var(--muted)">sealed run</text>
+      <path d="M 846 506 A 26 26 0 0 1 898 506" fill="none" stroke="var(--amber)" stroke-width="2.2"/>
+      <line x1="846" y1="506" x2="898" y2="506" stroke="var(--amber)" stroke-width="1.4"/>
+      <line x1="872" y1="506" x2="887.6" y2="490.4" stroke="var(--amber)" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="872" cy="506" r="2.8" fill="var(--amber)"/>
+      <text x="872" y="519" text-anchor="middle" font-size="7" fill="var(--amber)">real usage</text>
+      <text x="872" y="529" text-anchor="middle" font-size="6" fill="var(--muted)">the flag rate</text>
+      <text x="792" y="468" text-anchor="middle" font-size="6.6" fill="var(--amber)">outranks these three</text>
+      <path d="M 842 484 C 812 474, 782 478, 752 484" fill="none" stroke="var(--amber)" stroke-width="1.4" marker-end="url(#mA)"/>
+      <text x="765" y="539" text-anchor="middle" font-size="6.6" fill="var(--muted)">a benchmark that moves while real use stays flat helped nobody</text>
+    </g>
+
+    <!-- ---- guard 5: THE NEGATIVES LEDGER ---- -->
+    <g data-panel="negatives" role="button" tabindex="0"
+       aria-label="a negative is a result: a ledger of three rejected changes, each crossed out and banked with the number that killed it.">
+      <rect class="frame" x="560" y="556" width="410" height="112" rx="6" fill="none" stroke="var(--line)" stroke-width="1.4"/>
+      <text x="765" y="575" text-anchor="middle" font-size="9.5" font-weight="600">a negative is a result</text>
+      <text x="600" y="591" font-size="5.8" letter-spacing="0.7" fill="var(--muted)">TRIED</text>
+      <text x="750" y="591" font-size="5.8" letter-spacing="0.7" fill="var(--muted)">THE NUMBER THAT KILLED IT</text>
+      <line x1="578" y1="595" x2="952" y2="595" stroke="var(--line)"/>
+      <circle cx="586" cy="605" r="5" fill="none" stroke="var(--amber)" stroke-width="1.1"/>
+      <path d="M 583.6 602.6 L 588.4 607.4 M 588.4 602.6 L 583.6 607.4" stroke="var(--amber)" stroke-width="1.1"/>
+      <text x="600" y="608" font-size="7" fill="var(--ink)">15 structural signals at once</text>
+      <text x="750" y="608" font-size="6.6" fill="var(--muted)">errors 373 → 534, on both sets</text>
+      <line x1="578" y1="614" x2="952" y2="614" stroke="var(--faint)"/>
+      <circle cx="586" cy="624" r="5" fill="none" stroke="var(--amber)" stroke-width="1.1"/>
+      <path d="M 583.6 621.6 L 588.4 626.4 M 588.4 621.6 L 583.6 626.4" stroke="var(--amber)" stroke-width="1.1"/>
+      <text x="600" y="627" font-size="7" fill="var(--ink)">the models as a second opinion</text>
+      <text x="750" y="627" font-size="6.6" fill="var(--muted)">correctly-handled 41.8 → 35.9%</text>
+      <line x1="578" y1="633" x2="952" y2="633" stroke="var(--faint)"/>
+      <circle cx="586" cy="643" r="5" fill="none" stroke="var(--amber)" stroke-width="1.1"/>
+      <path d="M 583.6 640.6 L 588.4 645.4 M 588.4 640.6 L 583.6 645.4" stroke="var(--amber)" stroke-width="1.1"/>
+      <text x="600" y="646" font-size="7" fill="var(--ink)">one classifier fit on both sets</text>
+      <text x="750" y="646" font-size="6.6" fill="var(--muted)">operation macro-F1 73.4 → 69.3</text>
+      <text x="765" y="661" text-anchor="middle" font-size="6.6" fill="var(--muted)">banked, so no later cycle retries it blind</text>
+    </g>
+
+    <!-- ---- the record: ERAS, drawn as a timeline with a reset barline ---- -->
+    <g data-panel="eras" role="button" tabindex="0"
+       aria-label="Eras: a timeline of banked runs with a barline where a structural change resets the baseline; the runs behind the line stay archived and re-scorable, and a comparison across it may only be drawn as a labelled trend.">
+      <rect class="frame" x="40" y="684" width="930" height="86" rx="6" fill="none" stroke="var(--line)" stroke-width="1.4"/>
+      <text x="505" y="706" text-anchor="middle" font-size="10" font-weight="600">eras — history kept, comparisons reset</text>
+      <line x1="80" y1="726" x2="584" y2="726" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="4 3"/>
+      <text x="82" y="721" font-size="6.5" fill="var(--muted)">era 1 baseline</text>
+      <line x1="616" y1="726" x2="932" y2="726" stroke="var(--amber)" stroke-width="1.2" stroke-dasharray="4 3"/>
+      <text x="618" y="721" font-size="6.5" fill="var(--amber)">era 2 baseline — a fresh zero</text>
+      <line x1="70" y1="744" x2="940" y2="744" stroke="var(--line)" stroke-width="1.3"/>
+      <g fill="var(--screen)" stroke="var(--line)" stroke-width="1.1">
+        <circle cx="92" cy="744" r="3"/><circle cx="126" cy="744" r="3"/><circle cx="160" cy="744" r="3"/>
+        <circle cx="194" cy="744" r="3"/><circle cx="228" cy="744" r="3"/><circle cx="262" cy="744" r="3"/>
+        <circle cx="296" cy="744" r="3"/><circle cx="330" cy="744" r="3"/><circle cx="364" cy="744" r="3"/>
+        <circle cx="398" cy="744" r="3"/><circle cx="432" cy="744" r="3"/><circle cx="466" cy="744" r="3"/>
+        <circle cx="500" cy="744" r="3"/><circle cx="534" cy="744" r="3"/><circle cx="568" cy="744" r="3"/>
+      </g>
+      <g fill="var(--screen)" stroke="var(--amber)" stroke-width="1.1">
+        <circle cx="632" cy="744" r="3"/><circle cx="666" cy="744" r="3"/><circle cx="700" cy="744" r="3"/>
+        <circle cx="734" cy="744" r="3"/><circle cx="768" cy="744" r="3"/><circle cx="802" cy="744" r="3"/>
+        <circle cx="836" cy="744" r="3"/><circle cx="870" cy="744" r="3"/>
+      </g>
+      <circle cx="904" cy="744" r="3.4" fill="var(--amber)" stroke="var(--amber)"/>
+      <text x="904" y="736" text-anchor="middle" font-size="6" fill="var(--amber)">now</text>
+      <line x1="597" y1="714" x2="597" y2="756" stroke="var(--amber)" stroke-width="1.6"/>
+      <line x1="603" y1="714" x2="603" y2="756" stroke="var(--amber)" stroke-width="1.6"/>
+      <text x="600" y="766" text-anchor="middle" font-size="6.5" fill="var(--amber)">a structural change</text>
+      <text x="86" y="762" font-size="6.5" fill="var(--muted)">every run behind the line stays archived and re-scorable</text>
+      <text x="932" y="762" text-anchor="end" font-size="6.5" fill="var(--muted)">across it: trend lines only, labelled as such</text>
     </g>
   </g>
 </svg>
 
-<svg id="view-eval" class="stage" hidden viewBox="0 0 1000 700" role="group"
+<svg id="view-eval" class="stage off" viewBox="0 0 1000 792" role="group"
      aria-label="The evaluation: five levels of metric, each measuring one component at its own granularity, beside the three families of dataset they are computed on. Below, the idea that unifies nearly all of them — precision and recall asked at different granularities — and the three metrics that deliberately are not.">
   <g class="world">
-    <text x="30" y="26" font-size="10.5" letter-spacing="1.4" fill="var(--muted)">THE EVALUATION · dataset/METRICS.md · every number carries its dataset, its slice and its meaning</text>
-
-    <text x="30" y="52" font-size="9.5" letter-spacing="1.2" fill="var(--muted)">FIVE LEVELS · each component judged at its own grain</text>
-    <text x="520" y="52" font-size="9.5" letter-spacing="1.2" fill="var(--muted)">THREE FAMILIES OF DATA · and what each is FOR</text>
-
-    <g data-panel="lvl1" role="button" tabindex="0" aria-label="Level one, the engine board: did the whole command produce the right records?">
-      <rect class="frame" x="30" y="64" width="460" height="58" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
-      <text x="260" y="84" text-anchor="middle" font-size="9.5" font-weight="600">1 · the engine board</text>
-      <text x="260" y="98" text-anchor="middle" font-size="7.5" fill="var(--muted)">count-correctness · item precision/recall/F1 · missing-half</text>
-      <text x="260" y="111" text-anchor="middle" font-size="7.5" fill="var(--muted)">date-collapse · garbage titles · field quality · labels · latency</text>
+    <text x="30" y="26" font-size="10.5" letter-spacing="1.4" fill="var(--muted)">THE EVALUATION · every number carries its dataset, its slice and its meaning</text>
+    <text x="30" y="54" font-size="9.5" letter-spacing="1.2" fill="var(--muted)">FIVE BOARDS · finer grain as you go down</text>
+    <text x="640" y="54" font-size="9.5" letter-spacing="1.2" fill="var(--muted)">AND THE DATA EACH ONE READS</text>
+    <text x="462" y="54" font-size="7" fill="var(--muted)">a board reads the</text>
+    <text x="462" y="64" font-size="7" fill="var(--muted)">set it points to</text>
+    <g data-panel="lvl1" role="button" tabindex="0" aria-label="Board 1: the engine board. count-correctness · item P/R/F1 · field quality · labels">
+      <rect class="frame" x="30" y="68" width="390" height="62" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
+      <text x="225" y="88" text-anchor="middle" font-size="9.5" font-weight="600">1 · the engine board</text>
+      <text x="225" y="102" text-anchor="middle" font-size="7" fill="var(--amber)">grain: the whole command</text>
+      <text x="225" y="116" text-anchor="middle" font-size="7.5" fill="var(--muted)">count-correctness · item P/R/F1 · field quality · labels</text>
     </g>
-    <g data-panel="lvl2" role="button" tabindex="0" aria-label="Level two, the FastRule product-shape board: measured by what it is for, not by how busy it is.">
-      <rect class="frame" x="30" y="130" width="460" height="58" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
-      <text x="260" y="150" text-anchor="middle" font-size="9.5" font-weight="600">2 · the product-shape board</text>
-      <text x="260" y="164" text-anchor="middle" font-size="7.5" fill="var(--muted)">of single-item commands, how many did it act on — and</text>
-      <text x="260" y="177" text-anchor="middle" font-size="7.5" fill="var(--muted)">of those, how many right · plus harm, and half-executions</text>
+    <g data-panel="lvl2" role="button" tabindex="0" aria-label="Board 2: the product-shape board. handled? · right? · harm · half-executions">
+      <rect class="frame" x="30" y="142" width="390" height="62" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
+      <text x="225" y="162" text-anchor="middle" font-size="9.5" font-weight="600">2 · the product-shape board</text>
+      <text x="225" y="176" text-anchor="middle" font-size="7" fill="var(--amber)">grain: one command's routing</text>
+      <text x="225" y="190" text-anchor="middle" font-size="7.5" fill="var(--muted)">handled? · right? · harm · half-executions</text>
     </g>
-    <g data-panel="lvl3" role="button" tabindex="0" aria-label="Level three, the classifiers: accuracy and per-class precision, recall and F1 for atomicity, operation and kind.">
-      <rect class="frame" x="30" y="196" width="460" height="58" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
-      <text x="260" y="216" text-anchor="middle" font-size="9.5" font-weight="600">3 · the three classifiers</text>
-      <text x="260" y="230" text-anchor="middle" font-size="7.5" fill="var(--muted)">per-class precision/recall/F1 and macro-F1, per dataset</text>
-      <text x="260" y="243" text-anchor="middle" font-size="7.5" fill="var(--muted)">atomicity scored three ways: rules · model · the wiring</text>
+    <g data-panel="lvl3" role="button" tabindex="0" aria-label="Board 3: the three classifiers. per-class P/R/F1 · both error kinds as COUNTS">
+      <rect class="frame" x="30" y="216" width="390" height="62" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
+      <text x="225" y="236" text-anchor="middle" font-size="9.5" font-weight="600">3 · the three classifiers</text>
+      <text x="225" y="250" text-anchor="middle" font-size="7" fill="var(--amber)">grain: one decision</text>
+      <text x="225" y="264" text-anchor="middle" font-size="7.5" fill="var(--muted)">per-class P/R/F1 · both error kinds as COUNTS</text>
     </g>
-    <g data-panel="lvl4" role="button" tabindex="0" aria-label="Level four, the speakers: per-persona boards, and the spread between the best and worst served — the spread is the finding.">
-      <rect class="frame" x="30" y="262" width="460" height="58" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
-      <text x="260" y="282" text-anchor="middle" font-size="9.5" font-weight="600">4 · the speakers</text>
-      <text x="260" y="296" text-anchor="middle" font-size="7.5" fill="var(--muted)">one board per invented speaker, plus the SPREAD</text>
-      <text x="260" y="309" text-anchor="middle" font-size="7.5" fill="var(--muted)">between best- and worst-served — the spread is the finding</text>
+    <g data-panel="lvl4" role="button" tabindex="0" aria-label="Board 4: the speakers. a board each, and the SPREAD between best and worst">
+      <rect class="frame" x="30" y="290" width="390" height="62" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
+      <text x="225" y="310" text-anchor="middle" font-size="9.5" font-weight="600">4 · the speakers</text>
+      <text x="225" y="324" text-anchor="middle" font-size="7" fill="var(--amber)">grain: one speaker</text>
+      <text x="225" y="338" text-anchor="middle" font-size="7.5" fill="var(--muted)">a board each, and the SPREAD between best and worst</text>
     </g>
-    <g data-panel="lvl5" role="button" tabindex="0" aria-label="Level five, real usage: the flag rate on actual commands. It outranks every benchmark above it.">
-      <rect class="frame" x="30" y="328" width="460" height="58" rx="6" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.6"/>
-      <text x="260" y="348" text-anchor="middle" font-size="9.5" font-weight="600" fill="var(--amber)">5 · real usage — the outer gate</text>
-      <text x="260" y="362" text-anchor="middle" font-size="7.5" fill="var(--muted)">the flag rate on commands actually spoken, test traffic out</text>
-      <text x="260" y="375" text-anchor="middle" font-size="7.5" fill="var(--muted)">it disagrees with the benchmarks, and it wins</text>
+    <g data-panel="lvl5" role="button" tabindex="0" aria-label="Board 5: real usage. the flag rate — and it outranks everything above it">
+      <rect class="frame" x="30" y="364" width="390" height="62" rx="6" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.6"/>
+      <text x="225" y="384" text-anchor="middle" font-size="9.5" font-weight="600" fill="var(--amber)">5 · real usage</text>
+      <text x="225" y="398" text-anchor="middle" font-size="7" fill="var(--amber)">grain: one real command</text>
+      <text x="225" y="412" text-anchor="middle" font-size="7.5" fill="var(--muted)">the flag rate — and it outranks everything above it</text>
     </g>
-
-    <g data-panel="poolset" role="button" tabindex="0" aria-label="The verification pool: three thousand real recorded utterances, with compounds built by joining two of a known kind, and three hundred rows sealed away.">
-      <rect class="frame" x="520" y="64" width="450" height="104" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
-      <text x="745" y="84" text-anchor="middle" font-size="9.5" font-weight="600">the verification pool — real speech</text>
-      <text x="745" y="100" text-anchor="middle" font-size="7.5" fill="var(--muted)">3,000 real voice utterances, plus compounds built by</text>
-      <text x="745" y="114" text-anchor="middle" font-size="7.5" fill="var(--muted)">joining two real ones of a known kind — the join IS the</text>
-      <text x="745" y="128" text-anchor="middle" font-size="7.5" fill="var(--muted)">ground truth, so nothing needed hand-labelling</text>
-      <text x="745" y="142" text-anchor="middle" font-size="7.5" fill="var(--muted)">300 rows sealed: excluded from every run by default,</text>
-      <text x="745" y="156" text-anchor="middle" font-size="7.5" fill="var(--amber)">read only at milestones, and never mined</text>
+    <path d="M 422 99 L 520 99 L 520 124 L 636 124" fill="none" stroke="var(--line)" stroke-width="1.4" marker-end="url(#mI)"/>
+    <path d="M 422 173 L 560 173 L 560 252 L 636 252" fill="none" stroke="var(--line)" stroke-width="1.4" marker-end="url(#mI)"/>
+    <path d="M 422 247 L 545 247 L 545 258 L 636 258" fill="none" stroke="var(--line)" stroke-width="1.4" marker-end="url(#mI)"/>
+    <path d="M 422 253 L 530 253 L 530 376 L 636 376" fill="none" stroke="var(--line)" stroke-width="1.4" marker-end="url(#mI)"/>
+    <path d="M 422 321 L 575 321 L 575 370 L 636 370" fill="none" stroke="var(--line)" stroke-width="1.4" marker-end="url(#mI)"/>
+    <path d="M 422 395 L 600 395 L 600 471 L 636 471" fill="none" stroke="var(--line)" stroke-width="1.4" marker-end="url(#mI)"/>
+    <path d="M 422 179 L 500 179 L 500 140 L 636 140" fill="none" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#mi)"/>
+    <g data-panel="poolset" role="button" tabindex="0" aria-label="The verification pool: real recorded speech, with three hundred rows sealed behind a wall.">
+      <rect class="frame" x="640" y="68" width="330" height="112" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
+      <text x="805" y="88" text-anchor="middle" font-size="9" font-weight="600">the verification pool — real speech</text>
+      <text x="805" y="101" text-anchor="middle" font-size="7" fill="var(--muted)">3,000 utterances; a compound is two real ones joined</text>
+      <rect x="652" y="112" width="274" height="18" rx="2" fill="var(--screen)" stroke="var(--line)"/>
+      <rect x="926" y="112" width="32" height="18" rx="2" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.4"/>
+      <text x="789" y="125" text-anchor="middle" font-size="6.8" fill="var(--muted)">train — mine it freely</text>
+      <text x="942" y="125" text-anchor="middle" font-size="6.5" fill="var(--amber)">sealed</text>
+      <text x="805" y="146" text-anchor="middle" font-size="7" fill="var(--muted)">the sealed rows leave every ordinary run by default</text>
+      <text x="805" y="158" text-anchor="middle" font-size="7" fill="var(--amber)">reported at milestones · never mined</text>
     </g>
-    <g data-panel="fastset" role="button" tabindex="0" aria-label="The generated FastRule set: ground truth by construction, split by pattern family so a test wording never appeared in training.">
-      <rect class="frame" x="520" y="178" width="450" height="104" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
-      <text x="745" y="198" text-anchor="middle" font-size="9.5" font-weight="600">the generated set — structure supervision</text>
-      <text x="745" y="214" text-anchor="middle" font-size="7.5" fill="var(--muted)">7,200 rows from pattern skeletons and filler banks:</text>
-      <text x="745" y="228" text-anchor="middle" font-size="7.5" fill="var(--muted)">the generator put the values in, so it knows the answer</text>
-      <text x="745" y="242" text-anchor="middle" font-size="7.5" fill="var(--muted)">4,800 rows to train and tune on, 2,400 held back</text>
-      <text x="745" y="256" text-anchor="middle" font-size="7.5" fill="var(--amber)">split by pattern FAMILY, not by row — so the held-back</text>
-      <text x="745" y="270" text-anchor="middle" font-size="7.5" fill="var(--amber)">half is wordings the system has genuinely never seen</text>
+    <g data-panel="fastset" role="button" tabindex="0" aria-label="The generated set: ground truth by construction, split by pattern family so a held-back wording never appeared in training.">
+      <rect class="frame" x="640" y="196" width="330" height="112" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
+      <text x="805" y="216" text-anchor="middle" font-size="9" font-weight="600">the generated set — structure supervision</text>
+      <text x="805" y="229" text-anchor="middle" font-size="7" fill="var(--muted)">7,200 rows from pattern skeletons · truth by construction</text>
+      <rect x="652" y="240" width="204" height="18" rx="2" fill="var(--screen)" stroke="var(--line)"/>
+      <rect x="856" y="240" width="102" height="18" rx="2" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.4"/>
+      <text x="754" y="253" text-anchor="middle" font-size="6.8" fill="var(--muted)">train 4,800</text>
+      <text x="907" y="253" text-anchor="middle" font-size="6.5" fill="var(--amber)">held back 2,400</text>
+      <text x="805" y="274" text-anchor="middle" font-size="7" fill="var(--muted)">split by pattern FAMILY, never by row — so the held-back</text>
+      <text x="805" y="286" text-anchor="middle" font-size="7" fill="var(--amber)">half is wordings the system has genuinely never seen</text>
     </g>
-    <g data-panel="personaset" role="button" tabindex="0" aria-label="The persona sets: six invented speakers, every row test-only, built to answer whether quality varies by speaker.">
-      <rect class="frame" x="520" y="292" width="450" height="104" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
-      <text x="745" y="312" text-anchor="middle" font-size="9.5" font-weight="600">the personas — does it work for anyone else?</text>
-      <text x="745" y="328" text-anchor="middle" font-size="7.5" fill="var(--muted)">6 invented speakers, 2,520 rows, every one test-only</text>
-      <text x="745" y="342" text-anchor="middle" font-size="7.5" fill="var(--muted)">each realises the SAME catalogue of asks in its own voice,</text>
-      <text x="745" y="356" text-anchor="middle" font-size="7.5" fill="var(--muted)">so the comparison is voice, not composition</text>
-      <text x="745" y="370" text-anchor="middle" font-size="7.5" fill="var(--amber)">the answer is yes, it varies — and the ablation says it is</text>
-      <text x="745" y="384" text-anchor="middle" font-size="7.5" fill="var(--amber)">the PHRASING, not the vocabulary</text>
+    <g data-panel="personaset" role="button" tabindex="0" aria-label="The personas: six invented speakers, every row test-only, built to ask whether quality varies by speaker.">
+      <rect class="frame" x="640" y="324" width="330" height="100" rx="6" fill="var(--screen)" stroke="var(--line)" stroke-width="1.3"/>
+      <text x="805" y="344" text-anchor="middle" font-size="9" font-weight="600">the personas — six invented speakers</text>
+      <text x="805" y="357" text-anchor="middle" font-size="7" fill="var(--muted)">2,520 rows · the same catalogue of asks, six voices</text>
+      <rect x="652" y="368" width="306" height="18" rx="2" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.4"/>
+      <text x="805" y="381" text-anchor="middle" font-size="6.8" fill="var(--amber)">no training half at all — every row is test-only, forever</text>
+      <text x="805" y="404" text-anchor="middle" font-size="7" fill="var(--muted)">a set you have optimised against cannot answer this</text>
+      <text x="805" y="416" text-anchor="middle" font-size="7" fill="var(--muted)">question about anything</text>
     </g>
-
+    <g data-panel="lvl5" role="button" tabindex="0" aria-label="Real usage has no dataset: the label is a person's verdict on a command they actually meant.">
+      <rect class="frame" x="640" y="440" width="330" height="62" rx="6" fill="none" stroke="var(--amber)" stroke-width="1.4" stroke-dasharray="5 4"/>
+      <text x="805" y="460" text-anchor="middle" font-size="9" font-weight="600" fill="var(--amber)">real usage — not a dataset at all</text>
+      <text x="805" y="475" text-anchor="middle" font-size="7" fill="var(--muted)">the commands actually spoken, test traffic excluded</text>
+      <text x="805" y="489" text-anchor="middle" font-size="7" fill="var(--muted)">no constructed truth — a person's verdict is the label</text>
+    </g>
     <g data-panel="unify" role="button" tabindex="0" aria-label="The unifying idea: nearly every metric here is precision and recall, asked at a different granularity.">
-      <rect class="frame" x="30" y="420" width="940" height="118" rx="7" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.5"/>
-      <text x="500" y="440" text-anchor="middle" font-size="10.5" font-weight="600" fill="var(--amber)">nearly all of it is two questions, asked at different sizes</text>
-      <text x="500" y="458" text-anchor="middle" font-size="8.5" fill="var(--muted)">RECALL — of the things that should have happened, how many did.  PRECISION — of what we did, how much was right.</text>
-      <text x="500" y="474" text-anchor="middle" font-size="8" fill="var(--muted)">at a classifier's decision: is this compound? · at a component's job: did FastRule act, and act rightly?</text>
-      <text x="500" y="490" text-anchor="middle" font-size="8" fill="var(--muted)">at an item: were the asked-for records created, and were the created ones asked for?</text>
-      <text x="500" y="506" text-anchor="middle" font-size="8" fill="var(--muted)">at a slot: is the date the words named the date that landed?</text>
-      <text x="500" y="522" text-anchor="middle" font-size="8" fill="var(--muted)">same pair, four grains — which is why a single headline can only say THAT something is wrong, never WHAT</text>
+      <rect class="frame" x="30" y="530" width="940" height="112" rx="7" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.5"/>
+      <text x="500" y="552" text-anchor="middle" font-size="10.5" font-weight="600" fill="var(--amber)">nearly all of it is two questions, asked at four sizes</text>
+      <text x="500" y="572" text-anchor="middle" font-size="8.5" fill="var(--muted)">RECALL — of the things that should have happened, how many did.   PRECISION — of what we did, how much was right.</text>
+      <text x="500" y="592" text-anchor="middle" font-size="8" fill="var(--muted)">a decision: did we catch the compounds · a component: did FastRule act, and act rightly</text>
+      <text x="500" y="610" text-anchor="middle" font-size="8" fill="var(--muted)">an item: were the asked-for records created, and were the created ones asked for · a slot: is the date that landed the one that was said</text>
+      <text x="500" y="630" text-anchor="middle" font-size="8" fill="var(--amber)">which is why one headline can only say THAT something is wrong, never WHAT</text>
     </g>
-
-    <g data-panel="notpr" role="button" tabindex="0" aria-label="The three metrics that are deliberately not precision and recall: harm, the knew-versus-accident split, and latency.">
-      <rect class="frame" x="30" y="558" width="940" height="122" rx="7" fill="none" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="5 4"/>
-      <text x="500" y="578" text-anchor="middle" font-size="10.5" font-weight="600">three that deliberately break the pattern</text>
-      <text x="500" y="596" text-anchor="middle" font-size="8.5" fill="var(--muted)">HARM — a wrong delete and a wrong title are not the same failure, so wrong commits are weighted by severity</text>
-      <text x="500" y="614" text-anchor="middle" font-size="8" fill="var(--muted)">deleting is destructive: when the engine cannot identify what to remove, finding nothing is the right answer and guessing is not</text>
-      <text x="500" y="632" text-anchor="middle" font-size="8.5" fill="var(--muted)">KNEW vs ACCIDENT — a correct deferral splits into &ldquo;it knew this was compound&rdquo; and &ldquo;it deferred for some other reason&rdquo;</text>
-      <text x="500" y="650" text-anchor="middle" font-size="8" fill="var(--muted)">same outcome, different mechanism — and only the first survives as the component gets better</text>
-      <text x="500" y="668" text-anchor="middle" font-size="8.5" fill="var(--muted)">LATENCY — how slowly, which no accuracy figure contains</text>
+    <g data-panel="notpr" role="button" tabindex="0" aria-label="Three metrics deliberately break the precision-and-recall pattern: harm, the knew-versus-accident split, and latency.">
+      <rect class="frame" x="30" y="664" width="940" height="112" rx="7" fill="none" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <text x="500" y="686" text-anchor="middle" font-size="10.5" font-weight="600">three that deliberately break the pattern</text>
+      <text x="500" y="708" text-anchor="middle" font-size="8.5" fill="var(--muted)">HARM — a wrong delete and a wrong title are not the same failure, so wrong commits are weighted by severity</text>
+      <text x="500" y="730" text-anchor="middle" font-size="8.5" fill="var(--muted)">KNEW vs ACCIDENT — same outcome, different machine; only &ldquo;it knew&rdquo; survives as the component improves</text>
+      <text x="500" y="752" text-anchor="middle" font-size="8.5" fill="var(--muted)">LATENCY — how slowly, which no accuracy figure contains</text>
     </g>
   </g>
 </svg>
 
+</div>
 <div id="devctl" role="group" aria-label="Thin surfaces attached to the host">
   <span>SURFACES</span>
   <button id="dminus" aria-label="Remove a surface">−</button>
@@ -865,7 +962,7 @@
 </div>
 <div id="tip" role="tooltip" hidden></div>
 </div>
-<p class="cap">Four views, along the bottom. Every framed part opens &mdash; <kbd>&larr;</kbd> <kbd>&rarr;</kbd>
+<p class="cap">Click any framed part of the drawing to open it &mdash; <kbd>&larr;</kbd> <kbd>&rarr;</kbd>
 step through them, <kbd>esc</kbd> closes. On the system view, <kbd>+</kbd>/<kbd>&minus;</kbd> attach and
 remove thin surfaces.</p>
 
@@ -884,10 +981,6 @@ remove thin surfaces.</p>
   </div>
 </aside>
 
-<nav id="nav" aria-label="Views and their parts">
-  <div id="views" role="tablist" aria-label="Views"></div>
-  <div id="rail" aria-label="Jump to any part"></div>
-</nav>
 
 <script>
 const P = {
@@ -896,7 +989,7 @@ const P = {
     view:"system", tag:"the thesis", name:"the brain", rl:"◆ one brain", title:"One brain",
     z:[352,256,1.9],
     sum:`<p>One process understands and executes everything. The host's own window and every attached surface are thin clients &mdash; <strong>none of them contains a parser</strong>.</p>
-    <p class="figs">15 actions · 9 of them reachable by rule alone · Python 49,600 lines · a test suite</p>`,
+    <p class="figs">15 actions · 9 of them reachable by rule alone · sixteen named rules · a test suite</p>`,
     more:`<h3>How one command becomes an answer</h3>
     <p>Read straight through for the story; the engine view has each component's own mechanics.</p>
     <ol>
@@ -1276,28 +1369,6 @@ series_id   NULL
     <code>calendar_sources</code>. Turning it on requires connecting an account explicitly; nothing reaches
     a company through either door unless you open it yourself.</p>`
   },
-  bench: {
-    view:"system", tag:"beside the machine", name:"the bench", rl:"the bench", title:"How it is kept honest",
-    z:[500,622,1.35],
-    sum:`<p>Written notes carry the decisions; tests fail the build when the code and the notes
-    disagree. None of it runs when you speak — it runs when the code changes.</p>
-    <p class="figs">tested · one machine · no network</p>`,
-    more:`<p>Every constant on this page — the routing line, the confidence multipliers, how many verbs
-    the table holds, how many past commands are retrieved — is a number somebody can change in an afternoon
-    without opening this file. Two had already drifted before anyone looked, both quietly wrong for
-    weeks.</p>
-    <p>So the agreement is a test rather than a promise. One suite reads each value out of the source and
-    asserts the page says the same thing; another estimates where every label in every diagram lands and
-    fails when two collide, which is how a 22-pixel overlap was found. A third treats any word from the
-    personal vocabulary as a leak unless it has been explicitly declared general — the burden inverted
-    deliberately, because presuming the other way means every new name silently becomes publishable.</p>
-    <p>The same idea guards the drawing of the pipeline: the review panel's chain, the engine's stage set
-    and the icons are tied together by a test that goes red naming what to update, so a revamp cannot draw
-    the old system's chain of thought for the new one.</p>
-    <p>The reason it sits below the line: this is the only part of the drawing that is not running. No
-    model, no user, no command — it is the workbench the machine was built on, and it is here because a
-    system that cannot be checked is only believed.</p>`
-  },
 
   /* ================= THE ENGINE ================= */
   engine: {
@@ -1379,45 +1450,41 @@ series_id   NULL
   fastrule: {
     view:"engine", tag:"the fast track", name:"FastRule", rl:"◆ FastRule", title:"FastRule — the atomic-item executor",
     z:[245,320,1.9],
-    sum:`<p>FastRule handles <strong>exactly one event or task</strong> and defers anything else. It is not a parser that always answers — it is a <em>selective classifier</em>: <code>run(text)</code> returns a commit-or-abstain verdict, and abstaining is a correct outcome, not a miss.</p>
-    <p class="figs">parse → Atomicity → Gatekeeper → Scorer → commit or defer</p>`,
-    more:`<svg viewBox="0 0 380 132" role="img" aria-label="FastRule's four steps in order: the parse, then the atomicity layer, then the gatekeeper's vetoes, then the scorer's commit predicate. Any of the last three can turn the verdict into a deferral.">
-      <g font-size="8">
-        <rect x="0" y="6" width="86" height="34" rx="4" fill="var(--screen)" stroke="var(--line)"/>
-        <text x="43" y="21" text-anchor="middle" font-weight="600" font-size="8">parse</text>
-        <text x="43" y="33" text-anchor="middle" font-size="7" fill="var(--muted)">7 phases</text>
-        <rect x="98" y="6" width="86" height="34" rx="4" fill="var(--amber-soft)" stroke="var(--amber)"/>
-        <text x="141" y="21" text-anchor="middle" font-weight="600" fill="var(--amber)" font-size="8">Atomicity</text>
-        <text x="141" y="33" text-anchor="middle" font-size="7" fill="var(--muted)">one, or many?</text>
-        <rect x="196" y="6" width="86" height="34" rx="4" fill="var(--screen)" stroke="var(--line)"/>
-        <text x="239" y="21" text-anchor="middle" font-weight="600" font-size="8">Gatekeeper</text>
-        <text x="239" y="33" text-anchor="middle" font-size="7" fill="var(--muted)">the vetoes</text>
-        <rect x="294" y="6" width="86" height="34" rx="4" fill="var(--screen)" stroke="var(--line)"/>
-        <text x="337" y="21" text-anchor="middle" font-weight="600" font-size="8">Scorer</text>
-        <text x="337" y="33" text-anchor="middle" font-size="7" fill="var(--muted)">sure enough?</text>
-        <rect x="196" y="86" width="184" height="34" rx="4" fill="none" stroke="var(--good)"/>
-        <text x="288" y="101" text-anchor="middle" font-weight="600" fill="var(--good)" font-size="8">commit — executed now</text>
-        <text x="288" y="113" text-anchor="middle" font-size="7" fill="var(--muted)">no language-model call on this path</text>
-        <rect x="0" y="86" width="184" height="34" rx="4" fill="none" stroke="var(--line)" stroke-dasharray="4 3"/>
-        <text x="92" y="101" text-anchor="middle" font-weight="600" font-size="8">defer — with a reason</text>
-        <text x="92" y="113" text-anchor="middle" font-size="7" fill="var(--muted)">and the partial parse rides along</text>
-      </g>
+    sum:`<p>FastRule handles <strong>exactly one event or task</strong> and defers anything else. Not a parser that always answers — a <em>selective classifier</em>, where abstaining is a correct outcome rather than a miss.</p>
+    <p class="figs">the same object, used twice, at two different bars</p>`,
+    more:`<svg viewBox="0 0 380 250" role="img" aria-label="The same FastRule object is used twice: once on the whole command at a bar of 0.80, and once per atomic item at 0.60. Inside, four steps run in order, and any of the last three turns a finished parse into a deferral.">
+      <rect x="0" y="0" width="140" height="32" rx="4" fill="none" stroke="var(--line)"/>
+      <text x="70" y="14" text-anchor="middle" font-size="7.5" font-weight="600">the whole command</text>
+      <text x="70" y="26" text-anchor="middle" font-size="7" fill="var(--amber)">bar 0.8 — deep is the net</text>
+      <rect x="240" y="0" width="140" height="32" rx="4" fill="none" stroke="var(--line)"/>
+      <text x="310" y="14" text-anchor="middle" font-size="7.5" font-weight="600">one atomic item</text>
+      <text x="310" y="26" text-anchor="middle" font-size="7" fill="var(--amber)">bar 0.6 — judged after</text>
+      <path d="M 70 34 L 70 44 L 190 44 L 190 52" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+      <path d="M 310 34 L 310 44 L 190 44" fill="none" stroke="var(--muted)"/>
+      <rect x="60" y="54" width="260" height="124" rx="5" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.4"/>
+      <text x="190" y="70" text-anchor="middle" font-size="9" font-weight="600" fill="var(--amber)">FastRule</text>
+      <rect x="74" y="76" width="232" height="20" rx="3" fill="var(--panel)" stroke="var(--line)"/>
+      <text x="190" y="89.5" text-anchor="middle" font-size="7.5">1 · parse — normalize · route · slots</text>
+      <rect x="74" y="100" width="232" height="20" rx="3" fill="var(--panel)" stroke="var(--line)"/>
+      <text x="190" y="113.5" text-anchor="middle" font-size="7.5">2 · Atomicity — one item, or several?</text>
+      <rect x="74" y="124" width="232" height="20" rx="3" fill="var(--panel)" stroke="var(--line)"/>
+      <text x="190" y="137.5" text-anchor="middle" font-size="7.5">3 · Gatekeeper — the vetoes</text>
+      <rect x="74" y="148" width="232" height="20" rx="3" fill="var(--panel)" stroke="var(--line)"/>
+      <text x="190" y="161.5" text-anchor="middle" font-size="7.5">4 · Scorer — sure enough, nothing missing?</text>
+      <path d="M 190 180 L 190 190 L 95 190 L 95 200" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+      <path d="M 190 190 L 285 190 L 285 200" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+      <rect x="20" y="202" width="150" height="34" rx="4" fill="none" stroke="var(--good)" stroke-width="1.4"/>
+      <text x="95" y="216" text-anchor="middle" font-size="8" font-weight="600" fill="var(--good)">commit</text>
+      <text x="95" y="229" text-anchor="middle" font-size="7" fill="var(--muted)">executed now, no language model</text>
+      <rect x="210" y="202" width="150" height="34" rx="4" fill="none" stroke="var(--line)" stroke-dasharray="4 3"/>
+      <text x="285" y="216" text-anchor="middle" font-size="8" font-weight="600">defer</text>
+      <text x="285" y="229" text-anchor="middle" font-size="7" fill="var(--muted)">with a reason, and its class</text>
     </svg>
-    <figcaption>Any of the last three steps can turn a finished parse into a deferral.</figcaption>
-    <h3>Two instances, two bars</h3>
-    <p>The same object runs in two places with different confidence bars. At the front door it reads the
-    whole, possibly complex command and holds out for <strong>0.8</strong>, because the deep track is its
-    safety net. Inside the deep track it reads one atomic fragment at a time and relaxes to
-    <strong>0.6</strong>, because a fragment is a simple shape and the judge is the net there.</p>
-    <p>The deep track asks it the same question the front door already asked, so a repeat with unchanged
-    words is skipped rather than re-parsed: FastRule is deterministic, and a second identical call cannot
-    produce a different verdict.</p>
-    <h3>Why it is shaped as an executor</h3>
-    <p>The organising idea is that every judgment here is the same tiered decision — rules when they are
-    confident, a tiny model when they are not, and defer when neither is sure — applied to three questions:
-    is this atomic, which operation, which kind. Splitting it into named objects means each one can be
-    scored on its own board, which is how a wiring bug was found that made the whole layer score worse than
-    the model inside it.</p>`
+    <figcaption>One object, two operating points: 0.8 on a whole command, because the deep track is its safety net, and 0.6 on a single fragment, because the judge is the net there. Any of steps 2–4 turns a finished parse into a deferral.</figcaption>
+    <p>Every judgment inside it is the same tiered decision — rules when they are confident, a tiny model
+    when they are not, defer when neither is sure — asked three times: is this atomic, which operation,
+    which kind. Naming them as separate objects is what lets each be scored on its own board, which is how
+    a wiring bug was found that made the whole layer score worse than the model inside it.</p>`
   },
   parse: {
     view:"engine", tag:"fastrule · step 1", name:"the parse", rl:"1 parse", title:"parse — normalize, route, fill",
@@ -1470,46 +1537,32 @@ series_id   NULL
   atomicity: {
     view:"engine", tag:"fastrule · layer 0", name:"Atomicity", rl:"2 Atomicity", title:"Atomicity — one item, or several?",
     z:[245,296,2.5],
-    sum:`<p>The call the whole architecture rests on: FastRule executes atomic items, the deep system atomizes. So this layer answers <strong>one question only</strong> — is this one ask, or more than one?</p>
-    <p class="figs">rule gates ∪ a trained model — a union, not a fallback</p>`,
-    more:`<svg viewBox="0 0 380 116" role="img" aria-label="Both tiers of the atomicity layer are asked unconditionally: the rule gates read announced joiners and the dependency parse, the model reads the shape of the whole utterance, and either one saying compound is enough.">
+    sum:`<p>The call the whole architecture rests on: FastRule executes atomic items, the deep system atomizes. This layer answers <strong>that one question</strong> and nothing else.</p>
+    <p class="figs">rule gates &cup; a trained model — a union, not a fallback</p>`,
+    more:`<svg viewBox="0 0 380 116" role="img" aria-label="Both tiers are asked unconditionally: the rule gates read announced joiners and the dependency parse, the model reads the shape of the whole utterance, and either one saying compound is enough.">
       <g font-size="8">
         <rect x="0" y="8" width="170" height="44" rx="4" fill="var(--screen)" stroke="var(--line)"/>
-        <text x="85" y="24" text-anchor="middle" font-weight="600" font-size="8">the rule gates</text>
+        <text x="85" y="24" text-anchor="middle" font-size="8" font-weight="600">the rule gates</text>
         <text x="85" y="36" text-anchor="middle" font-size="7" fill="var(--muted)">announced joiners</text>
         <text x="85" y="46" text-anchor="middle" font-size="7" fill="var(--muted)">and the dependency parse</text>
         <rect x="210" y="8" width="170" height="44" rx="4" fill="var(--screen)" stroke="var(--model)"/>
-        <text x="295" y="24" text-anchor="middle" font-weight="600" fill="var(--model)" font-size="8">the trained model</text>
+        <text x="295" y="24" text-anchor="middle" font-size="8" font-weight="600" fill="var(--model)">the trained model</text>
         <text x="295" y="36" text-anchor="middle" font-size="7" fill="var(--muted)">the shape of the whole</text>
         <text x="295" y="46" text-anchor="middle" font-size="7" fill="var(--muted)">utterance, 22 signals</text>
+        <path d="M 85 54 L 85 68 L 190 68 L 190 76" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+        <path d="M 295 54 L 295 68 L 190 68" fill="none" stroke="var(--muted)"/>
         <rect x="60" y="78" width="260" height="30" rx="4" fill="var(--amber-soft)" stroke="var(--amber)"/>
-        <text x="190" y="97" text-anchor="middle" font-weight="600" fill="var(--amber)" font-size="8">either one says compound — that is enough</text>
+        <text x="190" y="97" text-anchor="middle" font-size="8" font-weight="600" fill="var(--amber)">either one says compound — that is enough</text>
       </g>
     </svg>
-    <figcaption>Each tier catches compounds the other has no cue for.</figcaption>
-    <h3>The three rules that hold it together</h3>
-    <ul>
-      <li><strong>Both tiers, unconditionally.</strong> The model used to be a last resort, reachable only
-      when the parse had found a single intent. The layer then scored <em>worse than the model inside
-      it</em>: on the held-back half, more than half its misses were rows the parse had split into two
-      intents, every one of them compound, which the layer answered &ldquo;atomic&rdquo; for without ever
-      asking. That guard was an execution judgement wearing an atomicity answer's clothes.</li>
-      <li><strong>The answer is not the decision.</strong> This layer says what the sentence <em>is</em>;
-      what routing does about it is a separate question, and the answer is not always &ldquo;defer&rdquo;.
-      When the rule parser has itself read every ask and produced an intent for each, deferring throws a
-      complete correct answer away — and with the model unreachable, throws away the only answer there
-      was.</li>
-      <li><strong>&ldquo;Covers&rdquo; is not &ldquo;two intents&rdquo;.</strong> Mining the training half
-      found that more than a quarter of the compounds committed on a two-intent parse did <em>not</em> cover the ask,
-      and four in five of those were three-ask sentences where the parse found two and dropped the third.
-      Those are the real half-executions. So the parse must produce at least as many intents as the
-      sentence's joiners announce asks.</li>
-    </ul>
-    <h3>The floor is asymmetric on purpose</h3>
-    <p>The model is acted on only when it says &ldquo;compound&rdquo; <em>and</em> its margin clears a
-    floor, because the two errors do not cost the same: a wrong &ldquo;compound&rdquo; costs one slow
-    answer, and a wrong &ldquo;atomic&rdquo; half-executes a two-ask command in front of you. The floor is
-    set by a sweep over both training halves and printed by the fitting script — never assumed.</p>`
+    <figcaption>Each tier catches compounds the other has no cue for. Gating the model behind the rules once cost the layer more than half its misses.</figcaption>
+    <div class="tblwrap"><table>
+      <tr><th>the rule</th><th>because</th></tr>
+      <tr><td>both tiers, always</td><td>a layer that scores worse than the model inside it is a wiring bug</td></tr>
+      <tr><td>the answer is not the decision</td><td>a compound the parse fully covers still commits — deferring throws a correct answer away</td></tr>
+      <tr><td>&ldquo;covers&rdquo; ≠ &ldquo;two intents&rdquo;</td><td>the parse must find as many asks as the sentence's joiners announce</td></tr>
+      <tr><td>the floor is swept, not guessed</td><td>a wrong &ldquo;compound&rdquo; costs one slow answer; a wrong &ldquo;atomic&rdquo; half-executes in front of you</td></tr>
+    </table></div>`
   },
   gatekeeper: {
     view:"engine", tag:"fastrule · step 3", name:"Gatekeeper", rl:"3 Gatekeeper", title:"Gatekeeper — the vetoes",
@@ -1562,60 +1615,61 @@ series_id   NULL
   reasons: {
     view:"engine", tag:"the handoff", name:"the reason", rl:"the reason", title:"A deferral carries a reason",
     z:[500,690,2.0],
-    sum:`<p>Deferring is not one thing. The reason's <strong>class</strong> decides how the deep track picks the command up — and getting that wrong once meant the deep track re-committed exactly what the front door had refused.</p>
-    <p class="figs">REFUSAL · STRUCTURE · INCAPACITY</p>`,
-    more:`<div class="tblwrap"><table>
-      <tr><th>class</th><th>means</th><th>so the deep track…</th></tr>
-      <tr><td>REFUSAL</td><td>a correct reading that must not execute as stated</td><td>may
-      <em>resolve</em> the objection — a pronoun into a real target — but a bare re-read must never
-      overturn it</td></tr>
-      <tr><td>STRUCTURE</td><td>this is more than one item</td><td>atomizes further, and hands each atom
-      back to FastRule</td></tr>
-      <tr><td>INCAPACITY</td><td>&ldquo;I couldn't read this&rdquo;</td><td>hands it to the model — with
-      FastRule's partial parse, rather than starting from zero</td></tr>
-    </table></div>
-    <p>Before this contract existed, every reason read the same downstream: <em>you deal with it</em>. So
-    the deep track re-read the raw text with the gates switched off and committed things the front door had
-    deliberately vetoed. An audit of the engine named it: the rail only guarded the front door.</p>
-    <p>The classes also feed forward as evidence. When FastRule defers with a STRUCTURE reason, the segment
-    stage is told <em>that</em> and <em>why</em>, and grounds its own prompt in it — trust that this
-    contains at least two requests, and find the split — rather than asking the model to rediscover from
-    the raw words what a deterministic reader already worked out.</p>`
+    sum:`<p>Deferring is not one thing. The reason's <strong>class</strong> decides which stage picks the command up, and what that stage is allowed to do with it.</p>
+    <p class="figs">REFUSAL · STRUCTURE · INCAPACITY — three exits, three destinations</p>`,
+    more:`<svg viewBox="0 0 380 168" role="img" aria-label="Three arrows leave FastRule for three different destinations: a refusal that generate must honour, a structure verdict that sends it back to segment, and an incapacity that hands it to the model.">
+      <rect x="110" y="6" width="160" height="30" rx="4" fill="var(--amber-soft)" stroke="var(--amber)"/>
+      <text x="190" y="25" text-anchor="middle" font-size="8.5" font-weight="600" fill="var(--amber)">FastRule defers</text>
+      <path d="M 190 38 L 190 54 L 59 54 L 59 66" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+      <path d="M 190 38 L 190 66" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+      <path d="M 190 38 L 190 54 L 321 54 L 321 66" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+      <rect x="0" y="68" width="118" height="56" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="59" y="86" text-anchor="middle" font-size="8" font-weight="600">REFUSAL</text>
+      <text x="59" y="99" text-anchor="middle" font-size="6.8" fill="var(--muted)">deep may resolve it</text>
+      <text x="59" y="110" text-anchor="middle" font-size="6.8" fill="var(--muted)">never overturn it</text>
+      <rect x="131" y="68" width="118" height="56" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="190" y="86" text-anchor="middle" font-size="8" font-weight="600">STRUCTURE</text>
+      <text x="190" y="99" text-anchor="middle" font-size="6.8" fill="var(--muted)">atomize further,</text>
+      <text x="190" y="110" text-anchor="middle" font-size="6.8" fill="var(--muted)">then re-ask FastRule</text>
+      <rect x="262" y="68" width="118" height="56" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="321" y="86" text-anchor="middle" font-size="8" font-weight="600">INCAPACITY</text>
+      <text x="321" y="99" text-anchor="middle" font-size="6.8" fill="var(--muted)">the model takes over,</text>
+      <text x="321" y="110" text-anchor="middle" font-size="6.8" fill="var(--muted)">from the partial parse</text>
+      <text x="59" y="142" text-anchor="middle" font-size="7" fill="var(--amber)">→ generate</text>
+      <text x="190" y="142" text-anchor="middle" font-size="7" fill="var(--amber)">→ segment</text>
+      <text x="321" y="142" text-anchor="middle" font-size="7" fill="var(--amber)">→ generate</text>
+    </svg>
+    <figcaption>Before this contract, every reason read the same downstream — so the deep track re-read the raw text with the gates off and re-committed what the front door had refused.</figcaption>
+    <p>The classes also feed forward as evidence: a STRUCTURE deferral tells the segment stage <em>that</em> and <em>why</em>, rather than asking the model to rediscover from the raw words what a deterministic reader already worked out.</p>`
   },
   router: {
     view:"engine", tag:"the small models", name:"ModelRouter", rl:"◆ the classifiers", title:"ModelRouter — three small models",
     z:[245,564,2.0],
-    sum:`<p>Three logistic classifiers: <em>atomicity</em>, <em>operation</em>, <em>kind</em>. Fitted offline with scikit-learn and shipped as a file of JSON weights — inference is a hand-written dot product, and the running engine imports no machine-learning library.</p>
-    <p class="figs">one Featurizer and one LogisticModel — not four copies of each</p>`,
-    more:`<p>Before this module the same logistic regression existed four times over, each with its own copy
-    of the features, the gradient loop and the scoring. One divergence between copies is a silent bug, so
-    there is now exactly one of each thing: a <code>Featurizer</code> that turns text into a fixed vector of
-    <em>named</em> signals, a <code>LogisticModel</code> that fits, predicts and evaluates, and a
-    <code>ModelRouter</code> that composes them. The three featurizers are
-    <code>OperationFeatures</code> with 21 signals, <code>KindFeatures</code> with 18 signals, and
-    <code>AtomicityFeatures</code> with 22 signals &mdash; every one of them named, so a report can say
-    which signal earned its place and which did not.</p>
-    <h3>They may only speak when sure</h3>
-    <p><code>predict</code> returns a label <em>and a margin</em> — the gap to the runner-up, which is how
-    decisive the call was. Each model has a margin floor, and the router composes operation × kind into an
-    action only when both clear theirs. Otherwise it returns nothing at all and the caller's old behaviour
-    — defer — stands.</p>
-    <p>Loading refuses a weights file whose vectors do not match the featurizer's length. Dot products are
-    computed by zipping two lists, and zip truncates silently: weights fitted before a signal was added
-    would keep working and quietly ignore the new signal — a wrong answer with no error anywhere. A
-    mismatch loads nothing, and &ldquo;no opinion&rdquo; stands until the file is refitted.</p>
-    <h3>Two of the signals are personal, and read at inference</h3>
-    <p>The kind model's last two features ask the user's own category scheme and tag scheme whether they
-    recognise these words. No training, no refit, correct for any user on day one — the user had already
-    told the app what kind of thing that word is; the model simply was not reading it.</p>
-    <h3>A banked negative worth keeping</h3>
-    <p>Every wrong commit the fast path makes is an operation-or-kind error made <em>confidently</em> by a
-    rule — so the models are never consulted on exactly the rows they might save. Wiring them in as a
-    second opinion, so a confident disagreement forces a deferral, was tried at three strengths and
-    <strong>lost at all three</strong>. The reason was measurable and in front of us: those two models are
-    not better than a confident rule, so their disagreement is noise more often than signal. For atomicity
-    the model demonstrably <em>is</em> better, which is why that rewiring worked and this one did not.</p>
-    <p>A doubt signal is only worth having when the doubter is the better judge.</p>`
+    sum:`<p>Three logistic classifiers, fitted offline and shipped as a file of JSON weights. Inference is a hand-written dot product, so the running engine imports no machine-learning library.</p>
+    <p class="figs">and they may only speak when SURE</p>`,
+    more:`<svg viewBox="0 0 380 190" role="img" aria-label="Operation and kind are two separate classifiers whose answers are composed into one action, and only when both margins clear their floors.">
+      <rect x="0" y="20" width="150" height="44" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="75" y="38" text-anchor="middle" font-size="8.5" font-weight="600">operation</text>
+      <text x="75" y="50" text-anchor="middle" font-size="6.8" fill="var(--muted)">new · edit · remove</text>
+      <text x="75" y="60" text-anchor="middle" font-size="6.8" fill="var(--muted)">complete · query</text>
+      <rect x="0" y="86" width="150" height="44" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="75" y="104" text-anchor="middle" font-size="8.5" font-weight="600">kind</text>
+      <text x="75" y="116" text-anchor="middle" font-size="6.8" fill="var(--muted)">event · task</text>
+      <text x="75" y="126" text-anchor="middle" font-size="6.8" fill="var(--muted)">read at inference</text>
+      <path d="M 152 42 L 168 42 L 168 70" fill="none" stroke="var(--muted)"/>
+      <path d="M 152 108 L 168 108 L 168 86" fill="none" stroke="var(--muted)"/>
+      <text x="176" y="82" font-size="13" fill="var(--muted)">×</text>
+      <path d="M 190 78 L 206 78" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+      <rect x="210" y="56" width="170" height="44" rx="4" fill="var(--amber-soft)" stroke="var(--amber)"/>
+      <text x="295" y="74" text-anchor="middle" font-size="8.5" font-weight="600" fill="var(--amber)">one action</text>
+      <text x="295" y="88" text-anchor="middle" font-size="6.8" fill="var(--muted)">create_event · delete_todo · …</text>
+      <rect x="0" y="150" width="380" height="34" rx="4" fill="none" stroke="var(--line)" stroke-dasharray="4 3"/>
+      <text x="190" y="166" text-anchor="middle" font-size="7.5" font-weight="600">but only when BOTH margins clear their floors</text>
+      <text x="190" y="178" text-anchor="middle" font-size="7" fill="var(--muted)">otherwise: no opinion at all, and the caller defers, exactly as before</text>
+    </svg>
+    <figcaption>OperationFeatures with 21 signals and KindFeatures with 18 signals compose an action between them; AtomicityFeatures with 22 signals answers layer 0 on its own. Every signal is named.</figcaption>
+    <p><strong>A banked negative.</strong> Every wrong fast commit is an operation-or-kind error made <em>confidently</em> by a rule — so these models are never consulted on the rows they might save. Wiring them in as a second opinion was tried at three strengths and lost at all three: their accuracy is not better than a confident rule, so a disagreement is noise more often than signal. For atomicity the model demonstrably <em>is</em> better, which is why that rewiring worked and this one did not.</p>
+    <p>Loading refuses a weights file whose vectors do not match the featurizer, because a dot product over mismatched lists truncates silently — a wrong answer with no error anywhere.</p>`
   },
   deepsystem: {
     view:"engine", tag:"the deep track", name:"DeepSystem", rl:"◆ DeepSystem", title:"DeepSystem — the atomizer",
@@ -1635,58 +1689,59 @@ series_id   NULL
   },
   segment: {
     view:"engine", tag:"stage 2", name:"segment", rl:"2 segment", title:"segment — into independent asks",
-    z:[735,244,2.4],
-    sum:`<p>One transcript in, typed items out. &ldquo;Book a meeting tomorrow and remind me to call mom&rdquo; becomes two items, an event and a task. <strong>Biased to under-split</strong>, on purpose.</p>
-    <p class="figs">the pipeline's single point of failure — and it carries the densest tests</p>`,
-    more:`<h3>Three tiers, in order</h3>
-    <ol>
-      <li><strong>Free delimiters.</strong> Brackets from a queued phone backlog, the orchestrator's
-      coalescing wrapper, the configured spoken separator. If one of these split it, the model is never
-      consulted. The delimiters themselves must not survive into a title — an event called
-      &ldquo;[gym]&rdquo; helps nobody.</li>
-      <li><strong>One schema-constrained model call</strong> — and only when the words even suggest
-      compounding. The absence of a joining word is a free proof that the input is one item.</li>
-      <li><strong>Otherwise: one item.</strong> Always a legitimate reading.</li>
-    </ol>
-    <h3>Why under-split</h3>
-    <p>A wrong merge gets two more chances — the next stage splits again, and the judge can send it back. A
-    wrong split of &ldquo;meeting with Tal and Sam&rdquo; is immediate garbage that nothing downstream can
-    undo. So the bias is enforced rather than hoped for: a split that produced a fragment — a lone word
-    with no verb and no time — is <em>refused</em>, because that is the model imagining structure.</p>
-    <p>Two more refusals, each from a real failure: an enumeration header (&ldquo;add tasks:&rdquo;)
-    announces the list and is not an item of it, and a part made only of scheduling words (&ldquo;due
-    tomorrow&rdquo;) is residue of the phrasing, not a request — kept, one became a phantom row.</p>
-    <h3>What it is told before it decides</h3>
-    <p>FastRule has already read this command, and may have concluded it is more than one item. That
-    verdict is stronger evidence than a cue-word regex — the regex knows only announced joiners, while the
-    atomicity model reads the shape — so when it says STRUCTURE, the prompt is grounded in that: trust that
-    this contains at least two requests, and find the split.</p>
-    <p>Every item then travels alone: parsed on its own words, fixed on its own words, remembered as its
-    own record. That per-item bookkeeping repaired a real bug where correcting one event in a batch
-    corrupted the stored corrections of the others.</p>`
+    z:[764,244,2.4],
+    sum:`<p>One transcript in, typed items out. Three tiers, and it falls through to the next only when the one above found nothing.</p>
+    <p class="figs">biased to under-split — a wrong merge is recoverable, a wrong split is not</p>`,
+    more:`<svg viewBox="0 0 380 196" role="img" aria-label="A cascade: free delimiters split it first; only if they found nothing and the words hint at a compound is one model call made; otherwise the command stays one item.">
+      <rect x="0" y="8" width="250" height="38" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="125" y="25" text-anchor="middle" font-size="8" font-weight="600">1 · free delimiters</text>
+      <text x="125" y="37" text-anchor="middle" font-size="7" fill="var(--muted)">brackets · the spoken separator</text>
+      <path d="M 252 27 L 292 27" fill="none" stroke="var(--good)" marker-end="url(#mi)"/>
+      <text x="298" y="25" font-size="7.5" fill="var(--good)">→ items</text>
+      <path d="M 125 48 L 125 62" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+      <text x="131" y="58" font-size="6.5" fill="var(--muted)">nothing split</text>
+      <rect x="0" y="64" width="250" height="38" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="125" y="81" text-anchor="middle" font-size="8" font-weight="600">2 · one model call</text>
+      <text x="125" y="93" text-anchor="middle" font-size="7" fill="var(--muted)">only if the words hint at a compound</text>
+      <path d="M 252 83 L 292 83" fill="none" stroke="var(--good)" marker-end="url(#mi)"/>
+      <text x="298" y="81" font-size="7.5" fill="var(--good)">→ items</text>
+      <path d="M 125 104 L 125 118" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+      <text x="131" y="114" font-size="6.5" fill="var(--muted)">no hint, or refused</text>
+      <rect x="0" y="120" width="250" height="38" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="125" y="137" text-anchor="middle" font-size="8" font-weight="600">3 · one item</text>
+      <text x="125" y="149" text-anchor="middle" font-size="7" fill="var(--muted)">always a legitimate reading</text>
+      <text x="190" y="180" text-anchor="middle" font-size="7.5" fill="var(--amber)">a split that leaves a fragment is REFUSED — that is the model imagining structure</text>
+    </svg>
+    <figcaption>A wrong merge gets two more chances downstream. A wrong split of &ldquo;meeting with Tal and Sam&rdquo; is garbage nothing can undo.</figcaption>
+    <p>Two more refusals, each from a real failure: an enumeration header (&ldquo;add tasks:&rdquo;) announces the list rather than being an item of it, and a part made only of scheduling words (&ldquo;due tomorrow&rdquo;) is residue of the phrasing — kept, one became a phantom row.</p>
+    <p>When FastRule has already deferred with a STRUCTURE reason, the prompt is grounded in that: trust that this holds at least two requests, and find the split.</p>`
   },
   decompose: {
     view:"engine", tag:"stage 3", name:"decompose", rl:"3 decompose", title:"decompose — into atomic pieces",
-    z:[735,286,2.4],
-    sum:`<p>Each item is broken into its atomic pieces in <strong>one bounded pass</strong>: two spoken times is two events, a list is one task per thing, and a count is one task carrying a number.</p>
-    <p class="figs">an item may split once — never again from what it became</p>`,
-    more:`<ul>
-      <li><strong>Two spoken times.</strong> &ldquo;Walk the dog at 9 and 2:30&rdquo; is two events —
-      recognised deterministically only in that narrow shape, because <em>&ldquo;with Tal and Sam&rdquo;
-      must never split</em>. A model call is available for wordier double-times, and it too is
-      self-skipping: two clock-time mentions are required before it is asked at all, and ranges are
-      excluded.</li>
-      <li><strong>A list.</strong> Rides the shared string rules: commas always separate, &ldquo;and&rdquo;
-      separates unless a preposition just before it already opened the phrase, idioms are protected, and
-      the first item's verb is handed down to the rest.</li>
-      <li><strong>A count.</strong> &ldquo;Buy 5 apples&rdquo; is ONE task carrying a quantity of five, not
-      five identical rows — five identical rows make it impossible to tell which one you ticked.</li>
-      <li><strong>A lead time.</strong> &ldquo;…and give me a heads-up half an hour before&rdquo; is lifted
-      out into a number of minutes, so it cannot be mistaken for part of the title.</li>
-    </ul>
-    <p>Bounded to one pass: an item's id may go one level deep and no deeper. A recurrence is deliberately
-    <em>not</em> a decomposition — a repeating command is one atomic item that happens to repeat, and the
-    cadence rides along as a slot. The database expands it into the series.</p>`
+    z:[764,286,2.4],
+    sum:`<p>One item in, N items out — in <strong>one bounded pass</strong>. An item may split once, never again from what it became.</p>
+    <p class="figs">two times · a list · a count — and the one that must not split</p>`,
+    more:`<svg viewBox="0 0 380 200" role="img" aria-label="One item enters and several leave, by three named splitters: two spoken times become two events, a list becomes one task per thing, and a count becomes one task carrying a number. Beside them, the case that must never split.">
+      <rect x="0" y="60" width="92" height="34" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="46" y="76" text-anchor="middle" font-size="8" font-weight="600">one item</text>
+      <text x="46" y="88" text-anchor="middle" font-size="7" fill="var(--muted)">from segment</text>
+      <path d="M 94 77 L 130 77 L 130 28 L 164 28" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+      <path d="M 94 78 L 164 78" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+      <path d="M 94 77 L 130 77 L 130 132 L 164 132" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+      <rect x="168" y="10" width="212" height="36" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="274" y="26" text-anchor="middle" font-size="7.5" font-weight="600">two spoken times → two events</text>
+      <text x="274" y="38" text-anchor="middle" font-size="6.5" fill="var(--muted)">walk the dog at 9 and 2:30</text>
+      <rect x="168" y="60" width="212" height="36" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="274" y="76" text-anchor="middle" font-size="7.5" font-weight="600">a list → one task per thing</text>
+      <text x="274" y="88" text-anchor="middle" font-size="6.5" fill="var(--muted)">milk, eggs and bread</text>
+      <rect x="168" y="114" width="212" height="36" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="274" y="130" text-anchor="middle" font-size="7.5" font-weight="600">a count → ONE task, times N</text>
+      <text x="274" y="142" text-anchor="middle" font-size="6.5" fill="var(--muted)">buy 5 apples — never five rows</text>
+      <rect x="0" y="164" width="380" height="30" rx="4" fill="none" stroke="var(--amber)" stroke-dasharray="4 3"/>
+      <text x="190" y="182" text-anchor="middle" font-size="7.5" fill="var(--amber)">and the counter-example: “with Tal and Sam” is ONE event</text>
+    </svg>
+    <figcaption>Five identical rows would make it impossible to tell which one you ticked — so a count is a number in a column, not a repetition.</figcaption>
+    <p>A recurrence is deliberately not a decomposition: a repeating command is one atomic item that happens to repeat, and the cadence rides along as a slot for the database to expand.</p>`
   },
   validate: {
     view:"engine", tag:"stage 4 · first pass", name:"validate", rl:"4 validate", title:"validate — tidy the words",
@@ -1763,39 +1818,37 @@ series_id   NULL
   },
   crosscheck: {
     view:"engine", tag:"stage 6", name:"crosscheck", rl:"6 crosscheck", title:"crosscheck — the judge",
-    z:[735,454,2.4],
-    sum:`<p>The model is asked what your <em>words</em> asked for — never &ldquo;were you right?&rdquo;. Code diffs that list against what was produced, and a fixed map decides which stage re-runs.</p>
+    z:[764,454,2.4],
+    sum:`<p>The model is asked what your <em>words</em> asked for — never &ldquo;were you right?&rdquo;. Code diffs that list against what was produced, and a fixed map decides which stage runs again.</p>
     <p class="figs">extraction, not self-grading · the model never picks the stage to blame</p>`,
-    more:`<svg viewBox="0 0 380 112" role="img" aria-label="Three steps: the model extracts the asks from the raw words, code compares them against the produced objects, and a fixed map turns each kind of mismatch into the stage that must re-run.">
-      <g font-size="8">
-        <rect x="0" y="10" width="112" height="40" rx="4" fill="var(--screen)" stroke="var(--model)"/>
-        <text x="56" y="27" text-anchor="middle" font-weight="600" fill="var(--model)" font-size="8">1 · EXTRACT</text>
-        <text x="56" y="40" text-anchor="middle" font-size="7" fill="var(--muted)">the model lists the asks</text>
-        <rect x="134" y="10" width="112" height="40" rx="4" fill="var(--screen)" stroke="var(--line)"/>
-        <text x="190" y="27" text-anchor="middle" font-weight="600" font-size="8">2 · COMPARE</text>
-        <text x="190" y="40" text-anchor="middle" font-size="7" fill="var(--muted)">code diffs, not the model</text>
-        <rect x="268" y="10" width="112" height="40" rx="4" fill="var(--screen)" stroke="var(--line)"/>
-        <text x="324" y="27" text-anchor="middle" font-weight="600" font-size="8">3 · BLAME</text>
-        <text x="324" y="40" text-anchor="middle" font-size="7" fill="var(--muted)">a fixed map, per kind</text>
-        <rect x="60" y="74" width="260" height="30" rx="4" fill="var(--amber-soft)" stroke="var(--amber)"/>
-        <text x="190" y="93" text-anchor="middle" font-weight="600" fill="var(--amber)" font-size="8">missing → re-run segment · wrong fields → re-run generate</text>
-      </g>
+    more:`<svg viewBox="0 0 380 210" role="img" aria-label="A cycle: the model extracts the asks, code diffs them against what was produced, a fixed map blames a stage, that stage re-runs — at most three times, after which the last parse is judged and committed anyway.">
+      <rect x="20" y="10" width="150" height="38" rx="4" fill="var(--screen)" stroke="var(--model)"/>
+      <text x="95" y="26" text-anchor="middle" font-size="8" font-weight="600" fill="var(--model)">1 · EXTRACT</text>
+      <text x="95" y="38" text-anchor="middle" font-size="6.8" fill="var(--muted)">the model lists the asks</text>
+      <rect x="210" y="10" width="150" height="38" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="285" y="26" text-anchor="middle" font-size="8" font-weight="600">2 · DIFF</text>
+      <text x="285" y="38" text-anchor="middle" font-size="6.8" fill="var(--muted)">code compares, not the model</text>
+      <rect x="210" y="100" width="150" height="38" rx="4" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="285" y="116" text-anchor="middle" font-size="8" font-weight="600">3 · BLAME</text>
+      <text x="285" y="128" text-anchor="middle" font-size="6.8" fill="var(--muted)">a fixed map picks the stage</text>
+      <rect x="20" y="100" width="150" height="38" rx="4" fill="var(--screen)" stroke="var(--amber)"/>
+      <text x="95" y="116" text-anchor="middle" font-size="8" font-weight="600" fill="var(--amber)">4 · RE-RUN</text>
+      <text x="95" y="128" text-anchor="middle" font-size="6.8" fill="var(--muted)">that stage, mistake in hand</text>
+      <path d="M 172 29 L 206 29" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+      <path d="M 285 50 L 285 96" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+      <path d="M 206 119 L 174 119" fill="none" stroke="var(--muted)" marker-end="url(#mi)"/>
+      <path d="M 95 96 L 95 52" fill="none" stroke="var(--amber)" stroke-width="1.4" marker-end="url(#ma)"/>
+      <text x="190" y="78" text-anchor="middle" font-size="7.5" font-weight="600" fill="var(--amber)">at most 3 re-entries</text>
+      <path d="M 285 140 L 285 156" fill="none" stroke="var(--muted)" stroke-dasharray="3 2" marker-end="url(#mi)"/>
+      <rect x="20" y="158" width="340" height="34" rx="4" fill="none" stroke="var(--line)" stroke-dasharray="4 3"/>
+      <text x="190" y="174" text-anchor="middle" font-size="7.5" font-weight="600">budget spent</text>
+      <text x="190" y="186" text-anchor="middle" font-size="7" fill="var(--muted)">the last parse is judged anyway, committed, and the reply says so</text>
     </svg>
-    <figcaption>Small local models extract far more reliably than they judge, so the check is built from the job they are good at.</figcaption>
-    <p>The loop re-runs the stage the mismatch blames, with the mistake quoted into that stage's own
-    prompt, <strong>at most three times</strong> per command across all stages. When the budget is spent
-    the best attempt is committed, the reply says so, and the memory record is marked uncertain rather
-    than quietly passing as clean.</p>
-    <p>Matching is deliberately forgiving in one direction: the extraction regularly mislabels a task as an
-    event, so asks are matched against same-kind items first and then against any kind, because a kind
-    quibble must not become a false &ldquo;missing&rdquo; that costs three pointless re-parses.</p>
-    <h3>Behind a fast answer, the same check is a verifier</h3>
-    <p>After a fast commit it runs in the background against what was just written, and its patches are
-    <em>tiered</em>: renaming a placeholder title is applied silently; adding or removing something you can
-    see is proposed rather than done. That is measured caution — an earlier always-on checker proposed
-    dozens of changes and fixed none of them.</p>
-    <p>When a removal <em>is</em> applied, the row is captured first and the correction carries a
-    ready-to-post body to put it back, so one tap reverts it.</p>`
+    <figcaption>Small local models extract far more reliably than they judge, so the check is built from the job they are good at. A finding re-runs the stage that lost it, with the mistake quoted into that stage's own prompt, at most three times per command.</figcaption>
+    <p>Behind a fast answer the same check runs as a verifier, and its patches are <em>tiered</em>: renaming
+    a placeholder title is applied silently, while adding or removing something you can see is proposed
+    rather than done. Measured caution — an earlier always-on checker proposed dozens of changes and fixed
+    none of them. When a removal <em>is</em> applied, the row is captured first so one tap puts it back.</p>`
   },
   commit: {
     view:"engine", tag:"the only write", name:"commit", rl:"commit", title:"commit — the only write",
@@ -1862,7 +1915,7 @@ series_id   NULL
   /* ================= THE LOOP ================= */
   backlog: {
     view:"loop", tag:"step 1", name:"the queue", rl:"1 queue", title:"A ranked queue, not a wish list",
-    z:[102,86,2.4],
+    z:[280,90,2.4],
     sum:`<p>Cycles do not start from an idea. They start from the top unblocked entry of a ranked queue, built by clustering the last run's failures by <em>the stage that caused each one</em>.</p>
     <p class="figs">cluster · rank · read the actual failing rows</p>`,
     more:`<p>The clustering is model-free: group the failures, rank the piles, and then — the part that is
@@ -1876,7 +1929,7 @@ series_id   NULL
   },
   predict: {
     view:"loop", tag:"step 2", name:"predict", rl:"2 predict", title:"Register the prediction first",
-    z:[262,86,2.4],
+    z:[444.5,185,2.4],
     sum:`<p>Before any code is touched, the cycle writes down which ONE component it will change, which metric on which slice it expects to move, in which direction, and roughly how much.</p>
     <p class="figs">component · metric · slice · direction · magnitude</p>`,
     more:`<p>The prediction is the whole point. A number on its own says something moved; a number next to
@@ -1893,7 +1946,7 @@ series_id   NULL
   },
   change: {
     view:"loop", tag:"step 3", name:"change one", rl:"3 change ONE", title:"One component's implementation",
-    z:[422,86,2.4],
+    z:[444.5,375,2.4],
     sum:`<p>Change exactly one component, and only its <em>implementation</em>. Two experiments in one cycle make the delta unattributable and the hypothesis untestable.</p>
     <p class="figs">contracts frozen · no bundling · bugs are exempt</p>`,
     more:`<p>The line that keeps this honest is between <strong>implementation</strong> and
@@ -1911,7 +1964,7 @@ series_id   NULL
   },
   measure: {
     view:"loop", tag:"step 4", name:"measure", rl:"4 measure", title:"The smallest slice that shows it",
-    z:[582,86,2.4],
+    z:[280,470,2.4],
     sum:`<p>Measure on the smallest slice rich enough to show the failure you are chasing, and upsize only as the gains slow. The full set is a generalisation check, never the working loop.</p>
     <p class="figs">fixed slices, so this cycle's delta compares to the last one's</p>`,
     more:`<p>The slices are <em>fixed</em> — always the same rows — so a delta is comparable across cycles
@@ -1931,7 +1984,7 @@ series_id   NULL
   },
   compare: {
     view:"loop", tag:"step 5", name:"compare", rl:"5 compare", title:"Actual against predicted",
-    z:[742,86,2.4],
+    z:[115.5,375,2.4],
     sum:`<p>Did the metric you named move as you said, on the slice you named? Did anything you did not predict move? Both are findings.</p>
     <p class="figs">read the rows behind the number, not the headline alone</p>`,
     more:`<p>A score is a pointer, not the point. The verdict is read off the <em>targeted</em> slice and the
@@ -1946,7 +1999,7 @@ series_id   NULL
   },
   bank: {
     view:"loop", tag:"step 6", name:"bank it", rl:"6 bank it", title:"Bank it — negatives included",
-    z:[902,86,2.4],
+    z:[115.5,185,2.4],
     sum:`<p>Three records per cycle: the prose understanding, one machine-readable row of every metric, and one ledger row naming the component and the kind of change. A run that is not logged did not happen.</p>
     <p class="figs">RESULTS.md · loop_log.csv · loop_changes.csv</p>`,
     more:`<p>The prose is where the <em>understanding</em> lives: prediction, actual, and the interpretation —
@@ -1962,7 +2015,7 @@ series_id   NULL
   },
   seal: {
     view:"loop", tag:"the guards", name:"the seal", rl:"the seal", title:"The half you may never look at",
-    z:[180,250,2.2],
+    z:[765,116,1.8],
     sum:`<p>Every dataset here has a training half and a held-back half. <strong>No result from the held-back half is ever used to decide what to improve</strong> — not a number, not a slice, not a surprising delta.</p>
     <p class="figs">aggregates only, and the tooling enforces it</p>`,
     more:`<p>The rule in full: hypotheses come from the training pool's failures, exclusively. A held-back
@@ -1983,7 +2036,7 @@ series_id   NULL
   },
   dualgate: {
     view:"loop", tag:"the guards", name:"dual gate", rl:"dual gate", title:"It has to win twice",
-    z:[500,250,2.2],
+    z:[765,240,1.8],
     sum:`<p>A change must win on the generated set's training half <strong>and</strong> not regress the pool of real recorded speech. Winning on one is not a result.</p>
     <p class="figs">generated data can teach a template artefact — real data catches it</p>`,
     more:`<p>The clearest case so far: a single structural signal — the grammar parse showing an
@@ -2002,7 +2055,7 @@ series_id   NULL
   },
   designline: {
     view:"loop", tag:"the guards", name:"the line", rl:"design line", title:"Implementation, or design?",
-    z:[820,250,2.2],
+    z:[765,364,1.8],
     sum:`<p>The loop may re-implement a component inside its frozen contract, as often as it likes. Changing the design — the shape of the pipeline, or when it trusts what — is a person's decision.</p>
     <p class="figs">I propose; a person decides; the record says which it was</p>`,
     more:`<p>The distinction is not ceremony. A component's implementation can be judged by a number, because
@@ -2016,7 +2069,7 @@ series_id   NULL
   },
   instruments: {
     view:"loop", tag:"the guards", name:"instruments", rl:"instruments", title:"Four instruments, one boss",
-    z:[500,384,1.9],
+    z:[765,488,1.8],
     sum:`<p>Four measurements, each answering a different question — and the one measuring <strong>real use</strong> outranks the other three.</p>
     <p class="figs">a cycle that moves a benchmark while real usage stays flat has not helped anybody</p>`,
     more:`<div class="tblwrap"><table>
@@ -2040,7 +2093,7 @@ series_id   NULL
   },
   negatives: {
     view:"loop", tag:"the record", name:"negatives", rl:"negatives", title:"A negative is a result",
-    z:[500,508,1.7],
+    z:[765,612,1.8],
     sum:`<p>Several were banked in a single day. Each one is written down with the numbers that killed it, so no later cycle retries it blind.</p>
     <p class="figs">the ones that failed are the cheapest thing here to keep</p>`,
     more:`<h3>The models are not yet good enough to doubt the rules</h3>
@@ -2064,7 +2117,7 @@ series_id   NULL
   },
   eras: {
     view:"loop", tag:"the record", name:"eras", rl:"eras", title:"History kept, comparisons reset",
-    z:[500,632,1.8],
+    z:[505,727,1.05],
     sum:`<p>When the system changes structurally, the history is kept and every run stays re-scorable — but the comparison baseline resets, because a before-and-after across a rebuild compares two different machines.</p>
     <p class="figs">cross-era reads are trend lines, labelled — never cycle against cycle</p>`,
     more:`<p>It would be easy, and wrong, to read a board taken after a rebuild against the cycles before it
@@ -2310,7 +2363,6 @@ const ptitle = document.getElementById("ptitle");
 const pbody  = document.getElementById("pbody");
 const pprev  = document.getElementById("pprev");
 const pnext  = document.getElementById("pnext");
-const railEl = document.getElementById("rail");
 const viewsEl = document.getElementById("views");
 const devctl = document.getElementById("devctl");
 let cur = null;
@@ -2337,39 +2389,19 @@ function buildViews(){
     viewsEl.appendChild(b);
   }
 }
-function buildRail(){
-  railEl.textContent = "";
-  const home = document.createElement("button");
-  home.type = "button";
-  home.dataset.go = "home";
-  home.textContent = "⌂ whole view";
-  home.addEventListener("click", close);
-  railEl.appendChild(home);
-  for (const id of VIEW_IDS[view] || []){
-    const b = document.createElement("button");
-    b.type = "button";
-    b.dataset.go = id;
-    b.textContent = P[id].rl || P[id].name || id;
-    b.addEventListener("click", () => open(id));
-    railEl.appendChild(b);
-  }
-  markRail();
-}
 function markRail(){
   viewsEl.querySelectorAll("button").forEach(b =>
     b.classList.toggle("on", b.dataset.view === view));
-  railEl.querySelectorAll("button").forEach(b =>
-    b.classList.toggle("on", b.dataset.go === (cur ?? "home")));
 }
 function setView(v, keepPanel){
-  if (v === view){ buildRail(); return; }
+  if (v === view){ markRail(); return; }
   resetWorld(view);
-  stageOf(view).hidden = true;
+  stageOf(view).classList.add("off");
   view = v;
-  stageOf(view).hidden = false;
+  stageOf(view).classList.remove("off");
   devctl.hidden = (view !== "system");
   if (!keepPanel && cur !== null && P[cur].view !== view){ cur = null; panel.hidden = true; }
-  buildRail();
+  markRail();
 }
 
 function open(id){
@@ -2616,6 +2648,6 @@ sysStage.addEventListener("focusin",   e => { const g = e.target.closest(".clien
 sysStage.addEventListener("focusout",  e => { if (e.target.closest(".client")) hideTip(); });
 
 buildViews();
-buildRail();
+markRail();
 renderClients();
 </script>

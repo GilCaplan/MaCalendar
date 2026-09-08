@@ -743,3 +743,44 @@ def test_the_dataset_sizes_quoted_are_current(all_prose):
                 f"there are {len(speakers)} personas; {name} says otherwise")
             assert f"{len(rows):,} rows" in text, (
                 f"{name} miscounts the persona rows; there are {len(rows):,}")
+
+
+def test_the_split_drawn_on_the_loop_view_matches_the_files():
+    """The seal is now a PICTURE — a bar split train | sealed — not a paragraph.
+
+    Every other check on this page runs against `_prose`, which strips the
+    <svg> blocks out on purpose: diagram geometry is full of bare numbers and
+    matching a claim against a path coordinate would let it pass for the wrong
+    reason. But the loop view's seal guard draws the split with its two row
+    counts printed on the bar, and a number a reader can see is a claim
+    whatever element it lives in. So this one reads the raw file, and only for
+    the two strings the drawing actually prints — narrow enough that a
+    coordinate cannot satisfy it by accident.
+
+    The group carries data-claim="seal-split" so the check fires on the
+    drawing rather than on any page that happens to mention a seal.
+    """
+    import json
+    pool = ROOT / "dataset" / "inputs" / "history_3000.json"
+    sealed = ROOT / "dataset" / "inputs" / "test_split.json"
+    if not (pool.exists() and sealed.exists()):
+        pytest.skip("the datasets are not present in this checkout")
+    n_pool = json.loads(pool.read_text())["n"]
+    n_sealed = json.loads(sealed.read_text())["n"]
+
+    drew = False
+    for path in PAGES:
+        raw = path.read_text()
+        if 'data-claim="seal-split"' not in raw:
+            continue
+        drew = True
+        assert f"train &#183; {n_pool - n_sealed:,}" in raw or \
+               f"train · {n_pool - n_sealed:,}" in raw, (
+            f"{path.name} draws the training half, but the pool holds {n_pool} "
+            f"rows of which {n_sealed} are sealed — the bar should say "
+            f"{n_pool - n_sealed:,}")
+        assert f"sealed &#183; {n_sealed}" in raw or f"sealed · {n_sealed}" in raw, (
+            f"{path.name} draws the sealed half as a different number; "
+            f"test_split.json holds {n_sealed} rows")
+    if not drew:
+        pytest.skip("no published page draws the split")
