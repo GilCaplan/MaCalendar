@@ -299,3 +299,122 @@ extremely important."*
    recommended it; Gil's answer implies keeping them adjacent. Not blocking.
 4. **Dated tasks on the calendar** — Gil raised it ("a task that shows in the
    calendar"). Noted as a product idea, out of scope here.
+
+---
+
+# 8 · What the research changed (2026-09-08)
+
+Six angles searched, every paper verified to exist by a second agent. Five
+findings change a decision here; the rest confirmed what we had.
+
+## 8.1 · DROP the atomicity classifier. The stopping test should be mechanical.
+
+Gil asked whether the ML model is the right method for the "is this atomic?"
+gate. The literature answers three-for-three, and the answer is that **nobody
+trains one**:
+
+- **DisSim** (Niklaus, ACL 2019) recurses a rule set until no rule fires —
+  a deterministic fixpoint, 100% reliable by construction, zero cost. Its
+  accuracy on the construction we actually care about, COORDINATE CLAUSES,
+  is **99.1%**.
+- **ADaPT** (NAACL Findings 2024) recurses only when the EXECUTOR reports it
+  could not do the task.
+- **DecomP** (arXiv 2210.02406) recurses on a hard-coded size check.
+
+And the one paper that did try a learned complexity head — **Adaptive-RAG**
+(NAACL 2024) — reports **54–66%** accuracy on a 3-way decision, with heavy
+confusion between adjacent classes. That is the weakest link in any loop.
+
+**We already own the mechanical test.** FastRule's `reason_class() ==
+STRUCTURE` is exactly ADaPT's "the executor could not execute this" trigger.
+So the rule becomes **recurse while a STRUCTURE gate fires**, not "recurse
+while a classifier says non-atomic" — and combined with §3's measured ceiling
+(2 of 5,014 rows) this is now the cheap deterministic fixpoint and nothing
+more.
+
+**Depth**, from the flagship assistant benchmark: TOP (EMNLP 2018) reports
+median tree depth **2**, mean 2.54, 35% deeper than 2. So cap at 2, escalate
+to 3. Not unbounded.
+
+## 8.2 · Cutting is the EASY half. Copying is where the work is.
+
+**DialogUSR** (Findings of EMNLP 2022) is the closest published problem to
+ours — 11,669 multi-intent assistant commands **with all punctuation stripped
+to match post-ASR input**, which is our exact register. It splits the task
+into Split / Delete / Complete, and the gap is stark:
+
+| | score |
+|---|---|
+| Split accuracy (where to cut) | 84.4% → **98.8%** |
+| Exact match on pieces NEEDING completion | 56.9% → **70.3%** |
+
+**A ~28-point gap between finding the boundary and filling the piece in.**
+That reverses my instinct: phase 2 deserves the engineering budget, not
+phase 1.
+
+Two more results from the same paper:
+
+- **ORDER IS MEASURED, and ours is the winning one.** Their ablation:
+  Split→(Delete+Complete) is best (EM 56.17); (Delete+Complete)→Split is
+  worst (47.57); Split→Delete→Complete as three stages is worse than two.
+  So: **cut on the raw text first, then do the removing and the copying as one
+  operation** — which is exactly the phase 1 / phase 2 shape Gil described.
+- **Anaphora is the wrong tool.** 62.5% of follow-on pieces are incomplete,
+  and of those only **2.4%** are coreference — the rest are bare omissions.
+  A pronoun resolver would address 2.4% of the problem. We need modifier
+  COPYING, which is what §2 already describes.
+
+## 8.3 · ABCD — the closest published architecture, and it fits what we own
+
+**ABCD** (ACL 2021) recasts splitting as a **graph edit**: nodes are word
+tokens, edges are linear-adjacency plus dependency relations, and every
+element is classified **Accept / Break / Copy / Drop**. Its COPY action is
+precisely our shared-modifier mechanism — a token duplicated into the second
+component so each piece is self-contained. Cut-and-distribute as ONE decision,
+not two stages.
+
+Why it matters here: it runs on a dependency parse and a small classifier —
+**exactly the spaCy + pure-python-logistic stack we already have** — and on
+messy informal text it beats a seq2seq generator by ~17 points on count-match
+(53.29% vs 36.20%), while tying on clean text. Worth prototyping against our
+hand-written rules before assuming rules win.
+
+Related: **Question Decomposition with Dependency Graphs** (arXiv 2104.08647)
+shows a tagger reaching this shape at ~80ms against ~1.3s for a generator, for
+a ~3-point accuracy tax — and, decisively for us, the graph parser
+**outperforms seq2seq at 10% of training data or less**. With a few thousand
+mostly-generated rows we are squarely in that regime.
+
+## 8.4 · Two dataset traps, both of which we would have walked into
+
+- **Fragment leakage.** *Split and Rephrase: Better Evaluation* (ACL 2018)
+  found the WebSplit benchmark leaked **>89% of its unique simple sentences**
+  between train and test, so a plain seq2seq scored well by MEMORISATION.
+  Our family-split is necessary and **not sufficient**: we must also verify
+  the ATOMIC ITEM STRINGS in the held-back half are unseen in training. If
+  "remind me to buy milk" appears in both, the number is partly a memorisation
+  score.
+- **Count-learning.** *MinWikiSplit* (2019) notes WikiSplit has exactly one
+  split per source sentence, so models learn "always emit two" regardless of
+  input. If our rows are almost all 1-or-2 asks, an implementation will learn
+  the COUNT rather than the criterion — and will fail on three-ask utterances
+  while scoring well. **Deliberately oversample 3+ ask rows**, and report the
+  gold-count distribution beside every score.
+
+## 8.5 · Do NOT add an LLM decomposition round
+
+*When Do Decompositions Help for Machine Reading?* (EMNLP 2023), verbatim:
+decompositions help in the few-shot case, but "when models are given access to
+datasets with around a few hundred or more examples, decompositions are not
+helpful (and can actually be detrimental)". We have thousands of rows. Stated
+honestly: their decomposition is a MEANS to a downstream answer where ours is
+the OUTPUT, so this does not say "don't split" — it says don't buy an extra
+model-driven round to help a stage with enough data to learn the split itself.
+It is the hypothesis to beat before spending a 2–8 s call per piece per round.
+
+**Calibration for our hardware**, from MAC-SLU (arXiv 2512.01603): Qwen3-8B —
+our model's class — scores **60.7%** on multi-intent commands with gold text,
+falling to **47.2%** at 3.6% CER and **35.5%** at 10.4% CER. So an
+LLM-does-everything decompose tops out around 60% even before ASR damage,
+which is the quantitative case for deterministic-first. It also prices the
+transcript stage: ~7 points of CER costs ~12 points of end-to-end accuracy.
