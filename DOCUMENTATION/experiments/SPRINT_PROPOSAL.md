@@ -137,6 +137,7 @@ which is the number that decides whether any of it mattered.
   noise? It would close the persona spread at its root and fits the rule that
   speech-specific handling belongs in cleanup — but rewrites destroy
   information, which is how the "high priority" retitle bug happened.
-- **Should a daypart count as a clock time** for the remind-convention?
-  Cycle B assumes NO (a daypart is not a time, so "remind me to take the
-  trash out tonight" is a task). If Gil rules otherwise, that item changes.
+- ~~Should a daypart count as a clock time?~~ **RULED (Q15): NO.** "remind me
+  to take the trash out tonight" is a task to do in the evening. The daypart
+  belongs in the task's due time, not in the kind decision. Cycle B
+  implements it.
