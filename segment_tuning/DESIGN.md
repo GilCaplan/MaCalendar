@@ -30,29 +30,39 @@ arithmetic rather than judgement:
   modifier is, and it is the only thing that distinguishes an edit from a
   rewrite.
 
-## 2 · The date-scoping rule, from Gil's three examples
+## 2 · The scoping model — WHERE the reference sits decides who gets it
 
-He gave three cases that a naive "share the date" rule gets wrong:
+Gil's framing, and it is the right one: *"where in the string is the reference
+to anything time related? that decides, once we split it, what time reference
+goes to what item."*
 
-| input | item 1 | item 2 |
+So the question is positional. Every time reference is either **INSIDE** one
+of the pieces, or at an **EDGE** of the whole command — before the first piece
+or after the last — belonging to no piece on its own.
+
+> **INTERIOR reference → binds to its own piece.
+> EDGE reference → distributes to every piece that has none of its own.**
+
+One rule, and it settles all four cases Gil gave, including the two that look
+contradictory:
+
+| input | where the reference sits | result |
 |---|---|---|
-| `tomorrow gym at 7 and meeting at 11` | tomorrow, 7 | **tomorrow**, 11 |
-| `tomorrow meeting at 7, today gym session` | tomorrow, 7 | **today** (its own) |
-| `gym session at 7, tomorrow meeting at 10` | **today** (default), 7 | tomorrow, 10 |
+| `tomorrow gym at 7 and meeting at 11` | **leading edge** | both tomorrow |
+| `tomorrow meeting at 7, today gym session` | interior ×2 | each keeps its own |
+| `gym session at 7, tomorrow meeting at 10` | **interior** to piece 2 | gym → today (default), meeting → tomorrow |
+| `submit the grades and prepare the slides by friday` | **trailing edge** | both due friday |
 
-One rule covers all three:
+My earlier "forward only" rule was wrong: it got the first three right and the
+fourth wrong. Edge-vs-interior gets all four, and it does not need to
+recognise deadline marker words to do it — which is the better sign.
 
-> **A date distributes FORWARD only, to later items that name none, and stops
-> at the next date.** An item with no date before any date has appeared takes
-> the default (today).
-
-Forward-only is what makes case 3 right: the gym does not become tomorrow just
-because a later item says so. This generalises what is in `segment.py` today
-(`_share_leading_date`, which only fires when the date OPENS the utterance).
-
-**The same rule is claimed for times and for due-dates but is NOT yet
-evidenced.** Whether "by friday" distributes the way "tomorrow" does is an
-assumption in this design — flagged in §7.
+**Still to settle, and the research angle on coordination scope is aimed at
+exactly this:** whether an edge reference distributes when the pieces are of
+DIFFERENT kinds (`"buy milk and book the dentist tomorrow"` — does the milk
+get a due date?), and whether TIMES behave like DATES (`"gym and yoga at 7"` —
+both at 7, or only the yoga?). The dataset must contain both shapes so the
+question is answered by data rather than by me.
 
 ## 3 · The architecture being proposed
 
@@ -74,7 +84,25 @@ Three consequences worth stating plainly:
 2. **The recursion needs a bound.** Proposed: max depth 3, and a piece that
    comes back unchanged stops immediately (the same "no progress, no point"
    rule that fixed the crosscheck loop today).
-3. **Every LLM call is a cost.** Gil: *"we do want to minimize LLM calls
+3. **THE CEILING IS MEASURED, and it is small.** Gil asked for this before
+   building. Re-running the deterministic splitter on its own output changes
+   the count on **2 of 5,014 FastRule rows (0.0%), 0 of 1,864 personas (0.0%)
+   and 8 of 847 real-speech rows (0.9%)**.
+
+   But the rows it does fix are the three-ask ones, and it fixes them
+   completely — `"remind me to organize the garage, call the plumber, and book
+   blood test friday"` comes out as 2 pieces on one pass and the right 3 on
+   two. So the splitter is NOT idempotent: it can leave a boundary on the
+   table.
+
+   **That changes the recommendation.** The cheap half of recursion — loop the
+   DETERMINISTIC tiers to a fixed point — costs microseconds, no model, no
+   classifier, and collects the whole measured ceiling. The expensive half —
+   an atomicity classifier gating a re-split — cannot beat that same ceiling,
+   so on current evidence it is not worth its call. Proposed: take the free
+   loop, and revisit the gated version only if the real-speech number grows.
+
+4. **Every LLM call is a cost.** Gil: *"we do want to minimize LLM calls
    because that's slow."* So the atomicity gate must be cheap — which makes
    §4 the open research question, not an implementation detail.
 
