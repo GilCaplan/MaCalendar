@@ -14,26 +14,31 @@
 | Orchestrator `run_transcript` (response contract, track selection) | `engine/__init__.py` |
 | Commit (only DB touchpoint; TargetNotFound recheck `_recheck_not_found`) | `engine/__init__.py` |
 | `EngineState` / `Item` / `Fix` dataclasses (the inter-stage contract) | `engine/state.py` |
-| Step 1: stop words, trivial filter, vocab, `needs_edit` gate | `engine/transcript.py` |
-| Step 2: deterministic splits + (gated) LLM segmentation | `engine/segment.py` |
-| Step 3: time-list → two events, task lists, quantities | `engine/decompose.py` |
-| Step 4: the named rules (`past_date_bump`, `bare_hour_pm`, …) + observance gate | `engine/validate.py` |
-| Step 5: `FastRule(threshold).run()` (selective classifier) + per-item parse | `engine/fastrule.py`, `engine/generate.py` |
-| Step 6: BLAME router + MAX_REENTRIES (implementation pending) | `engine/crosscheck.py` |
-| Step 7: label read-back | `engine/label.py` |
+| Step 1: stop words, trivial filter, vocab, `needs_edit` gate | `engine/ingest/repair.py` |
+| Step 2: deterministic splits + (gated) LLM segmentation | `engine/segmentation/old_seg/segment.py` |
+| Step 3: time-list → two events, task lists, quantities | `engine/decompose_validate/decompose.py` |
+| Step 4: the named rules (`past_date_bump`, `bare_hour_pm`, …) + observance gate | `engine/decompose_validate/validate.py` |
+| Step 5: `FastRule(threshold).run()` (selective classifier) + per-item parse | `engine/fastrule/fastrule.py`, `engine/generate/generate.py` |
+| Step 6: BLAME router + MAX_REENTRIES (implementation pending) | `engine/llmjudge/llmjudge.py` |
+| Step 7: label read-back | `engine/label/label.py` |
 | Contract pins | `tests/unit/test_engine_contracts.py` |
+| **Per-component docs** — what it is, its datasets, its metrics, its results | `engine/<component>/ARCHITECTURE.md` |
+| Segmentation's new halves (not yet promoted over `old_seg`) | `engine/segmentation/fastseg/`, `engine/segmentation/llmseg/` |
+| Segmentation's dataset (1,694 rows) and boards | `engine/segmentation/datasets/`, `engine/segmentation/experiments/` |
+| FastRule's dataset (7,200 rows) and boards | `engine/fastrule/datasets/`, `engine/fastrule/experiments/` |
+| Ingest's two halves: word repair, and queue coalescing | `engine/ingest/repair.py`, `engine/ingest/coalesce.py` |
 | Intake lock + `coalesce()` (step 0) | `engine/__init__.py` |
 | Background verify + patch tiers (`_background_verify`) | `engine/__init__.py` |
-| Gate learning (`learn_from_edit`, `confirm_unchanged`, confirms sidecar) | `engine/transcript.py` |
+| Gate learning (`learn_from_edit`, `confirm_unchanged`, confirms sidecar) | `engine/ingest/repair.py` |
 | Shared LLM transport (`call_json`, MACALENDAR_LLM_DISABLED guard) | `engine/llm.py` |
-| FastRule — the atomic-item executor (Atomicity / Gatekeeper / Scorer) | `engine/fastrule.py` |
+| FastRule — the atomic-item executor (Atomicity / Gatekeeper / Scorer) | `engine/fastrule/fastrule.py` |
 | The three routing classifiers + one shared LogisticModel | `intent/classifier.py` |
 | Spoken-noise cleanup — filler, courtesy, hedges, self-corrections (transcript stage + FastRule) | `intent/cleanup.py` |
 | Lead-time reader (shared by FastRule AND decompose — one copy) | `intent/lead_time.py` |
 | Recurrence as a SLOT (cadence, rounding, series anchor) | `intent/recurrence.py` |
 | NP- vs clause-coordination — a feature, a gate, AND the split boundary | `intent/coordination.py` |
 | Is this fragment an ASK? (shared by segment's clause tier and decompose's list tier) | `intent/asks.py` |
-| FastRule's product-shape board / atomicity board / persona board | `scripts/fastrule_shape.py`, `scripts/atomicity_board.py`, `scripts/persona_board.py` |
+| FastRule's product-shape board / atomicity board / persona board | `assistant/engine/fastrule/experiments/fastrule_shape.py`, `scripts/atomicity_board.py`, `scripts/persona_board.py` |
 | Fit the routing models (train halves only, deterministic) | `scripts/fit_route_models.py` |
 | Per-stage live gates | `scripts/engine_stage_check.py` |
 | K1 kind scorer — fit + offline eval (16 explainable weights; wiring = K2) | `scripts/kind_classifier_experiment.py` |

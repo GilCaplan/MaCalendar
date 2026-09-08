@@ -1,6 +1,7 @@
 # Engine restructure — component folders
 
-**Status: NOT STARTED. Blocked until the `v4-full` prompt run finishes.**
+**Status: DONE, 2026-09-08, on branch `engine-component-folders`.**
+Not merged to `main` — Gil reviews first.
 Agreed with Gil 2026-09-08. This is a **cleanup**: files move, the pipeline's
 shape does not. Work the checklist in order and tick as you go — it exists so a
 half-finished restructure can be resumed by someone who was not here.
@@ -58,27 +59,28 @@ Only the fastrule and segmentation datasets move.
 
 ## Order of work
 
-- [ ] **0. WAIT.** `v4-full` must finish. Two reasons, both real: the running
+- [x] **0. WAIT.** `v4-full` must finish. Two reasons, both real: the running
       job holds `segment_tuning` modules and appends to `segment_tuning/runs/`,
       and `old_vs_new.py` calls the OLD stage which falls back to
       `_llm_segments` — a second Ollama client would contend and silently
       inflate every latency number. Check with
       `ps -ax -o command | grep -c "^/opt/homebrew.*segment_tuning"` — must be 0.
-- [ ] 1. Branch. Never `main`.
-- [ ] 2. `git mv` every file per the table. `git mv`, not copy — history matters.
-- [ ] 3. Add temporary shim modules at the old paths re-exporting the new ones,
-      so the tree stays importable between steps.
-- [ ] 4. Update the **43 importers** (see below).
-- [ ] 5. `pytest tests/unit` green. This is the gate — `test_engine_contracts`,
+- [x] 1. Branch. Never `main`.
+- [x] 2. `git mv` every file per the table. `git mv`, not copy — history matters.
+- [~] 3. Shims turned out unnecessary: the moves were done in four groups
+      (least-depended-on first) with the importers updated in the same step,
+      so the tree was never broken for longer than one command.
+- [x] 4. Update the **43 importers** (see below).
+- [x] 5. `pytest tests/unit` green. This is the gate — `test_engine_contracts`,
       `test_engine_flow` and `test_panel_agreement` are what prove the shape
       did not move.
-- [ ] 6. Delete the shims. Re-run `pytest tests/unit`.
-- [ ] 7. `pytest tests/` (integration skips without Ollama).
-- [ ] 8. Write the ARCHITECTURE.md files.
-- [ ] 9. Run `old_vs_new.py`, record the result in
+- [x] 6. (no shims to delete)
+- [x] 7. `pytest tests/` (integration skips without Ollama).
+- [x] 8. Write the ARCHITECTURE.md files.
+- [x] 9. Run `old_vs_new.py`, record the result in
       `segmentation/experiments/RESULTS.md`.
-- [ ] 10. `python scripts/gen_api_reference.py` if any request field moved.
-- [ ] 11. Update `CLAUDE.md`, `DOCUMENTATION/SYSTEM.md`, `CODE_MAP.md`,
+- [x] 10. `python scripts/gen_api_reference.py` if any request field moved.
+- [x] 11. Update `CLAUDE.md`, `DOCUMENTATION/SYSTEM.md`, `CODE_MAP.md`,
       `ENGINE.md`, `TASKS.md` to the new paths.
 
 ## The 43 importers of `assistant.engine`

@@ -32,6 +32,7 @@ from __future__ import annotations
 import glob
 import os
 import sys
+import time
 
 _HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_HERE)))
@@ -49,7 +50,8 @@ for k, v in dict(MACALENDAR_DB=f"{_S}/c.db", MACALENDAR_MEMORY_DB=f"{_S}/m.db",
 from assistant.engine.segmentation.fastseg import invariant
 from assistant.engine.segmentation.experiments import score as sc          # noqa: E402
 from assistant.engine.segmentation.fastseg.fastseg import fastseg                 # noqa: E402
-from assistant.engine.segmentation.experiments.run_board import assign_splits         # noqa: E402
+from assistant.engine.segmentation.experiments.run_board import (  # noqa: E402
+    assign_splits, stratified_sample)
 
 
 def old_gold(row: "dict") -> "list[dict]":
@@ -84,9 +86,13 @@ def board(name: str, rows, predict, gold_of) -> dict:
     n = len(rows)
     count_ok = tp = n_pred = n_gold = tag_ok = tag_n = 0
     over = under = 0
+    elapsed = 0.0
     for row in rows:
         gold = [sc.as_item(g) for g in gold_of(row)]
-        pred = [sc.as_item(p) for p in predict(row["text"])]
+        _t0 = time.perf_counter()
+        raw_pred = predict(row["text"])
+        elapsed += time.perf_counter() - _t0
+        pred = [sc.as_item(p) for p in raw_pred]
         count_ok += len(gold) == len(pred)
         over += len(pred) > len(gold)
         under += len(pred) < len(gold)
@@ -103,16 +109,27 @@ def board(name: str, rows, predict, gold_of) -> dict:
             "p": prec, "r": rec,
             "f1": 2 * prec * rec / (prec + rec) if prec + rec else 0.0,
             "tag": tag_ok / tag_n if tag_n else 0.0, "tag_n": tag_n,
-            "over": over, "under": under}
+            "over": over, "under": under, "sec_per_row": elapsed / max(1, n)}
 
 
 def main() -> None:
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--limit", type=int, default=0,
+                    help="cap the rows; the OLD stage falls back to the LLM, so a "
+                         "full pass is a model job")
+    a = ap.parse_args()
     from assistant.engine import load_config
 
     cfg = load_config()
     rows = [r for r in assign_splits(
         sc.load_rows(sorted(glob.glob(f"{_HERE}/datasets/*.jsonl"))))
         if r["split"] == "train"]
+    if a.limit:
+        # TRAP-STRATIFIED, not the first N: the rows sort by id, so a plain head
+        # would be one template family repeated and would say nothing about the
+        # shapes the two systems actually differ on.
+        rows = stratified_sample(rows, a.limit)
 
     print(f"{len(rows)} rows — segment-tuning TRAIN half\n")
     print("Both systems judged ONLY on what both were built to do. The old "
@@ -125,17 +142,22 @@ def main() -> None:
     ]
 
     print(f"{'':<20}{'item count':>12}{'item P':>9}{'item R':>9}{'item F1':>10}"
-          f"{'tag acc':>10}{'over':>7}{'under':>7}")
+          f"{'tag acc':>10}{'over':>7}{'under':>7}{'sec/row':>10}")
     print("-" * 84)
     for b in results:
         print(f"{b['name']:<20}{b['count']:>12.1%}{b['p']:>9.1%}{b['r']:>9.1%}"
-              f"{b['f1']:>10.1%}{b['tag']:>10.1%}{b['over']:>7}{b['under']:>7}")
+              f"{b['f1']:>10.1%}{b['tag']:>10.1%}{b['over']:>7}{b['under']:>7}"
+              f"{b['sec_per_row']:>10.3f}")
 
     o, nw = results
     print(f"\n{'delta (new - old)':<20}{nw['count'] - o['count']:>+12.1%}"
           f"{nw['p'] - o['p']:>+9.1%}{nw['r'] - o['r']:>+9.1%}"
           f"{nw['f1'] - o['f1']:>+10.1%}{nw['tag'] - o['tag']:>+10.1%}")
 
+    print(f"\n   COST is the column that changes the reading: old_seg falls back "
+          f"to the\n   LLM when its deterministic pass finds nothing, so its score "
+          f"is MODEL-ASSISTED.\n   FastSeg makes zero model calls "
+          f"({o['sec_per_row'] / max(1e-9, nw['sec_per_row']):.0f}x faster here).")
     print("\nONLY THE NEW SYSTEM DOES THIS (no old-system number exists):")
     print("   time extraction — the old stage left the time inside the item text")
 

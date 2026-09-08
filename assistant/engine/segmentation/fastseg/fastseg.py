@@ -11,7 +11,7 @@ cut-then-assign shape below.
   2  ASSIGN TIME  reads the pieces AND the original string together
   3  TAG          event | task | review
 
-It lives in `segment_tuning/` rather than in `assistant/engine/` on purpose:
+It lives in `assistant/engine/segmentation/experiments/` rather than in `assistant/engine/` on purpose:
 this is the thing being tuned, and the engine is serving a phone. It IMPORTS
 the two stable readers it needs (the clause splitter and the ask guard) rather
 than copying them, so a fix there is not made twice.

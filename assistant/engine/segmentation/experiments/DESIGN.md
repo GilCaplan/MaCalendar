@@ -259,7 +259,7 @@ dependency-parse rules alone, the two in union (today's arrangement), a
 small gradient-boosted model on the same features, and the LLM as an upper
 bound on what is achievable. **The deliverable is a table, not a preference.**
 
-## 5 · The dataset — `/segment_tuning`
+## 5 · The dataset — `assistant/engine/segmentation/datasets/`
 
 Built fresh here, changing nothing under `dataset/`.
 
@@ -273,7 +273,7 @@ Built fresh here, changing nothing under `dataset/`.
 ```
 
 **Gold is exact by construction, not reconstructed.** The 321 templates in
-`dataset/fastrule/banks/complex_patterns.json` already encode the structure —
+`assistant/engine/fastrule/datasets/banks/complex_patterns.json` already encode the structure —
 e.g. `book {event_title} {date} at {time} and {event_title2} {date2} at
 {time2}`. A generator that renders the PARTS and joins them knows the gold
 split for free. That is far stronger than inferring boundaries after the fact,
@@ -497,7 +497,7 @@ and measured **5/14** against llama3.1:8b. The tested winner is V3 in §10,
 which scores **11/14** by removing the judgement entirely: the model always
 emits a decomposition and deterministic code diffs it.
 
-The exact tested text lives in `segment_tuning/verifier_prompt_v3.txt`.
+The exact tested text lives in `assistant/engine/segmentation/experiments/verifier_prompt_v3.txt`.
 
 ## The one risk, named up front
 

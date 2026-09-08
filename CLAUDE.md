@@ -57,6 +57,27 @@ decompose → validate → generate → crosscheck → label, with a fast track 
 commits a confident rule parse instantly. `DOCUMENTATION/ENGINE.md` is the
 canonical contract reference — open it before touching any stage.
 
+**Each component owns a FOLDER, and everything about it lives there** (Gil,
+2026-09-08): its code, the datasets used to improve it, the experiments run
+against it, and an `ARCHITECTURE.md` explaining all four. Open that file first.
+
+    ingest/  segmentation/  fastrule/  decompose_validate/
+    generate/  llmjudge/  label/          state.py component.py llm.py __init__.py
+
+Three things this shape is bought with:
+
+- **A folder name is not an import path.** `decompose_validate/` holds two
+  stage modules; `segmentation/` holds four packages. `cli.check_engine` keeps
+  `(component, module)` pairs for exactly this reason.
+- **A stage's `Stage("…")` identifier is NOT the folder name.** `trace.py`'s
+  `CHAINS` keys off generic kinds (`vocab`, `rule`, `verify`), so folders rename
+  freely — but renaming a *stage identifier* needs the whole panel procedure
+  below. `llmjudge/` still registers as `Stage("crosscheck")`; that is
+  deliberate.
+- **The datasets moved with their components.** `dataset/` still holds the
+  cross-component verification corpus; the FastRule and Segmentation sets are
+  now under `assistant/engine/<component>/datasets/`.
+
 - **Stage I/O contracts are frozen.** `tests/unit/test_engine_contracts.py`
   pins them. Fix a weak stage inside its own module, against its own tests —
   never by reshaping `EngineState`, editing the orchestrator, or reaching into
@@ -197,7 +218,7 @@ is proven on its OWN dataset before the system is reconnected:
 `DOCUMENTATION/STAGE_ISOLATION_PLAN.md` is the plan; per-stage data lives in
 `dataset/stages/<stage>/`, never edited to suit another stage, each with its
 own train–test split under the usual leakage rules. FastRule's is
-`dataset/fastrule/` (7,200 rows) scored by `scripts/fastrule_shape.py`
+`assistant/engine/fastrule/datasets/` (7,200 rows) scored by `assistant/engine/fastrule/experiments/fastrule_shape.py`
 against its product shape: **defer on non-atomic items, create the right
 event/task otherwise**. The whole-system improvement loop below is intact
 and resumes once the parts are proven.
@@ -228,7 +249,7 @@ comes from training-pool failures alone. Same rule for the FastRule 6000
 set's test half.
 
 The deterministic FAST track has its own lane: `python -m
-scripts.fast_sandbox` (seconds, full-3000 allowed, selective-classifier
+assistant.engine.fastrule.experiments.fast_sandbox` (seconds, full-3000 allowed, selective-classifier
 scoring, held-out aggregates only) — rules in ITERATION_PROTOCOL.md.
 
 (`--limit 0` lifts the script's default 150-row cap — without it a rank slice

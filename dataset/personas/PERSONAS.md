@@ -114,7 +114,7 @@ The generator chose the filler that became `slots.title`; the structure
 declares `action` / `atomic` / `events` / `tasks` once. Nothing is
 hand-labelled and no LLM is in the pipeline — it is deterministic string
 templating, which is also why regeneration is byte-identical. The row schema
-is `dataset/fastrule/`'s, so the same scorers read both:
+is `assistant/engine/fastrule/datasets/`'s, so the same scorers read both:
 
 ```json
 {
@@ -173,7 +173,7 @@ one definition in the repo.
     python -m scripts.persona_board --examples 6    # failing rows, per persona per bucket
     python -m scripts.persona_board --data dataset/personas/personas_ablation.jsonl
 
-Metrics are `scripts/fastrule_shape.py`'s, imported rather than recopied:
+Metrics are `assistant/engine/fastrule/experiments/fastrule_shape.py`'s, imported rather than recopied:
 atomic **handle-rate** and **correct-on-handled** are primary; the non-atomic
 bucket (deferred / covered / **half-executed**) is diagnostic; plus explicit-time
 correctness, invention rate, the Q9 propose defer rate, and the three

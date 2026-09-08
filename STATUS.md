@@ -214,7 +214,7 @@ milestones — never mined. (Gil, 2026-09-07) — this order, before ANY new hyp
 
 **Deep lane** — the 55-min dev-fast cycles below, now pairable (one [fast]
 + one [deep] hypothesis per run; [routing] rides alone — protocol).
-**Fast-sandbox lane (live 2026-09-07)** — `python -m scripts.fast_sandbox`
+**Fast-sandbox lane (live 2026-09-07)** — `python -m assistant.engine.fastrule.experiments.fast_sandbox`
 scores the rule system alone as a selective classifier in ~18s (commit
 rate × adjusted-on-committed; an abstain is deep's job). Batched
 predictions, dev-full gate, sealed held-out, and NOTHING lands on the main

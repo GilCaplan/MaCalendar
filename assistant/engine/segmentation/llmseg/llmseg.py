@@ -114,7 +114,7 @@ def normalise_tag(value, fallback: str = "event") -> str:
 
 
 # ---------------------------------------------------------------------------
-# THE PROMPT (V3, the tuned winner — see segment_tuning/verifier_prompt_v3.txt)
+# THE PROMPT (V3, the tuned winner — see assistant/engine/segmentation/experiments/verifier_prompt_v3.txt)
 # ---------------------------------------------------------------------------
 
 #: V4. V3 was measured against gold that has since changed underneath it, and

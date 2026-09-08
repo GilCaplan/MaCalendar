@@ -1,8 +1,8 @@
 """Sandbox the FAST track alone — the rule parser (with its gates) scored as
 a selective classifier, no deep track, no LLM, no execution.
 
-    python -m scripts.fast_sandbox --max-rank 250      # seconds, not minutes
-    python -m scripts.fast_sandbox --max-rank 600
+    python -m assistant.engine.fastrule.experiments.fast_sandbox --max-rank 250      # seconds, not minutes
+    python -m assistant.engine.fastrule.experiments.fast_sandbox --max-rank 600
 
 Rows replay frozen at their recorded timestamps (same epoch conventions as
 the main harness). Per row, generate.fast_propose() runs exactly as in

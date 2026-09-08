@@ -50,7 +50,7 @@ only" rule is retired — the sealed 300 replace it.
 aggregate replays and threshold sweeps had touched all ranks, so for
 FastRule-specific evaluation a fresh 6,000-prompt set is being built
 (2,000 simple / 4,000 complex, ground truth by construction, 80–20
-train–test) under `dataset/fastrule/`.
+train–test) under `assistant/engine/fastrule/datasets/`.
 
 ## FastRule's three data sources, and what each may tune (Gil, 2026-09-07)
 
@@ -59,7 +59,7 @@ our schema, our conventions. Powers the fits that were data-starved: K1
 kind-scorer retrains, R2's reliability diagram → multiplier calibration,
 threshold re-sweeps. Real usage-shaped text; judged by our ground truth.
 
-**B — the generated 6,000 (`dataset/fastrule/`): the STRUCTURE-SUPERVISION
+**B — the generated 6,000 (`assistant/engine/fastrule/datasets/`): the STRUCTURE-SUPERVISION
 source.** Ground truth by construction (atomic flag, action, slots) gives
 FastRule supervision it never had: per-gate precision/recall by family,
 slot-level (title/date/time) scoring, per-family regression floors (a regex
@@ -112,7 +112,7 @@ lines). **Whole-engine cycles RESUME from here**, with two changes to how
 they are judged:
 
 1. **Two boards, not one.** A change to FastRule is judged on the FastRule
-   7,200's test half FIRST (`scripts/fastrule_shape.py` — atomic handle-rate
+   7,200's test half FIRST (`assistant/engine/fastrule/experiments/fastrule_shape.py` — atomic handle-rate
    and correct-on-handled are primary; the non-atomic bucket is diagnostic
    per Gil's Q13), and only then on an engine run.
 2. **The dual gate still binds**: no FastRule batch ships if it regresses
@@ -143,7 +143,7 @@ graduates when its metric stops being the binding constraint on the stage
 below it.
 
 **FastRule's shape metric (the model for the others):** it is scored by what
-it is FOR — `scripts/fastrule_shape.py` reports handled-rate and
+it is FOR — `assistant/engine/fastrule/experiments/fastrule_shape.py` reports handled-rate and
 correct-on-handled for ATOMIC rows, defer-rate for NON-ATOMIC rows (a commit
 there is a routing violation, and the defer is split into "knew it was
 compound" vs "deferred by accident"), and defer-rate for Q9 propose rows.
@@ -491,7 +491,7 @@ row is scored with its parse path. Rules that keep attribution honest:
 
 ## The fast-sandbox lane (Gil, 2026-09-07)
 
-`python -m scripts.fast_sandbox --max-rank 250` replays the FAST track
+`python -m assistant.engine.fastrule.experiments.fast_sandbox --max-rank 250` replays the FAST track
 alone — rule parser + gates, no LLM, no execution — in ~18s (vs ~55min),
 scored as a SELECTIVE classifier: commit rate x correct-on-committed (an
 abstain is deep's job, never a failure). Rules: tweak batches carry ONE

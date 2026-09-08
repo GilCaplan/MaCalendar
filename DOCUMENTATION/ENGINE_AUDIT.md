@@ -31,16 +31,16 @@ That code does not exist. `FastRule` is instantiated **exactly once** in
 production:
 
 ```
-assistant/engine/generate.py:96-99   FastRule(RULE_THRESHOLD).run(...)   # the 0.80 front door
+assistant/engine/generate/generate.py:96-99   FastRule(RULE_THRESHOLD).run(...)   # the 0.80 front door
 ```
 (verified: `grep -rn "FastRule("` → the only other hits are `tests/unit/test_fastrule.py`,
-`scripts/fastrule6k.py`, `scripts/fastrule_shape.py`.)
+`assistant/engine/fastrule/experiments/fastrule6k.py`, `assistant/engine/fastrule/experiments/fastrule_shape.py`.)
 
 The per-item path instead **re-implements FastRule's commit predicate inline
 and omits both gate layers**:
 
 ```python
-# assistant/engine/generate.py:157-173  (_parse_item)
+# assistant/engine/generate/generate.py:157-173  (_parse_item)
 rr = rule_parser.analyze(item.text, current_view=state.current_view)
 is_fragment = item.text.strip() != state.text.strip()
 bar = SUBITEM_RULE_THRESHOLD if is_fragment else RULE_THRESHOLD
@@ -86,7 +86,7 @@ Four methods with **no callers anywhere outside `parser.py` itself**:
 
 | method | lines | superseded by |
 |---|---|---|
-| `verify_fast_path_async` | 210-240 | `engine/crosscheck.py` |
+| `verify_fast_path_async` | 210-240 | `engine/llmjudge/llmjudge.py` |
 | `_run_verification` | 329-360 | ” |
 | `verify_actions_async` | 361-388 | ” |
 | `_verify_block` | 389-504 | ” |
@@ -327,7 +327,7 @@ FastRule-lane experiment and does **not** need a full-engine run.
 
 ### P5 · Cadence rounding is implemented twice, with different tables, and one gap is silent
 
-| | `intent/recurrence.py:30-41` (`_PATTERNS`) | `engine/validate.py:50-57` (`_UNSUPPORTED_CADENCE`) |
+| | `intent/recurrence.py:30-41` (`_PATTERNS`) | `engine/decompose_validate/validate.py:50-57` (`_UNSUPPORTED_CADENCE`) |
 |---|---|---|
 | every other X | → weekly, `rounded_from` set | → announced |
 | every weekday | → daily, `rounded_from` set | → announced |
@@ -441,9 +441,9 @@ next row's foreground work, on every dev-fast-250 run.
 ### P9 · The two FastRule scorers disagree about what an atomicity abstain is
 
 ```
-scripts/fastrule_shape.py:40  _ATOMICITY_REASONS = {"strong-compound", "clause-coordination",
+assistant/engine/fastrule/experiments/fastrule_shape.py:40  _ATOMICITY_REASONS = {"strong-compound", "clause-coordination",
                                                     "mixed-mode-compound", "model-compound"}
-scripts/fastrule6k.py:54      _COMPOUND_REASONS  = ("strong-compound", "clause-coordination",
+assistant/engine/fastrule/experiments/fastrule6k.py:54      _COMPOUND_REASONS  = ("strong-compound", "clause-coordination",
                                                     "mixed-mode-compound")
 ```
 

@@ -26,7 +26,7 @@ about: **harm** (errors are not equal), the **knew-vs-accident split**
 | label-correctness | category accuracy + macro P/R/F1 (events), tag micro-P/R/F1 (tasks) |
 | parse path + latency (p50/p95) | which track answered, and how slowly |
 
-## Level 2 — FASTRULE, the atomic-item executor (`scripts/fastrule_shape.py`)
+## Level 2 — FASTRULE, the atomic-item executor (`assistant/engine/fastrule/experiments/fastrule_shape.py`)
 
 Measured by what it is FOR, not how busy it is. **Primary** (Gil, Q13):
 

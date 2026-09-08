@@ -30,8 +30,8 @@ purely backend (no client code beyond displaying the effects).
 | hybrid | [Share event as .ics](#share-event-as-ics) | one event → RFC 5545 file, both platforms | `ics_export.py`, `event_dialog.py` |
 | hybrid | [Pre-event notifications](#pre-event-notifications) | phone rings from its cache; server computes policy; per-category mute; live "Up Next" lock-screen card | `notify.py`, `ReminderScheduler.swift`, `LiveActivityManager.swift` |
 | hybrid | [Voice I/O & capture controls](#voice-in--voice-out--capture-controls) | hotkey/stop-phrases/review-bar; engine-selectable STT; spoken replies | `stt/`, `Voice/`, `tts/` |
-| hybrid | [Edit-transcription gate](#the-edit-transcription-round-trip-needs_edit) | doubted words → editor → learned | `engine/transcript.py` |
-| hybrid | [Confirm-create gate](#the-confirm-create-gate-confirm_create) | "should I add yoga tomorrow?" → Add / No, never a silent guess | `engine/validate.py`, `/voice/confirm` |
+| hybrid | [Edit-transcription gate](#the-edit-transcription-round-trip-needs_edit) | doubted words → editor → learned | `engine/ingest/repair.py` |
+| hybrid | [Confirm-create gate](#the-confirm-create-gate-confirm_create) | "should I add yoga tomorrow?" → Add / No, never a silent guess | `engine/decompose_validate/validate.py`, `/voice/confirm` |
 | hybrid | [Self-check & revert](#background-self-check--one-tap-revert) | background re-reasoning, one-tap undo | `engine/__init__.py`, panels |
 | hybrid | [Review panel / HUD](#the-review-panel-thinking-hud--ios-timeline) | live chain-of-thought card + history | `thinking_hud.py`, `ThinkingView` |
 | hybrid | [Personal vocabulary](#personal-vocabulary) | user's words fix transcripts first | `stt/vocab.py` |
@@ -49,7 +49,7 @@ purely backend (no client code beyond displaying the effects).
 | backend | [Task tags](#task-tags--a-finite-classification) | closed-set classification w/ healing | `actions/todo/tagging.py` |
 | backend | [Categories & stacking](#events-categories-colours--binder-stacking) | auto-colour/categorise; overlaps stack | `actions/calendar/categories.py` |
 | backend | [Hebrew calendar & observance](#hebrew-calendar--observance) | sundown-bounded halachic windows + gate | `observance.py`, `hebrew_calendar.py` |
-| backend | [Recurring events](#recurring-events) | daily/weekly/monthly, announced rounding | `db.py`, `engine/validate.py` |
+| backend | [Recurring events](#recurring-events) | daily/weekly/monthly, announced rounding | `db.py`, `engine/decompose_validate/validate.py` |
 | backend | [API server](#the-api-server) | the single front door, 112 endpoints | `api/server.py` |
 | backend | [Hosted calendar sync](#hosted-calendar-sync) | optional Outlook two-way / ICS read | `calendar_sync/` |
 | backend | [Self-improvement loop](#the-self-improvement-loop) | the AI measures & improves itself | `dataset/`, `scripts/` |
@@ -209,7 +209,7 @@ non-loopback sockets in the build.
 **What:** When the vocabulary doubts words in a transcript, nothing executes —
 the client shows an editor; the correction (or confirmation) is learned so the
 gate fires less over time.
-**Where:** gate in `assistant/engine/transcript.py`; Mac dialog via
+**Where:** gate in `assistant/engine/ingest/repair.py`; Mac dialog via
 `pipeline.py` (`supports_edit: true`); iOS `EditTranscriptionSheet` in
 `Views/VoiceButton.swift`; all `/voice*` routes forward `supports_edit`.
 **How:** A changed word becomes a vocab alias + phonetic key immediately; an
@@ -221,8 +221,8 @@ carries `edited_from` and bypasses the gate once.
 calendar tomorrow?", "what if I booked town hall for the 3rd?" — is neither
 executed nor silently dropped. The parse is finished and offered: the client
 shows what it would create, Add creates it, No discards it.
-**Where:** reader `is_interrogative_create` in `engine/segment.py`; rule
-`interrogative_create_asks_first` in `engine/validate.py`; short-circuit
+**Where:** reader `is_interrogative_create` in `engine/segmentation/old_seg/segment.py`; rule
+`interrogative_create_asks_first` in `engine/decompose_validate/validate.py`; short-circuit
 `_confirm_proposal` / `_confirm_response` in `engine/__init__.py`; token store
 and `POST /voice/confirm` in `api/server.py`; Mac `ask_create_confirm` in
 `calendar_ui/window.py` (via `pipeline.py`, `supports_confirm: true`); iOS
@@ -501,7 +501,7 @@ computed from the sky (candle lighting → tzeit) at the user's actual location;
 the observance gate on AI-created events; recurring series skip holy days
 (meals excepted, fasts inverted, Shabbat-anchored kept).
 **Where:** `assistant/observance.py`, `hebrew_calendar.py`;
-`db._skip_for_observance`; engine gate in `engine/validate.py`; location from
+`db._skip_for_observance`; engine gate in `engine/decompose_validate/validate.py`; location from
 the phone via `/observance/location`; iOS `HebrewDate.swift`,
 `DeviceLocation.swift`.
 **How:** `pyluach` + `astral`, sundown-bounded not midnight-bounded. All
@@ -513,7 +513,7 @@ gating sits behind `observance.enabled` (config, default on;
 rounding is announced; "until" excludes its day, "through"/"including" keep
 it; weekly series start on the soonest named weekday.
 **Where:** `db.create_event`/series instancing; rules re-checked in
-`engine/validate.py`.
+`engine/decompose_validate/validate.py`.
 **How:** Series instances materialise as rows sharing `series_id`; observance
 skipping applies per instance at creation.
 

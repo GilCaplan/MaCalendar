@@ -5,7 +5,7 @@
 > `DOCUMENTATION/STAGE_ISOLATION_PLAN.md`. The contracts below are unchanged;
 > what changed is that a stage is now judged by its OWN metric first.
 > FastRule v1 retired the same day (`retired/fastrule-v1/`, tag
-> `fastrule-v1`); `engine/fastrule.py` is now the Q11 structure — Atomicity
+> `fastrule-v1`); `engine/fastrule/fastrule.py` is now the Q11 structure — Atomicity
 > (layer 0), Gatekeeper, Scorer as objects — behaviour proven identical
 > across 7,200 rows before the switch.
 
@@ -187,7 +187,7 @@ behaviour and the booking runs. Without `supports_confirm` nothing changes,
 which is what keeps old clients working.
 
 ### 5 · generate (`generate.py` · trace `rule`/`llm` · tests `test_engine_generate.py` + integration)
-Owns ALL text→intent conversion. **`FastRule`** (`engine/fastrule.py`) is the
+Owns ALL text→intent conversion. **`FastRule`** (`engine/fastrule/fastrule.py`) is the
 deterministic rule parser + its abstention gates + a confidence threshold, as
 a self-contained SELECTIVE CLASSIFIER: `FastRule(threshold).run(prompt)`
 returns a commit-or-abstain verdict (`.committed`, `.intents`, `.confidence`,

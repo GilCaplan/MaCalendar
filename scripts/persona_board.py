@@ -7,7 +7,7 @@ cannot move the trained classifiers, which read STRUCTURE. If that holds, every
 persona's board looks the same and the variance rows are ~0. If it does not,
 the variance rows say by how much, and which persona pays.
 
-The metrics are `scripts/fastrule_shape.py`'s, unchanged and imported from it
+The metrics are `assistant/engine/fastrule/experiments/fastrule_shape.py`'s, unchanged and imported from it
 rather than recopied, so a persona board and a FastRule board mean the same
 thing:
 
@@ -421,7 +421,7 @@ def main() -> int:
     print(f"PERSONA BOARDS — {path.name} "
           f"({len(rows)} rows, {len(PERSONAS)} columns x {len(rows)//len(PERSONAS)}, "
           "TEST-ONLY)\nfast track only (FastRule + gates, no LLM, no execution) · "
-          "metrics from scripts/fastrule_shape.py")
+          "metrics from assistant/engine/fastrule/experiments/fastrule_shape.py")
     print("=" * 100)
     hdr = f"{'':30s}" + "".join(f"{SHORT[p]:>15s}" for p in PERSONAS)
     print(hdr)

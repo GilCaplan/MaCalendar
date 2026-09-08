@@ -1,6 +1,6 @@
 # The segment dataset — what gets built, in what order
 
-Everything lives in `segment_tuning/`. Nothing under `dataset/` is edited.
+Everything lives in `assistant/engine/segmentation/experiments/`. Nothing under `dataset/` is edited.
 
 ## The row
 
@@ -64,7 +64,7 @@ Ask-count spread `{1: 978, 2: 604, 3: 110, 4: 2}`; tags
 
 ### The generator did not start from scratch — and that is the point
 
-`dataset/fastrule/banks/complex_patterns.json` already held 321 templates built
+`assistant/engine/fastrule/datasets/banks/complex_patterns.json` already held 321 templates built
 for a different board, and they carry exactly what segment gold needs: an
 `atomic` flag and **named slots**. Because the template says `{date}`, the
 action/time split is *known* rather than inferred — a regex over rendered text

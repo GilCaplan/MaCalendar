@@ -1,8 +1,8 @@
 # FastRule & Segment research — techniques for a deterministic selective classifier
 
 Research pass, 2026-09-06. Scope: concrete, implementation-level techniques for
-(1) `assistant/intent/rule_parser.py` + `assistant/engine/fastrule.py`
-("FastRule", the deterministic front door) and (2) `assistant/engine/segment.py`
+(1) `assistant/intent/rule_parser.py` + `assistant/engine/fastrule/fastrule.py`
+("FastRule", the deterministic front door) and (2) `assistant/engine/segmentation/old_seg/segment.py`
 (the deep track's SEGMENT stage). No architecture change proposed anywhere —
 both stay deterministic-first with the existing abstention/under-split gates;
 the LLM call in segment stays a single schema-constrained call. Every claim
@@ -417,7 +417,7 @@ data preparation than idea #4).
 
 ## Part 2 — the SEGMENT stage (deep track, step 2)
 
-Read directly from `assistant/engine/segment.py`. Today: deterministic
+Read directly from `assistant/engine/segmentation/old_seg/segment.py`. Today: deterministic
 delimiters first (`_COALESCE_RE`, `_BRACKET_RE`, configured separator — all
 free and cannot be wrong per the module's own docstring); if none of those
 split anything, a **single** schema-constrained LLM call

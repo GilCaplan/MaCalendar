@@ -35,7 +35,7 @@ cycle may pair one deep hypothesis with one fast one; a *routing* change
 
 **Lane 2 — FastRule in its sandbox.** The deterministic rule parser
 (`FastRule`) is a *selective classifier* — it commits when confident and
-abstains otherwise. Because it needs no LLM, `scripts/fast_sandbox.py`
+abstains otherwise. Because it needs no LLM, `assistant/engine/fastrule/experiments/fast_sandbox.py`
 replays the whole 3,000-row dataset in **~3 minutes** (vs. 55), so FastRule
 iterates in its own worktree at ~180× the rate. It's scored on its own terms:
 commit rate × correct-on-committed (an abstain is the deep track's job, not a

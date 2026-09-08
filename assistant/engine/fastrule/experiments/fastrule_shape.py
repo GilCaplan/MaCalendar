@@ -20,8 +20,8 @@ being "the metric":
                   only one worth driving to zero
     deferred      handed up with a reason — also correct
 
-    python -m scripts.fastrule_shape                # test split (reported)
-    python -m scripts.fastrule_shape --split train  # mining
+    python -m assistant.engine.fastrule.experiments.fastrule_shape                # test split (reported)
+    python -m assistant.engine.fastrule.experiments.fastrule_shape --split train  # mining
 """
 from __future__ import annotations
 

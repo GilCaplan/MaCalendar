@@ -1,0 +1,19 @@
+294 rows — segment-tuning TRAIN half
+
+Both systems judged ONLY on what both were built to do. The old stage never
+separated time from action, so `time` and `exact-row` are N/A for it BY DESIGN,
+not a failure — it is not scored on them.
+
+                      item count   item P   item R   item F1   tag acc   over  under   sec/row
+------------------------------------------------------------------------------------
+old_seg (shipped)          86.1%    95.2%    95.0%     95.1%     84.6%     21     20     0.903
+FastSeg (new)              83.7%    95.3%    92.7%     94.0%     87.2%     19     29     0.002
+
+delta (new - old)          -2.4%    +0.1%    -2.3%     -1.1%     +2.6%
+
+   COST is the column that changes the reading: old_seg falls back to the
+   LLM when its deterministic pass finds nothing, so its score is MODEL-ASSISTED.
+   FastSeg makes zero model calls (551x faster here).
+
+ONLY THE NEW SYSTEM DOES THIS (no old-system number exists):
+   time extraction — the old stage left the time inside the item text

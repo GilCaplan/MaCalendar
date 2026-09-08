@@ -121,7 +121,7 @@ the single largest mis-kind driver: **499 of 609** on the FastRule test half,
 **Q14 (2026-09-07, Gil): "buy apples and eggs" is TWO tasks** — same action,
 separate items ("buy eggs", "buy apples"). This settles a contradiction the
 atomizer board found between our own documents: `decompose.py` and
-`list_split.py` split shopping lists; `dataset/fastrule/DATASET.md` labelled
+`list_split.py` split shopping lists; `assistant/engine/fastrule/datasets/DATASET.md` labelled
 them one task titled "apples and eggs". The CODE was right. Every over-split
 in the FastRule test half was this disagreement and nothing else — so those
 were never defects. **The dataset's np_decoy families need relabelling**

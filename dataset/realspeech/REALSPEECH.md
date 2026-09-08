@@ -3,7 +3,7 @@
 The missing input distribution.
 
 Every board this project owns measures **well-formed prompts**.
-`dataset/fastrule/`'s 7,200 rows are clean single-clause commands (mean 11.0
+`assistant/engine/fastrule/datasets/`'s 7,200 rows are clean single-clause commands (mean 11.0
 words, no decimal-point times, no self-corrections). The 3,000-row
 verification pool is tidied history. Meanwhile `scripts/weekly_review.py` —
 the only instrument pointed at real usage — reads a **50% flag rate**, against
@@ -163,7 +163,7 @@ were used to sanity-check the ask annotation (10 corrections name one action,
 
 ## How the shapes became rows
 
-Same machinery as `dataset/fastrule/`, one layer taller.
+Same machinery as `assistant/engine/fastrule/datasets/`, one layer taller.
 
 **Layer 1 — the clean base.** An utterance is composed of 0–4 *asks*. Each ask
 is a skeleton from `banks/ask_patterns.json` in one of the four registers the
@@ -266,7 +266,7 @@ under-representation; see below.
 
 ## The row schema
 
-Same shape as `dataset/fastrule/`'s, so `scripts/fastrule_shape.py` reads it
+Same shape as `assistant/engine/fastrule/datasets/`'s, so `assistant/engine/fastrule/experiments/fastrule_shape.py` reads it
 unmodified.
 
 ```json
@@ -393,7 +393,7 @@ slice, writes it to scratch, points `scripts/fastrule_shape` at it and runs
 it — so the numbers are literally the FastRule product-shape board (atomic
 handle rate, correct-on-handled, date/time correctness, invented times,
 severity-weighted harm, the non-atomic diagnostic buckets, propose defer
-rate), produced by the same code that scores `dataset/fastrule/`. Two boards
+rate), produced by the same code that scores `assistant/engine/fastrule/datasets/`. Two boards
 that share a scorer are comparable; two that share only a vocabulary are not.
 
 Report per `ITERATION_PROTOCOL.md`: dataset + slice + metric + meaning, every
@@ -402,7 +402,7 @@ is a report; "70%" is not.
 
 ## The first read (2026-09-07, build `c8121bd`)
 
-FastRule at `assistant/engine/fastrule.py` as committed, scored by
+FastRule at `assistant/engine/fastrule/fastrule.py` as committed, scored by
 `scripts/fastrule_shape` through `realspeech_board`. Reported figures are the
 **test half**; train figures are labelled working numbers, per
 `ITERATION_PROTOCOL.md`'s lane-reporting rule.
@@ -479,7 +479,7 @@ real usage and 1.79% of the FastRule 7,200.
   benefit, so they are left unnamed.
 - **Multi-turn context.** "the event you just made" appears as a *phrase*; no
   row is resolvable only against a previous command's state.
-- **Absolute dates/times.** Everything is a phrase, per `dataset/fastrule/`'s
+- **Absolute dates/times.** Everything is a phrase, per `assistant/engine/fastrule/datasets/`'s
   rule; resolving one is the parser's job, never this dataset's.
 - **Title/attendee string scoring.** The set carries `intended_title` and
   `intended_attendee`, so a future scorer *could* measure vocabulary repair —

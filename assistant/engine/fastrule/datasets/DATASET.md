@@ -1,6 +1,6 @@
 # The FastRule dataset
 
-A fresh eval/train set for `assistant/engine/fastrule.py` (the deterministic
+A fresh eval/train set for `assistant/engine/fastrule/fastrule.py` (the deterministic
 selective-classifier front door — see its module docstring and
 `DOCUMENTATION/experiments/FASTRULE_RESEARCH.md`). Built 2026-09-07 because
 the existing 3,000-row verification dataset (`dataset/DATASET.md`) had been

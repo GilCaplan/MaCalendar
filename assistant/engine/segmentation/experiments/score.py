@@ -19,8 +19,8 @@ every score" (SPEC, Distribution) exists because a corpus with a
 characteristic ask-count teaches the COUNT rather than the criterion — a
 scorer that hides its composition lets that pass as a win.
 
-    python segment_tuning/score.py                   # self-test, proves the scorer
-    python segment_tuning/score.py --rows rows.jsonl # audit the GOLD labels
+    python assistant/engine/segmentation/experiments/score.py                   # self-test, proves the scorer
+    python assistant/engine/segmentation/experiments/score.py --rows rows.jsonl # audit the GOLD labels
 
 Imports are `json re argparse collections difflib` and nothing else — no
 `assistant`, no spacy, no torch. Two model-loading jobs segfault this
@@ -453,7 +453,7 @@ def load_rows(paths=None, split: str = None, family: str = None,
     if not opened:
         raise SystemExit("no rows file found; tried:\n  " + "\n  ".join(tried)
                          + "\nPass them with --rows <file> [<file> ...] "
-                           "(the shell globs: segment_tuning/data/*.jsonl).")
+                           "(the shell globs: assistant/engine/segmentation/datasets/*.jsonl).")
     return rows
 
 
@@ -1164,7 +1164,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--rows", nargs="+",
                     help="JSONL corpus file(s); audits the gold labels. "
-                         "The shell globs: segment_tuning/data/*.jsonl")
+                         "The shell globs: assistant/engine/segmentation/datasets/*.jsonl")
     ap.add_argument("--split", choices=("train", "test"))
     ap.add_argument("--family")
     ap.add_argument("--trap")

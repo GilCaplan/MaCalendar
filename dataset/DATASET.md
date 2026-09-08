@@ -86,7 +86,7 @@ milestone `--test` run reports **aggregates only** (row detail suppressed by
 the tooling — a test result never drives improvement). Everything else —
 2,699 rows — is the training pool. dev-fast/dev-full remain the working
 slices inside it. FastRule additionally has its own 6,000-row set
-(`dataset/fastrule/DATASET.md`, 80–20 by pattern family) plus external
+(`assistant/engine/fastrule/datasets/DATASET.md`, 80–20 by pattern family) plus external
 corpora as train-side augmentation (`DOCUMENTATION/experiments/EXTERNAL_DATASETS.md`)
 — three sources, three roles, per ITERATION_PROTOCOL's data-sources section.
 
@@ -212,4 +212,4 @@ ruling does not touch. Consequences: no relabeling, no convention
 overrides, no board impact — the confirm gate is inert on this pool by
 measurement, not assumption. Question-shape ground truth (propose rows,
 confirm subprompts, the two-phase doctrine) lives in the FastRule 6,000
-(`dataset/fastrule/DATASET.md`), which was built after the ruling.
+(`assistant/engine/fastrule/datasets/DATASET.md`), which was built after the ruling.

@@ -10,7 +10,7 @@ train half (1,040 rows) — it now gets action, time and tag all three right on
 
 ## The corpus these numbers are computed over
 
-`segment_tuning/data/*.jsonl` — **1,694 rows**, split BY FAMILY (a family never
+`assistant/engine/segmentation/datasets/*.jsonl` — **1,694 rows**, split BY FAMILY (a family never
 straddles), ~60/40 train/test.
 
 | | rows | train | note |

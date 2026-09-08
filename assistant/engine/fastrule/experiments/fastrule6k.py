@@ -1,7 +1,7 @@
 """FS1 — score FastRule against its own 6,000-row dataset (all six metrics).
 
-    python -m scripts.fastrule6k                # train 4,800: full board + mining
-    python -m scripts.fastrule6k --split test   # test 1,200: AGGREGATES ONLY
+    python -m assistant.engine.fastrule.experiments.fastrule6k                # train 4,800: full board + mining
+    python -m assistant.engine.fastrule.experiments.fastrule6k --split test   # test 1,200: AGGREGATES ONLY
 
 Ground truth is by construction (assistant/engine/fastrule/datasets/DATASET.md). Scoring per
 row, against `expect`:

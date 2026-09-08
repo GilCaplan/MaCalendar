@@ -241,7 +241,7 @@ honest about the code.
 Leakage: 0 family overlap, 0 exact-text overlap; 11 test rows (1.8%) share a
 gold action-set with train — the one blemish, recorded rather than hidden.
 
-**1,554 rows did not start from scratch.** `dataset/fastrule/banks/
+**1,554 rows did not start from scratch.** `assistant/engine/fastrule/datasets/banks/
 complex_patterns.json` already held 321 templates built for a different board,
 and they carry exactly what segment gold needs: an `atomic` flag and **named
 slots**. Because the template says `{date}`, the action/time split is *known by
@@ -381,6 +381,32 @@ verified mechanically by `check_prompt.py`, and it still fixed **one row in
 ```
 put do the laundry and return the rental car on my list
 ```
+
+### old_seg vs FastSeg — the promotion question, measured
+
+294 trap-stratified TRAIN rows, judged only on what BOTH systems were built to
+do. `old_seg` emits `(text, kind)` and never separated time from action, so
+`time` and `exact-row` are N/A for it **by design** — it is not scored on them,
+and its gold is rebuilt as `action + time` (the span it should have produced),
+minus the date floor, which is a value the labelling adds rather than a word the
+speaker said.
+
+| | item count | item F1 | tag acc | over / under | sec/row |
+|---|---|---|---|---|---|
+| `old_seg` (shipped) | **86.1%** | **95.1%** | 84.6% | 21 / 20 | **0.903** |
+| FastSeg (new) | 83.7% | 94.0% | **87.2%** | 19 / 29 | **0.002** |
+| delta | −2.4% | −1.1% | +2.6% | | **551× faster** |
+
+**Read the cost column first, because it changes what the rest means.**
+`old_seg` falls back to the LLM whenever its deterministic pass finds nothing,
+so its 86.1% is a **model-assisted** score. FastSeg is within 2.4 points of it
+with **zero model calls**, at 551× the speed — and it additionally produces the
+`time` field, which `old_seg` does not do at all.
+
+So FastSeg is **not yet a clear win on boundaries alone**, and that is the
+honest state of the promotion question: it trades ~2 points of cut accuracy for
+a 551× latency cut, a better tagger, and a field the old stage never had. The
++205-row span headroom in the oracle table above is what would settle it.
 
 ### Three limits of that conclusion — recorded so it can be revisited honestly
 
