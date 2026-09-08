@@ -43,13 +43,22 @@
   .edge.two-way{stroke:var(--model); stroke-width:1.8;}
   .elabel{font:9px 'IBM Plex Mono',ui-monospace,monospace; fill:var(--muted);
           text-anchor:middle; pointer-events:none;}
-  .hit{stroke:transparent; stroke-width:16; fill:none; cursor:help;}
+  .hit{stroke:transparent; stroke-width:22; fill:none; cursor:help;
+       pointer-events:stroke;}
+  g.node{cursor:help;}
   g.wire:hover .edge{stroke:var(--amber); stroke-width:2.4;}
   g.node:hover .box{stroke:var(--amber); stroke-width:2.4;}
   .legend{max-width:1080px; margin:14px auto 0; padding:0 24px;
           font:12px/1.9 'IBM Plex Mono',ui-monospace,monospace; color:var(--muted);}
   .legend b{color:var(--ink);}
   .legend svg{vertical-align:middle;}
+  #tip{position:fixed; z-index:50; max-width:min(560px,84vw); display:none;
+       background:var(--panel); color:var(--ink); border:1px solid var(--line);
+       border-left:3px solid var(--amber); border-radius:7px;
+       box-shadow:0 8px 30px var(--shadow); padding:11px 13px;
+       font:11.5px/1.6 'IBM Plex Mono',ui-monospace,monospace;
+       white-space:pre-wrap; pointer-events:none;}
+  #tip.on{display:block;}
 </style>
 
 <header>
@@ -329,6 +338,63 @@ three passes through here.</title>
   </g>
 </svg>
 </main>
+
+<div id="tip" role="tooltip" aria-hidden="true"></div>
+<script>
+(function () {
+  // The native SVG <title> tooltip works, but takes a second or two to appear
+  // and is easy to miss entirely — which is what happened. The <title>
+  // elements stay (they are what a screen reader reads); this shows the same
+  // text immediately, and on tap for touch, where hover does not exist.
+  var tip = document.getElementById('tip');
+  var groups = document.querySelectorAll('g.wire, g.node');
+
+  function textFor(g) {
+    var el = g.querySelector(':scope > title');
+    return el ? el.textContent : '';
+  }
+  function place(x, y) {
+    tip.classList.add('on');
+    tip.setAttribute('aria-hidden', 'false');
+    var r = tip.getBoundingClientRect();
+    var left = Math.min(x + 16, window.innerWidth - r.width - 12);
+    var top = y + 16;
+    if (top + r.height > window.innerHeight - 12) top = Math.max(12, y - r.height - 16);
+    tip.style.left = Math.max(12, left) + 'px';
+    tip.style.top = top + 'px';
+  }
+  function hide() {
+    tip.classList.remove('on');
+    tip.setAttribute('aria-hidden', 'true');
+  }
+
+  groups.forEach(function (g) {
+    g.setAttribute('tabindex', '0');
+    g.addEventListener('mouseenter', function (e) {
+      tip.textContent = textFor(g);
+      place(e.clientX, e.clientY);
+    });
+    g.addEventListener('mousemove', function (e) {
+      if (tip.classList.contains('on')) place(e.clientX, e.clientY);
+    });
+    g.addEventListener('mouseleave', hide);
+    g.addEventListener('focus', function () {
+      tip.textContent = textFor(g);
+      var r = g.getBoundingClientRect();
+      place(r.left + r.width / 2, r.bottom);
+    });
+    g.addEventListener('blur', hide);
+    // touch: a tap opens it, a tap elsewhere closes it
+    g.addEventListener('click', function (e) {
+      e.stopPropagation();
+      tip.textContent = textFor(g);
+      place(e.clientX, e.clientY);
+    });
+  });
+  document.addEventListener('click', hide);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
+})();
+</script>
 
 <p class="legend">
   <b>Reading the wires.</b>
