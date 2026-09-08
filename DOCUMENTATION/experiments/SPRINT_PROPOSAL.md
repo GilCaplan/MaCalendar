@@ -77,13 +77,30 @@ sentence shapes, not vocabulary.
 features and receive only the class prior — 48.6% of terse-student rows
 against 6.2% for the control.
 
-Work:
+**Run it as a TWO-ARM COMPARISON (Gil, 2026-09-07): build both approaches
+and let the data pick.** The choice between them was going to be my risk
+judgment; measuring it is better, and both are implementation.
 
-1. **Split each verb class into `-initial` and `-anywhere` features**, so the
-   model LEARNS what position is worth instead of it being hard-coded at
-   "everything".
-2. **Features that fire without a verb** — noun-then-time, bare-NP,
-   determiner opener — for "the exam 12:30".
+- **Arm 1 — TEACH the models the phrasings.** Split each verb class into
+  `-initial` and `-anywhere` features so the model LEARNS what position is
+  worth instead of it being hard-coded at "everything"; add signals that fire
+  without a verb (noun-then-time, bare-NP, determiner opener) for "the exam
+  12:30". Conservative: nothing the user said is altered.
+- **Arm 2 — CANONICALISE in cleanup.** Rewrite unusual phrasings into one
+  standard form before anything parses ("would you be kind enough to put the
+  gym in for tomorrow at 7" → "add gym tomorrow at 7"; "gym tomorrow 7" →
+  the same). Fixes every downstream component at once and every speaker at
+  once. Aggressive: a rewrite that misreads a phrasing corrupts the command
+  SILENTLY, and unlike a defer there is no second chance — the "set X as high
+  priority" bug retitled a task to "high priority" exactly this way.
+
+**How the comparison is judged:** both arms measured on the persona boards
+(the spread is the point), the FastRule shape board, and the real-usage dual
+gate. Watch specifically whether Arm 2 introduces NEW harm — a canonicaliser
+failure shows up as a wrong action or a corrupted title, not as a defer, so
+the harm line and the title-quality line matter more than handle-rate here.
+They may also be COMPLEMENTARY (canonicalise the shapes that are safe,
+teach the rest); the cycle decides that too, on evidence.
 3. **The daypart defects, both of them.** (a) A daypart word ANYWHERE,
    including inside a title, overrides an explicit clock time — "book the
    coffee morning … at 7pm" → 08:00, live and user-visible. (b) `_CLOCKISH_RE`
