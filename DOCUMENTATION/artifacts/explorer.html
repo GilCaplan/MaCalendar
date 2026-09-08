@@ -518,7 +518,7 @@
     <g data-panel="segment" role="button" tabindex="0" aria-label="Stage two, segment: split the transcript into typed items, biased to under-split. This is where a missing ask is re-run from.">
       <rect class="frame" x="575" y="226" width="377" height="34" rx="5" fill="var(--screen)" stroke="var(--line)"/>
       <text x="764" y="241" text-anchor="middle" font-size="9.5" font-weight="600">2 · segment — into independent asks</text>
-      <text x="764" y="254" text-anchor="middle" font-size="7.5" fill="var(--muted)">delimiters first, then one gated model call</text>
+      <text x="764" y="254" text-anchor="middle" font-size="7.5" fill="var(--muted)">delimiters · the clause parse · one gated call</text>
     </g>
     <g data-panel="decompose" role="button" tabindex="0" aria-label="Stage three, decompose: one bounded pass breaking an item into atomic pieces.">
       <rect class="frame" x="575" y="264" width="377" height="34" rx="5" fill="var(--screen)" stroke="var(--line)"/>
@@ -591,40 +591,46 @@
     <!-- ============ SHARED READERS ============ -->
     <text x="30" y="776" font-size="10.5" letter-spacing="1.4" fill="var(--muted)">SHARED READERS · one copy, two callers · assistant/intent</text>
     <g data-panel="readers" role="button" tabindex="0" aria-label="cleanup: the spoken noise that carries no request, stripped once so everything downstream is generic.">
-      <rect class="frame" x="48" y="788" width="140" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="118" y="808" text-anchor="middle" font-size="9" font-weight="600">cleanup</text>
-      <text x="118" y="822" text-anchor="middle" font-size="7.5" fill="var(--muted)">umm · please · or so</text>
-      <text x="118" y="834" text-anchor="middle" font-size="7.5" fill="var(--muted)">the person-specific bit</text>
+      <rect class="frame" x="42" y="788" width="124" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="104" y="808" text-anchor="middle" font-size="8.5" font-weight="600">cleanup</text>
+      <text x="104" y="822" text-anchor="middle" font-size="7" fill="var(--muted)">umm · please · or so</text>
+      <text x="104" y="834" text-anchor="middle" font-size="7" fill="var(--muted)">the person-specific bit</text>
     </g>
     <g data-panel="readers" role="button" tabindex="0" aria-label="lead_time: a spoken lead time pulled out of the command into a number of minutes.">
-      <rect class="frame" x="196" y="788" width="140" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="266" y="808" text-anchor="middle" font-size="9" font-weight="600">lead_time</text>
-      <text x="266" y="822" text-anchor="middle" font-size="7.5" fill="var(--muted)">30 minutes before</text>
-      <text x="266" y="834" text-anchor="middle" font-size="7.5" fill="var(--muted)">it used to eat titles</text>
+      <rect class="frame" x="174" y="788" width="124" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="236" y="808" text-anchor="middle" font-size="8.5" font-weight="600">lead_time</text>
+      <text x="236" y="822" text-anchor="middle" font-size="7" fill="var(--muted)">30 minutes before</text>
+      <text x="236" y="834" text-anchor="middle" font-size="7" fill="var(--muted)">it used to eat titles</text>
     </g>
-    <g data-panel="readers" role="button" tabindex="0" aria-label="recurrence: the cadence as a slot of one atomic item, rounded to daily, weekly or monthly and announced.">
-      <rect class="frame" x="344" y="788" width="140" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="414" y="808" text-anchor="middle" font-size="9" font-weight="600">recurrence</text>
-      <text x="414" y="822" text-anchor="middle" font-size="7.5" fill="var(--muted)">daily · weekly · monthly</text>
-      <text x="414" y="834" text-anchor="middle" font-size="7.5" fill="var(--muted)">a slot, never N items</text>
+    <g data-panel="readers" role="button" tabindex="0" aria-label="recurrence: the cadence as a slot of one atomic item, rounded and announced.">
+      <rect class="frame" x="306" y="788" width="124" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="368" y="808" text-anchor="middle" font-size="8.5" font-weight="600">recurrence</text>
+      <text x="368" y="822" text-anchor="middle" font-size="7" fill="var(--muted)">daily · weekly · monthly</text>
+      <text x="368" y="834" text-anchor="middle" font-size="7" fill="var(--muted)">a slot, never N items</text>
     </g>
-    <g data-panel="readers" role="button" tabindex="0" aria-label="coordination: does this and join two things or two asks? The dependency parse answers.">
-      <rect class="frame" x="492" y="788" width="140" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="562" y="808" text-anchor="middle" font-size="9" font-weight="600">coordination</text>
-      <text x="562" y="822" text-anchor="middle" font-size="7.5" fill="var(--muted)">two things, or two asks</text>
-      <text x="562" y="834" text-anchor="middle" font-size="7.5" fill="var(--muted)">one memoised parse</text>
+    <g data-panel="readers" role="button" tabindex="0" aria-label="coordination: does this and join two things or two asks, and if two, exactly where the boundary falls.">
+      <rect class="frame" x="438" y="788" width="124" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="500" y="808" text-anchor="middle" font-size="8.5" font-weight="600">coordination</text>
+      <text x="500" y="822" text-anchor="middle" font-size="7" fill="var(--muted)">two things, or two asks</text>
+      <text x="500" y="834" text-anchor="middle" font-size="7" fill="var(--muted)">and WHERE they meet</text>
+    </g>
+    <g data-panel="readers" role="button" tabindex="0" aria-label="asks: is this fragment a request, or the words a person says around one? Every splitter must pass it.">
+      <rect class="frame" x="570" y="788" width="124" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="632" y="808" text-anchor="middle" font-size="8.5" font-weight="600">asks</text>
+      <text x="632" y="822" text-anchor="middle" font-size="7" fill="var(--muted)">is this piece an ask?</text>
+      <text x="632" y="834" text-anchor="middle" font-size="7" fill="var(--muted)">refuse the whole split</text>
     </g>
     <g data-panel="readers" role="button" tabindex="0" aria-label="list_split and quantity: a title split into items by string rules, and a spoken count kept as a number.">
-      <rect class="frame" x="640" y="788" width="140" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="710" y="808" text-anchor="middle" font-size="9" font-weight="600">list_split · quantity</text>
-      <text x="710" y="822" text-anchor="middle" font-size="7.5" fill="var(--muted)">commas always split</text>
-      <text x="710" y="834" text-anchor="middle" font-size="7.5" fill="var(--muted)">and sometimes does not</text>
+      <rect class="frame" x="702" y="788" width="124" height="52" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="764" y="808" text-anchor="middle" font-size="8.5" font-weight="600">list_split · quantity</text>
+      <text x="764" y="822" text-anchor="middle" font-size="7" fill="var(--muted)">commas always split</text>
+      <text x="764" y="834" text-anchor="middle" font-size="7" fill="var(--muted)">and sometimes does not</text>
     </g>
     <g data-panel="plumbing" role="button" tabindex="0" aria-label="EngineState, Stage and Component: the frozen contract stages exchange, and the one interface every worker has.">
-      <rect class="frame" x="788" y="788" width="140" height="52" rx="5" fill="none" stroke="var(--line)" stroke-dasharray="3 2"/>
-      <text x="858" y="808" text-anchor="middle" font-size="9" font-weight="600">the plumbing</text>
-      <text x="858" y="822" text-anchor="middle" font-size="7.5" fill="var(--muted)">EngineState · Stage</text>
-      <text x="858" y="834" text-anchor="middle" font-size="7.5" fill="var(--muted)">Component</text>
+      <rect class="frame" x="834" y="788" width="124" height="52" rx="5" fill="none" stroke="var(--line)" stroke-dasharray="3 2"/>
+      <text x="896" y="808" text-anchor="middle" font-size="9" font-weight="600">the plumbing</text>
+      <text x="896" y="822" text-anchor="middle" font-size="7.5" fill="var(--muted)">EngineState · Stage</text>
+      <text x="896" y="834" text-anchor="middle" font-size="7.5" fill="var(--muted)">Component</text>
     </g>
   </g>
 </svg>
