@@ -614,7 +614,7 @@ def test_the_deep_stage_names_match_the_state_contract(all_prose):
         if _ENGINE_MARK not in text:
             continue
         for stage in STAGES:
-            if stage == "intake":
+            if stage == "ingest":
                 continue          # the orchestrator's own half, drawn as Engine
             assert stage in text, (
                 f"{name} draws the deep track but never names the {stage} stage")

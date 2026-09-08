@@ -73,7 +73,7 @@
 
 <main>
 <svg class="flow" viewBox="0 0 1400 372" role="img"
-     aria-label="Flow chart of the MACalendar engine, left to right: the audio transcription, intake, transcript, segment, decompose, validate, generate, crosscheck, commit, label, the answer. FastRule sits below generate and talks both ways. A dashed loop returns from crosscheck to segment with a budget of three.">
+     aria-label="Flow chart of the MACalendar engine, left to right: the audio transcription, ingest, transcript, segment, decompose, validate, generate, crosscheck, commit, label, the answer. FastRule sits below generate and talks both ways. A dashed loop returns from crosscheck to segment with a budget of three.">
   <title></title>
   <defs>
     <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7"
@@ -91,9 +91,9 @@
     <text class="name" x="70" y="209" style="font-size:10px">transcription</text>
     
   </g>
-  <g class="node" data-tip="intake — step 0, in the orchestrator (assistant/engine/__init__.py).&#10;Two halves, and they queue DIFFERENT things.&#10;&#10;THE LOCK — one command is parsed at a time. Flask serves requests on threads,&#10;and two interleaving would race the anaphora context (&quot;the one I just made&quot;)&#10;and the per-run trace. A command arriving mid-run WAITS here, FIFO. It is not&#10;merged with anything; the wait just shows up honestly in the trace&#x27;s total.&#10;&#10;COALESCING — this is the concatenation, and it applies to the PENDING queue:&#10;commands parked while the language model was unreachable. When it comes back,&#10;they are combined into (&quot;…&quot;)and(&quot;…&quot;) batches up to engine.coalesce_max_tokens&#10;(300, counted at ≈4 chars per token), so several short queued commands cost&#10;ONE parse instead of several. Overflow runs as later batches, sequentially.&#10;&#10;The wrapper is deterministic on purpose: step 2 splits it back apart with no&#10;model, and each command&#x27;s logic stays independent." aria-label="intake — step 0, in the orchestrator (assistant/engine/__init__.py).">
+  <g class="node" data-tip="ingest — step 0, in the orchestrator (assistant/engine/__init__.py).&#10;Two halves, and they queue DIFFERENT things.&#10;&#10;THE LOCK — one command is parsed at a time. Flask serves requests on threads,&#10;and two interleaving would race the anaphora context (&quot;the one I just made&quot;)&#10;and the per-run trace. A command arriving mid-run WAITS here, FIFO. It is not&#10;merged with anything; the wait just shows up honestly in the trace&#x27;s total.&#10;&#10;COALESCING — this is the concatenation, and it applies to the PENDING queue:&#10;commands parked while the language model was unreachable. When it comes back,&#10;they are combined into (&quot;…&quot;)and(&quot;…&quot;) batches up to engine.coalesce_max_tokens&#10;(300, counted at ≈4 chars per token), so several short queued commands cost&#10;ONE parse instead of several. Overflow runs as later batches, sequentially.&#10;&#10;The wrapper is deterministic on purpose: step 2 splits it back apart with no&#10;model, and each command&#x27;s logic stays independent." aria-label="ingest — step 0, in the orchestrator (assistant/engine/__init__.py).">
     <rect class="box" x="152" y="168" width="100" height="62" rx="8"/>
-    <text class="name" x="202.0" y="195">intake</text>
+    <text class="name" x="202.0" y="195">ingest</text>
     <text class="step" x="202" y="211">step 0</text>
   </g>
   <g class="node" data-tip="transcript — step 1 (transcript.py). The only person-specific stage:&#10;the personal vocabulary repairs what was misheard and spoken filler comes off, so every stage&#10;after it is generic." aria-label="transcript — step 1 (transcript.py). The only person-specific stage:">
@@ -101,7 +101,7 @@
     <text class="name" x="324.0" y="195">transcript</text>
     <text class="step" x="324" y="211">step 1</text>
   </g>
-  <g class="node" data-tip="segment — step 2 (segment.py). Splits the command into independent&#10;items and gives each a kind. Three tiers: literal delimiters, the clause parse, then one gated&#10;LLM call. Biased to UNDER-split — a wrong merge has two more chances, a wrong split is garbage&#10;immediately." aria-label="segment — step 2 (segment.py). Splits the command into independent">
+  <g class="node" data-tip="segment — step 2 (segment.py). Splits the command into independent items and&#10;gives each a kind.&#10;&#10;NOT RECURSIVE. run() makes ONE pass: it tries the deterministic tiers and, if&#10;they split, returns immediately; otherwise it makes one gated model call. It&#10;never calls itself, and it never re-examines a piece it just produced.&#10;&#10;Three tiers, in order:&#10;  1. literal delimiters — brackets, the (&quot;…&quot;)and(&quot;…&quot;) wrapper, the configured&#10;     separator. Free, but all three are inserted by the PHONE, so on dictated&#10;     speech none of them can fire.&#10;  2. the clause parse — a dependency parse finds where two ASKS meet. A verb&#10;     conjunct with its own argument is a second ask; a noun conjunct is a&#10;     longer noun phrase, so &quot;meeting with Tal and Ravid&quot; is never split.&#10;  3. one gated LLM call, only if neither tier fired and the words carry a&#10;     compound hint.&#10;&#10;Biased to UNDER-split: a wrong merge is recoverable, a wrong split is garbage&#10;immediately.&#10;&#10;SO WHAT SPLITS A PIECE FURTHER? Two things, neither of them recursion here:&#10;  • step 3 (decompose) gives exactly ONE more level — it loops over segment&#x27;s&#10;    items, and appends sub-items to a NEW list rather than re-entering them,&#10;    which is what bounds ids at &quot;item_1-2&quot; and never &quot;item_1-2-3&quot;.&#10;  • the crosscheck loop. If a missing ask is found, the orchestrator throws&#10;    the items away (state.items = []) and re-runs the WHOLE chain from&#10;    segment, carrying state.mistakes into the prompt. Up to 3 times.&#10;&#10;So the depth is 2 splits per pass, and the retries are whole fresh passes —&#10;not a deeper tree." aria-label="segment — step 2 (segment.py). Splits the command into independent items.">
     <rect class="box" x="396" y="168" width="100" height="62" rx="8"/>
     <text class="name" x="446.0" y="195">segment</text>
     <text class="step" x="446" y="211">step 2</text>
@@ -158,7 +158,7 @@
     <line class="edge" x1="374" y1="199.0" x2="390" y2="199.0" marker-end="url(#ar)"/>
     <line class="hit" x1="374" y1="199.0" x2="390" y2="199.0"/>
   </g>
-  <g class="wire" data-tip="carries  items — list[Item], ordered. Rebuilt fresh whenever segment runs.&#10;&#10;Item at this point:&#10;    id    — str, &quot;item_1&quot;, &quot;item_2&quot;, …&#10;    kind  — str, one of &quot;event&quot; | &quot;task&quot; | &quot;review&quot; | &quot;other&quot;&#10;    text  — str, the words belonging to this item&#10;&#10;slots, action, intent and labels are still empty; the stages after this fill&#10;them in turn." aria-label="carries  items — list[Item], ordered. Rebuilt fresh whenever segment runs.">
+  <g class="wire" data-tip="carries  items — list[Item], ordered. Rebuilt fresh whenever segment runs.&#10;&#10;An Item always has these EIGHT fields (assistant/engine/state.py). What&#10;changes down the pipeline is which of them are FILLED — here, only the&#10;first three:&#10;&#10;    id       str          &quot;item_1&quot;, &quot;item_2&quot;, …          ← filled here&#10;    kind     str          &quot;event&quot;|&quot;task&quot;|&quot;review&quot;|&quot;other&quot; ← filled here&#10;    text     str          the words belonging to this item ← filled here&#10;    slots    dict         quantity, reminder_minutes, recurrence  (step 3)&#10;    action   str | None   the registry action name        (step 5)&#10;    intent   BaseIntent   the validated object to execute (step 5)&#10;    blocked  str | None   a refusal reason; never executed (step 4)&#10;    labels   dict         category, colour, tags          (step 7)&#10;&#10;So an Item is not &quot;three characteristics&quot; — it is one shape that the stages&#10;fill in turn. The ids also carry structure: step 3 may split &quot;item_1&quot; into&#10;&quot;item_1-1&quot; and &quot;item_1-2&quot;." aria-label="carries  items — list[Item], ordered. Rebuilt fresh whenever segment runs.">
     <line class="edge" x1="496" y1="199.0" x2="512" y2="199.0" marker-end="url(#ar)"/>
     <line class="hit" x1="496" y1="199.0" x2="512" y2="199.0"/>
   </g>
@@ -215,6 +215,10 @@
   // and is easy to miss entirely — which is what happened. The <title>
   // elements stay (they are what a screen reader reads); this shows the same
   // text immediately, and on tap for touch, where hover does not exist.
+  // The host wraps this page and its wrapper carries a title, which the
+  // browser then renders as a second, native tooltip on top of ours.
+  // An empty title on our own root elements overrides an inherited one.
+  try { document.body.title = ''; document.documentElement.title = ''; } catch (e) {}
   var tip = document.getElementById('tip');
   var groups = document.querySelectorAll('g.wire, g.node');
 

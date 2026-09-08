@@ -32,7 +32,7 @@ if you want to know how it works.
 
 1. A command arrives — typed, or a spoken transcript — from the Mac or the
    phone.
-2. **Intake.** If other commands are queued they're merged into this one;
+2. **Ingest.** If other commands are queued they're merged into this one;
    filler and false-starts are dropped (and never remembered).
 3. **Ask FastRule** — the deterministic front door. It either *commits* an
    answer or *defers*.
@@ -133,7 +133,7 @@ that were never atomic, and one LLM crosscheck judges the result.**
 ```
 Engine.run(prompt, source, trace, view):
     state = EngineState(raw=prompt, text=prompt, source, trace, view)
-    state = intake(state)              # coalesce queued cmds, strip stop-words,
+    state = ingest(state)              # coalesce queued cmds, strip stop-words,
                                        # drop trivial false-starts (not remembered)
 
     r = self.front.run(state.text)     # FastRule(0.80): commit or defer

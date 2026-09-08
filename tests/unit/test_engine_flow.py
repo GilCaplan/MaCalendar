@@ -215,7 +215,7 @@ def test_the_endpoint_learns_and_bypasses_the_gate(scratch_vocab, monkeypatch, c
     assert "noga" in [a.lower() for a in entry.aliases]
 
 
-# --- step 0: intake coalescing ---------------------------------------------
+# --- step 0: ingest coalescing ---------------------------------------------
 
 def test_coalesce_wraps_within_budget():
     got = engine.coalesce(["gym tomorrow at 7am", "buy milk"], max_tokens=300)

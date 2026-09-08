@@ -30,7 +30,7 @@ page; if it goes red you are changing a contract, not fixing a stage.
 ## The shape
 
 ```
-text ─▶ 0 intake      orchestrator   queue + coalescing
+text ─▶ 0 ingest      orchestrator   queue + coalescing
      ─▶ 1 transcript  transcript.py  vocabulary repair + confidence gate
      ─▶ 2 segment     segment.py     split into typed items
      ─▶ 3 decompose   decompose.py   items that are several things, or one × N
@@ -62,7 +62,7 @@ channel to mutate state through.
 
 | Field | Written by | Read by | Meaning |
 |---|---|---|---|
-| `raw_text`, `source`, `current_view`, `supports_edit`, `supports_confirm`, `mode` | intake | all | read-only after intake; `mode` is `foreground` or `background` (fast-track verify pass) |
+| `raw_text`, `source`, `current_view`, `supports_edit`, `supports_confirm`, `mode` | ingest | all | read-only after ingest; `mode` is `foreground` or `background` (fast-track verify pass) |
 | `text` | transcript | all later | the working transcript (stop words stripped, vocab applied) |
 | `corrections` | transcript | response | vocab fixes, client shape |
 | `needs_edit` | transcript | orchestrator | doubtful words; non-empty ⇒ the gate fired, nothing executes |
@@ -78,7 +78,7 @@ channel to mutate state through.
 
 ## The stages
 
-### 0 · intake (orchestrator — `assistant/engine/__init__.py`)
+### 0 · ingest (orchestrator — `assistant/engine/__init__.py`)
 Two halves, both live. **Serialization**: `run_transcript` holds a lock — one
 command at a time, FIFO, so concurrent requests cannot race the anaphora
 context; the wait shows honestly in the trace total. **Coalescing**:

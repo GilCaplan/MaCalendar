@@ -8,7 +8,7 @@ already understands. `Engine` holds the once-per-command stages and a
 `DeepSystem`, whose ordered Stage list is the 7-step deep track (`DOCUMENTATION/ENGINE.md` is the canonical contract
 reference):
 
-    0 intake      (here)            queueing + coalescing
+    0 ingest      (here)            queueing + coalescing
     1 transcript  transcript.py     vocabulary repair + confidence gate
     2 segment     segment.py        split into typed items
     3 decompose   decompose.py      items that are several things, or one × N
@@ -54,7 +54,7 @@ def _brain_version() -> str:
 
 # Step 0, half one: one command at a time. Flask serves requests on threads,
 # and two commands interleaving would race the anaphora context ("the one I
-# just made") and the per-run trace. Waiting here is the intake queue — FIFO,
+# just made") and the per-run trace. Waiting here is the ingest queue — FIFO,
 # invisible, and the wait shows up honestly in the trace's total.
 _run_lock = threading.Lock()
 

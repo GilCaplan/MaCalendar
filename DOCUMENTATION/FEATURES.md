@@ -448,7 +448,7 @@ frozen contracts); entered only via `assistant.api` (`/voice*` routes).
 **How:** `DOCUMENTATION/ENGINE.md` is the canonical stage-contract reference.
 Deterministic-first everywhere; every LLM call schema-constrained and grounded
 on the raw words; per-stage tests + `scripts/engine_stage_check.py`.
-**Notable behaviours (each a named, tested rule):** intake coalescing of
+**Notable behaviours (each a named, tested rule):** ingest coalescing of
 queued commands; stop-word stripping; trivial/false-start filtering (ignored
 AND not remembered); anaphora ("the one I just made" → context memory);
 "another one at 7" title carry-over; not-found honesty on updates/deletes

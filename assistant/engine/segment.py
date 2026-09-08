@@ -8,7 +8,7 @@ Contract (see DOCUMENTATION/ENGINE.md):
 Deterministic delimiters first — they are free and cannot be wrong:
 
   • bracket batching:   "[gym tomorrow] [lunch with Tal]"   (queued phone commands)
-  • intake coalescing:  ("gym tomorrow")and("lunch with Tal")  (step 0's wrapper)
+  • ingest coalescing:  ("gym tomorrow")and("lunch with Tal")  (step 0's wrapper)
   • the configured event separator (config.audio.event_separator)
 
 Only when none of those split anything may the LLM be consulted, and the bias

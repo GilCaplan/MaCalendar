@@ -414,10 +414,10 @@
   <g class="world">
     <text x="30" y="26" font-size="10.5" letter-spacing="1.4" fill="var(--muted)">THE ENGINE · assistant/engine · every box is a door</text>
 
-    <g data-panel="engine" role="button" tabindex="0" aria-label="Engine, the orchestrator: one command at a time behind a lock, intake and coalescing, track selection, commit and bookkeeping."><title>Engine, the orchestrator: one command at a time behind a lock, intake and coalescing, track selection, commit and bookkeeping.</title>
+    <g data-panel="engine" role="button" tabindex="0" aria-label="Engine, the orchestrator: one command at a time behind a lock, ingest and coalescing, track selection, commit and bookkeeping."><title>Engine, the orchestrator: one command at a time behind a lock, ingest and coalescing, track selection, commit and bookkeeping.</title>
       <rect class="frame" x="30" y="40" width="940" height="54" rx="7" fill="var(--amber-soft)" stroke="var(--amber)" stroke-width="1.6"/>
       <text x="500" y="62" text-anchor="middle" font-size="12" font-weight="600" fill="var(--amber)">Engine — the orchestrator</text>
-      <text x="500" y="80" text-anchor="middle" font-size="8.5" fill="var(--muted)">engine/__init__.py · a lock, so one command at a time · intake · track selection · commit · bookkeeping</text>
+      <text x="500" y="80" text-anchor="middle" font-size="8.5" fill="var(--muted)">engine/__init__.py · a lock, so one command at a time · ingest · track selection · commit · bookkeeping</text>
     </g>
     <path d="M 500 94 L 500 104" stroke="var(--muted)" fill="none" marker-end="url(#mi)"/>
 
@@ -1080,7 +1080,7 @@ const P = {
     <ol>
       <li><strong>Arrival.</strong> A command arrives &mdash; typed, or a spoken transcript &mdash; from
       the Mac or the phone. A field called <code>source</code> is the whole difference between them.</li>
-      <li><strong>Intake.</strong> The orchestrator takes a lock, so one command runs at a time; queued
+      <li><strong>Ingest.</strong> The orchestrator takes a lock, so one command runs at a time; queued
       inputs can be merged into one batch first.</li>
       <li><strong>Repair the words.</strong> Stop words, false starts, spoken noise, then the personal
       vocabulary. A transcript with nothing in it is dropped and <em>not remembered</em>.</li>
@@ -1460,7 +1460,7 @@ series_id   NULL
     view:"engine", tag:"the orchestrator", name:"Engine", rl:"◆ Engine", title:"Engine",
     z:[500,67,1.9],
     sum:`<p><code>Engine</code> is the brain as an object. It builds the shared state, runs the transcript stage, picks a track, commits, labels, and does the bookkeeping. <strong>It adds structure, never logic</strong> — the parsing lives in the stages.</p>
-    <p class="figs">engine/__init__.py · intake · track selection · commit · bookkeeping</p>`,
+    <p class="figs">engine/__init__.py · ingest · track selection · commit · bookkeeping</p>`,
     more:`<h3>What it owns</h3>
     <ul>
       <li><strong>Serialization.</strong> A process-wide lock: one command at a time, first in first out,

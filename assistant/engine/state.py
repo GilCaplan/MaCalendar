@@ -20,7 +20,7 @@ from typing import Any
 # execution back to one of them by name (its blame router only ever names one
 # of these).
 STAGES = (
-    "intake",      # step 0 — queue + coalescing (lives in the orchestrator)
+    "ingest",      # step 0 — queue + coalescing (lives in the orchestrator)
     "transcript",  # step 1 — vocabulary repair + confidence gate
     "segment",     # step 2 — split into typed items (events / tasks / review)
     "decompose",   # step 3 — recursive per-item breakdown
@@ -99,7 +99,7 @@ class CheckFinding:
 class EngineState:
     """Everything about one command's journey through the engine."""
 
-    # -- set at intake, read-only afterwards --------------------------------
+    # -- set at ingest, read-only afterwards --------------------------------
     raw_text: str                 # exactly what arrived
     source: str = "test"          # "mac" | "ios" | "test"
     current_view: str = "month"

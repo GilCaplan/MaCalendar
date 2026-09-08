@@ -28,7 +28,7 @@ def _field_names(cls) -> set:
 
 def test_stage_roster_is_fixed():
     assert STAGES == (
-        "intake", "transcript", "segment", "decompose",
+        "ingest", "transcript", "segment", "decompose",
         "validate", "generate", "crosscheck", "label",
     ), FROZEN
 
@@ -39,7 +39,7 @@ def test_item_kinds_are_fixed():
 
 def test_engine_state_fields():
     assert _field_names(EngineState) == {
-        # intake
+        # ingest
         "raw_text", "source", "current_view", "supports_edit",
         "supports_confirm", "mode",
         # step 1
@@ -80,7 +80,7 @@ def test_check_finding_fields():
 
 def test_every_stage_module_exposes_run():
     """One module per step, one public entry point: run(state, cfg) -> state.
-    (intake lives inside the orchestrator, so it has no module.)"""
+    (ingest lives inside the orchestrator, so it has no module.)"""
     import assistant.engine.crosscheck
     import assistant.engine.decompose
     import assistant.engine.generate
