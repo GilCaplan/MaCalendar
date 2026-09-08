@@ -32,6 +32,42 @@ Each item is exactly three strings.
   SPOKEN**.
 - **tag** — `event` | `task` | `review`.
 
+### SCORING THE ACTION — exact, and PARTIAL CREDIT (Gil, 2026-09-08)
+
+`exact-row` demands all three fields on every item. It is the product-level
+number and it stays. But where exactly the time reference ends and the action
+begins is a **judgement call**, so a one-token disagreement was costing a whole
+row — `action+time` is exact-row's largest single failure bucket.
+
+So there is a second, softer board: **2 of 3 fields, with the action compared
+by KIND OF DIFFERENCE rather than by similarity.**
+
+> **The action is correct when every token the two readings disagree on is a
+> TIME token** — i.e. they differ only in where the time was cut. Time and tag
+> stay EXACT; there is nothing subjective in a copied span or a three-way
+> label, so softening either would only hide errors.
+
+**A similarity threshold was tried first and rejected on measurement.** Dice
+overlap cannot separate the two populations at any cutoff:
+
+| Dice threshold | action "ok" | real errors admitted | judgement calls rejected |
+|---|---|---|---|
+| 0.60 | 98.9% | 210 | 11 |
+| 0.80 | 88.5% | **140** | 85 |
+| 0.90 | 74.4% | 18 | **158** |
+| 1.00 | 72.5% | 0 | 166 |
+
+At 0.80 it admits `pred 'schedule budget review and add water the plants to my
+list'` against `gold 'add water the plants to my list'` (sim 0.82) — an
+under-split that swallowed a whole other item — while rejecting `'yoga class'`
+vs `'yoga class at late'` (sim 0.67), which is purely a boundary call. **How
+much differs is the wrong axis; WHAT KIND of token differs is the right one.**
+
+Report the missed-field breakdown beside the 2-of-3 rate, always: "2 of 3" can
+be passed by failing the *same* field on every item, so a system that never
+extracts a time could score well on it. If one field dominates the breakdown,
+the rate is not measuring what it looks like it is measuring.
+
 ### THE INVARIANT (checked mechanically; a row violating it is a bug)
 
 For every item: `tokens(action) ∪ tokens(time)` contains every content token
@@ -55,15 +91,55 @@ A time reference is either INSIDE one item, or at an EDGE of the whole command
 > **INTERIOR → binds to its own item.
 > EDGE → applies to every item that has none of its own.**
 
+**The two edges do not behave the same.** This asymmetry was found by
+generating gold from the templates (`generate.py`), not by reasoning about it:
+
+> **LEADING** scopes forward over the whole command and distributes **per slot
+> class** — a day and a clock are separate slots, so a leading day still
+> reaches an item that has a clock but no day.
+>
+> **TRAILING** attaches to its own clause, and reaches back **only to an item
+> carrying no time at all**.
+
 | text | gold times | why |
 |---|---|---|
-| `tomorrow gym at 7 and meeting at 11` | `tomorrow at 7` · `tomorrow at 11` | leading edge covers both |
+| `tomorrow gym at 7 and meeting at 11` | `tomorrow at 7` · `tomorrow at 11` | leading day, per slot: item 2 has a clock, no day |
 | `tomorrow meeting at 7, today gym session` | `tomorrow at 7` · `today` | each has its own |
 | `gym session at 7, tomorrow meeting at 10` | `today at 7` · `tomorrow at 10` | interior — does NOT reach back |
-| `submit the grades and prepare the slides by friday` | `by friday` · `by friday` | trailing edge covers both |
-| `buy milk and book the dentist tomorrow` | `tomorrow` · `tomorrow` | trailing edge, crosses kinds |
+| `submit the grades and prepare the slides by friday` | `by friday` · `by friday` | trailing, and item 1 has no time at all |
+| `buy milk and book the dentist tomorrow` | `tomorrow` · `tomorrow` | trailing, crosses kinds, item 1 untimed |
+| `do i have anything this weekend and book the haircut at 3:45` | `this weekend` · `at 3:45` | trailing clock stays put — item 1 already has a time |
 
-**Default:** an item with no time reference at all gets `"today"`.
+Distributing per slot class in **both** directions gets the last row wrong,
+giving the question `this weekend at 3:45`. The asymmetry also matches how
+English works: pre-posed temporal adverbials scope over the utterance,
+post-posed ones attach to the nearest clause.
+
+### THE DATE FLOOR — the day defaults, the clock never does
+
+The two hand-written files were built to **opposite** conventions before this
+was written down: `split_traps` labelled a clock-only item `today at 4`,
+`nosplit_traps` labelled it `at 8`. One rule, applied everywhere:
+
+> **The DATE slot floors to `today` when the item has no day reference.
+> The CLOCK is never invented.**
+
+| item has | gold time |
+|---|---|
+| nothing | `today` |
+| a clock only | `today at 7` |
+| a day only | `tomorrow` |
+| both | `tomorrow at 7` |
+
+This is the reading SPEC's own scoping table already used (`gym session at 7,
+tomorrow meeting at 10` → `today at 7`), and the one the tuned LLMSeg prompt
+teaches the model. FastSeg emitted the bare form, which means the deterministic
+half and the model half **disagreed systematically on every clock-only item** —
+a disagreement the accept step would keep paying for.
+
+The floor is a legal value that is deliberately *not* in the text, so the
+invariant exempts it — see `invariant.py`. It is the one named exemption; every
+other word must still be grounded.
 
 ## Recurrence
 

@@ -49,6 +49,54 @@ the CURRENT implementation early.
 Steps 1–4 are the milestone. If the scorer disagrees with intuition on the 100
 rows, the rules are wrong and no amount of generated volume fixes it.
 
+## Where it actually stands (2026-09-08)
+
+**1,694 rows — 140 hand-written + 1,554 generated.** Steps 1–5 are done.
+
+| file | rows | what it is |
+|---|---|---|
+| `nosplit_traps.jsonl` | 65 | hand-written; all 11 must-NOT-split traps |
+| `split_traps.jsonl` | 75 | hand-written; the must-split shapes |
+| `generated.jsonl` | 1,554 | 259 template families, gold by construction |
+
+Ask-count spread `{1: 978, 2: 604, 3: 110, 4: 2}`; tags
+`{event 1416, task 1047, review 61}` — review is thin and is the next gap.
+
+### The generator did not start from scratch — and that is the point
+
+`dataset/fastrule/banks/complex_patterns.json` already held 321 templates built
+for a different board, and they carry exactly what segment gold needs: an
+`atomic` flag and **named slots**. Because the template says `{date}`, the
+action/time split is *known* rather than inferred — a regex over rendered text
+would just be FastSeg marking its own homework.
+
+**187 of the 321 templates are `atomic`, and 74 of those contain a joiner**
+("buy {item} and {item2}", "wash and fold the laundry"). Those 74 are decoy
+rows a naive splitter fails — the most expensive kind to write by hand and the
+cheapest to get this way.
+
+**62 families are excluded, never guessed** (`--report` prints them):
+38 `propose` templates ("should i book X?"), which ask for advice and so have
+no honest label in a three-tag contract; 15 whose action or tag is underivable;
+and 9 whose derivation failed validation. Two of the exclusions are open
+questions for Gil, listed in DESIGN.md §11.
+
+### Two bugs the generator found in the code it was built to measure
+
+Generating gold from structure disagreed with the implementation twice, and
+**both times the implementation was wrong**:
+
+1. **The invariant rejected its own documented default.** SPEC says an untimed
+   item gets `"today"`; the check called that an invention, because "today" is
+   not in the text. It was three copies of one rule that had drifted, so the
+   runtime guard in `llmseg.accept` would have rejected a *correct* model
+   answer. Now one definition in `invariant.py`, imported by all three.
+2. **Edge distribution is directional.** Distributing a trailing time per slot
+   class gave "do i have anything this weekend and book the haircut at 3:45"
+   the gold `this weekend at 3:45` for the question. Leading edges scope
+   forward per slot class; trailing edges reach back only to an item with no
+   time at all. Both `fastseg.py` and SPEC's scoping table now say so.
+
 ## Splitting — three rules, not one
 
 Family-split alone is NOT enough; *Split and Rephrase* (ACL 2018) found
