@@ -1,3 +1,11 @@
+# SUPERSEDED — this is the V3 prompt, kept as the record of the 14-case
+# bake-off it won (V1 5/14, V2 1/14, V3 11/14, V6 8/14). The prompt the code
+# actually ships is V4, in llmseg.py, and it differs on five points an audit
+# found V3 getting wrong once the gold moved: the symmetric edge rule, a
+# missing date floor, a dropped preposition, a half-stated floor, and nothing
+# about what the tag means for a delete. Do not copy from this file.
+# `experiments/check_prompt.py` validates the LIVE prompt, not this one.
+
 COMMAND (exactly as spoken):
 tomorrow gym at 7 and meeting at 11
 

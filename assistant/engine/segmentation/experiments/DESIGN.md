@@ -497,7 +497,7 @@ and measured **5/14** against llama3.1:8b. The tested winner is V3 in §10,
 which scores **11/14** by removing the judgement entirely: the model always
 emits a decomposition and deterministic code diffs it.
 
-The exact tested text lives in `assistant/engine/segmentation/experiments/verifier_prompt_v3.txt`.
+The exact tested text lives in `assistant/engine/segmentation/llmseg/prompts/v3_historical.txt`.
 
 ## The one risk, named up front
 

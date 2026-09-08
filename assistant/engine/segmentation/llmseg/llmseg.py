@@ -114,7 +114,10 @@ def normalise_tag(value, fallback: str = "event") -> str:
 
 
 # ---------------------------------------------------------------------------
-# THE PROMPT (V3, the tuned winner — see assistant/engine/segmentation/experiments/verifier_prompt_v3.txt)
+# THE PROMPT — V4 lives HERE, in code. The V3 text that the 14-case
+# bake-off actually ran is kept at
+#   assistant/engine/segmentation/llmseg/prompts/v3_historical.txt
+# as the record of that measurement; it is SUPERSEDED, not current.
 # ---------------------------------------------------------------------------
 
 #: V4. V3 was measured against gold that has since changed underneath it, and
