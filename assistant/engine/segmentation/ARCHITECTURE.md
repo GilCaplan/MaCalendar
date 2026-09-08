@@ -153,7 +153,37 @@ A parser was tried here first and was much worse (65.0%) — see §6.
 
 ---
 
-## 3 · LLMSeg — the model half
+## 3 · LLMSeg — the model half, **OFF BY DEFAULT**
+
+> ### The flag
+>
+> ```python
+> llmseg.ENABLED          # False unless MACALENDAR_LLMSEG is set
+> segment(text)                      # -> FastSeg only, route "fastseg-only"
+> segment(text, use_model=True)      # -> forces the model on, for experiments
+> segment(text, use_model=False)     # -> forces it off
+> ```
+>
+> `MACALENDAR_LLMSEG=1` turns it on for one command. **The default is OFF**
+> (Gil, 2026-09-08). LLMSeg stays wired, tested and kept — it simply does not
+> run unless something asks for it.
+>
+> **Any board measuring LLMSeg must pass `use_model=True` explicitly.** If a
+> measurement inherited the default it would report FastSeg's numbers under
+> LLMSeg's name, and that class of silent-measurement bug has already bitten
+> this module twice.
+>
+> **When Segmentation is promoted over `old_seg`, this becomes a config
+> setting** — `engine.segmentation.llmseg: off` in `config.yaml`, mirrored into
+> `config.example.yaml` per the project convention. It is a module flag today
+> only because the component is not yet wired to `config.py`.
+>
+> **Why it is off**, in one line: measured four independent ways against
+> FastSeg on 571 trap-stratified rows, every one came back negative, and the
+> most decisive test used a prompt written *after* an audit fixed five defects
+> in the old one — so the prompt was not the problem. Numbers in §6.
+
+
 
 One schema-shaped call to the local llama3.1:8b, anchored on FastSeg's
 proposal, followed by two deterministic guards.
@@ -316,14 +346,58 @@ morning`, `9 in the morning`.
 | the model should do the cutting, FastSeg the copying | **NO** — item-count 83.9% → **57.3%**, breaks 132. Predicted from DialogUSR's cut-vs-copy gap, but that compares a model's cut to its *own* copy, not to a tuned deterministic cutter. |
 | a similarity threshold can score the action | **NO** — see §5 |
 
-### LLMSeg's standing
+### LLMSeg's standing — turned OFF, on four measurements
 
-Against the V3 prompt it was **net-negative**: exact-row 47.2% → 40.9% at
-6.3 s/row, with all of the loss in the rows where ACCEPT took the model's
-answer. That measurement is **void** — V3 taught a superseded scoping rule on
-12.2% of rows. The V4 re-run is the honest test.
+| test | result |
+|---|---|
+| V3 full rewrite | −10 rows — **void**, the prompt taught a superseded rule on 12.2% of rows |
+| `boundaries` — model cuts, FastSeg copies | exact-row −17.3pp, item-count −26.6pp, **NO-INVENTION 0 → 4** |
+| `count` — model returns only a digit | −2.4pp, breaks 19 |
+| **`v4-full` — every prompt defect fixed** | **−12pp; fixes 1, breaks 42** |
 
-> **`v4-full` result: pending — fill in when the run lands.**
+Full board for `boundaries`, all twenty metrics, 571 identical rows:
+
+| metric | FastSeg | +LLMSeg | |
+|---|---|---|---|
+| exact-set / exact-row | 61.1% / 51.1% | 40.8% / 33.8% | WORSE |
+| right item count | 83.9% | 57.3% | WORSE |
+| item P / R / F1 | 95.8 / 92.5 / 94.1 | 51.5 / 94.7 / 66.7 | WORSE |
+| rows over- / under-split | 33 / 59 | **238** / 6 | WORSE |
+| A2 rows ≥ 2 of 3 | 78.3% | 53.6% | WORSE |
+| NO-INVENTION items *(must be 0)* | **0** | **4** | WORSE |
+| NO-LOSS items *(must be 0)* | 89 | 226 | WORSE |
+| tag accuracy | 86.5% | 85.4% | WORSE |
+| seconds / row | 0.01 | 6.30 | WORSE |
+
+Read the "better" cells carefully: recall rises only because it over-splits 238
+rows, and precision falls 44 points to pay for it. **Over- and under-split are
+never summed** — an over-split makes garbage immediately, an under-split gets
+two more chances downstream, so trading one for the other is not a win.
+
+`v4-full` is the one that settles it. Every prompt defect fixed, examples
+verified mechanically by `check_prompt.py`, and it still fixed **one row in
+358**:
+
+```
+put do the laundry and return the rental car on my list
+```
+
+### Three limits of that conclusion — recorded so it can be revisited honestly
+
+1. **The corpus is 92% template-generated**, from the very templates FastSeg
+   was tuned against. That is a structural bias toward the deterministic side.
+2. **One model, one protocol.** llama3.1:8b rewriting a proposal item-by-item.
+   This does not show that no model belongs in Segmentation.
+3. **The strongest case for a model is a population this dataset cannot
+   measure.** A corpus of templates plus hand-written traps cannot contain
+   phrasings nobody thought of, and that is exactly where a model would earn
+   its keep. `scripts/weekly_review.py` on real usage is the instrument for
+   that, and per CLAUDE.md real usage **outranks** every dataset number.
+
+The `v4-full` run was stopped at 458 of 571 rows, so the generated-vs-handwritten
+split is **untested** — every hand-written row sorts after the generated ones
+and none was reached. If that split is ever wanted, the cache makes it cheap to
+finish.
 
 ---
 

@@ -46,6 +46,28 @@ TAGS = ("event", "task", "review")
 MODEL = "llama3.1:8b"
 ENDPOINT = "http://localhost:11434/api/chat"
 
+#: OFF BY DEFAULT (Gil, 2026-09-08). LLMSeg is wired, tested and kept, but it
+#: does not run unless something asks for it.
+#:
+#: It was measured against FastSeg on 571 trap-stratified TRAIN rows, four
+#: independent ways, and every one came back negative — most decisively the V4
+#: prompt, written after an audit fixed five places where the prompt taught
+#: something the gold no longer accepted. With the prompt correct it still
+#: fixed ONE row in 358 and broke 42. The prompt was not the problem.
+#:
+#:     FastSeg alone            exact-row 55.4%
+#:     FastSeg + LLMSeg (V4)    exact-row 43.8%      fixes 1 / breaks 42
+#:     cost                     10 ms/row -> 6.3 s/row
+#:
+#: Full numbers and the three limits of that conclusion are in
+#: `assistant/engine/segmentation/ARCHITECTURE.md`.
+#:
+#: The env override exists so an experiment can turn it on without editing
+#: code — and so that turning it on is always a deliberate act that shows up
+#: in the command that ran it.
+ENABLED = os.environ.get("MACALENDAR_LLMSEG", "").strip().lower() in (
+    "1", "true", "yes", "on")
+
 
 # ---------------------------------------------------------------------------
 # TAG COERCION — the tag is made correct, not requested
@@ -238,8 +260,18 @@ def accept(text: str, proposal: "list[dict]", candidate) -> "tuple[list[dict], s
     return candidate, "corrected"
 
 
-def segment(text: str, use_model: bool = True) -> "dict":
-    """The whole component. Returns the items and how they were arrived at."""
+def segment(text: str, use_model: "bool | None" = None) -> "dict":
+    """The whole component. Returns the items and how they were arrived at.
+
+    `use_model=None` means "whatever the flag says", which is OFF. Pass True to
+    force it on for an experiment; pass False to force it off. A caller that
+    measures LLMSeg must pass True EXPLICITLY — if the default silently decided
+    it, a board would report FastSeg's numbers under LLMSeg's name, which is
+    the exact class of silent-measurement bug this module has already been
+    bitten by twice.
+    """
+    if use_model is None:
+        use_model = ENABLED
     proposal = fastseg(text)
     if not use_model:
         return {"items": proposal, "route": "fastseg-only", "proposal": proposal}
@@ -258,7 +290,7 @@ if __name__ == "__main__":                            # pragma: no cover
                   "submit the grades and prepare the slides by friday",
                   "what do i have on friday",
                   "meeting with Sam and Alex at 8"):
-        r = segment(probe)
+        r = segment(probe, use_model=True)
         print(f"\n{probe!r}   [{r['route']}]")
         for it in r["items"]:
             print(f"   action={it['action']!r:36s} time={it['time']!r:20s} {it['tag']}")

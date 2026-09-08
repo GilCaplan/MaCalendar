@@ -157,7 +157,10 @@ def build_predictor(name: str):
             if hit is not None:
                 return dict(hit, cached=True)
             t0 = time.perf_counter()
-            out = segment(text)
+            # use_model=True EXPLICITLY: LLMSeg is off by default, and a
+            # board that inherited the default would quietly report FastSeg's
+            # numbers under LLMSeg's name.
+            out = segment(text, use_model=True)
             rec = {"items": out["items"], "calls": 1,
                    "seconds": time.perf_counter() - t0,
                    "tier": out["route"], "route": out["route"]}
