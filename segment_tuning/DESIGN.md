@@ -99,8 +99,10 @@ A separate phase holding both the pieces AND the original can.
    │        · a reference at an EDGE, owned
    │          by no piece                     → covers every piece
    │                                            that has none of its own
-   │        · no date anywhere                → TODAY
-   │        · a time is needed, none given    → NOW (the clock)
+   │        · captured AS SPOKEN — never resolved,
+   │          never expanded to a range or a duration
+   │        · NO expression anywhere for an item → today
+   │          (or the clock, if a time is truly required)
    │   ↓
    │   (action, time) per item
    │
@@ -135,33 +137,56 @@ Worked example:
 
 | input | action | time | tag |
 |---|---|---|---|
-| `book haircut every monday at 9am` | `book haircut every monday` | `9am` | event |
+| `book haircut every monday at 9am` | `book haircut` | `every monday at 9am` | event |
 | `tomorrow gym at 7 and meeting at 11` | `gym` / `meeting` | `tomorrow at 7` / `tomorrow at 11` | event / event |
 | `submit the grades and prepare the slides by friday` | `submit the grades` / `prepare the slides` | `by friday` / `by friday` | task / task |
+| `buy 5 apples` | `buy 5 apples` | `today` (default) | task |
 
-**Where does RECURRENCE go — flagged, not decided.** In the first row above I
-put `every monday` in `action`, on the reading that `time` is *when this one
-occurrence is* and recurrence is *how it repeats* — which decompose and
-validate expand later. The opposite reading (recurrence is temporal, so it
-belongs in `time`) is also defensible. The no-loss invariant means neither
-choice loses data, so this is a labelling convention to settle, not a risk.
-**Confirm before the rows are written.**
+### Segment CAPTURES; it does not RESOLVE
 
+Gil, on whether `"add the interview on next friday"` should become an all-day
+block: *"the time will be friday. dont add more information that is not your
+job here."*
 
-**Why three phases and not one pass:** each has a different input, a different
-failure mode and a different metric, so each can be tuned and blamed on its
-own. Phase 1 is judged on boundaries, phase 2 on whether the right piece got
-the right date, phase 3 on kind accuracy. Today all three are entangled in one
-function, which is why fixing the splitter this morning made mis-typing worse
-and no single number could say why.
+That is the stage boundary, and it settles several questions at once. `time`
+holds **the expression as spoken**. Segment never turns "friday" into a date,
+never expands a dateless event into 00:00–23:59, never picks a duration. Every
+one of those is a later stage's job, and doing them here would be inventing
+information the speaker did not give.
 
-**One nuance in the "default to now" rule, flagged not assumed.** Gil: *"if no
-time given the default should be today, and if need specific time then right
-now whatever the current time is."* Read literally that would end all-day
-events — `"add the interview on next friday"` is legitimately 00:00–23:59
-today and should stay that way. My reading: the time defaults to the clock only
-when the item NEEDS a clock time; a dated event with no time spoken stays
-all-day. **Confirm this reading before it is labelled.**
+So the defaults are a floor, not a resolver: when an item has **no time
+expression anywhere** — none of its own and none distributed to it — `time`
+falls back to today (or the clock, where a specific time is genuinely
+required). An expression that EXISTS is captured verbatim and left alone.
+
+### Recurrence — RULED (Gil, 2026-09-08)
+
+Split by what kind of repetition it is:
+
+| kind | example | goes in | why |
+|---|---|---|---|
+| **temporal** repetition | `every friday buy groceries` | **`time`** = `every friday` | it IS the time expression |
+| **quantity** | `buy 5 apples` | **`action`** = `buy 5 apples` | not temporal at all — don't touch it |
+
+Gil: *"reoccurent on time include in the time feature, other type of
+reoccurence like buy x5 apples stays in the action feature. then the next
+stage in the pipeline should deal with it."* Both are captured and passed on;
+neither is expanded here.
+
+### Edge references cross kinds — RULED
+
+`"buy milk and book the dentist tomorrow"` → **break first, then time both**:
+
+| action | time | tag |
+|---|---|---|
+| `buy milk` | `tomorrow` | task |
+| `book the dentist` | `tomorrow` | event |
+
+Gil: *"it should get broken to two items first — buy milk, book dentist — then
+the time feature for both according to this is tomorrow."* So a trailing edge
+reference distributes even when the pieces are of different kinds. This also
+confirms the edge/interior model on a fifth example, and on the one shape that
+could most easily have broken it.
 
 ## 4 · The classification method — RESEARCH FIRST
 
