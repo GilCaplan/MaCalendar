@@ -1451,6 +1451,35 @@ the rules' ~36%), which is why that rewiring worked and this one does not.
 kind models reach the atomicity model's standard. Banked so no future cycle
 re-tries it blind.
 
+## MILESTONE — the pre-loop baseline on the SEALED 300 (run 21, 2026-09-07)
+
+**Dataset: the sealed test set (300 rows, never mined, never trained on,
+never used to pick a fix). Aggregates only, tooling-enforced.** This is the
+first objective read on the engine, and the reference every sprint cycle is
+judged against.
+
+| metric | value | meaning |
+|---|---|---|
+| count-correct raw | **83%** | of 301 commands, the right number of events/tasks |
+| product-adjusted | **82%** | after the conventions layer |
+| item-level F1 | **85.2** (P 87.2 / R 83.3) | it invents less than it drops |
+| simple / medium / complex | 90% / 92% / **67%** | the hard tier is the weak one, as always |
+| event+event / task+task / event+task | 63% / 78% / **59%** | mixed compounds are the worst family |
+| fast path | **90%** correct, 135 of 301 rows | nearly half the traffic, and the best path |
+| deep path | 77% correct, 166 rows | |
+| garbage titles | **0%** | |
+| field quality / when-correct | 88.9% / 81.9% | |
+| latency p50 / p95 | 12.0 s / **70.4 s** | |
+
+**Read honestly.** The headline is the best the engine has produced and the
+fast path carries 45% of traffic at 90% correct — the FastRule work landed.
+But three things temper it: **complex is 67%** and mixed compounds 59%,
+which the atomizer board explains exactly (6.2% of compounds atomized
+correctly); **p95 is 70 seconds**, which is not a product-acceptable tail
+even after the background-verify fix; and most importantly **this measures
+clean prompts** — the same engine scores 50% on Gil's real speech. The
+sprint is aimed at all three.
+
 ## PERSONA FINDING (2026-09-07) — the engine is tuned to SENTENCE SHAPES, not vocabulary
 
 **Dataset:** 6 synthetic personas × 420 rows (`dataset/personas/`), ground

@@ -679,7 +679,7 @@ def test_the_classifier_feature_counts_are_current(all_prose):
 
 
 def test_the_count_of_model_calling_stages_is_current(all_prose):
-    """"Five of the seven deep stages may call the language model."
+    """"Five of the seven engine stages may call the language model."
 
     The claim a reader is most likely to act on — how much of the pipeline is
     deterministic — so it is read from the stage modules themselves.
@@ -690,9 +690,9 @@ def test_the_count_of_model_calling_stages_is_current(all_prose):
     callers = [s for s in stages
                if re.search(r"call_json\(|parser\.parse", (engine / f"{s}.py").read_text())]
     for name, text in all_prose.items():
-        if "deep stages may call the language model" not in text:
+        if "stages may call the language model" not in text:
             continue
-        assert re.search(rf"\b{_word(len(callers))} of the seven deep stages", text, re.I), (
+        assert re.search(rf"\b{_word(len(callers))} of the seven engine stages", text, re.I), (
             f"{len(callers)} of the seven stages can call the model; {name} says otherwise")
 # ---------------------------------------------------------------------------
 # The datasets the evaluation section describes

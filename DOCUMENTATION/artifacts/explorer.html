@@ -224,6 +224,7 @@
     <line x1="248" y1="233" x2="212" y2="233" stroke="var(--muted)" marker-start="url(#mi)" marker-end="url(#mi)"/>
     <text x="229" y="224" text-anchor="middle" font-size="8" fill="var(--muted)">asks it</text>
     <line x1="352" y1="243" x2="352" y2="247" stroke="var(--muted)" marker-end="url(#mi)"/>
+    <text x="735" y="491" text-anchor="middle" font-size="7" fill="var(--muted)">back out to the orchestrator — Engine owns the write and the labels</text>
     <g data-panel="commit" role="button" tabindex="0" aria-label="Commit and label: the only place the engine touches the database, through the action classes; then category, colour and tags are read back.">
       <rect class="frame" x="262" y="248" width="181" height="18" rx="3" fill="var(--screen)" stroke="var(--line)"/>
       <text x="352" y="260" text-anchor="middle" font-size="9.5">4 · commit · label</text>
@@ -518,7 +519,7 @@
     </g>
 
     <!-- ============ THE DEEP SYSTEM ============ -->
-    <rect x="500" y="176" width="470" height="390" rx="8" fill="none" stroke="var(--line)" stroke-width="1.6"/>
+    <rect x="500" y="176" width="470" height="306" rx="8" fill="none" stroke="var(--line)" stroke-width="1.6"/>
     <g data-panel="deepsystem" role="button" tabindex="0" aria-label="DeepSystem: the atomizer. It breaks a command down to atomic items so FastRule can create the right record per item.">
       <rect class="frame" x="504" y="180" width="462" height="42" rx="6" fill="transparent" stroke="transparent"/>
       <text x="735" y="198" text-anchor="middle" font-size="11.5" font-weight="600">DeepSystem — the atomizer</text>
@@ -556,14 +557,14 @@
       <text x="735" y="466" text-anchor="middle" font-size="7.5" fill="var(--muted)">loops back at most 3 times · the model never picks the stage</text>
     </g>
     <g data-panel="commit" role="button" tabindex="0" aria-label="Commit: the only place the engine touches the database, through the action classes.">
-      <rect class="frame" x="518" y="478" width="434" height="36" rx="5" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="735" y="495" text-anchor="middle" font-size="9.5" font-weight="600">commit — the only write</text>
-      <text x="735" y="508" text-anchor="middle" font-size="7.5" fill="var(--muted)">a blocked item is refused out loud, never dropped quietly</text>
+      <rect class="frame" x="518" y="496" width="434" height="36" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="735" y="513" text-anchor="middle" font-size="9.5" font-weight="600">commit — the only write</text>
+      <text x="735" y="526" text-anchor="middle" font-size="7.5" fill="var(--muted)">a blocked item is refused out loud, never dropped quietly</text>
     </g>
     <g data-panel="label" role="button" tabindex="0" aria-label="Stage seven, label: category, colour and tags are read back onto the items for the reply, the trace and the audit.">
-      <rect class="frame" x="518" y="520" width="434" height="36" rx="5" fill="var(--screen)" stroke="var(--line)"/>
-      <text x="735" y="537" text-anchor="middle" font-size="9.5" font-weight="600">7 · label — read the labels back</text>
-      <text x="735" y="550" text-anchor="middle" font-size="7.5" fill="var(--muted)">the actions labelled it; this stage reports what they chose</text>
+      <rect class="frame" x="518" y="538" width="434" height="36" rx="5" fill="var(--screen)" stroke="var(--line)"/>
+      <text x="735" y="555" text-anchor="middle" font-size="9.5" font-weight="600">7 · label — read the labels back</text>
+      <text x="735" y="568" text-anchor="middle" font-size="7.5" fill="var(--muted)">the actions labelled it; this stage reports what they chose</text>
     </g>
     <path d="M 512 454 L 506 454 L 506 244 L 512 244" fill="none" stroke="var(--muted)" stroke-dasharray="3 2" marker-end="url(#mi)"/>
 
@@ -960,7 +961,7 @@ const P = {
     It holds one. Whisper loads in the API process and spaCy in the rule parser &mdash; both inside the
     process that does the deciding &mdash; and the language model sits beside them in <strong>its own
     process</strong>, answering when asked.</p>
-    <p>Five of the seven deep stages may call the language model, each with its own schema-constrained
+    <p>Five of the seven engine stages may call the language model, each with its own schema-constrained
     question: split this command, split this item's times, repair these garbled words, read this item, and
     list what the raw words asked for. The other two &mdash; the transcript stage and the label stage
     &mdash; never call it at all. Same weights, five different questions.</p>
