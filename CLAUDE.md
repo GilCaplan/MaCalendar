@@ -236,7 +236,15 @@ silently returns only its first 150 rows.)
 
 **Each cycle is a hypothesis:** predict the component you'll change and the
 metric+slice you expect to move, then compare actual vs. expected — and note any
-novel effects — in `dataset/RESULTS.md`. A score is a pointer, not the point:
+novel effects — in `dataset/RESULTS.md`.
+
+**A cycle ends by starting the next one** (Gil, 2026-09-08). Banking the
+result IS the report — register the next prediction in the same breath and
+keep going. Implementation fixes and cleanups between cycles are fine and do
+not need asking. Stop only for a DESIGN decision, or when three cycles running
+move nothing past the noise floor (then change the instrument, slice or
+dataset — say so plainly rather than grinding). Never stop merely to show a
+number. A score is a pointer, not the point:
 read the breakdown and the failing rows to understand what it *means*, never
 just the number. Full protocol: `DOCUMENTATION/experiments/ITERATION_PROTOCOL.md`.
 

@@ -1626,3 +1626,53 @@ unchanged from baseline — not caused here).
 25/606 → 133/807) because splitting EXPOSES second items that then need
 kinding, and `_TASK_RE` still recognises no non-create todo verb. That is
 cycle A change 2, measured next.
+
+## CYCLE A PART 2 — THE KIND DECISION — REGISTERED PREDICTION 2026-09-08
+
+**Why this is the next cycle, chosen by the last one's own result.** Part 1
+raised compound count-correctness a lot (complex 49.8%→70.5% personas,
+60.4%→75.1% FastRule) and mis-typing rose with it: personas complex 25/606 →
+133/807. Splitting EXPOSES second items, and each exposed item now needs a
+kind. The kind logic was never the binding constraint while segment split
+nothing; it is now.
+
+**Baseline to beat** (atomizer board, test halves, deterministic path, as of
+a222f60): personas complex mis-typed **133/807 (16.5%)**, simple 393/1302
+(30.2%); FastRule complex **320/825 (38.8%)**, simple 360/797 (45.2%).
+
+**The mechanism, read out of the code before measuring:** kind is decided in
+`segment._kind_of` / `_enforce_pinned_kinds`, and `decompose.run()` then
+branches ENTIRELY on it. So one wrong kind costs two errors — the wrong label
+AND the wrong decomposition (an event gets time-splitting, a task gets
+list-splitting and quantity extraction).
+
+**Changes** (all implementation; contracts frozen):
+1. **`_TASK_RE` recognises only CREATE-shaped to-do phrasing.** No complete,
+   update or delete verb matches it, so "cross off buy milk" / "mark the
+   laundry done" / "take the dentist off my list" fall through to "event".
+2. **Q15: a daypart is not a clock time.** `_CLOCKISH_RE` ends with
+   `(noon|midnight|tonight|morning|evening|afternoon)`, and both kind call
+   sites use it to promote a reminder to the calendar — against Gil's
+   explicit ruling that "remind me to take the trash out tonight" is a task
+   due in the evening. The daypart belongs in the due time.
+3. **`_strip_reminder_clause` runs only for events**, so a task carrying a
+   lead-time keeps the whole clause in its title.
+4. **The wrapper tear** in `list_split`, producing titles like "Jordan to my
+   to-do list".
+
+**Predict:**
+- atomizer board, both test halves: **mis-typed down 10–20 pt** on the complex
+  tier (personas 16.5% → 5–10%; FastRule 38.8% → 22–30%). Change 2 is the
+  largest single driver by the earlier attribution (499 of 609), change 1 the
+  second.
+- **count-correctness must not regress**: complex holds at or above 70.5% /
+  75.1%, simple holds at 100% / 99.6%. A kind fix that costs count-correctness
+  is a bad trade and would be banked as a negative.
+- **OVER stays ≤3%.** Nothing here should split more.
+- FastRule shape board: **kind/action correctness up**, handle rate ±1 —
+  FastRule's own router is untouched, but it receives better-kinded items.
+- **Risk, stated up front:** change 1 widens a regex, and this project's bias
+  is that a wrong action beats no action only when the action is additive.
+  Adding delete/complete verbs to a TASK matcher moves rows toward
+  destructive operations. If harm (weighted destructive errors) rises at all,
+  that is a banked negative regardless of what mis-typed does.

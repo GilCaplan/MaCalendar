@@ -258,6 +258,36 @@ boundary are not comparable. Standing policies: **merge the loop branch into
 deltas, so a cycle that targets one component sees THAT component move, not
 just the overall blur.
 
+## A cycle ends by starting the next one (Gil, 2026-09-08)
+
+**The loop does not stop to report.** Banking the result in `RESULTS.md` IS
+the report; the next cycle's prediction is registered in the same breath and
+the work continues. Gil: "keep running more cycles — it's supposed to be
+automatic."
+
+This is written down because the opposite happened: cycle A part 1 was
+measured, banked and then *narrated*, and the loop sat idle waiting for a
+"go" that was never needed. Nothing in this protocol said where a cycle ends,
+so it ended at the nearest satisfying stopping point — a summary.
+
+The rule, concretely, after `compare` and `bank`:
+
+1. Read the result for what it CHANGED about the binding constraint. A cycle
+   that fixes one thing usually promotes another to first place — part 1
+   raised compound splitting and thereby made the kind decision the new
+   ceiling, which is what chose part 2. The queue is re-ranked by the run,
+   not by the plan.
+2. Register the next prediction BEFORE writing any code.
+3. Keep going. Ask Gil only for a DESIGN decision (a contract change, a
+   convention with two defensible readings, a product ruling) — never for
+   permission to continue, and never merely to show a number.
+
+**What still stops the loop**, and only these: a design question that needs a
+person; three consecutive cycles that move nothing past the noise floor (say
+so plainly and change the instrument, the slice or the dataset rather than
+grinding); or a measurement that says the last change made the product worse
+in a way that is not obviously repairable.
+
 ## One cycle — a hypothesis, tested
 
 Every cycle is an experiment with a **written prediction**, so the result can be
