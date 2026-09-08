@@ -7,6 +7,11 @@
 
 ## The Engine — `assistant/engine/` (THE BRAIN)
 
+**Start at `assistant/engine/ARCHITECTURE.md`** — the chain as a
+diagram, each stage as a black box, and a status table saying which
+parts are wired today versus planned in `ENGINE_REWIRE.md`.
+
+
 > Contracts frozen — read `DOCUMENTATION/ENGINE.md` before touching a stage.
 
 | What | Location |
