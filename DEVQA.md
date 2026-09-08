@@ -79,6 +79,17 @@ digest banner?** Lifestyle call, not engineering.
 
 ## Answered log
 
+**Q15 (2026-09-07, Gil): a DAYPART IS NOT A CLOCK TIME.** "remind me to take
+the trash out tonight" is **a task to do in the evening**, not a calendar
+event. The pinned reminder convention turns on a real clock time ("remind me
+about the dentist tomorrow AT 9AM" = event; "remind me TO <verb>" = task),
+but `segment._CLOCKISH_RE` lists `tonight|morning|evening|afternoon`
+alongside actual times, so any remind-phrased errand with a vague daypart
+became a calendar entry. A daypart is a rough WHEN — it belongs in the
+task's due time, not in the decision of what kind of thing this is. This is
+the single largest mis-kind driver: **499 of 609** on the FastRule test half,
+383 of 418 on the personas. Fixed in sprint cycle B.
+
 **Q14 (2026-09-07, Gil): "buy apples and eggs" is TWO tasks** — same action,
 separate items ("buy eggs", "buy apples"). This settles a contradiction the
 atomizer board found between our own documents: `decompose.py` and
