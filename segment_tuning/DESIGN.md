@@ -83,31 +83,70 @@ A separate phase holding both the pieces AND the original can.
   text
    │
    │ ── PHASE 1 · BREAK DOWN ─────────────────────────────
-   │      find every independent action. CUTTING ONLY —
-   │      no time reasoning happens here at all.
+   │      find every independent action. CUTTING ONLY.
    │        A  literal delimiters   (phone artifacts)
    │        B  clause parse         (fires on speech)
    │        C  one gated LLM call   (only if A and B found nothing)
    │        ↺  loop A+B to a fixed point
    │        GUARD  refuse a split where any piece is not an ask
    │   ↓
-   │   pieces: ["gym", "buy milk"]
+   │   pieces (spans of the original)
    │
    │ ── PHASE 2 · TIME ASSIGNMENT ────────────────────────
    │      INPUT: the pieces AND the original string, together.
-   │      For each piece decide its date and its time:
+   │      Splits each piece into two strings and fills the gaps:
    │        · a reference INSIDE a piece      → binds to that piece
-   │        · a reference at an EDGE of the
-   │          command, owned by no piece      → covers every piece
+   │        · a reference at an EDGE, owned
+   │          by no piece                     → covers every piece
    │                                            that has none of its own
    │        · no date anywhere                → TODAY
-   │        · a time is needed and none given → NOW (the clock)
+   │        · a time is needed, none given    → NOW (the clock)
    │   ↓
-   │   pieces + when: [("gym", tomorrow), ("buy milk", tomorrow)]
+   │   (action, time) per item
    │
    └── PHASE 3 · CLASSIFY ───────────────────────────────
-          each piece → event | task | review
+          (action, time) → tag ∈ {event, task, review}
+   ↓
+   ITEM = (action, time, tag)
 ```
+
+### The output contract (Gil, 2026-09-08)
+
+Segmentation returns **a list of items, each three strings**:
+
+```
+  action  str   everything in this item that is NOT the time
+  time    str   the time reference for this occurrence
+  tag     str   "event" | "task" | "review"
+```
+
+**The invariant that makes it safe**, and the reason Gil specified it:
+
+> "make sure that the action includes all the text for that item that is not
+> related to time so we dont lose information like occurences etc which the
+> decompose step is suppose to deal with"
+
+So: **`tokens(action) ∪ tokens(time)` must cover every content token of that
+item.** Nothing may fall on the floor between phase 2's two outputs. That is
+checkable by arithmetic, and it is what stops the time-extractor quietly
+eating a recurrence, an attendee or a location on its way past.
+
+Worked example:
+
+| input | action | time | tag |
+|---|---|---|---|
+| `book haircut every monday at 9am` | `book haircut every monday` | `9am` | event |
+| `tomorrow gym at 7 and meeting at 11` | `gym` / `meeting` | `tomorrow at 7` / `tomorrow at 11` | event / event |
+| `submit the grades and prepare the slides by friday` | `submit the grades` / `prepare the slides` | `by friday` / `by friday` | task / task |
+
+**Where does RECURRENCE go — flagged, not decided.** In the first row above I
+put `every monday` in `action`, on the reading that `time` is *when this one
+occurrence is* and recurrence is *how it repeats* — which decompose and
+validate expand later. The opposite reading (recurrence is temporal, so it
+belongs in `time`) is also defensible. The no-loss invariant means neither
+choice loses data, so this is a labelling convention to settle, not a risk.
+**Confirm before the rows are written.**
+
 
 **Why three phases and not one pass:** each has a different input, a different
 failure mode and a different metric, so each can be tuned and blamed on its
@@ -198,13 +237,17 @@ hides which way it is failing.
   symmetric: an under-split has two more chances downstream, an over-split is
   garbage immediately.
 
-**B · the edit**
-- no-invention violations (tokens not in the input) — must be **0**
-- no-loss violations (input content tokens in no item) — must be **0**
-- shared-modifier accuracy: did the right items get the shared date
+**B · the (action, time) split** — phase 2
+- no-invention violations (a token in no part of the input) — must be **0**
+- no-loss violations (an item's content token in NEITHER action nor time) —
+  must be **0**. This is the invariant Gil specified, scored directly.
+- time-assignment accuracy: did each item get the RIGHT time, including the
+  distributed ones and the defaults (today / the clock)
+- action purity: does `action` still carry the recurrence, attendees and
+  location the later stages need
 
-**C · classification**
-- kind accuracy + per-class P/R/F1 + the confusion matrix
+**C · classification** — phase 3, scored on `(action, time)` as given
+- tag accuracy + per-class P/R/F1 + the confusion matrix
 - atomicity accuracy, and separately its cost AS A GATE: how many extra
   recursion rounds a false "not atomic" bought
 
