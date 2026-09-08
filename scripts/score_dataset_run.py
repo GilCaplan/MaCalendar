@@ -391,3 +391,20 @@ def load_test_split(path: pathlib.Path = None) -> "set[str]":
         return {text for text, _ in _json.loads(p.read_text())["rows"]}
     except Exception:
         return set()
+
+
+def load_dev100(path: pathlib.Path = None) -> "set[str]":
+    """The dev-100 texts — the FAST ITERATION slice for engine cycles.
+
+    Fixed (same rows every cycle, so deltas compare), stratified on
+    scenario x intent x complexity to match the train pool, drawn from TRAIN
+    only. One flipped row = 1.0 pt, so the noise floor is ~2.5-3 pt: it is
+    for DIRECTION. Confirm a win on dev-fast 250 before believing it.
+    """
+    p = path or (pathlib.Path(__file__).resolve().parents[1]
+                 / "dataset" / "inputs" / "dev100.json")
+    try:
+        import json as _json
+        return {text for text, _ in _json.loads(p.read_text())["rows"]}
+    except Exception:
+        return set()

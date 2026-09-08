@@ -61,10 +61,23 @@ naturally stratified.
 
 | rung | ranks | n | ~time (8B, serial) | one flipped prompt = | use |
 |---|---|---|---|---|---|
-| dev-fast | 1–250 | 250 | ~80 min | 0.40 pt | rapid single-component cycles |
+| **dev-100** | fixed stratified sample | 100 | **~25 min** | **1.00 pt** | **fast iteration — DIRECTION only** |
+| dev-fast | 1–250 | 250 | ~80 min | 0.40 pt | confirm a dev-100 win before believing it |
 | dev-full | 1–600 | 600 | ~3¼ h | 0.17 pt | confirm a fast win |
 | TRAIN pool | all minus sealed | 2,699 | — | — | mine/train/tune freely |
 | SEALED test | `inputs/test_split.json` | 300 | ~1¾ h | 0.33 pt | milestones only — **never mined, tooling-enforced** |
+
+**The ladder (Gil, 2026-09-07): iterate on dev-100, confirm on dev-fast,
+milestone on the sealed 300.** dev-100 is FIXED (the same rows every cycle,
+seed 100, `dataset/inputs/dev100.json`, `--dev100`) so deltas compare
+across cycles, and STRATIFIED on scenario × intent × complexity so its
+composition matches the train pool within a point on every stratum. The
+cost is honest: one flipped row is 1.0 pt, so its noise floor is ~2.5–3 pt
+and several of this session's real wins (+1.0, +1.9) would have been
+invisible on it. It is for direction; a fixed slice iterated against hard
+will eventually be overfit, which is what the dev-fast confirmation step is
+for. NOTE this ladder is for ENGINE cycles only — FastRule's boards already
+run 7,200 rows in seconds, and the atomizer board 4,920.
 
 **Since 2026-09-07 (Gil): train–test supersedes the old held-out seal.** The
 sealed set is 300 stratified rows (drawn from the never-mined 601–3000

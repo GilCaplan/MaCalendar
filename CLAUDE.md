@@ -214,7 +214,8 @@ frozen), rerun.
 **Start on the smallest rich-enough slice and upsize only as gains slow — never
 the full 3000 as the working loop:**
 
-    python -m scripts.engine_dataset_compare --limit 0 --max-rank 250   # dev-fast (~80 min)
+    python -m scripts.engine_dataset_compare --limit 0 --dev100          # iterate (~25 min)
+    python -m scripts.engine_dataset_compare --limit 0 --max-rank 250   # confirm (~80 min)
     python -m scripts.engine_dataset_compare --limit 0 --max-rank 600   # dev-full
     python -m scripts.engine_dataset_compare --limit 0 --test           # SEALED 300 (milestone only)
 

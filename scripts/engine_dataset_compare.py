@@ -108,7 +108,8 @@ def _load_scorer():
 
 def _source_rows(source: pathlib.Path, limit: int,
                  min_rank: int = 0, max_rank: int = 0,
-                 test_only: bool = False) -> list[tuple[str, int]]:
+                 test_only: bool = False,
+                 dev100_only: bool = False) -> list[tuple[str, int]]:
     where = "tier_rank IS NOT NULL"
     if min_rank:
         where += f" AND tier_rank >= {int(min_rank)}"
@@ -121,9 +122,12 @@ def _source_rows(source: pathlib.Path, limit: int,
         ).fetchall()
     # The SEALED test split (Gil, 2026-09-07): excluded from every run by
     # default; --test runs ONLY those 300, for milestone evaluation.
-    from scripts.score_dataset_run import load_test_split
+    from scripts.score_dataset_run import load_dev100, load_test_split
     test = load_test_split()
     rows = [r for r in rows if (r[0] in test) == test_only]
+    if dev100_only:
+        dev = load_dev100()
+        rows = [r for r in rows if r[0] in dev]
     return rows[: int(limit)] if limit else rows
 
 
@@ -206,6 +210,9 @@ def main() -> int:
     ap.add_argument("--max-rank", type=int, default=0)
     ap.add_argument("--test", action="store_true",
                     help="run ONLY the sealed 300-row test split (milestone runs)")
+    ap.add_argument("--dev100", action="store_true",
+                    help="run ONLY the fixed 100-row iteration slice (~25 min; "
+                         "noise floor ~2.5-3 pt, so confirm wins on dev-fast 250)")
     ap.add_argument("--out-dir", type=pathlib.Path,
                     default=WORKTREE / "DOCUMENTATION" / "experiments" / "engine_compare")
     ap.add_argument("--llm", default="",
@@ -306,7 +313,7 @@ def main() -> int:
     scorer = _load_scorer()
     prov = scorer.load_provenance(args.fixture)
     rows = _source_rows(args.source, args.limit, args.min_rank, args.max_rank,
-                        test_only=args.test)
+                        test_only=args.test, dev100_only=args.dev100)
     print(f"Replaying {len(rows)} rows from {args.source.name} through engine-v2 "
           f"(scratch: {_TMP})")
 

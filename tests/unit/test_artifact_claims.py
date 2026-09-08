@@ -557,3 +557,189 @@ def test_the_loop_budget_matches_crosscheck(all_prose):
             continue
         assert re.search(rf"at most {word} times", text, re.I), (
             f"the loop budget is {MAX_REENTRIES}; {name} says otherwise")
+
+
+# ---------------------------------------------------------------------------
+# The engine's components — the page names them, so the names must be real
+#
+# The explorer page draws the engine as its actual objects rather than as
+# friendly labels, which is worth more to a reader and rots faster: a class
+# renamed in a refactor leaves a page naming something that no longer exists.
+# Each check below reads the name out of the module that owns it. They fire
+# only on a page that makes the claim (the marker phrase), so a page that
+# describes the system at a different altitude is not held to it.
+# ---------------------------------------------------------------------------
+
+#: Only a page that draws FastRule's internals uses this phrase.
+_ENGINE_MARK = "atomic-item executor"
+
+
+def _classes(path: pathlib.Path) -> set:
+    return {m.group(1) for m in re.finditer(r"^class (\w+)", path.read_text(), re.M)}
+
+
+def test_the_fastrule_components_named_on_the_page_exist(all_prose):
+    """FastRule's inner objects, by the names the page prints."""
+    have = _classes(ROOT / "assistant" / "engine" / "fastrule.py")
+    for cls in ("FastRule", "Atomicity", "Gatekeeper", "Scorer"):
+        assert cls in have, f"{cls} is no longer a class in engine/fastrule.py"
+    for name, text in all_prose.items():
+        if _ENGINE_MARK not in text:
+            continue
+        for cls in ("Atomicity", "Gatekeeper", "Scorer"):
+            assert cls in text, (
+                f"{name} draws FastRule but never names {cls}, which is one of "
+                "the objects it is made of")
+
+
+def test_the_engine_objects_named_on_the_page_exist(all_prose):
+    """Engine / DeepSystem / Stage / Component / EngineState."""
+    orchestrator = _classes(ROOT / "assistant" / "engine" / "__init__.py")
+    component = _classes(ROOT / "assistant" / "engine" / "component.py")
+    state = _classes(ROOT / "assistant" / "engine" / "state.py")
+    assert {"Engine", "DeepSystem"} <= orchestrator, "the orchestrator's classes moved"
+    assert {"Component", "Stage"} <= component, "component.py's classes moved"
+    assert "EngineState" in state, "EngineState is no longer defined in state.py"
+    for name, text in all_prose.items():
+        if _ENGINE_MARK not in text:
+            continue
+        for ident in ("DeepSystem", "EngineState", "Component", "Stage"):
+            assert ident in text, f"{name} draws the engine but never names {ident}"
+
+
+def test_the_deep_stage_names_match_the_state_contract(all_prose):
+    """The stage names are the ones `state.STAGES` declares, in the code."""
+    from assistant.engine.state import STAGES
+    for name, text in all_prose.items():
+        if _ENGINE_MARK not in text:
+            continue
+        for stage in STAGES:
+            if stage == "intake":
+                continue          # the orchestrator's own half, drawn as Engine
+            assert stage in text, (
+                f"{name} draws the deep track but never names the {stage} stage")
+
+
+def test_the_deferral_reason_classes_are_current(all_prose):
+    """A deferral's class decides the handoff — there are exactly three."""
+    from assistant.engine.fastrule import (INCAPACITY, REFUSAL, STRUCTURE,
+                                           _REASON_CLASS)
+    classes = {REFUSAL, STRUCTURE, INCAPACITY}
+    assert set(_REASON_CLASS.values()) == classes, (
+        "a deferral reason now maps to a class the page does not describe")
+    for name, text in all_prose.items():
+        if "deferral carries a" not in text.lower():
+            continue
+        for cls in classes:
+            assert cls.upper() in text, (
+                f"{name} describes the deferral contract without naming {cls.upper()}")
+
+
+def test_the_two_fastrule_thresholds_are_current(all_prose):
+    """The front door's bar and the per-fragment bar are different numbers."""
+    from assistant.engine.generate import SUBITEM_RULE_THRESHOLD
+    from assistant.intent.rule_parser import RULE_THRESHOLD
+    for name, text in all_prose.items():
+        if "per fragment" not in text:
+            continue
+        for value in (RULE_THRESHOLD, SUBITEM_RULE_THRESHOLD):
+            assert re.search(rf"{re.escape(str(value))}(?![0-9])", text), (
+                f"{name} quotes the two FastRule bars, but {value} is not one of them")
+
+
+def test_the_number_of_shipped_classifiers_is_current(all_prose):
+    """Three small logistic models ride inside the fast path."""
+    from assistant.intent.classifier import ModelRouter
+    n = sum(1 for v in vars(ModelRouter()).values() if hasattr(v, "featurizer"))
+    for name, text in all_prose.items():
+        if "fitted classifiers" not in text:
+            continue
+        assert re.search(rf"\b{n}\b\s+fitted classifiers", text), (
+            f"the router carries {n} fitted classifiers; {name} says otherwise")
+
+
+def test_the_classifier_feature_counts_are_current(all_prose):
+    """Each featurizer's signal count, read from its own `names` list.
+
+    Named signals are the point of these models — a page that quotes how many
+    there are has to track the list, or it is quoting a number from a model
+    that no longer exists.
+    """
+    from assistant.intent.classifier import (AtomicityFeatures, KindFeatures,
+                                             OperationFeatures)
+    counts = {"OperationFeatures": len(OperationFeatures.names),
+              "KindFeatures": len(KindFeatures.names),
+              "AtomicityFeatures": len(AtomicityFeatures.names)}
+    for name, text in all_prose.items():
+        for cls, n in counts.items():
+            if cls not in text:
+                continue
+            assert f"{cls} with {n} signals" in text, (
+                f"{cls} holds {n} named signals; {name} quotes a different count")
+
+
+def test_the_count_of_model_calling_stages_is_current(all_prose):
+    """"Five of the seven deep stages may call the language model."
+
+    The claim a reader is most likely to act on — how much of the pipeline is
+    deterministic — so it is read from the stage modules themselves.
+    """
+    engine = ROOT / "assistant" / "engine"
+    stages = ("transcript", "segment", "decompose", "validate", "generate",
+              "crosscheck", "label")
+    callers = [s for s in stages
+               if re.search(r"call_json\(|parser\.parse", (engine / f"{s}.py").read_text())]
+    for name, text in all_prose.items():
+        if "deep stages may call the language model" not in text:
+            continue
+        assert re.search(rf"\b{_word(len(callers))} of the seven deep stages", text, re.I), (
+            f"{len(callers)} of the seven stages can call the model; {name} says otherwise")
+# ---------------------------------------------------------------------------
+# The datasets the evaluation section describes
+# ---------------------------------------------------------------------------
+
+def test_the_dataset_sizes_quoted_are_current(all_prose):
+    """Row counts read from the dataset files, not from the prose that cites them.
+
+    These are the numbers a reader would use to judge whether the evaluation
+    means anything, and every one of them moves when a set is regenerated.
+    """
+    import collections
+    import json
+    pool = ROOT / "dataset" / "inputs" / "history_3000.json"
+    sealed = ROOT / "dataset" / "inputs" / "test_split.json"
+    generated = ROOT / "dataset" / "fastrule" / "fastrule_7200.jsonl"
+    personas = ROOT / "dataset" / "personas" / "personas.jsonl"
+    if not all(p.exists() for p in (pool, sealed, generated, personas)):
+        pytest.skip("the datasets are not present in this checkout")
+
+    n_pool = json.loads(pool.read_text())["n"]
+    n_sealed = json.loads(sealed.read_text())["n"]
+    splits = collections.Counter()
+    for line in generated.open():
+        splits[json.loads(line)["split"]] += 1
+    rows = [json.loads(line) for line in personas.open()]
+    speakers = {r["persona"] for r in rows}
+    assert {r["split"] for r in rows} == {"test"}, (
+        "a persona row is no longer test-only — the page says every one of them is")
+
+    for name, text in all_prose.items():
+        if "real voice utterances" in text:
+            assert f"{n_pool:,} real voice utterances" in text, (
+                f"{name} miscounts the verification pool; it holds {n_pool:,}")
+        if "rows sealed" in text:
+            assert f"{n_sealed} rows sealed" in text, (
+                f"{name} miscounts the sealed rows; there are {n_sealed}")
+        if "rows expanded from pattern skeletons" in text:
+            total = splits["train"] + splits["test"]
+            assert f"{total:,} rows expanded from pattern skeletons" in text, (
+                f"{name} miscounts the generated set; it holds {total:,} rows")
+            assert f"{splits['train']:,} to train and tune on" in text, (
+                f"{name} miscounts its training half ({splits['train']:,})")
+            assert f"{splits['test']:,} held back" in text, (
+                f"{name} miscounts its held-back half ({splits['test']:,})")
+        if "synthetic users" in text:
+            assert re.search(rf"\b{_word(len(speakers))} synthetic users", text, re.I), (
+                f"there are {len(speakers)} personas; {name} says otherwise")
+            assert f"{len(rows):,} rows" in text, (
+                f"{name} miscounts the persona rows; there are {len(rows):,}")
