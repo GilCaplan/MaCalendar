@@ -336,7 +336,9 @@ judgement).
 
 `recurrence` is only ever `daily`, `weekly` or `monthly`. Anything a speaker
 says that is not one of those gets rounded to one that is, and the rounding is
-announced in the reply rather than done quietly — "every other tuesday" became
+announced in the reply rather than done quietly. **A weekly series may name
+SEVERAL weekdays** — `recur_days` carries them ("every tuesday and thursday");
+that is WHICH days a weekly series lands on, not a fourth cadence — "every other tuesday" became
 one event before anyone noticed, and "every weekday" books Shabbat.
 
 **"until" excludes the day it names; "through" and "including" keep it.**

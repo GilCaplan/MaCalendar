@@ -205,7 +205,11 @@ RECURRENCES = {
     "every other tuesday": ("weekly", "tuesday"),
     "every weekday": ("daily", None),
     "every weekend": ("weekly", "saturday"),
-    "every tuesday and thursday": AMBIGUOUS,   # two series, or one? undecided
+    # Gil, 2026-09-08 chose option (c): ONE weekly series naming both days,
+    # rather than losing the Thursday or making two series for one sentence.
+    # The CADENCE is still weekly -- `recur_days` says WHICH days it lands on,
+    # so daily|weekly|monthly is unchanged.
+    "every tuesday and thursday": ("weekly", ["tuesday", "thursday"]),
 }
 
 #: Recurrences whose cadence was ROUNDED to fit daily|weekly|monthly. The reply

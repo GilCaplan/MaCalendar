@@ -107,6 +107,7 @@ CREATE TABLE IF NOT EXISTS events (
     created_at     TEXT    NOT NULL,
     series_id      INTEGER,               -- NULL = not recurring; shared by all instances
     recurrence     TEXT    NOT NULL DEFAULT '',   -- '' | 'daily' | 'weekly' | 'monthly'
+    recur_days     TEXT    NOT NULL DEFAULT '',   -- weekly only: 'tuesday,thursday'
     recurrence_end TEXT    NOT NULL DEFAULT ''    -- '' or ISO date (last allowed date)
 )
 """
@@ -125,6 +126,10 @@ _MIGRATIONS = [
     # Pre-event notifications: NULL = inherit (category default, then global),
     # 0 = explicitly none, N>0 = fire N minutes before start_time.
     "ALTER TABLE events ADD COLUMN reminder_minutes INTEGER",
+    # A weekly series can name SEVERAL weekdays ("every tuesday and thursday").
+    # Stored comma-separated and lowercase; empty means "the same weekday as the
+    # first instance", which is every series written before 2026-09-08.
+    "ALTER TABLE events ADD COLUMN recur_days TEXT NOT NULL DEFAULT ''",
 ]
 
 _CREATE_CALENDAR_SOURCES_TABLE = """
@@ -447,8 +452,19 @@ def _utcnow_iso() -> str:
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
 
-def _next_date(d: datetime.date, recurrence: str, anchor_day: int | None = None) -> datetime.date:
+_WEEKDAY_NUM = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+                "friday": 4, "saturday": 5, "sunday": 6}
+
+
+def _next_date(d: datetime.date, recurrence: str, anchor_day: int | None = None,
+               recur_days: "list[str] | None" = None) -> datetime.date:
     """Advance d by one recurrence period.
+
+    `recur_days` makes a WEEKLY series able to name several weekdays — "gym
+    every tuesday and thursday" (Gil, 2026-09-08). Without it, a multi-weekday
+    ask had only bad answers: keep one day and silently lose the other, or make
+    two separate series for one spoken sentence. With it, the series steps to
+    the next NAMED day instead of always +7.
 
     For monthly recurrence, `anchor_day` (the original series day-of-month, e.g.
     31 for a "31st of every month" series) is used instead of `d.day` so a
@@ -459,6 +475,12 @@ def _next_date(d: datetime.date, recurrence: str, anchor_day: int | None = None)
     if recurrence == "daily":
         return d + datetime.timedelta(days=1)
     if recurrence == "weekly":
+        wanted = sorted({_WEEKDAY_NUM[x] for x in (recur_days or [])
+                         if x in _WEEKDAY_NUM})
+        if len(wanted) > 1:
+            # The soonest named weekday strictly after d, wrapping the week.
+            ahead = [(n - d.weekday()) % 7 or 7 for n in wanted]
+            return d + datetime.timedelta(days=min(ahead))
         return d + datetime.timedelta(weeks=1)
     if recurrence == "monthly":
         month = d.month + 1
@@ -886,7 +908,8 @@ class CalendarDB:
         max_instances = 500  # hard safety cap
 
         while count < max_instances:
-            current = _next_date(current, recurrence, anchor_day=anchor_day)
+            current = _next_date(current, recurrence, anchor_day=anchor_day,
+                                 recur_days=getattr(intent, "recur_days", None))
             if current > end_date:
                 break
             if not anchored_on_holy and _skip_for_observance(

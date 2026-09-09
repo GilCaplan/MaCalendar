@@ -16,6 +16,12 @@ class CalendarIntent(BaseIntent):
     location: Optional[str] = None
     description: Optional[str] = None
     recurrence: Optional[str] = None      # 'daily', 'weekly', 'monthly'
+    # WEEKLY ONLY: the weekdays a series lands on, lowercase, when the speaker
+    # named more than one ("every tuesday and thursday"). Empty means the same
+    # weekday as the first instance, which is how every series behaved before
+    # 2026-09-08. The cadence stays daily|weekly|monthly -- this says WHICH
+    # days a weekly one uses, it does not add a fourth cadence.
+    recur_days: List[str] = []
     recur_until: Optional[str] = None     # ISO 8601 date, e.g. "2026-12-31"
     # Spoken lead time ("…and give me a heads-up half an hour before"):
     # minutes before start_time; None = inherit category/global default.
