@@ -4,6 +4,72 @@
 vocabulary is the measured lever, and it carries the rules that keep this folder
 from becoming convoluted. This file is how the stage WORKS.
 
+---
+
+## 0 · Where this stage stands — 2026-09-09
+
+**Wired and live**: `IMPLEMENTATION = "fastseg"`, LLMSeg off, 0 model calls.
+Verified end to end through `engine.run_transcript`, not inferred from the boards.
+
+| | train half (1,051 rows / 1,513 items) |
+|---|---|
+| exact-set (actions) | **76.3%** |
+| exact-row (action+time+tag) | **64.8%** |
+| **the CUT alone** — right item count | **85.3%** |
+| item precision · recall · F1 | 96.7% · 92.4% · **94.5%** |
+| over-split · under-split | 47 · **108** rows |
+| time on a **spoken** time | **91.6%** |
+| tag accuracy | **87.3%** |
+| NO-INVENTION violations | **0** |
+| cost | **0 model calls**, 3.5 s for 1,051 rows |
+| **downstream, end to end** | **86.0%** rows fully right |
+
+The sealed 660 rows have never been scored.
+
+### THE BINDING CONSTRAINT IS NOW THE CUT
+
+The span was the lever and it has been spent — time on a spoken time went
+73.4% → 91.6%, and A2's most-missed field fell from time (166) to 21. What is left
+is the cut, and three readings say so independently:
+
+    1 ask   641 rows (61%)  ->  71.8%      under-split  108 rows
+    2 ask   358 rows (34%)  ->  53.9%      over-split    47 rows
+    3 ask    52 rows ( 5%)  ->  53.8%
+
+An 18-point gap between single- and multi-ask rows; under-split more than twice
+over-split, so the failure is *not cutting* rather than cutting wrongly; and every
+worst trap is a compound — `remind_then` 43.8%, `joiner` 46.2%, `and_compound`
+46.4%, `texture` 48.6%.
+
+The oracle ablation bounds it: perfect everything on correctly-cut rows is 84.5%,
+so the cut caps the row metric no matter how good the rest gets.
+
+### What is DONE
+
+| | |
+|---|---|
+| the time-span vocabulary | `PLAN.md` Phase 1 — one table, +13.5 exact-row, +34 end-to-end |
+| discourse tails | a trailing confirmation is not part of the command (Gil) |
+| the `other` tag | `ITEM_KINDS`' fourth value, which nothing had ever produced |
+| the dataset | incoherent gold 15 → 0, duplicates 21 → 0, four missing trap classes added, and the generator un-broken |
+
+### What is OPEN, in the order the boards argue for
+
+1. **The CUT** — `PLAN.md` Phase 3. §8.1's enumeration (`walk the dog at 9 and
+   2:30`, still 54 malformed items downstream) plus the under-split compounds.
+2. **TAG, stuck at 87.3%.** The logistic head is refuted (§6). The error is
+   one-directional — event read as task, 116 of 175 — so it needs a different
+   idea rather than a better classifier.
+3. **§8.3** — the date floor injected as a literal word, costing two workarounds.
+4. **Two contract questions from Gil** — where an enumeration header's count goes,
+   and whether `other` should carry it. `PLAN.md` §3c.
+5. **`old_seg` retirement** — 716 lines inactive with three things still borrowed.
+6. **No board for unusable input.** The `other` work was verified on 11 hand
+   probes; the audit's 25 cases are all well-formed commands, so nothing in the
+   repo measures this.
+
+---
+
 The engine's second step. It takes one spoken command and returns the separate
 things the speaker asked for. Everything downstream — decompose, generate, the
 calendar write — operates on what this step decides, so a boundary drawn wrong
