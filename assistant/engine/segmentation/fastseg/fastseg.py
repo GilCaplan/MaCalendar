@@ -51,6 +51,18 @@ _MONTH = (r"january|february|march|april|may|june|july|august|september"
           r"|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept"
           r"|oct|nov|dec")
 
+_HOURWORD = (r"one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve")
+#: Minute words a spoken clock can end in. Deliberately a CLOSED list: an open
+#: `\w+` would read "book three rooms" as 3:00-something.
+_MINWORD = (r"o'?clock|fifteen|twenty[\s-]five|twenty|thirty[\s-]five|thirty|"
+            r"forty[\s-]five|forty|fifty[\s-]five|fifty|ten|five")
+_COUNTWORD = (r"a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve"
+              r"|\d+")
+#: One end of a spoken range. Bare numbers are allowed HERE and nowhere else,
+#: because "between 2 and 4" is unambiguous while a loose "2" is not.
+_RANGEEND = (rf"(?:\d{{1,2}}(?::\d{{2}})?\s*(?:am|pm|a\.m\.|p\.m\.)?"
+             rf"|noon|midday|midnight|{_HOURWORD})")
+
 #: Ordered longest-first: a longer phrase must win over a fragment of itself,
 #: or "every friday" is read as the bare date "friday" and the recurrence is
 #: lost. Each entry is (pattern, kind).
@@ -99,6 +111,77 @@ _TIME_PATTERNS: "list[tuple[str, str]]" = [
     (r"\b(?:in\s+the\s+)?(?:morning|afternoon|evening)\b", "date"),
     (r"\bnew\s+year'?s\s+eve\b", "date"),
     (r"\bchristmas(?:\s+day)?\b", "date"),
+
+    # ================= 2026-09-09 span vocabulary (PLAN.md Phase 1) ==========
+    # Ordering in this list does NOT matter: `find_time_refs` collects every
+    # candidate and takes them longest-first. These are entries, not placements.
+
+    # --- LEAD TIME, a reference in its own right. The `lead_time` trap sat at
+    #     0.0% on 72 rows because nothing here matched "15 minutes before".
+    (rf"\b(?:half\s+an?|{_COUNTWORD})\s+(?:minute|min|hour|day|week)s?\s+"
+     r"(?:before|beforehand|ahead|prior|in\s+advance)\b", "lead"),
+
+    # --- RANGES as ONE reference. Matched as two ends (or not at all), which
+    #     left "from 3" in the action and "to 4pm" as the whole time.
+    (rf"\b(?:from|between)\s+{_RANGEEND}\s+(?:to|until|till|and|through|thru)\s+"
+     rf"{_RANGEEND}\b", "range"),
+
+    # --- CLOCK + half of day as ONE span. Two refs before this, so the digit
+    #     stranded in the action AND "in the morning" read as a DAY, which
+    #     suppressed the date floor. One entry, two symptoms.
+    (rf"\b(?:\d{{1,2}}(?::\d{{2}})?\s*(?:am|pm)?|{_HOURWORD})\s+in\s+the\s+"
+     r"(?:morning|afternoon|evening)\b", "clock"),
+
+    # --- COARSE + MODIFIER. The bare word matched and the modifier stranded
+    #     ("book yoga late" / "afternoon"). Clock-class because gold FLOORS it.
+    (r"\b(?:early|late|mid)[\s-]*(?:morning|afternoon|evening|night)\b", "clock"),
+    (r"\bfirst\s+thing(?:\s+in\s+the\s+morning)?\b", "clock"),
+    (r"\b(?:around|about)?\s*(?:lunchtime|dinnertime|suppertime)\b", "clock"),
+
+    # --- SPOKEN CLOCKS. Not matched at all before; Whisper writes what was said.
+    (rf"\b(?:{_HOURWORD})\s+(?:{_MINWORD})\b", "clock"),
+    (rf"\b(?:half|quarter|twenty[\s-]five|twenty|fifteen|ten|five)\s+"
+     rf"(?:past|to)\s+(?:{_HOURWORD}|\d{{1,2}})\b", "clock"),
+
+    # --- "12 noon": `noon` won and the 12 stranded — the `at late` bug again.
+    (r"\b12\s*(?:noon|midday)\b", "clock"),
+
+    # --- OFFSET IN HOURS. The offset pattern covers day/week/month and not hour,
+    #     so "in two hours" produced no reference whatsoever (corpus 25x).
+    (rf"\bin\s+(?:{_COUNTWORD})\s+hours?\b", "clock"),
+
+    # --- END OF A MONTH / YEAR (corpus 74x), outside a deadline marker too.
+    (rf"\b(?:the\s+)?end\s+of\s+(?:the\s+)?(?:month|year|week|{_MONTH})\b", "date"),
+
+    # --- A PLURAL WEEKDAY IS A SERIES, not a date: "gym on sundays" is weekly.
+    #     `\bsunday\b` cannot match "sundays" (corpus 31x, dataset had 0 rows).
+    (rf"\b(?:on\s+)?(?:{_WEEKDAY})s\b", "recurrence"),
+
+    # --- ONE-WORD and FREQUENCY cadences (corpus 79x).
+    (r"\b(?:everyday|every\s+year|annually|yearly|biweekly|fortnightly)\b",
+     "recurrence"),
+    (r"\b(?:once|twice|thrice)\s+a\s+(?:day|week|month|year)\b", "recurrence"),
+    (r"\bevery\s+(?:weekend|other\s+day)\b", "recurrence"),
+    (r"\bevery\s+\w+\s+(?:days|weeks|months)\b", "recurrence"),
+
+    # --- MONTH + ORDINAL in the "of" order. This is §8.2: the bare-ordinal
+    #     pattern won and "of november" stranded, so the MONTH was never handed
+    #     downstream at all.
+    (rf"\b(?:the\s+)?\d{{1,2}}(?:st|nd|rd|th)?\s+of\s+(?:{_MONTH})\b", "date"),
+
+    (r"\bthe\s+rest\s+of\s+the\s+day\b", "date"),
+
+    # --- WEEKDAY + half of day as ONE span. As two refs, the trailing "morning"
+    #     made the right-hand side of a conjunct look TIMED, and
+    #     "a cut and blow dry on saturday morning" split into two items.
+    (rf"\b(?:{_WEEKDAY})\s+(?:morning|afternoon|evening|night)\b", "date"),
+    (rf"\b(?:tomorrow|today|tonight)\s+(?:morning|afternoon|evening|night)\b", "date"),
+
+    # --- A MULTI-DAY SERIES is ONE reference: "every tuesday and thursday" is a
+    #     weekly series naming two days (Gil, 2026-09-08), not two references
+    #     with a joiner between them — read as two, the "and" split the series.
+    (rf"\bevery\s+(?:{_WEEKDAY})(?:\s*,\s*(?:{_WEEKDAY}))*"
+     rf"(?:\s+and\s+(?:{_WEEKDAY}))+\b", "recurrence"),
 ]
 
 _COMPILED = [(re.compile(p, re.I), kind) for p, kind in _TIME_PATTERNS]
@@ -249,7 +332,15 @@ def _split_verbless_conjuncts(piece: str) -> "list[str]":
         return [piece]
 
     def timed(span: str) -> bool:
-        return bool(find_time_refs(span))
+        """Does this side carry a time of its OWN?
+
+        A LEAD TIME does not count. "book the gym at 1pm and give me a nudge an
+        hour before" is ONE ask: the lead time modifies the same event rather than
+        timing a second one, and counting it made the reminder clause look like an
+        independent ask — 20 rows of over-split the moment lead times became
+        visible (2026-09-09).
+        """
+        return any(r.kind != "lead" for r in find_time_refs(span))
 
     def has_own_content(span: str) -> bool:
         """Content left in the span once its time expressions are removed."""
@@ -340,7 +431,12 @@ def assign_times(text: str, pieces: "list[str]") -> "list[tuple[str, str]]":
                 have.add(_slot(r))
         if not mine:
             mine = list(trail)
-        time_str = " ".join(r.text for r in sorted(mine, key=lambda r: r.start))
+        # BY SLOT CLASS, then position — the order gold uses
+        # (`order = {"day": 0, "clock": 1}`, stable). Joining by position alone
+        # scored "every week at 8 o'clock until next tuesday" against gold's
+        # "every week until next tuesday at 8 o'clock": same tokens, wrong order.
+        time_str = " ".join(r.text for r in sorted(
+            mine, key=lambda r: (_SLOT_ORDER[_slot(r)], r.start)))
         action = _strip_spans(piece, [(r.start - spans[i][0], r.end - spans[i][0])
                                       for r in owned[i]])
         # THE DATE FLOOR (SPEC): the day defaults to today, the clock never
@@ -354,10 +450,19 @@ def assign_times(text: str, pieces: "list[str]") -> "list[tuple[str, str]]":
     return out
 
 
+#: The gold's own two classes (`experiments/generate.py`: `_DAY_SLOTS` /
+#: `_CLOCK_SLOTS`), and the order it joins them in. Matched rather than invented —
+#: gold puts `lead_time` and `time_range` on the CLOCK side, so a lead falling to
+#: "day" here would both collide with a real date and satisfy the
+#: `any(_slot(r) == "day")` test that guards the date floor, silently switching the
+#: floor off.
+_SLOT_ORDER = {"day": 0, "clock": 1}
+
+
 def _slot(ref: "TimeRef") -> str:
     """Which slot a reference fills. A day and a clock time are different
     slots, so one does not block the other from being distributed."""
-    return "clock" if ref.kind == "clock" else "day"
+    return "clock" if ref.kind in ("clock", "range", "lead") else "day"
 
 
 def _locate(text: str, pieces: "list[str]") -> "list[tuple[int, int]]":
