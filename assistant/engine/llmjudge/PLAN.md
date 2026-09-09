@@ -67,11 +67,96 @@ model call happens where the model lives.
 
 ---
 
+## 1.3 · THE LOOP — commit what is right, rewrite only what is wrong (Gil, 2026-09-09)
+
+> *"Given the output from FastRule it compares the original text prompt and the
+> objects, and for the objects which are good it pushes them through. Whatever is
+> left it fixes/trims the original text to pass only the objects that are wrong and
+> need fixing, in better wording… if FastRule passed 5 objects and 3 are good and 2
+> are bad, LLMJudge lets the 3 good ones get committed and the 2 bad ones it rewords
+> best it can into a new prompt and passes it back to segmentation. This cycle
+> repeats up to 3 times before objects get committed or thrown away."*
+
+```
+   original text ─────────────────────────────────────────────┐
+        |                                                     │
+        v                                                     │
+   segmentation -> decompose_validate -> FastRule             │
+        |                                                     │
+        v                                                     │
+   ┌──────────────────── LLMJudge ────────────────────┐       │
+   │  compare each object against the ORIGINAL text   │       │
+   │                                                  │       │
+   │   3 good  ─────────────────────► COMMIT now      │       │
+   │                                                  │       │
+   │   2 bad   ─► reword ONLY those parts ──► X1' ────┼───────┘
+   └──────────────────────────────────────────────────┘   round < 3
+                                  |
+                            round == 3
+                                  v
+                        commit best / discard
+```
+
+### Why the rewrite is a TRIM, not a retry of the whole thing
+
+This is the part that makes the loop safe, and it is worth stating as a rule
+rather than leaving to the implementation:
+
+**X1′ contains only the failed asks.** Not the original utterance, not the original
+minus a flag — the words for the two things that went wrong, reworded. Three
+consequences, each of which is the point:
+
+1. **No double-commit.** The three good objects are already written. If X1′ still
+   described them, round two would create them again. The trim is what prevents
+   that, so it is a correctness requirement rather than an optimisation.
+2. **Each round is a SMALLER problem.** Five asks became two. A command that was
+   too tangled to segment correctly gets simpler every round instead of being
+   re-attempted at full difficulty — which is why three rounds is enough.
+3. **The retry can actually differ.** Segmentation is DETERMINISTIC, so re-entering
+   with unchanged text returns the identical answer and burns the budget for
+   nothing. Real usage, 2026-09-08: *"Let an event to go out for a run now"* looped
+   three times to the same result and apologised after 30 seconds. A trimmed,
+   reworded X1′ is a genuinely different input — which is exactly why
+   `rewrite_for_retry` was gated as a stub until it could produce one.
+
+### What "good" means, and who decides it
+
+The model must not be the judge — that is this stage's founding rule. So:
+
+- the model **EXTRACTS** the asks it can see in the original text;
+- deterministic code **DIFFS** that list against the objects FastRule built;
+- an object is GOOD when it matches an extracted ask and carries no finding
+  against it. Everything else is bad and goes into the trim.
+
+Which means `extract_asks` and `_produced` — both already here — are the machinery
+the loop needs; what is missing is the partition and the rewrite.
+
+### The budget, and what happens when it runs out
+
+Three rounds per original prompt, counted per COMMAND rather than per object, so a
+row cannot loop forever by failing a different ask each time.
+
+On exhaustion the existing convention holds and should not be quietly changed:
+**commit the best attempt, say so in the reply, and mark the memory record
+uncertain** so it reaches the review queue. Gil's *"committed or thrown away"* leaves
+the choice open; discarding silently is the one option that is not acceptable,
+because the speaker asked for something and heard nothing back.
+
+> **Open question for Gil.** Should a *destructive* ask that is still unresolved at
+> round 3 commit as the best attempt, or be dropped with an explanation? The
+> project's own rule — *"when the engine cannot identify what to delete, 'I couldn't
+> find…' is the right answer; guessing is not"* — argues for dropping deletes and
+> committing creates, but that asymmetry should be a decision rather than an
+> inference.
+
 ## 2 · What this stage then is
 
     IN    the objects FastRule built + the DEFERs it could not, with reasons
           + Gatekeeper's objections as context
-    OUT   approve, or a repaired object, or X1' — a rewritten utterance
+          + the ORIGINAL text, which is what everything is compared against
+    OUT   the GOOD objects, committed now
+          + X1' — only the failed asks, reworded, back to segmentation
+          + on round 3, the best attempt and an honest reply
 
 Which makes the existing shape more honest, not less: LLMJudge already **extracts**
 what the raw text asked for and lets deterministic code diff it. It gains the two

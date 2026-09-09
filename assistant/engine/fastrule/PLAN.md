@@ -115,6 +115,56 @@ to one object, with no model, no database, and no opinion about whether to commi
 That is what makes it measurable against its own task — which is the other half of
 what this restructure is for.
 
+## 2d · THE TARGET — what FastRule is when this is done
+
+One module, one entry point, one job.
+
+```python
+def build(item: Item, *, today: date) -> BuildResult:
+    """One Item -> one object the system accepts, or a DEFER saying why."""
+```
+
+    BuildResult = object   a CalendarIntent / CreateTodoIntent / … ready to commit
+                | DEFER    (reason, reason_class, partial)  ->  LLMJudge
+
+### What it DOES, in order
+
+1. **COPY the values.** All eight, from `item.slots`, unconditionally:
+   `date · start_time · end_time · recurrence · recur_days · recur_until ·
+   quantity · reminder_minutes`. Not as hints, not "if the intent has nothing
+   there" — as the answer. The stage that produced them is measured at 99.9%
+   train / 98.7% sealed on exactly this question, and this stage has no better
+   information.
+2. **Pick the OPERATION** from the action words — create / update / delete /
+   complete / query. `item.tag` narrows it (`event` vs `task` vs `review`); the
+   verb decides the rest.
+3. **Fill the object's own fields** from the action words: title, attendees,
+   location, and for an edit or delete the TARGET record.
+4. **Return the object** — or `DEFER` when a required field cannot be filled,
+   carrying the partial parse so the next stage starts from it rather than cold.
+
+### What it does NOT do — and where each went
+
+| not this | goes to |
+|---|---|
+| decide whether the command is one item or several | segmentation (`Atomicity` → the fast track's admission test) |
+| re-read the date, time or recurrence from the text | nowhere — `decompose_validate` already did it |
+| veto a reading that must not execute | **LLMJudge**, as prompt context |
+| call the model when the rules fall short | **LLMJudge** |
+| decide whether the answer is good enough to COMMIT | the fast track / orchestrator |
+| apply another stage's field rules | `decompose_validate.run_objects` |
+
+### The two properties that make it testable alone
+
+**No I/O and no model.** No database lookup, no LLM call, no config. `build` is a
+pure function of `(Item, today)`, so its board can be a table of items and expected
+objects, and a failure is reproducible from the row alone.
+
+**DEFER is an output, not an exception.** Which keeps the primary metric a PAIR —
+how often it builds, and how right it is when it does. Either number alone is
+gameable: a converter that defers everything is never wrong, and one that guesses
+everything always answers.
+
 ## 3 · Order of work
 
 | # | step | why it is first / last |

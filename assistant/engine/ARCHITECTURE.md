@@ -181,6 +181,19 @@ hidden:
 | **`decompose_validate/resolve.py`** | built and scored (100% on its generated set, 0 model calls) but **not yet the wired path** — `stage.py` still runs the legacy `decompose.py`/`validate.py`. Wiring waits on `checks.py`, the validate half, so the stage is replaced once rather than half-swapped. |
 | **the loop** | `llmjudge.rewrite_for_retry` is a stub returning None, so no loop fires. The contract and its single call site are in place; the rewrite itself wants a model call grounded on `state.raw_text`. |
 
+**What the loop is FOR, decided 2026-09-09** (Gil) — `llmjudge/PLAN.md` §1.3 has
+the detail, and it changes what `rewrite_for_retry` has to produce:
+
+> LLMJudge compares each object against the ORIGINAL text. The **good ones commit
+> immediately**; only the failed asks are reworded into `X1'` and sent back to
+> segmentation. Five objects with three good and two bad means three commits now and
+> a two-ask retry — so `X1'` is a **TRIM of the original, not a re-run of it**.
+
+That makes the trim a correctness requirement rather than an optimisation: the three
+committed objects must not appear in `X1'`, or round two creates them again. It also
+makes each round a smaller problem than the last, which is why three rounds is
+enough.
+
 **Why the loop is gated on a rewrite rather than just re-running.**
 Segmentation is deterministic, so re-entering it with the same text returns the
 same items — the retry can only spend the budget. Real usage, 2026-09-08: *"Let
