@@ -1,0 +1,443 @@
+[
+ {
+  "family": "dv_month_ord_1",
+  "nuance": "month_ordinal",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} on {date} at {time}"
+ },
+ {
+  "family": "dv_month_ord_2",
+  "nuance": "month_ordinal",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "put {event_title} on {date}"
+ },
+ {
+  "family": "dv_month_ord_3",
+  "nuance": "month_ordinal",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} for {date} at {time}"
+ },
+ {
+  "family": "dv_month_ord_4",
+  "nuance": "month_ordinal",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "add {event_title} to the calendar on {date} at {time}"
+ },
+ {
+  "family": "dv_month_ord_5",
+  "nuance": "month_ordinal",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "set up {event_title} {date} {time_range}"
+ },
+ {
+  "family": "dv_month_ord_6",
+  "nuance": "month_ordinal",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "book {event_title} on {date} at {time} and {event_title2} on {date2} at {time2}"
+ },
+ {
+  "family": "dv_month_ord_7",
+  "nuance": "month_ordinal",
+  "action": "add_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "remind me to {task_title} on {date}"
+ },
+ {
+  "family": "dv_month_ord_8",
+  "nuance": "month_ordinal",
+  "action": "add_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "remind me to {task_title} on {date} at {time}"
+ },
+ {
+  "family": "dv_series_bound_1",
+  "nuance": "series_bound",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "{recurrence} {event_title} at {time} until {date}"
+ },
+ {
+  "family": "dv_series_bound_2",
+  "nuance": "series_bound",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "{recurrence} {event_title} at {time} through {date}"
+ },
+ {
+  "family": "dv_series_bound_3",
+  "nuance": "series_bound",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {recurrence} at {time} until {date}"
+ },
+ {
+  "family": "dv_series_bound_4",
+  "nuance": "series_bound",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} {recurrence} {time_range} through {date}"
+ },
+ {
+  "family": "dv_series_bound_5",
+  "nuance": "series_bound",
+  "action": "add_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "{recurrence} remind me to {task_title} until {date}"
+ },
+ {
+  "family": "dv_series_bound_6",
+  "nuance": "series_bound",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "{recurrence} {event_title} {time_range} until {date}"
+ },
+ {
+  "family": "dv_series_bound_7",
+  "nuance": "series_bound",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {recurrence} at {time} including {date}"
+ },
+ {
+  "family": "dv_series_start_1",
+  "nuance": "series_start",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "{recurrence} {event_title} at {time} starting {date}"
+ },
+ {
+  "family": "dv_series_start_2",
+  "nuance": "series_start",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {recurrence} at {time} beginning {date}"
+ },
+ {
+  "family": "dv_series_start_3",
+  "nuance": "series_start",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} {recurrence} {time_range} starting {date}"
+ },
+ {
+  "family": "dv_series_start_4",
+  "nuance": "series_start",
+  "action": "add_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "{recurrence} remind me to {task_title} starting {date}"
+ },
+ {
+  "family": "dv_duration_1",
+  "nuance": "duration",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {date} at {time} {event_duration}"
+ },
+ {
+  "family": "dv_duration_2",
+  "nuance": "duration",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} on {date} at {time} {event_duration}"
+ },
+ {
+  "family": "dv_duration_3",
+  "nuance": "duration",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "{recurrence} {event_title} at {time} {event_duration}"
+ },
+ {
+  "family": "dv_duration_4",
+  "nuance": "duration",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "book {event_title} at {time} {event_duration} and {event_title2} at {time2}"
+ },
+ {
+  "family": "dv_lead_syn_1",
+  "nuance": "lead_synonym",
+  "action": "add_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "remind me to {task_title} {date} at {time} {lead_time}"
+ },
+ {
+  "family": "dv_lead_syn_2",
+  "nuance": "lead_synonym",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {date} at {time} and remind me {lead_time}"
+ },
+ {
+  "family": "dv_lead_syn_3",
+  "nuance": "lead_synonym",
+  "action": "add_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "{recurrence} remind me to {task_title} at {time} {lead_time}"
+ },
+ {
+  "family": "dv_lead_syn_4",
+  "nuance": "lead_synonym",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "add {event_title} {date} at {time} with a reminder {lead_time}"
+ },
+ {
+  "family": "dv_range_1",
+  "nuance": "range_pair",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {date} {time_range}"
+ },
+ {
+  "family": "dv_range_2",
+  "nuance": "range_pair",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "{event_title} {time_range} on {date}"
+ },
+ {
+  "family": "dv_range_3",
+  "nuance": "range_pair",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "schedule {event_title} {time_range} and {event_title2} at {time}"
+ },
+ {
+  "family": "dv_range_4",
+  "nuance": "range_pair",
+  "action": "create_event",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "book {event_title} {time_range} {date} and remind me to {task_title}"
+ },
+ {
+  "family": "dv_spoken_clock_1",
+  "nuance": "spoken_clock",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {date} at {time}"
+ },
+ {
+  "family": "dv_spoken_clock_2",
+  "nuance": "spoken_clock",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "{event_title} at {time} on {date}"
+ },
+ {
+  "family": "dv_spoken_clock_3",
+  "nuance": "spoken_clock",
+  "action": "add_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "remind me to {task_title} at {time}"
+ },
+ {
+  "family": "dv_spoken_clock_4",
+  "nuance": "spoken_clock",
+  "action": "create_event",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "book {event_title} at {time} and {event_title2} at {time2}"
+ },
+ {
+  "family": "dv_spoken_clock_5",
+  "nuance": "spoken_clock",
+  "action": "create_event",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "put {event_title} {date} at {time} and remind me to {task_title2} at {time2}"
+ },
+ {
+  "family": "dv_offset_month_1",
+  "nuance": "offset_month",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "book {event_title} {date} at {time}"
+ },
+ {
+  "family": "dv_offset_month_2",
+  "nuance": "offset_month",
+  "action": "add_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "remind me to {task_title} {date}"
+ },
+ {
+  "family": "dv_offset_month_3",
+  "nuance": "offset_month",
+  "action": "create_event",
+  "atomic": true,
+  "events": 1,
+  "tasks": 0,
+  "template": "schedule {event_title} {date} {time_range}"
+ },
+ {
+  "family": "dv_multi_date_1",
+  "nuance": "multi_date",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "book {event_title} {date} at {time} and remind me to {task_title} {date2}"
+ },
+ {
+  "family": "dv_multi_date_2",
+  "nuance": "multi_date",
+  "action": "mixed",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "add {event_title} on {date} and {event_title2} on {date2}"
+ },
+ {
+  "family": "dv_multi_date_3",
+  "nuance": "multi_date",
+  "action": "mixed",
+  "atomic": false,
+  "events": 0,
+  "tasks": 2,
+  "template": "remind me to {task_title} {date} and {task_title2} {date2}"
+ },
+ {
+  "family": "dv_multi_date_4",
+  "nuance": "multi_date",
+  "action": "mixed",
+  "atomic": false,
+  "events": 2,
+  "tasks": 0,
+  "template": "book {event_title} {date} at {time} and {event_title2} {date2} {time_range}"
+ },
+ {
+  "family": "dv_multi_date_5",
+  "nuance": "multi_date",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "{recurrence} {event_title} at {time} and remind me to {task_title} {date}"
+ },
+ {
+  "family": "dv_qty_date_1",
+  "nuance": "quantity_date",
+  "action": "add_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "add {qty} {item} to the list {date}"
+ },
+ {
+  "family": "dv_qty_date_2",
+  "nuance": "quantity_date",
+  "action": "add_todo",
+  "atomic": true,
+  "events": 0,
+  "tasks": 1,
+  "template": "remind me to buy {qty} {item} on {date} at {time}"
+ },
+ {
+  "family": "dv_qty_date_3",
+  "nuance": "quantity_date",
+  "action": "mixed",
+  "atomic": false,
+  "events": 1,
+  "tasks": 1,
+  "template": "put {qty} {item} on the shopping list and book {event_title} {date} at {time}"
+ },
+ {
+  "family": "dv_query_1",
+  "nuance": "query_range",
+  "action": "query_schedule",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "what do I have {query_range}"
+ },
+ {
+  "family": "dv_query_2",
+  "nuance": "query_range",
+  "action": "query_schedule",
+  "atomic": true,
+  "events": 0,
+  "tasks": 0,
+  "template": "what is on my calendar {query_range}"
+ }
+]

@@ -241,6 +241,12 @@ _FILL = {"event_title": "event_titles", "event_title2": "event_titles",
          "time_range": "time_ranges", "recurrence": "recurrences",
          "recurrence2": "recurrences", "occasion": "occasions",
          "lead_time": "lead_times", "duration": "durations",
+         # `event_duration` ("for an hour") is the event's LENGTH, which is a
+         # different thing from `duration` ("by 30 minutes") -- that one
+         # modifies an update and deliberately stays in the action. Purely
+         # additive: no segmentation template uses this slot, so no existing
+         # row can change. decompose_validate's grown families use it.
+         "event_duration": "event_durations",
          "quoted_item": "quotable", "generic_target": "generic_targets",
          "query_range": "query_ranges", "query_range2": "query_ranges"}
 

@@ -147,10 +147,16 @@ def untraceable(item: dict, text: str, today: str) -> list:
             says_weekday = _WEEKDAY_NAME[d.weekday()] in tl
             says_dom = re.search(rf"\b{d.day}(?:st|nd|rd|th)?\b", tl) is not None
             says_month = d.strftime("%B").lower() in tl
+            # A SERIES' START IS DERIVED, not spoken: "twice a week" names no
+            # date, yet the first instance has to land somewhere. The check knew
+            # only `every`/`each`, so every once-a-week and twice-a-week start was
+            # reported as an invented date. Also `end of ...`, which names a day.
             says_relative = re.search(
                 r"\b(tomorrow|tonight|today|next|this|coming|"
                 r"in \w+ (?:day|week|month)s?|\w+ (?:day|week|month)s? from|"
-                r"christmas|new year|every|each|weekend)\b", tl) is not None
+                r"christmas|new year|every|each|weekend|end of|"
+                r"everyday|biweekly|fortnightly|"
+                r"(?:once|twice|thrice|\d+ times) a)\b", tl) is not None
             if not (says_weekday or says_dom or says_month or says_relative):
                 out.append(f"date {date} unsupported by the words")
 
@@ -173,9 +179,26 @@ def untraceable(item: dict, text: str, today: str) -> list:
         # answers as inventions. Written out here rather than imported from the
         # resolver: the scorer must never agree with the code under test by
         # sharing its table.
-        spoken = _SPOKEN_DIGIT.get(h) or _SPOKEN_DIGIT.get(h12)
+        # Three more spellings of the same truth, each of which was reporting a
+        # CORRECT answer as an invention:
+        #
+        #  - ZERO-PADDED. "at 09:30" holds no bare 9 — the 9 is preceded by a 0,
+        #    which the digit-boundary guard (rightly) rejects.
+        #  - A "TO" HOUR. "twenty to seven" is 18:40, so the hour SPOKEN is one
+        #    MORE than the hour resolved; looking for "six" never found it.
+        #  - A DERIVED END. "book staff meeting for 45 minutes" at 09:30 ends
+        #    10:15, and no part of "10:15" appears in the words. The duration is
+        #    what grounds it, and a range word grounds an end the same way.
+        words = [_SPOKEN_DIGIT.get(h), _SPOKEN_DIGIT.get(h12)]
+        if re.search(r"\b(?:quarter|five|ten|twenty|twenty[\s-]five)\s+to\b", tl):
+            words.append(_SPOKEN_DIGIT.get(h12 % 12 + 1))
+        derived_end = field == "end_time" and re.search(
+            r"\bfor\s+(?:\d+|[a-z]+(?:[\s-][a-z]+)?)\s+(?:min|minute|hour)s?\b"
+            r"|\b(?:to|until|till|through|and)\b", tl)
         if not (re.search(rf"(?<!\d){h}(?!\d)|(?<!\d){h12}(?!\d)", tl)
-                or (spoken and re.search(rf"\b{spoken}\b", tl))
+                or re.search(rf"(?<!\d){h:02d}(?!\d)|(?<!\d){h12:02d}(?!\d)", tl)
+                or any(w and re.search(rf"\b{w}\b", tl) for w in words)
+                or derived_end
                 or re.search(r"\b(noon|midday|midnight|lunchtime|morning|"
                              r"afternoon|evening|tonight|half past|quarter)\b", tl)):
             out.append(f"{field} {wren} unsupported by the words")
@@ -185,8 +208,13 @@ def untraceable(item: dict, text: str, today: str) -> list:
             r"\b(two|three|four|five|six|eight|twelve|dozen|couple|few)\b", tl):
         out.append(f"quantity {q} unsupported by the words")
 
+    # Same blind spot as the trigger in `resolve_recurrence` had: the one-word
+    # and frequency cadences. 115 CORRECT weekly recurrences were reported as
+    # invented because the check had never heard of "twice a week".
     rec = item.get("recurrence")
-    if rec and not re.search(r"\b(every|each|daily|weekly|monthly|nightly)\b", tl):
+    if rec and not re.search(r"\b(every|each|daily|weekly|monthly|nightly|everyday|"
+                             r"biweekly|fortnightly|"
+                             r"(?:once|twice|thrice|\d+\s+times)\s+a)\b", tl):
         out.append(f"recurrence {rec!r} unsupported by the words")
     return out
 
