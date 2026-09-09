@@ -204,11 +204,16 @@ The sealed 660 rows were read once, aggregates only, and land within 1-4 points 
 train while being better on five metrics — weakest on item count, which is exactly
 where the work stopped.
 
-**Pick it up at PLAN.md §0's ordered list.** First is 3b, the under-split compounds
-(108 rows, the biggest remaining lever, and the risky half). Second is **re-testing
-LLMSeg**: its four measurements were taken against a much weaker FastSeg and are
-stale in both directions, and board D — the one built to answer "does the correction
-pay for itself" — has never run at all.
+**FROZEN by Gil, 2026-09-09** — *"for now segmentation we leave, I don't want to
+edit or make changes there."* Not paused-and-drifting: no edits to
+`assistant/engine/segmentation/` at all while FastRule and LLMJudge are the work.
+The list below is where it resumes, kept intact so nothing has to be re-derived.
+
+**When it resumes, pick it up at PLAN.md §0's ordered list.** First is 3b, the
+under-split compounds (108 rows, the biggest remaining lever, and the risky half).
+Second is **re-testing LLMSeg**: its four measurements were taken against a much
+weaker FastSeg and are stale in both directions, and board D — the one built to
+answer "does the correction pay for itself" — has never run at all.
 
 ## The measurement that set the priority (2026-09-09)
 
@@ -241,6 +246,85 @@ worth doing:
 | 4 | **The traceability board's vocabulary is hand-maintained** and has drifted 7 times. | Fix is to derive it from `normalization.py`'s closed tables — the gold's own words, so the board stays independent of `resolve.py` while it stops drifting. Do it before the next batch of forms lands, not after. |
 | 4b | **`"walk the dog at 9 and 2:30"` is broken BOTH ways** — found while testing item 1. Without the splitter: one event, titled `'dog'`, and the 9 o'clock lost. With it: a spurious todo *plus* an `'Untitled Event'`. It should be two events. | A segmentation failure (§8.1), not this stage's — but it is a live wrong answer on a case the docs use as a trap example, so it is worth someone's attention rather than a footnote. |
 | 5 | **Segmentation §8.1 / §8.2 / §8.3** are recorded for Gil, §8.3 being the date FLOOR injected into `time` as a word. | Another stage's work. §8.3 already costs two workarounds and caused one live audit failure, so it is the one with a price attached. |
+
+## FastRule + LLMJudge — the restructure is PLANNED, not started (2026-09-09)
+
+`assistant/engine/fastrule/PLAN.md` and `assistant/engine/llmjudge/PLAN.md` are
+written; **no code has been touched.** Gil's definition of the box is what the plan
+is measured against:
+
+> *"FastRule's job is only to take each Item and make it into an object format the
+> system accepts, so we can commit when ready."*
+
+Against that, ~423 of ~890 lines in `fastrule.py` + `objects.py` belong elsewhere,
+and the function doing the job the stage exists for is **eleven lines** copying
+**two of eight** available values. The plan's target is one entry point,
+`build(item, *, today) -> BuildResult`, with no model, no database and no opinion
+about whether to commit.
+
+**Four phases, in this order** (Gil, 2026-09-09) — `fastrule/PLAN.md` §3:
+
+| | | where |
+|---|---|---|
+| **A · PORT OUT** | `Gatekeeper` + the LLM fallback into `llmjudge/` — a move with an import redirect, behaviour identical, **no number moves** | `llmjudge/PLAN.md` §1.0 |
+| **B · RESTRUCTURE** | measure the ceiling → `build(item, today)` proven alone → **B3 WIRE IT INTO THE ENGINE** (five touch-points, the format, and the md files) → `Atomicity`+`fast_propose` → a new `fast_track.py` → delete the call sites and the dead code | `fastrule/PLAN.md` §3 |
+| **C · MEASURE** | fix the generator, add gold Items, rewrite the board to feed `build()`, iterate until satisfied | `fastrule/PLAN.md` §3 |
+| **D · STOP** | report to Gil. **LLMJudge's own work does not start before this** | — |
+
+Phase A exists because Gil asked for it directly — *"before we start breaking
+FastRule code, port what's relevant to the LLMJudge folder"* — and the reason holds
+up: trim first and the ported guards exist only in git history, so "port" becomes
+"rewrite from memory". `_guard_inventions` is the one that would be lost first, and
+it exists because a model once fabricated an event onto the calendar (cycle 7).
+
+**Two things B3 settles that are easy to get wrong.** `BuildResult` is **internal**
+— X4 stays `item.action` + `item.intent` on the frozen `Item`, so most of the
+pipeline needs no change at all; what changes is that the values are COPIED from
+`item.slots` instead of re-parsed. Making `BuildResult` the stage's real output
+would be an `Item`-contract change and therefore a design decision for this file,
+not a step inside phase B. And **`fastrule/objects.py` is the engine's shared
+accessor** for the action registry and both parsers — six call sites outside the
+stage, including `server.py`'s warm-up — so those need a home (`engine/llm.py`)
+*before* anything deletes the file, not during.
+
+**Phase C is mandatory, not polish** — B2 invalidates the instrument. The 7,200-row
+board feeds raw TEXT into `FastRule.run(text)`; the restructured box takes an
+`Item`. So the moment `build()` lands, the primary board cannot run at all, and
+FastRule would be unmeasurable exactly when it has just been rewritten.
+
+⚠️ **And phase C opens on a blocker found 2026-09-09: FastRule's dataset generator
+is broken.** `scripts/gen_fastrule_dataset.py:56-57` still points at
+`dataset/fastrule/banks/`; the banks moved to
+`assistant/engine/fastrule/datasets/banks/` in the stage restructure, so it raises
+`FileNotFoundError` on the first bank load. **The 7,200-row dataset cannot currently
+be rebuilt or extended** — which is exactly what phase C needs to do. This is the
+**fourth** instance of the rot class in "Things that have bitten before", after
+segmentation's generator, FastRule's primary board and `fit_route_models.py`; the
+fix moves it to `fastrule/datasets/generate.py` where the stage owns it, minding the
+`ROOT = parents[1]` inversion that made the first repair of the other three worse.
+
+**Segmentation is FROZEN — Gil, 2026-09-09**: *"For now segmentation we leave, I
+don't want to edit or make changes there."* The order is FastRule → LLMJudge →
+Gil decides. This supersedes the "segmentation is the next stage to work on"
+verdict below **as an order of work**; it does not touch it as a measurement,
+which still stands and still says where the score is lost.
+
+**What the freeze changes is the instrument.** With segmentation fixed, its
+265-item loss is a permanent ceiling rather than a thing to fix, so a whole-engine
+number is no longer evidence about FastRule at all:
+
+- **Use `fastrule/experiments/fastrule_shape.py`** — the 7,200 product-shape set
+  feeds FastRule directly, so segmentation is not in the path and the board is
+  unaffected by the freeze.
+- **Not `scripts/engine_dataset_compare.py`** for judging this work — it runs the
+  real segmenter, so it measures the upstream loss we have agreed not to touch.
+
+Reporting the second as a FastRule result would break the dataset/metric/meaning
+rule in its most expensive direction: blaming this stage for another's loss.
+
+**`BRAIN_VERSION` is not bumped by any of it.** `Gatekeeper`, the fallback and
+`Atomicity` are Components, not Stages; the chain's shape is unchanged. This is the
+`old_seg -> FastSeg` case, not the rename case.
 
 ## Working agreements
 - Everything on the phone is local: no third-party services; the only network peer is the Mac over Tailscale.

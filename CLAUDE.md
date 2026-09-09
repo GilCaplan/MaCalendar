@@ -317,12 +317,16 @@ judgement).
   to one thread, which fixed it, but the audit does not. The same applies to
   any two model-loading jobs side by side.
 - **A path in an experiment or generator rots silently, and only breaks when you
-  next run it.** The per-stage restructure moved datasets and banks, and three
-  things kept pointing at the old locations for a month: segmentation's dataset
+  next run it.** The per-stage restructure moved datasets and banks, and **four**
+  things kept pointing at the old locations: segmentation's dataset
   GENERATOR (`FileNotFoundError`, so the dataset could not be rebuilt),
-  FastRule's PRIMARY BOARD, and `scripts/fit_route_models.py` — the script that
-  fits the logistic weights. Nothing noticed because all three are manual steps
-  whose OUTPUT is committed, so the stale `.jsonl` and `.json` kept working.
+  FastRule's PRIMARY BOARD, `scripts/fit_route_models.py` — the script that
+  fits the logistic weights — and `scripts/gen_fastrule_dataset.py`, found still
+  broken on 2026-09-09, a month after the first three were fixed. **Finding some
+  of these is not finding all of them**, and the survivor was the one still living
+  in `scripts/` rather than in the stage folder that owns it. Nothing noticed
+  because all four are manual steps whose OUTPUT is committed, so the stale
+  `.jsonl` and `.json` kept working.
   **Before trusting any board, run it.** And note the trap in these files: `ROOT =
   parents[1]` meant the repo root before the move and means the STAGE folder after
   it, so a path that merely looks wrong may be right and vice versa.
