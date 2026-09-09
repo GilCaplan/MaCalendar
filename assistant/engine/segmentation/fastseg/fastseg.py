@@ -617,9 +617,42 @@ def _is_not_calendar(action: str, time_str: str = "") -> bool:
     return any(rx.search(a) for rx in _NOT_CALENDAR_RE)
 
 
+#: Scaffolding in front of the verb — politeness, modals, and the "i need to" /
+#: "i'd like to" frame. Skipped before the head verb is read, never treated as one.
+_PREAMBLE = frozenset("""
+    i i'd id we you your my me us please can could would should will shall
+    need needs want wants like to gonna going have has had let lets let's
+    so um uh er hmm ok okay and then also first next now just really
+""".split())
+
+#: A time the speaker STATED, as opposed to the floor's bare "today".
+_STATED_CLOCK = re.compile(
+    r"\d{1,2}:\d{2}|\d{1,2}\s*(?:am|pm)|\bat\s+\d{1,2}\b|\bnoon\b|\bmidnight\b"
+    r"|\bo'?clock\b|\b(?:half|quarter)\s+(?:past|to)\b", re.I)
+
+
 def _lexicon_kind(action: str) -> "str | None":
-    for word in action.lower().replace(",", " ").split():
-        word = word.strip(".!?")
+    """The verb's verdict, read at the HEAD of the action only.
+
+    Scanning every word made a NOUN decide: "add the budget review" and "add a
+    call with Riley" were tagged `task` because `review` and `call` are on the
+    task list, though the verb is `add` in both. That was the single largest tag
+    error — 56 of 179 — and reading the head instead fixes it without touching
+    the lexicon's contents.
+
+    TWO words, not one, because the head can carry a particle: "block off",
+    "put out", "top up".
+
+    AND THE PREAMBLE IS SKIPPED FIRST. "um so i need to book birthday dinner" puts
+    `i need` in the first two slots and the real verb three words later, so a
+    literal head-of-string reading lost the `book` that scanning everything used to
+    find — six `texture` rows regressed on exactly that before this was added. The
+    head verb is the first word that is not scaffolding.
+    """
+    words = [w.strip(".!?,") for w in action.lower().split()]
+    while words and words[0] in _PREAMBLE:
+        words.pop(0)
+    for word in words[:2]:
         if word in _CALENDAR_VERBS:
             return "event"
         if word in _TASK_VERBS:
@@ -664,7 +697,15 @@ def tag(action: str, time_str: str) -> str:
         # place an event, so `event` is exactly where an unusable ask lands.
         if _is_not_calendar(action, time_str):
             return "other"
-        return _lexicon_kind(action) or kind
+        verdict = _lexicon_kind(action)
+        if verdict == "task" and _STATED_CLOCK.search(time_str or ""):
+            # A STATED CLOCK MEANS SCHEDULED. "walk the dog" is a to-do and "walk
+            # the dog at 9" is an appointment — same verb, and the only thing that
+            # changed is that the speaker named a time. The floor's bare "today"
+            # does not count, because the engine wrote that rather than the
+            # speaker. Second largest error class, 34 of 179.
+            return kind
+        return verdict or kind
     return kind
 
 
