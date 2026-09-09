@@ -537,10 +537,18 @@ def _public_words() -> set[str]:
 
 
 def test_the_named_rule_count_matches_validate(all_prose):
-    """"Fifteen named rules" on the explorer must track the module that owns
-    them — a rule added without updating the page is how numbers rot."""
-    import assistant.engine.decompose_validate.validate as v
-    n = sum(1 for name in dir(v) if name.startswith("_rule_"))
+    """The explorer's named-rule count must track the modules that own them — a
+    rule added without updating the page is how numbers rot.
+
+    They used to live in one file (`validate.py`, retired 2026-09-08); now they
+    are split by what they are FOR, so the count is the sum across the modules
+    that hold them. Nine date rules were deleted in the same change, which is why
+    the number went down rather than up.
+    """
+    import assistant.engine.decompose_validate.object_rules as o
+    import assistant.engine.decompose_validate.targeting as t
+    n = sum(1 for m in (t, o)
+            for name in vars(m) if name.startswith("_rule_"))
     word = _word(n)
     for name, text in all_prose.items():
         if "named rule" not in text.lower():
@@ -580,7 +588,11 @@ _STAGE_FILES = {
     "transcript": "ingest/repair.py",
     "segment":    "segmentation/old_seg/segment.py",
     "decompose":  "decompose_validate/decompose.py",
-    "validate":   "decompose_validate/validate.py",
+    # The stage's model call moved with the retirement of validate.py: `checks.py`
+    # is deterministic by design, and the LLM call this stage still makes lives in
+    # `text_repair.py` (rewriting a mangled item's words). Pointing this at
+    # checks.py would say the stage never calls the model, which is not true.
+    "validate":   "decompose_validate/text_repair.py",
     "fastrule":   "fastrule/objects.py",
     "crosscheck": "llmjudge/llmjudge.py",
     "label":      "label/label.py",

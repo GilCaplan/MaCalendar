@@ -40,7 +40,7 @@ from typing import Any
 # Each is a stage module with the frozen `run(state, cfg) -> state`.
 from assistant.engine import segmentation as _segment
 from assistant.engine.decompose_validate import stage as _decompose_validate
-from assistant.engine.decompose_validate import validate as _validate
+from assistant.engine.decompose_validate import stage as _dv_objects
 from assistant.engine.fastrule import objects as _generate   # registry + commit helpers
 from assistant.engine.fastrule import stage as _fastrule
 from assistant.engine.ingest import repair as _transcript
@@ -245,7 +245,7 @@ class Engine(Component):
         try:
             fast = cfg.engine.fast_track and _generate.fast_propose(state, cfg)
             if fast:
-                _validate.run_objects(state, cfg)
+                _dv_objects.run_objects(state, cfg)
                 _commit(state, cfg)      # labels inside
                 # The deep track runs BEHIND the instant answer: extraction-
                 # based cross-check against what was just committed, patched
@@ -520,7 +520,7 @@ def _start_background_verify(state: EngineState, cfg) -> None:
 def _background_verify(state: EngineState, cfg) -> "dict | None":
     """The check itself, on the worker thread. Returns the correction payload
     for the verify endpoint (None = agreed)."""
-    from assistant.engine.decompose_validate.validate import is_placeholder_title
+    from assistant.engine.decompose_validate.text_helpers import is_placeholder_title
 
     speech: list[str] = []
     refresh: set = set()
@@ -610,7 +610,7 @@ def _commit_missing_ask(state: EngineState, cfg, finding) -> "str | None":
     sub.items = [Item(id="item_1", kind="other", text=words)]
     try:
         _generate.run(sub, cfg)
-        _validate.run_objects(sub, cfg)
+        _dv_objects.run_objects(sub, cfg)
         _commit(sub, cfg)
     except Exception:
         return None

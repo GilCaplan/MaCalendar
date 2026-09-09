@@ -26,7 +26,7 @@ def test_enabled_is_the_default(monkeypatch):
 
 def test_disabled_stands_down_the_engine_gate(monkeypatch):
     monkeypatch.setenv("MACALENDAR_OBSERVANCE", "0")
-    from assistant.engine.decompose_validate import validate
+    from assistant.engine.decompose_validate import observance_gate as validate
     # 2026-09-05 is Shabbat and "gym" is neither leyning, a meal nor davening —
     # with the flag on this would be refused.
     intent = SimpleNamespace(recurrence="", date="2026-09-05",

@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 import assistant.engine.llm as engine_llm
-import assistant.engine.decompose_validate.validate as validate
+import assistant.engine.decompose_validate.stage as validate
 from assistant.engine import load_config
 from assistant.engine.state import EngineState, Item
 
@@ -215,12 +215,21 @@ def test_shabbat_davening_is_allowed(cfg):
     assert it.blocked is None
 
 
-def test_shabbat_gym_is_refused_with_a_reason(cfg):
+def test_shabbat_gym_is_flagged_with_a_reason(cfg):
+    """FLAGGED, not refused (Gil, 2026-09-08).
+
+    A blocked item is a command that silently did nothing; a flagged one is
+    committed with a note the speaker can see and act on. What must NOT change is
+    that the reason names Shabbat — the point was never to be quiet about it.
+    """
     it = _item("create_event", _event_intent(
         title="gym session", date=_next_saturday().isoformat(), start_time="10:00"))
     st = _state("gym on saturday morning", [it])
     validate.run_objects(st, cfg)
-    assert it.blocked and "Shabbat" in it.blocked
+    assert it.blocked is None, "a flag must not block the item"
+    flags = (it.slots or {}).get("flags") or []
+    assert any("Shabbat" in f for f in flags), flags
+    assert any(f.rule == "flag:observance" for f in st.fixes)
 
 
 def test_motzei_shabbat_is_fine(cfg):

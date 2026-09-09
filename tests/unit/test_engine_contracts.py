@@ -96,10 +96,10 @@ def test_every_stage_module_exposes_run():
     import assistant.engine.label.label
     import assistant.engine.segmentation.old_seg.segment
     import assistant.engine.ingest.repair
-    import assistant.engine.decompose_validate.validate
+    import assistant.engine.decompose_validate.stage
 
     for mod in (assistant.engine.ingest.repair, assistant.engine.segmentation.old_seg.segment,
-                assistant.engine.decompose_validate.decompose, assistant.engine.decompose_validate.validate,
+                assistant.engine.decompose_validate.decompose, assistant.engine.decompose_validate.stage,
                 assistant.engine.fastrule.objects, assistant.engine.llmjudge.llmjudge,
                 assistant.engine.label.label):
         run = getattr(mod, "run", None)
@@ -111,7 +111,7 @@ def test_every_stage_module_exposes_run():
 def test_validate_has_object_pass():
     """Step 4 runs twice by design: on items before generation, on generated
     objects after — both entry points are contract."""
-    import assistant.engine.decompose_validate.validate as v
+    import assistant.engine.decompose_validate.stage as v
     params = list(inspect.signature(v.run_objects).parameters)
     assert params == ["state", "cfg"], FROZEN
 

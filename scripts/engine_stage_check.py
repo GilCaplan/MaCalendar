@@ -143,7 +143,7 @@ def _cases_decompose(cfg):
 def _cases_validate(cfg):
     import datetime as dt
     from types import SimpleNamespace
-    from assistant.engine.decompose_validate import validate
+    from assistant.engine.decompose_validate import stage as validate
 
     def ev(**kw):
         base = dict(title="x", date=None, start_time=None, end_time=None,

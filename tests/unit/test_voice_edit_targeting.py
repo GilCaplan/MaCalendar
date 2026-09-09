@@ -43,7 +43,7 @@ def normalise():
     """The anaphor/date-pin rules live in the engine's validate stage now;
     drive them through its public object pass, same shapes as before."""
     from assistant.engine import load_config
-    from assistant.engine.decompose_validate import validate
+    from assistant.engine.decompose_validate import stage as validate
     from assistant.engine.state import EngineState, Item
 
     cfg = load_config()

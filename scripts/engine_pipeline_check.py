@@ -134,7 +134,7 @@ def run_shapes(text: str, verbose: bool) -> None:
     """One command, stopping at each boundary."""
     from assistant.engine import _label, _segment, _transcript
     from assistant.engine.decompose_validate import decompose as _decompose
-    from assistant.engine.decompose_validate import validate as _validate
+    from assistant.engine.decompose_validate import stage as _validate
     from assistant.engine.fastrule import objects as _generate
 
     cfg = load_config()

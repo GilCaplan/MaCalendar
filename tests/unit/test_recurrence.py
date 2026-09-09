@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import pytest
 
-from assistant.engine.decompose_validate.validate import named_weekdays as _named_weekdays, unsupported_cadence as _unsupported_cadence
+from assistant.engine.decompose_validate.text_helpers import named_weekdays as _named_weekdays, unsupported_cadence as _unsupported_cadence
 
 
 @pytest.mark.parametrize("text, expected", [
@@ -77,7 +77,7 @@ def test_until_excludes_the_day_it_names(text):
     """The owner's reading, stated plainly: "until" is the boundary you stop
     at, not the last one you keep. English supports both; this project picks
     one so it is predictable rather than guessed per sentence."""
-    from assistant.engine.decompose_validate.validate import end_is_exclusive as _end_is_exclusive
+    from assistant.engine.decompose_validate.text_helpers import end_is_exclusive as _end_is_exclusive
     assert _end_is_exclusive(text) is True
 
 
@@ -90,12 +90,12 @@ def test_until_excludes_the_day_it_names(text):
 def test_saying_so_keeps_the_last_day(text):
     """"through", "including" — and "end of", where the phrase names the final
     day rather than a boundary beyond it."""
-    from assistant.engine.decompose_validate.validate import end_is_exclusive as _end_is_exclusive
+    from assistant.engine.decompose_validate.text_helpers import end_is_exclusive as _end_is_exclusive
     assert _end_is_exclusive(text) is False
 
 
 def test_a_series_with_no_end_word_is_not_shortened(text=None):
     """No end date phrase at all must not trigger the adjustment."""
-    from assistant.engine.decompose_validate.validate import end_is_exclusive as _end_is_exclusive
+    from assistant.engine.decompose_validate.text_helpers import end_is_exclusive as _end_is_exclusive
     assert _end_is_exclusive("gym every monday at 6am") is False
     assert _end_is_exclusive("mincha every day at 1900") is False

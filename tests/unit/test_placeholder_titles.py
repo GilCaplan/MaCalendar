@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from assistant.engine.decompose_validate.validate import is_placeholder_title as _is_placeholder_title
+from assistant.engine.decompose_validate.text_helpers import is_placeholder_title as _is_placeholder_title
 
 
 class _Cfg:

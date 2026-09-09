@@ -22,7 +22,7 @@ import pytest
 from assistant.engine import _confirm_proposal, _create_spec
 from assistant.engine.segmentation.old_seg.segment import is_interrogative_create
 from assistant.engine.state import EngineState, Item
-from assistant.engine.decompose_validate import validate as _validate
+from assistant.engine.decompose_validate import stage as _validate
 
 
 # ---------------------------------------------------------------------------
