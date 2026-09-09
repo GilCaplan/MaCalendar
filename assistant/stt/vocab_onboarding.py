@@ -47,7 +47,7 @@ PRESETS: list[dict[str, Any]] = [
                "Tisha B'Av", "Yom HaZikaron", "Yom HaAtzmaut", "Yom Yerushalayim", "Erev Chag",
                "Tu BiShvat", "Fast of Esther"]},
     {"id": "israel", "label": "Israeli life",
-     "words": ["Technion", "Haifa", "Tel Aviv", "Jerusalem", "Yerushalayim", "Herzliya", "Jerusalem",
+     "words": ["Technion", "Haifa", "Tel Aviv", "Jerusalem", "Yerushalayim", "Herzliya",
                "Beer Sheva", "Netanya", "Modi'in", "Miluim", "Tzahal", "Kupat Cholim", "Misrad",
                "Rav-Kav", "Shuk", "Machane Yehuda", "Yalla", "Beseder", "Balagan", "Sababa", "Achi",
                "Chevre", "Ulpan", "Bituach Leumi"]},

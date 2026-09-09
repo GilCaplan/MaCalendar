@@ -558,11 +558,11 @@ def _skip_for_observance(date: datetime.date, start_time: str = "",
     """Should a repeating event skip this slot?
 
     Shabbat and yom tov are bounded by candle lighting and tzeit hakochavim at
-    the configured location, not by midnight. That matters: candle lighting in
-    Jerusalem is 18:43 in September and 16:20 in December, so a 19:00 event on a
-    Friday is outside Shabbat in one and well inside it in the other. Using the
-    date alone would skip a whole Friday in summer and admit a Friday evening
-    in winter, both wrong.
+    the configured location, not by midnight. That matters: at Israeli
+    latitudes candle lighting swings well over two hours between September and
+    December, so a 19:00 event on a Friday is outside Shabbat in one and well
+    inside it in the other. Using the date alone would skip a whole Friday in
+    summer and admit a Friday evening in winter, both wrong.
 
     Meals are the exception, because they are what the day is for — kiddush and
     seudah belong on Shabbat. Unless it is a fast, where a meal is the one thing

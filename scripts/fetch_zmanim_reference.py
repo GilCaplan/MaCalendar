@@ -40,7 +40,6 @@ FIXTURE = pathlib.Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "
 #: mistake that only shows up far from home — a timezone applied twice, a
 #: longitude sign dropped, a hemisphere assumption — cannot hide.
 LOCATIONS = [
-    {"name": "Jerusalem",  "latitude": 31.7683,  "longitude": 35.2137,   "tz": "Asia/Jerusalem"},
     {"name": "Jerusalem", "latitude": 31.7683,  "longitude": 35.2137,   "tz": "Asia/Jerusalem"},
     {"name": "New York",  "latitude": 40.7128,  "longitude": -74.0060,  "tz": "America/New_York"},
     {"name": "London",    "latitude": 51.5074,  "longitude": -0.1278,   "tz": "Europe/London"},

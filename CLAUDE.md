@@ -384,10 +384,10 @@ a Wednesday.
 
 **Series skip Shabbat and yom tov**, bounded by candle lighting and tzeit at
 the configured location (`hebrew_calendar` / `observance` settings in
-config.yaml — latitude, longitude, timezone), not by midnight. Candle lighting
-in Jerusalem is 18:43 in September and 16:20 in December, so a 19:00 Friday
-event is outside Shabbat in one and inside it in the other; a date-only rule
-gets a whole season wrong.
+config.yaml — latitude, longitude, timezone), not by midnight. At Israeli
+latitudes candle lighting swings well over two hours between September and
+December, so a 19:00 Friday event is outside Shabbat in one and inside it in
+the other; a date-only rule gets a whole season wrong.
 
 Three exceptions, each with a reason:
 
