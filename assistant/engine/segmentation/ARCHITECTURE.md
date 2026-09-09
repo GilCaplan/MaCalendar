@@ -1,5 +1,9 @@
 # Segmentation
 
+**`PLAN.md` is what to do next and in what order** (2026-09-09) — the span
+vocabulary is the measured lever, and it carries the rules that keep this folder
+from becoming convoluted. This file is how the stage WORKS.
+
 The engine's second step. It takes one spoken command and returns the separate
 things the speaker asked for. Everything downstream — decompose, generate, the
 calendar write — operates on what this step decides, so a boundary drawn wrong
