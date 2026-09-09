@@ -35,7 +35,12 @@ _HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_HERE)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
-_BANKS = os.path.join(_ROOT, "dataset", "fastrule", "banks")
+#: FastRule's banks, read-only. This pointed at `dataset/fastrule/banks` until
+#: 2026-09-09 — a path that moved in the per-stage restructure, so the generator
+#: raised FileNotFoundError and the dataset could not be rebuilt at all. Nothing
+#: caught it because regenerating is a manual step and the committed .jsonl kept
+#: working.
+_BANKS = os.path.join(_ROOT, "assistant", "engine", "fastrule", "datasets", "banks")
 
 from assistant.engine.segmentation.fastseg import invariant                  # noqa: E402
 
@@ -283,9 +288,27 @@ def _fill(template: str, binding: dict) -> str:
 # Validation — nothing ships that cannot be checked
 # --------------------------------------------------------------------------
 
+#: Halves of the day that cannot both be true of one item's time. The generator
+#: pairs a {date} filler with a {time} filler independently, so it happily built
+#: "project sync tonight at 9 in the morning" — 15 rows of it (audit 2026-09-09).
+#: A row whose GOLD contradicts itself cannot teach a correct boundary; it is the
+#: same defect class decompose_validate's generator already refuses.
+_HALVES = (re.compile(r"\b(morning|first thing)\b", re.I),
+           re.compile(r"\b(tonight|evening|night|midnight)\b", re.I),
+           re.compile(r"\b(afternoon|lunchtime)\b", re.I))
+
+
+def _contradicts_itself(time_str: str) -> bool:
+    """Two different halves of the day inside ONE item's time."""
+    return sum(bool(rx.search(time_str or "")) for rx in _HALVES) > 1
+
+
 def validate(text: str, items: "list[dict]", t: dict) -> "list[str]":
     """Every check that must hold before a generated row is allowed out."""
     bad = list(invariant.violations(text, items))
+    for i, it in enumerate(items, 1):
+        if _contradicts_itself(it.get("time", "")):
+            bad.append(f"item {i} time contradicts itself: {it['time']!r}")
     for i, it in enumerate(items, 1):
         if not it["action"].strip():
             bad.append(f"item {i} empty action")
@@ -333,6 +356,7 @@ def build(per_template: int = 6, seed: int = 20260908) -> "tuple[list[dict], lis
 
         rng = random.Random(f"{seed}:{t['family']}")
         made, failures = 0, []
+        seen_text: set = set()
         for n in range(per_template * 3):        # oversample; keep what validates
             if made >= per_template:
                 break
@@ -344,10 +368,18 @@ def build(per_template: int = 6, seed: int = 20260908) -> "tuple[list[dict], lis
             items = [{"action": _fill(s["action"], binding),
                       "time": _fill(s["time"], binding),
                       "tag": s["tag"]} for s in spec]
+            # A TEMPLATE WITH NO SLOTS renders the same sentence every time, so
+            # "wash and dry the dishes" was in the corpus SIX times and got six
+            # votes in every board. Distinct texts per family only (audit
+            # 2026-09-09, 21 such texts).
+            if text in seen_text:
+                failures.append("duplicate render")
+                continue
             bad = validate(text, items, t)
             if bad:
                 failures.append(bad[0])
                 continue
+            seen_text.add(text)
             rows.append({"id": f"gen_{t['family']}_{n}", "text": text,
                          "gold": items, "traps": [t["nuance"]],
                          "source": "generated", "family": t["family"],

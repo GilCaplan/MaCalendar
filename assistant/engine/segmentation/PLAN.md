@@ -291,11 +291,18 @@ written, or the fix ships unmeasured:
     one-word cadences        "yoga every year", "walk the dog everyday"
     12 noon                  "lunch at 12 noon"
 
-Where they go, without disturbing anything: `datasets/split_traps.jsonl` and
-`nosplit_traps.jsonl` are the hand-written trap files and this is exactly what they
-are for — a named trap, a handful of rows, gold written by hand. **Not** the
-generated set, whose templates would spray each form across hundreds of rows and
-drown the classes that are already covered.
+**Added 2026-09-09**: 22 rows in `nosplit_traps.jsonl`, TWO families per class —
+one train, one test. That respects family-disjointness (a family cannot straddle
+the split) while still giving the sealed half coverage of each class, which one
+family per class could not do.
+
+All four are visible and failing on the first run, which is the point of adding
+them: `offset-hours` **0.0%**, `plural-weekday` **0.0%**, `one-word-cadence`
+**0.0%**, `numbered-noon` **50.0%**. Before this the defects were real and no
+board could see them.
+
+Not the generated set, whose templates would spray each form across hundreds of
+rows and drown the classes that are already covered.
 
 One caveat on the corpus figures: they count occurrences of a form in 11,932
 utterances, which is evidence of what people SAY, not of what the dataset should
@@ -321,6 +328,23 @@ later:
 | family concentration | max 6 rows, median 6 — no family dominates |
 | trap coverage | 44 traps, only 2 with ≤4 rows |
 | ask-count spread | 1-ask 978 · 2-ask 604 · 3-ask 110 · 4-ask 2 |
+
+> **STATUS 2026-09-09: defects 1 and 3 are FIXED, and the four missing classes now
+> have rows.** Both fixes went into the GENERATOR rather than the .jsonl, so they
+> cannot come back on the next regeneration. Defect 2 still needs a ruling.
+>
+>     rows      1,694 -> 1,711      (1,051 train / 660 test)
+>     families    314 -> 322        leaked across the split: still 0
+>     incoherent gold items  15 -> 0
+>     duplicate texts        21 -> 0
+>     baseline exact-row  51.5% -> 51.1% on the cleaned set
+>
+> And a defect the audit did not go looking for: **the generator was BROKEN.**
+> `_BANKS` still pointed at `dataset/fastrule/banks`, a path that moved in the
+> per-stage restructure, so it raised `FileNotFoundError` and the dataset could not
+> be rebuilt at all. Nothing caught it because regenerating is a manual step and
+> the committed `.jsonl` kept working — the failure mode of any build step that
+> only runs by hand.
 
 ### Defect 1 — 15 incoherent gold items (9 train, 6 test)
 
