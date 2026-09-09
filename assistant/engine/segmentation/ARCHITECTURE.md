@@ -539,6 +539,22 @@ more correct ahead of the code, not a regression.
 a multi-DAY enumeration, `decompose_validate` should read it as a recurrence
 rather than lose the second day. A degraded answer, but not a lost one.
 
+### Live evidence, 2026-09-08
+
+Measured end to end through the real engine, `"walk the dog at 9 and 2:30"` is
+wrong in BOTH configurations of the stage below it:
+
+| decompose_validate's legacy splitter | result |
+|---|---|
+| enabled | `create_todo 'walk the dog'` **plus** `create_event 'Untitled Event'` at 14:30 |
+| disabled | one `create_event` titled `'dog'` at 14:30 — the 9 o'clock is lost entirely |
+
+Neither is the two events the sentence names, and note that the downstream stage
+cannot fix it either way: with one item it has one item's words, and with a
+garbage title it has a garbage title. **This is the argument for fixing the split
+here** rather than compensating for it later — §8.1's five gold rows are the same
+defect seen from the dataset side.
+
 ## 8.2 · The month can be severed from its ordinal
 
 Recorded rather than fixed, because the current job is wiring the engine

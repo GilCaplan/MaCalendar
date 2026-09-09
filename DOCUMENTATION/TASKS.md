@@ -197,10 +197,11 @@ worth doing:
 
 | # | item | why it is not blocking |
 |---|---|---|
-| 1 | **`decompose.py` is the last v1 file** (194 lines: item splitting + text repair). This stage's settled design says it does NOT split — segmentation does. | Whether its splitting is now redundant is **one audit run** to find out: disable it, compare. If parity, the last of v1 goes. Nobody has run it. |
+| 1 | **`decompose.py` is the last v1 file** (194 lines: item splitting). This stage's settled design says it does NOT split — segmentation does. | **Partly answered 2026-09-08**: disabled, the 25-case audit is IDENTICAL (76% / 81%) and all 1336 tests pass. Three of four probe cases are identical and the fourth is *worse with it* (see below). Evidence says removable; it deserves the FULL audit corpus both ways before deleting, not a 25-case slice — the slice is events-only and the splitter's list path is a task path. |
 | 2 | **FastRule re-parses instead of reading `item.slots`.** | Behaviour is already right (values reach the intents in `run_objects`), so this is duplicated parsing rather than a wrong answer. Natural to do while working on FastRule. |
 | 3 | **11 sealed rows still fail** (of 840; date 99.1%). | They sit in a construction class **train has no failing instance of**, so fixing them means growing train speculatively — and the sealing rule forbids reading the test rows. Below the noise floor. |
 | 4 | **The traceability board's vocabulary is hand-maintained** and has drifted 7 times. | Fix is to derive it from `normalization.py`'s closed tables — the gold's own words, so the board stays independent of `resolve.py` while it stops drifting. Do it before the next batch of forms lands, not after. |
+| 4b | **`"walk the dog at 9 and 2:30"` is broken BOTH ways** — found while testing item 1. Without the splitter: one event, titled `'dog'`, and the 9 o'clock lost. With it: a spurious todo *plus* an `'Untitled Event'`. It should be two events. | A segmentation failure (§8.1), not this stage's — but it is a live wrong answer on a case the docs use as a trap example, so it is worth someone's attention rather than a footnote. |
 | 5 | **Segmentation §8.1 / §8.2 / §8.3** are recorded for Gil, §8.3 being the date FLOOR injected into `time` as a word. | Another stage's work. §8.3 already costs two workarounds and caused one live audit failure, so it is the one with a price attached. |
 
 ## Working agreements
