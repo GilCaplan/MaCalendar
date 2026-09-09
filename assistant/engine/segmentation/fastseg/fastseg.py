@@ -171,6 +171,20 @@ _TIME_PATTERNS: "list[tuple[str, str]]" = [
 
     (r"\bthe\s+rest\s+of\s+the\s+day\b", "date"),
 
+    # --- A BOUNDED ENUMERATION OF TIMES (§8.1). "at 9 and 2:30" is one activity
+    #     at SEVERAL times, so it is captured whole here and expanded into one
+    #     item per time by `_expand_enumerations` below. Captured rather than cut
+    #     because `cut` returns substrings of the text and `_locate` needs them to
+    #     be substrings — a synthesised "walk the dog at 2:30" is not one.
+    #
+    #     It cannot swallow the decoys: `between 2 and 4` and
+    #     `every tuesday and thursday` are LONGER patterns and win outright, and
+    #     `meeting with Sam and Alex at 8` has no time on the left of its joiner.
+    (rf"\b(?:at\s+)?{_RANGEEND}(?:\s*,\s*(?:at\s+)?{_RANGEEND})*"
+     rf"\s+and\s+(?:at\s+)?{_RANGEEND}\b", "enum_clock"),
+    (rf"\b(?:on\s+)?(?:{_WEEKDAY})(?:\s*,\s*(?:on\s+)?(?:{_WEEKDAY}))*"
+     rf"\s+and\s+(?:on\s+)?(?:{_WEEKDAY})\b", "enum_day"),
+
     # --- WEEKDAY + half of day as ONE span. As two refs, the trailing "morning"
     #     made the right-hand side of a conjunct look TIMED, and
     #     "a cut and blow dry on saturday morning" split into two items.
@@ -462,7 +476,7 @@ _SLOT_ORDER = {"day": 0, "clock": 1}
 def _slot(ref: "TimeRef") -> str:
     """Which slot a reference fills. A day and a clock time are different
     slots, so one does not block the other from being distributed."""
-    return "clock" if ref.kind in ("clock", "range", "lead") else "day"
+    return "clock" if ref.kind in ("clock", "range", "lead", "enum_clock") else "day"
 
 
 def _locate(text: str, pieces: "list[str]") -> "list[tuple[int, int]]":
@@ -658,6 +672,53 @@ def tag(action: str, time_str: str) -> str:
 # the component
 # ---------------------------------------------------------------------------
 
+_ENUM_SPLIT = re.compile(r"\s*,\s*|\s+and\s+", re.I)
+
+
+def _expand_enumerations(pairs: "list[tuple[str, str]]") -> "list[tuple[str, str]]":
+    """One activity at SEVERAL times becomes several items (§8.1).
+
+    Gil, 2026-09-08: *"the segmentation is supposed to split 'walk the dog at 9
+    and 2:30' into two events of walk the dog."* A bounded enumeration is several
+    items; an unbounded `every X` is ONE item with a recurrence, and recurrence is
+    a FEATURE that `decompose_validate` fills rather than more segmentation.
+
+    Done here, after `assign_times`, rather than in `cut`: the cutter returns
+    substrings and `_locate` maps them back to the original text, so a synthesised
+    piece has nowhere to be located. On (action, time) pairs there is no such
+    constraint, and `cut` stays the fixed-point loop it is.
+
+    The action is COPIED, not divided — that is the whole point, and it is why the
+    invariant permits a token in more than one item.
+    """
+    out: "list[tuple[str, str]]" = []
+    for action, time_str in pairs:
+        enum = next((r for r in find_time_refs(time_str)
+                     if r.kind in ("enum_clock", "enum_day")), None)
+        if enum is None:
+            out.append((action, time_str))
+            continue
+        parts = [p.strip() for p in _ENUM_SPLIT.split(enum.text) if p.strip()]
+        if len(parts) < 2:
+            out.append((action, time_str))
+            continue
+        # Whatever surrounds the enumeration is SHARED by every instance: the
+        # trailing "tomorrow" in "at 11 and 4 tomorrow" dates both of them.
+        before = time_str[:enum.start].strip()
+        after = time_str[enum.end:].strip()
+        # THE PREPOSITION IS SHARED TOO. "at 9 and 2:30" says "at" once and means
+        # it twice, so a part that lost it gets it back — otherwise the second item
+        # reads "today 2:30" while the first reads "today at 9", and SPEC captures a
+        # time AS SPOKEN rather than as punctuated.
+        lead = re.match(r"(at|on|from|by|for)\s+", parts[0], re.I)
+        prep = lead.group(1) + " " if lead else ""
+        for part in parts:
+            if prep and not re.match(r"(at|on|from|by|for)\s+", part, re.I):
+                part = prep + part
+            out.append((action, " ".join(x for x in (before, part, after) if x)))
+    return out
+
+
 def fastseg(text: str) -> "list[dict]":
     """text -> [{"action", "time", "tag"}, ...]"""
     from assistant.intent.cleanup import strip_spoken_noise
@@ -670,8 +731,8 @@ def fastseg(text: str) -> "list[dict]":
     # earlier offset moves.
     clean = _invariant.strip_discourse_tail(strip_spoken_noise(text or ""))
     pieces = cut(clean)
-    return [{"action": a, "time": t, "tag": tag(a, t)}
-            for a, t in assign_times(clean, pieces)]
+    pairs = _expand_enumerations(assign_times(clean, pieces))
+    return [{"action": a, "time": t, "tag": tag(a, t)} for a, t in pairs]
 
 
 if __name__ == "__main__":                          # pragma: no cover

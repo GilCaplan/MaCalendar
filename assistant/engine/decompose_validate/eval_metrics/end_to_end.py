@@ -76,8 +76,15 @@ for r in rows:
         t = (it.text or "").strip().lower()
         if t.endswith((" and", " then", " also", " plus", ",")):
             malformed["action ends in a joiner"] += 1
-        if len(R._SPOKEN_CLOCK.findall(said)) + len(
-                __import__("re").findall(r"\d{1,2}:\d{2}|\d{1,2}\s*(?:am|pm)", said)) > 1:
+        # COUNT REFERENCES, not clock-shaped substrings. Counting substrings
+        # flagged every legitimate RANGE -- "from 10am to 11:30am" contains two
+        # clock expressions and is ONE reference -- so the 54 this reported were
+        # mostly ranges rather than the §8.1 enumerations it was built to catch.
+        # Segmentation's own reader knows the difference, so ask it.
+        from assistant.engine.segmentation.fastseg.fastseg import find_time_refs
+        clocks = [r for r in find_time_refs(said)
+                  if r.kind in ("clock", "enum_clock")]
+        if len(clocks) > 1:
             malformed["two clocks in one item"] += 1
 
     pred, _f, _g = C.run(pred, r["text"], anchor)
