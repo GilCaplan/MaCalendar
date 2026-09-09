@@ -551,6 +551,13 @@ _TASK_VERBS = frozenset("""
 #: are the same thing. The difference is semantic, so the signal has to be
 #: vocabulary.
 #:
+#: EVERY PATTERN IS TESTED AGAINST A SEGMENTED ACTION, not a raw sentence. A rule
+#: for "call mum/dad" as a phone action was in this list for about ten minutes and
+#: it was wrong twice over: calling your mother is a perfectly ordinary thing to put
+#: on a list, and it only showed up because the pipeline passes the ACTION ("call
+#: mum") while the first check passed whole sentences ("call mum at 5"), which never
+#: matched the anchored pattern. Verify with `fastseg(text)`, never with `tag(text)`.
+#:
 #: Measured harm before this existed: of eleven unusable inputs, SIX reached the
 #: calendar — "i love you", "play some music", "turn on the lights", "the weather is
 #: nice today" and "hmm let me think" each created an event, and "wait no forget it"
@@ -571,17 +578,29 @@ _NOT_CALENDAR = (
     r"radio|podcast|tv)\b",
     r"\bturn\s+(?:on|off|up|down)\s+the\s+\w+",
     r"^(?:what'?s|how'?s|tell\s+me)\s+the\s+(?:weather|temperature|news|time)\b",
-    r"^(?:call|text|message|email)\s+(?:mum|mom|dad)$",   # a phone action, not a diary entry
     # conversation about the world rather than the diary
     r"^the\s+weather\s+is\b", r"^i\s+(?:love|hate|miss)\s+you\b",
 )
 _NOT_CALENDAR_RE = [re.compile(p, re.I) for p in _NOT_CALENDAR]
 
 
-def _is_not_calendar(action: str) -> bool:
-    """True when the words are not a calendar ask at all."""
+def _is_not_calendar(action: str, time_str: str = "") -> bool:
+    """True when the words are not a calendar ask at all.
+
+    A STATED TIME OVERRULES THE VETO. "turn on the lights" is a smart-home
+    command; "turn on the oven at 6" is a reminder, and the only thing telling
+    them apart is that the speaker scheduled one. Erring this way is deliberate:
+    a false `other` LOSES a command the speaker gave, while a missed one puts a
+    row on the calendar they can delete. The floor's bare "today" does not count,
+    since the engine wrote that rather than the speaker.
+    """
     a = (action or "").strip().lower()
-    return bool(a) and any(rx.search(a) for rx in _NOT_CALENDAR_RE)
+    if not a:
+        return False
+    said_a_time = (time_str or "").strip().lower() not in ("", "today")
+    if said_a_time:
+        return False
+    return any(rx.search(a) for rx in _NOT_CALENDAR_RE)
 
 
 def _lexicon_kind(action: str) -> "str | None":
@@ -629,7 +648,7 @@ def tag(action: str, time_str: str) -> str:
         # BECAUSE it answered in both directions. `other` can therefore never
         # swallow a task or a review, and `_kind_of` calls everything it cannot
         # place an event, so `event` is exactly where an unusable ask lands.
-        if _is_not_calendar(action):
+        if _is_not_calendar(action, time_str):
             return "other"
         return _lexicon_kind(action) or kind
     return kind
