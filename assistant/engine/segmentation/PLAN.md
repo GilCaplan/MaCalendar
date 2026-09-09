@@ -154,6 +154,45 @@ Gold orders a time string by SLOT CLASS (day/recurrence → bound → clock);
 78.2% against 78.9% same-tokens-any-order, so ordering alone is **~10 items**.
 Worth fixing while in the code, never worth a phase.
 
+#### HOW — three local changes, and deliberately no fourth
+
+Read the code before planning the edit, and it is smaller than it looks.
+
+**1 · Entries in `_TIME_PATTERNS`, and ORDER DOES NOT MATTER.** `find_time_refs`
+collects every candidate from every pattern and then takes them
+**longest-first, non-overlapping** — the docstring records that this was once only
+a claim and cost 31 content-loss rows before it became a property of the code. So a
+longer alternative automatically beats the shorter one inside it: adding
+`late afternoon` fixes `at late` without being placed above `afternoon`, and adding
+`9 in the morning` beats both `at 9` and `in the morning`. `_absorb_preposition`
+then pulls the spoken `at`/`on`/`for` in on its own.
+
+That is the whole of classes 1–8 and the four corpus-only ones: **table rows.**
+
+**2 · `_slot()` must agree with the gold about two new kinds.** Today it is
+`"clock" if kind == "clock" else "day"`, so a `lead` or a `range` would fall to
+`"day"` — colliding with the real date, and worse, satisfying the
+`any(_slot(r) == "day")` test that guards the date floor, which would silently stop
+the floor applying.
+
+**No third slot class is needed**, and the reason is worth writing down: the gold
+already decided. `experiments/generate.py` has `_CLOCK_SLOTS = {time, time_range,
+lead_time}` and `_DAY_SLOTS = {date, recurrence, query_range}` — two classes, and a
+lead time is a **clock**. So the change is one line extending the clock side to
+`("clock", "range", "lead")`, chosen to match gold rather than invented here.
+
+**3 · The time string is joined in the wrong ORDER.** `assign_times` uses
+`sorted(mine, key=r.start)` — position. The gold uses
+`order = {"day": 0, "clock": 1}` with a stable sort — **slot class, day first**.
+That is the `until_through` mismatch (`every week at 8 o'clock until next tuesday`
+scored against `every week until next tuesday at 8 o'clock`). One line: sort by
+`(slot_order, start)`. Board B prices order-only at ~10 items, so this is worth
+doing because the code is open, not because it is a lever.
+
+**Nothing else.** No new module, no new tier, no change to `cut`, no change to the
+`Item` contract. If a fix in this phase wants a fourth kind of change, that is the
+signal to stop and re-read this section.
+
 **Target**: exact-row 51.5% → the ablation's 71.1% is the honest bound for span
 work alone. Past ~65% the phase has paid for itself.
 
@@ -180,11 +219,28 @@ This is a **new split mode**, not a tweak to the existing one:
 distributes ONE action over N times. Keep them separate functions; merging them is
 how the condition that protects the decoys gets lost.
 
-The genuinely hard part, and the reason this is Phase 3 rather than Phase 1: the
-same rule must still keep `take the tablets at noon and at six` — which is
-arguably also an enumeration — and `meeting with Sam and Alex at 8`, which is a
-person list. So the test cannot be "two times ⇒ split". §8.1's five gold rows are
-the specification; write them first.
+**Phase 1 must come first for a MECHANICAL reason, not just a leverage one.** The
+hard part of this rule is telling an enumeration from a decoy, and Phase 1 removes
+most of the difficulty:
+
+| piece | after Phase 1 | so the rule |
+|---|---|---|
+| `walk the dog at 9 and 2:30` | two clock refs | fires — distribute |
+| `take the tablets at noon and at six` | two clock refs | fires — distribute (§8.1 says it should) |
+| `book gym between 2 and 4` | **ONE range ref** | cannot fire |
+| `meeting with Sam and Alex at 8` | ONE clock ref | cannot fire |
+
+So once ranges are a single reference the test is simply **≥2 clock-class refs and
+the right side has no own content of its own → distribute the action over them**.
+Written before Phase 1 it would need a special case per decoy; written after, the
+decoys exclude themselves by their reference count. That is the argument for the
+order.
+
+It also makes `_split_verbless_conjuncts`'s docstring true: it claims a joiner
+inside a time reference is protected, and today `between 2 and 4` is actually saved
+by the content test instead. With a range pattern the claim becomes the mechanism.
+
+§8.1's five gold rows are the specification; write them first.
 
 **This is also what retires `decompose.py`.** Its `_split_times` exists to
 compensate for exactly this gap, and it produces garbage when it fires on a
