@@ -50,7 +50,7 @@ if str(ROOT) not in sys.path:
 # Importing this ALSO pins every MACALENDAR_* store at a scratch dir, sets
 # MACALENDAR_NO_WARMUP and pins BLAS to one thread — see its module header.
 # It must happen before anything under assistant/ is imported.
-from scripts import fastrule_shape as FS       # noqa: E402
+from assistant.engine.fastrule.experiments import fastrule_shape as FS  # noqa: E402
 
 DATA = ROOT / "dataset" / "personas" / "personas.jsonl"
 BASE = ["observant_student", "household_parent", "freelance_consultant",

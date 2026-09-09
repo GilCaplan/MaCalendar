@@ -210,9 +210,16 @@ def main() -> None:
     result["wall_seconds"] = round(time.time() - started, 1)
 
     board = scorer.format_board(result)
-    if a.test:                       # strip every row-level line
-        board = "\n".join(l for l in board.splitlines()
-                          if not l.strip().startswith(("·", "-", "row ", "  '")))
+    if a.test:
+        # BELT AND BRACES. `samples=0` above is the real guard — no failing row
+        # is ever collected — but if that ever regresses, the appendix must not
+        # reach a held-out report. Truncating at the appendix's own header is
+        # exact; the previous version filtered by line PREFIX and matched none
+        # of the lines it was meant to remove, so it looked like a guard while
+        # doing nothing.
+        marker = "--- reading the failures"
+        if marker in board:
+            board = board[:board.index(marker)].rstrip()
     print(board)
     print(f"\nwall clock: {result['wall_seconds']}s")
 

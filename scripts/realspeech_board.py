@@ -3,7 +3,8 @@
 
 This deliberately owns NO metric of its own. It selects a slice of
 `realspeech_1200.jsonl`, writes it to a scratch file, points
-`scripts/fastrule_shape` at that file and runs it — so the numbers printed
+`assistant/engine/fastrule/experiments/fastrule_shape` at that file and runs
+it — so the numbers printed
 here are literally the FastRule product-shape board (atomic handle-rate,
 correct-on-handled, date/time correctness, harm, the non-atomic diagnostic
 buckets and the propose defer rate), computed by the same code that produces
@@ -92,7 +93,7 @@ def main() -> int:
     # import AFTER the slice exists; fastrule_shape sets its scratch stores at
     # import time (MACALENDAR_* -> a temp dir), which is what keeps this run
     # from ever touching ~/.assistant_tools/.
-    from scripts import fastrule_shape
+    from assistant.engine.fastrule.experiments import fastrule_shape
     fastrule_shape.DATA = scratch
 
     print(f"dataset/realspeech · pool={a.pool} · split={a.split}"
@@ -100,7 +101,8 @@ def main() -> int:
           + (f" · shape={a.shape}" if a.shape else "")
           + (" · undisputed dates only" if a.undisputed_dates else "")
           + f" · n={len(sel)}")
-    print("(metrics: scripts/fastrule_shape — same scorer as the FastRule 7,200 board)\n")
+    print("(metrics: assistant/engine/fastrule/experiments/fastrule_shape "
+          "— same scorer as the FastRule 7,200 board)\n")
     sys.argv = ["fastrule_shape", "--split", a.split]
     return fastrule_shape.main()
 
