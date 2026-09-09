@@ -61,39 +61,87 @@ November was never handed to it. No downstream work can recover that, which is w
 
 ### Phase 1 — the time-span vocabulary  ·  the +205 lever  ·  ONE table
 
-Every defect in §1(c) is a missing or short entry in `fastseg._TIME_PATTERNS`.
-Concretely, ordered by how much real speech they cover (counts are corpus
-occurrences from the 11,932-text mining below):
+#### The research behind this list (2026-09-09)
 
-| class | missing form | corpus |
-|---|---|---|
-| coarse + modifier | `late afternoon`, `early evening`, `mid morning` — the bare word matches and the modifier strands | 130+ |
-| clock + half-of-day | `9 in the morning`, `eight in the evening` — matched as *two* refs, so the clock lands in the action | 484 / 335 |
-| **spoken clocks** | `ten thirty`, `three o'clock`, `twenty past eight`, `ten past six`, `quarter to five` — **not matched at all** | high |
-| ranges | `from 3 to 4pm`, `between 2 and 4` — no range pattern, so both ends match separately or not at all | 59 distinct |
-| month + ordinal, `of` order | `the 20th of november` — **this is §8.2**, and it is a missing pattern rather than a separate defect | 58 distinct |
-| month ends | `the end of the month`, `the end of september` | 74 |
-| bare coarse words | `night`, `lunchtime` | 52 / 122 |
-| multi-day series | `every tuesday and thursday` as ONE recurrence span | — |
+Two independent sources, and they agree — which is why the table below is a
+finding rather than a guess.
 
-**The vocabulary already exists and is already adjudicated.** Building
-decompose_validate's gold mined 11,932 corpus texts (sealed 300 excluded) into 248
-hand-checked fillers — `datasets/normalization.py` there, and the coverage report
-that produced it. Those are exactly the surface forms this stage must recognise.
-The two stages are the same vocabulary at ISO-TimeML's two levels: **extent** here,
-**value** there.
+**(i) The dataset's own failures, as a census.** For all 1,040 train rows, the
+token sequences gold puts in `time` that FastSeg leaves in the action:
+**53 distinct phrases, 192 occurrences.** The reverse direction is almost empty —
+`evening` 3x, `daily` 1x — so FastSeg barely ever OVER-captures a span. Recall of
+spans is the whole problem, and that matches item precision 96.2% against the span
+numbers.
 
-> **Copy the forms, never import the module.** Stages do not reach into each
-> other, and that gold's independence from resolvers is what lets its board catch
-> bugs. The mining is the SOURCE for hand-writing patterns here; the coupling
-> stays at the level of a human reading a list.
+**(ii) The real-speech corpus**, 11,932 texts with the sealed 300 excluded, mined
+for time expressions. Of 515 distinct forms, **343 never appear in segmentation's
+dataset at all** — and a handful of those are pattern classes the dataset cannot
+show, because it has no rows for them.
 
-Ordering inside the table is load-bearing and already documented: longest-first, or
-a fragment wins over the phrase that contains it. `late afternoon` must precede
-`afternoon`; `the 20th of november` must precede `the 20th`.
+#### The classes, ranked, with both sources' evidence
 
-**Target**: exact-row 51.5% → the ablation's 71.1% ceiling is the honest bound for
-span work alone. Anything past ~65% is the phase paying for itself.
+| # | class | forms | dataset census | corpus | trap now |
+|---|---|---|---|---:|---|
+| 1 | **lead time** | `15 minutes before`, `an hour before`, `two hours before`, `a day before`, `a week before` | **48** | 26+ | `lead_time` **0.0%** on 72 rows |
+| 2 | **ranges** | `between 2 and 4`, `from 6 to 8`, `from 3 to 4pm` | **33** | 59 distinct | `time_list_vs_range` **2.8%** on 36 |
+| 3 | **spoken clocks** | `ten thirty`, `twenty past eight`, `ten past six`, `at nine` | **20** | high | — |
+| 4 | **end of a month** | `the end of the month`, `the end of september` | **18** | 74 | — |
+| 5 | **coarse + modifier** | `late afternoon`, `early evening`, `first thing in the morning` | **17** | 130+ | `texture` 37.5% |
+| 6 | `around lunchtime` | | **14** | — | — |
+| 7 | **frequency cadences** | `every weekend`, `twice a week`, `once a week` | **13** | 79 | `recurrence` 61.1% |
+| 8 | `the rest of the day` | | 4 | — | — |
+
+Classes 1–8 account for **167 of the 192** missed occurrences.
+
+#### Four classes ONLY the corpus reveals — and these need dataset rows too
+
+Each verified to produce **no time reference at all** today:
+
+| class | example | corpus | why the dataset cannot show it |
+|---|---|---:|---|
+| **offset in HOURS** | `in two hours`, `in one hour` | **25** | the pattern covers `day\|week\|month` and not `hour`; the dataset has **zero** rows of it |
+| **plural weekday = recurrence** | `on sundays`, `sundays` | **31** | `_WEEKDAY` has no plurals, so `\bsunday\b` fails on "sundays" — and the MEANING is a weekly series, not a date |
+| **yearly / one-word cadences** | `every year`, `everyday` | **38** | neither is in the recurrence pattern. `yearly` is now a real cadence downstream (2026-09-08), so this is the seam |
+| **`12 noon`** | | 12 | `noon` matches and the `12` strands — the `at late` defect in another costume |
+
+Also found and left out deliberately: **`before it starts` / `before the meeting`
+/ `before my meeting at 3pm`** (24 occurrences). A `before` pointing at ANOTHER
+EVENT is a relation, not a lead time, and the next stage already draws that line
+(`resolve_lead_time`'s tail test). Capturing it here needs a ruling first, so it is
+a question rather than a pattern.
+
+And **`thanksgiving`** (6) is out of scope: US-specific, and the Jewish calendar
+comes from `hebrew_calendar`, not a regex.
+
+#### Two defects that are the SAME defect
+
+`at late` (14x) and `12 noon` (12x) are one bug: a **shorter pattern matches inside
+a longer phrase and the remainder strands in the action**. `afternoon` wins over
+`late afternoon`; `noon` wins over `12 noon`. The table is already documented as
+longest-first — these are entries missing from it, not a broken rule. Adding a
+longer alternative fixes each.
+
+#### One pattern fixes two symptoms
+
+`9 in the morning` is currently TWO refs (`in the morning` as a *date*, the `9`
+stranded). Class it as ONE clock span and the second symptom goes too: because
+`in the morning` is classed as a day, `assign_times` thinks the item has a day and
+**skips the date floor**, so gold's `today at 9 in the morning` comes back as
+`at 9 in the morning`. That is 4 of the 5 sampled `and_compound` failures. Fix the
+span, and the floor starts applying.
+
+#### Ordering, measured — a small residual, not a lever
+
+Gold orders a time string by SLOT CLASS (day/recurrence → bound → clock);
+`assign_times` joins by POSITION in the text. So
+`every week at 8 o'clock until next tuesday` is scored against
+`every week until next tuesday at 8 o'clock` — same tokens, different order, and
+`until_through` (33.3%) is where it shows. But board B prices it: time accuracy
+78.2% against 78.9% same-tokens-any-order, so ordering alone is **~10 items**.
+Worth fixing while in the code, never worth a phase.
+
+**Target**: exact-row 51.5% → the ablation's 71.1% is the honest bound for span
+work alone. Past ~65% the phase has paid for itself.
 
 ### Phase 2 — the dangling joiner
 
@@ -158,6 +206,31 @@ Last because the ablation ranks it third, and because a tagger measured through 
 broken span is measured through a broken span.
 
 ---
+
+## 3b · Does the DATASET need updating? Yes — four classes, and only four
+
+The census in Phase 1 is derived FROM the dataset, so the dataset already exercises
+classes 1–8; the CODE lacks them. Adding rows there would measure nothing new.
+
+The four corpus-only classes are different: the dataset has **zero rows** for them,
+so no board can currently see them fail. Those need rows before the patterns are
+written, or the fix ships unmeasured:
+
+    offset in hours          "call Sam in two hours"
+    plural weekday           "gym on sundays"          (a SERIES, not a date)
+    one-word cadences        "yoga every year", "walk the dog everyday"
+    12 noon                  "lunch at 12 noon"
+
+Where they go, without disturbing anything: `datasets/split_traps.jsonl` and
+`nosplit_traps.jsonl` are the hand-written trap files and this is exactly what they
+are for — a named trap, a handful of rows, gold written by hand. **Not** the
+generated set, whose templates would spray each form across hundreds of rows and
+drown the classes that are already covered.
+
+One caveat on the corpus figures: they count occurrences of a form in 11,932
+utterances, which is evidence of what people SAY, not of what the dataset should
+weight. Four traps of a dozen rows each is the right size; matching corpus
+frequency would rebuild the dataset around am/pm spellings.
 
 ## 4 · The rules that keep this from becoming convoluted
 
