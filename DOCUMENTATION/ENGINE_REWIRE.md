@@ -96,11 +96,44 @@ What does change is the chain's SHAPE, so:
       `rewrite(X4) -> X1'`, re-enter at Segmentation, bounded at 3.
 - [ ] 7. Retraction path on the loop (`state.records` -> delete -> re-commit).
       NOT DONE — nothing loops yet, so nothing needs retracting. It becomes
-      necessary the moment `rewrite_for_retry` stops returning None.
+      necessary the moment `rewrite_for_retry` stops returning None. Design
+      decided, see below.
 - [x] 8. `BRAIN_VERSION` + `CHAINS` + panel/iOS/explorer.
 - [x] 9. `pytest tests/unit` green. Baseline to beat: **1319 passed**.
 - [x] 10. Update `CLAUDE.md`, `ENGINE.md`, `CODE_MAP.md`, and each
       `ARCHITECTURE.md`; regenerate the API reference if a field moved.
+
+## Step 7 — retraction, and the UX it depends on (Gil, 2026-09-08)
+
+**The machinery exists.** `ExecutedAction.record` is
+`("event" | "todo", row_id, action, index)` — per ITEM, which is what fixed the
+row-75 cross-item corruption — and `db.delete_event` / `db.delete_todo` are
+there. Retracting is: walk the records, call the matching delete, re-commit from
+the new parse.
+
+**It must not be a silent swap.** A row appears in the calendar and then
+changes; "the assistant quietly deleted the event it just showed me" is a bad
+surprise even when the replacement is better.
+
+**Gil's answer: the review panel already says the work is unfinished.** The fast
+track commits, returns a `verify_token`, and the clients poll
+`GET /voice/verify/<token>` while the judge keeps checking behind the instant
+answer — the panel has a live-slot state for exactly this. So the user sees
+"committed, still checking" from the start, and a later correction is the
+completion of something they were already watching rather than a change out of
+nowhere.
+
+So step 7 is:
+
+1. judge unhappy -> rewrite -> re-parse
+2. delete the rows in `state.records`
+3. commit the new parse
+4. report it through the SAME verify-token channel the panel is already polling,
+   with the one-tap revert destructive patches already carry
+
+No new surface is needed — the affordance is the one the fast track has used all
+along. What is new is only that the correction can now REPLACE rather than only
+patch.
 
 ## Open, for when we design `decompose_validate`
 
