@@ -106,6 +106,9 @@ def _gold_item(spec: dict, binding: dict, anchor: dt.date, transcript: str = "")
                 item[f"_part_of_day"] = hint
         elif base == "time":
             item["start_time"] = got
+            win = N.window(raw)
+            if win:                       # a coarse part of day sets its END too
+                item["end_time"] = win[1]
         elif base == "time_range":
             item["start_time"], item["end_time"] = got
         elif base == "recurrence":

@@ -125,12 +125,22 @@ TIMES = {
     "noon": "12:00", "midday": "12:00", "midnight": "00:00",
     "5 pm": "17:00", "3pm": "15:00", "6pm": "18:00", "8pm": "20:00",
     "14:00": "14:00",
-    # Coarse parts of the day. The product has NO stated convention for what
-    # o'clock "late afternoon" is, so these stay ambiguous and their rows are
-    # dropped — see OPEN_QUESTIONS in the dataset README. Guessing 16:00 here
-    # would teach a number nobody decided.
-    "first thing in the morning": AMBIGUOUS, "around lunchtime": AMBIGUOUS,
-    "late afternoon": AMBIGUOUS, "early evening": AMBIGUOUS,
+    # Coarse parts of the day. These are a PRODUCT decision, not a fact, so
+    # each one is either decided by Gil or left ambiguous — never guessed.
+    "first thing in the morning": AMBIGUOUS,   # undecided
+    "around lunchtime": AMBIGUOUS,             # undecided
+    "early evening": AMBIGUOUS,                # undecided
+}
+
+#: Coarse parts of the day that resolve to a WINDOW, not an instant — so they
+#: set an end time as well as a start. Gil, 2026-09-08: "late afternoon just set
+#: default as 5-7pm unless stated otherwise."
+#:
+#: "unless stated otherwise" is already how the rest works: an explicit clock in
+#: the sentence is a different filler and wins outright. This only fills the gap
+#: when the speaker gave nothing more precise.
+PART_OF_DAY_WINDOW = {
+    "late afternoon": ("17:00", "19:00"),
 }
 
 #: Times spoken WITHOUT am/pm, as an (hour, minute) pair. Their value depends on
@@ -159,6 +169,8 @@ _EVENING_WORDS = ("tonight", "this evening", "evening", "dinner", "supper",
 def resolve_time(filler: str, transcript: str = ""):
     """-> "HH:MM" | AMBIGUOUS | None. Needs the sentence for a bare hour."""
     key = filler.strip().lower()
+    if key in PART_OF_DAY_WINDOW:
+        return PART_OF_DAY_WINDOW[key][0]      # the start; the end via window()
     if key in TIMES:
         return TIMES[key]
     if key not in BARE_HOURS:
@@ -248,6 +260,16 @@ def resolve_date(filler: str, anchor: dt.date):
     return fn(anchor).isoformat(), hint
 
 
+def window(filler: str):
+    """-> (start, end) for a coarse part of the day, else None.
+
+    Separate from `resolve_time` because these are the only fillers that imply
+    a DURATION. Everything else gives a start and lets the event's default
+    length apply.
+    """
+    return PART_OF_DAY_WINDOW.get(filler.strip().lower())
+
+
 def coverage() -> dict:
     """How much of each bank is normalized — printed by the generator so the
     dataset's blind spots are visible rather than implied."""
@@ -255,7 +277,7 @@ def coverage() -> dict:
         known = sum(1 for v in table.values() if v is not AMBIGUOUS)
         return {"known": known, "ambiguous": len(table) - known}
     times = split(TIMES)
-    times["known"] += len(BARE_HOURS)      # resolved by rule, not by lookup
+    times["known"] += len(BARE_HOURS) + len(PART_OF_DAY_WINDOW)
     return {"dates": split(DATES), "times": times,
             "recurrences": split(RECURRENCES), "quantities": split(QUANTITIES),
             "time_ranges": split(TIME_RANGES),
