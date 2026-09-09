@@ -115,15 +115,20 @@ That change dissolves problems 1–4 at once:
 
 ## 4b · X3 — the output structure
 
-X3 is **the item list, complete**. Same shape as X2's items, with every field an
-object needs already filled and checked. The transcript does NOT travel on to
-FastRule: once the items are complete, FastRule has no reason to re-read the
-words, and taking the string away is what stops it re-deriving.
+X3 is **the item list, complete — and X1 rides along** (Gil, 2026-09-08).
+LLMJudge needs the original words to compare the produced objects against, so
+the transcript is carried the whole way rather than re-fetched:
 
 ```
 X2 = ( [Item, …], X1 )        items + the fixed transcript
-X3 =   [Item, …]              items, COMPLETE — nothing left to re-read
+X3 = ( [Item, …], X1 )        items COMPLETE, transcript still carried
+X4 = ( [object, …], X1 )      objects + the words to judge them against
 ```
+
+X1 is **read-only from segmentation onward**. Every stage may look at it; none
+may rewrite it. The single exception is LLMJudge's loop, whose entire job is to
+produce a NEW X1 (`X1'`) and start again — which is why the rewrite belongs
+there and nowhere else.
 
 ### The fields, derived from what FastRule builds
 
@@ -144,7 +149,7 @@ recur_until · attendees · location · description · reminder_minutes`.
 | `quantity` | decompose *(exists)* | `5` |
 | `reminder_minutes` | decompose *(exists)* | `30` |
 | `attendees` | decompose | `["Sam"]` |
-| `blocked` | **validate** | a refusal reason, or None |
+| `fixes` | **validate** | what it changed and why — a trace record, not a gate |
 
 ### Three properties X3 must have
 
@@ -158,9 +163,12 @@ quantity that no words support is an invention, and that is validate's
 invariant (§5c). This is the same shape of contract segmentation already has,
 which means it can be scored the same way.
 
-**3 · COMPLETE or BLOCKED, never half-built.** An item either has what it needs
-or carries `blocked` with a reason that is said out loud. FastRule then has one
-job — build the object — and no repair to do.
+**3 · COMPLETE, and never silently refused.** `blocked` is dropped (Gil): an
+item that validate cannot satisfy is not killed here. Validate fixes what it
+can and RECORDS what it could not, and the item goes on with its finding
+attached — LLMJudge has X1 and a model and is the stage equipped to decide.
+Refusing at this stage means refusing on a deterministic rule's say-so, before
+anything has looked at the whole picture.
 
 ### What this buys
 
@@ -174,6 +182,56 @@ that item's own `time`, so there is no flat list of dates to pin by index, and
 "which event does this date belong to" is never asked.
 
 ---
+
+## 4c · What validate does that segmentation CANNOT (Gil's question)
+
+> *"I don't want to repeat what segmentation does — what can validate do
+> differently?"*
+
+**Segmentation works on WORDS. Validate works on RESOLVED VALUES.** That is the
+whole distinction, and it means the two cannot overlap.
+
+Segmentation can guarantee *"the words `next friday` went to item 2"*. It can
+NEVER check whether `next friday` resolved to the right date, because it does
+not resolve — "capture, do not resolve" is its contract. **Validate is the only
+stage that holds both the words and the value**, so it is the only one that can
+check them against each other.
+
+### The deterministic checks, all of them impossible upstream
+
+| check | a failure it catches |
+|---|---|
+| resolved date matches the words | `time="next friday"` → `date` is a Wednesday |
+| ordinal agreement | `time="the 20th"` → `date` ends `-15` |
+| weekday agreement for a series | `recurrence=weekly`, `time="every tuesday"`, `date` is a Thursday |
+| numbers agree | `"5 apples"` → `quantity=3`; `"half an hour before"` → `reminder_minutes=45` |
+| cross-field arithmetic | `end_time <= start_time`; `recur_until < date`; a past date |
+| completeness | a clock with no day; `recur_until` with no `recurrence` |
+| **every time-phrase in X1 was honoured** | `"the 20th of November"` half-resolved — **today's bug** |
+
+The last one is the prize: it is the **value-level analogue of segmentation's
+invariant**. Segmentation guarantees no word is LOST; validate guarantees no
+word went UNHONOURED. Same shape of contract, different level, so it can be
+scored the same way and the two boards cannot be confused.
+
+### Where an LLM helps — and where it does not
+
+**Not for any of the above.** Those are arithmetic and set comparison; a model
+would be slower, non-deterministic and worse at them. That is also the measured
+lesson from segmentation, where every LLM variant lost (`segmentation/
+ARCHITECTURE.md` §6).
+
+A model is only interesting for genuine AMBIGUITY that rules cannot settle —
+`"book it for the weekend"` (Saturday or Sunday?), `"early next week"`. But
+those are not contradictions, they are underspecification, and they are a
+different problem from the checks above.
+
+**Proposal: validate stays fully deterministic and emits a FINDING.** LLMJudge
+already holds X1 and already makes a model call; it is the stage equipped to
+settle doubt. That keeps ONE model call in the chain instead of two, keeps
+validate fast and scoreable, and keeps the division clean:
+
+> **validate finds contradictions. LLMJudge settles doubt.**
 
 ## 5 · What needs research before building
 
