@@ -155,7 +155,23 @@ it gains tasks:
 
 A parser was tried here first and was much worse (65.0%) — see §6.
 
-#### Candidate, not yet tried: the logistic `kind` head (Gil, 2026-09-08)
+#### MEASURED AND REFUTED: the logistic `kind` head (2026-09-09)
+
+Run as `experiments/tag_head.py` — **88.7% shipped against 80.4%** for the head,
+and worse on every slice including the hand-written rows that cannot be in its
+fitting data. It over-predicts `task`, which is precisely the failure the lexicon
+experiment below already measured and rejected.
+
+**The lesson generalises past this one试.** Two independent signals — a task-verb
+lexicon and a fitted task/event classifier — both fail the same way on this data,
+by calling events tasks. Calendar commands are verb-rooted imperatives, so anything
+keyed on the verb leans task; and of 439 items no verb list decides, **349 are
+events**. The shipped tagger wins by using the signal only as a ONE-WAY veto, and
+that asymmetry is doing the work rather than the signal's quality.
+
+The brief below is kept as the record of what was tried and why.
+
+#### The original candidate (Gil, 2026-09-08)
 
 The engine already carries a trained **event/task classifier** —
 `classifier.py`'s `KindFeatures` + `LogisticModel`, weights in
@@ -397,6 +413,7 @@ morning`, `9 in the morning`.
 | gating LLMSeg to the right rows rescues it | **NO** — it fixes 6 and breaks 16, so an *oracle* gate is worth +3.8% |
 | the model should do the cutting, FastSeg the copying | **NO** — item-count 83.9% → **57.3%**, breaks 132. Predicted from DialogUSR's cut-vs-copy gap, but that compares a model's cut to its *own* copy, not to a tuned deterministic cutter. |
 | a similarity threshold can score the action | **NO** — see §5 |
+| **the logistic `kind` head is a better TAG** | **NO — 88.7% → 80.4%**, and refuted on all three slices including hand-written rows that cannot be in its fitting data. It over-predicts `task`: task recall rises 90.2% → 92.8% while **event recall collapses 87.7% → 71.4%**, event→task errors 106 → 247. Tried as a decisive-only tier (81.2%) and as a one-way veto over `event` (80.1%) — both worse. `experiments/tag_head.py` |
 
 ### LLMSeg's standing — turned OFF, on four measurements
 
