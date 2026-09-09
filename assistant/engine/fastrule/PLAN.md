@@ -4,148 +4,150 @@
 
 ---
 
-## 1 · The box, and the code that does not match it
+## 1 · The box (Gil, 2026-09-09)
 
-**The task, as a black box** (Gil, 2026-09-09):
+> *"This step shouldn't be redoing segmentation's work. It takes the work from
+> segmentation and decompose_validate — which is a `List[Item]` — and makes it
+> into an object format the software accepts, and if there's an issue it tells
+> LLMVerify."*
 
-    IN   one ATOMIC item — (action, time, tag)
-    OUT  a committable calendar / to-do object
-         ── or ── DEFER + a reason (REFUSAL | STRUCTURE | INCAPACITY)
+    IN    List[Item]  — everything the two stages upstream worked out
+    OUT   the objects the software accepts (CalendarIntent / CreateTodoIntent …)
+    ELSE  a DEFER with a reason, handed to LLMJudge
 
-Four ways the code says something different.
+**So FastRule is a CONVERTER, not a parser.** That single sentence is the
+restructure: the current code re-reads the raw text and works the whole thing out
+again, and almost every defect below follows from that.
 
-### (a) It takes TEXT, not an item
+## 2 · What the Item already carries, and what is genuinely left to do
 
-`FastRule.run(text, current_view)`. Both callers flatten an item back into a
-string before handing it over — the deep track calls `run(item.spoken())` — so the
-executor never sees `action`, `time` or `tag` separately even though segmentation
-worked them out and `decompose_validate` resolved them into values.
+| the object needs | who decided it | today |
+|---|---|---|
+| `date`, `start_time`, `end_time` | **decompose_validate** | re-derived from text |
+| `recurrence`, `recur_days`, `recur_until` | **decompose_validate** | re-derived |
+| `quantity`, `reminder_minutes` | **decompose_validate** | re-derived |
+| event vs task vs review vs other | **segmentation** (`tag`) | re-derived |
+| the words of the ask | **segmentation** (`action`) | re-derived |
+| **which OPERATION** — create / update / delete / complete / query | **nobody yet** | ✔ FastRule's |
+| **the TITLE** — the ask minus its verb | nobody yet | ✔ FastRule's |
+| **attendees, location** | nobody yet | ✔ FastRule's |
+| **the TARGET record** for an edit or delete | nobody yet | ✔ FastRule's |
 
-### (b) So it re-derives what two stages already decided — and its vocabulary is now far behind
+Six of ten fields are already decided upstream and thrown away. **What is actually
+left is the operation, the title, the people and the target** — and those are the
+four things the rule parser is genuinely good at, because they are about the ACTION
+words, not about time.
 
-Measured 2026-09-09, whole-command parses of things segmentation reads correctly:
+### The cost of re-deriving, measured
+
+Whole-command parses of things segmentation reads correctly (2026-09-09):
 
 | said | segmentation | the rule parser |
 |---|---|---|
 | `remind me to call the bank in two hours` | action `remind me to call the bank`, time `today in two hours` | title **`call the bank in two hours`** — the time is IN THE TITLE |
-| `book yoga late afternoon` | action `book yoga`, time `today late afternoon` | **nothing** |
-| `book the dentist the 20th of november at 3pm` | action, time both right | **nothing** |
+| `book yoga late afternoon` | action + time both right | **nothing** |
+| `book the dentist the 20th of november at 3pm` | both right | **nothing** |
 | `gym on sundays at 7am` | action `gym`, time `on sundays` | **`RuleParserSkip`** |
 
 Three of four produce nothing at all. Segmentation learned lead times, ranges,
 spoken clocks, month-of-ordinals, plural weekdays and one-word cadences on
-2026-09-09; `rule_parser.py` knows none of them and never will unless the
-vocabulary is taught twice.
+2026-09-09; `rule_parser.py` knows none of them.
 
-**This is the single biggest lead in the folder.** `below-threshold` is 573 of
-about 989 atomic deferrals, and a parser that returns nothing scores zero
-confidence by construction.
+**And teaching it is the wrong fix.** A second time vocabulary is a second thing to
+keep in step, and the project already paid for that lesson three times — the
+invariant that was three copies, the logistic regression that was four, the pipeline
+GUI and server each with their own parser. The fix is to stop asking it about time.
 
-### (c) `Atomicity` belongs to the front door, not to the executor
+`below-threshold` is **573 of about 989** atomic deferrals, and a parser that
+returns nothing scores zero confidence by construction — so this is where that mass
+most plausibly sits. Step 1 below measures it before anything is moved.
 
-`FastRule` carries an `Atomicity` component that asks *"one item or several?"* —
-which is **segmentation's question**, and is meaningless for a caller whose
-contract says the item is already atomic. It exists because the same class serves
-two different jobs:
+## 2b · Three more mismatches, all downstream of the same cause
+
+**`Atomicity` belongs to the front door.** `FastRule` carries a component asking
+*"one item or several?"* — segmentation's question, and meaningless to a caller
+whose contract says the item is atomic. It is there because one class serves two
+jobs, and which contract you are in is decided by a string comparison:
+`item.text.strip() != state.text.strip()`.
 
 | caller | input | bar | needs Atomicity? |
 |---|---|---|---|
 | `fast_propose` | the WHOLE command | `RULE_THRESHOLD` | **yes** — it is the fast track's admission test |
 | `_parse_item` | ONE item | `SUBITEM_RULE_THRESHOLD` | no — atomic by contract |
 
-And which contract you are in is decided by a string comparison —
-`item.text.strip() != state.text.strip()` — rather than by which thing you called.
+**The board measures the front door.** `fastrule_shape.py` feeds whole dataset
+rows, so the atomic-item executor is scored as a whole-command executor with 1,399
+non-atomic rows reported as "diagnostic". That section exists only because the two
+jobs share a class.
 
-### (d) The board measures the front door, not the executor
-
-`fastrule_shape.py` feeds whole dataset rows, so the "atomic-item executor" is
-scored as a whole-command executor with 1,399 non-atomic rows reported as
-"diagnostic". That section exists only because the two jobs share a class.
+**DEFER goes to LLMJudge**, and the reason class is the contract it reads:
+`REFUSAL` must not be overturned, `STRUCTURE` means split further, `INCAPACITY`
+means take over with the partial parse. That part is already right and should not
+be touched.
 
 ---
 
-## 2 · The restructure
-
-**One idea: separate the two contracts, and let each be measured on its own
-question.** Everything below follows from it.
+## 2c · The restructure
 
 ```
-   BEFORE                              AFTER
+   BEFORE                                  AFTER
 
-   fast_propose ─┐                     fast_track.propose(state)
-                 ├─► FastRule.run(text)   └─ Atomicity  (admission test)
-   _parse_item  ─┘   ├─ Atomicity          └─► FastRule.build(item)
+   fast_propose ─┐                         fast_track.propose(state)
+                 ├─► FastRule.run(TEXT)      └─ Atomicity   (admission test)
+   _parse_item  ─┘   ├─ Atomicity            └─► FastRule.build(item)
                      ├─ Gatekeeper
-                     └─ Scorer          objects.run(state)
-                                          └─► FastRule.build(item)
-                                                ├─ Gatekeeper
-                                                └─ Scorer
+                     ├─ Scorer             objects.run(state)   List[Item]
+                     └─ re-parses               └─► FastRule.build(item)
+                        EVERYTHING                    ├─ COPY the slots
+                                                      ├─ operation · title ·
+                                                      │  attendees · target
+                                                      ├─ Gatekeeper
+                                                      └─ Scorer → object | DEFER
 ```
 
-### 2.1 · `FastRule.build(item) -> object | DEFER` — the executor, and only that
+**`FastRule.build(item) -> object | DEFER`**
 
-- Takes an **`Item`**, not a string. Reads `action`, `time`, `tag` and the values
-  `decompose_validate` already resolved into `item.slots`.
-- **No `Atomicity`.** Its contract is that the item is atomic; if that is ever
-  untrue, that is segmentation's defect and the item-count board is where it shows.
-- One threshold, its own, not chosen by the caller.
-- `Gatekeeper` and `Scorer` stay exactly as they are — they are about *this item*
-  and they are the two things that make DEFER a first-class output.
+1. **Copy** what `item.slots` already holds — never re-derive it.
+2. **Read the action words** for the operation, title, attendees and target. This
+   is the rule parser's real job and it keeps it.
+3. **Gatekeeper** — is this a reading that must not execute? (unchanged)
+4. **Scorer** — confident enough? (unchanged) Otherwise DEFER, to LLMJudge.
 
-### 2.2 · Use what upstream decided, and parse only the rest
+`Atomicity` moves to `fast_track.py`, where the item does not exist yet and *"is
+this one ask?"* is the right question.
 
-The rule parser stops being the source of the date, time and recurrence when the
-item already carries them. It keeps its real job: **reading the ACTION** — which
-verb, which object, which target record.
-
-> Order of preference, and the reason: `item.slots` was produced by the stage that
-> owns values and is measured at 99.9% train / 98.7% sealed on exactly that
-> question. The rule parser's own reading is a fallback for items that arrive
-> without slots (the front door, where segmentation has not run yet).
-
-This is where the `below-threshold` mass should move, and it is the first thing to
-measure rather than assume.
-
-### 2.3 · `fast_track.py` — the front door, with `Atomicity` as its admission test
-
-The whole-command fast path becomes its own small module, and `Atomicity` moves
-into it, where the question *"is this one ask?"* is exactly the right one to ask.
-It calls `FastRule.build` once it has decided there is a single item.
-
-### 2.4 · `objects.py` splits by concern
-
-453 lines holding: registry access, parser caching, the fast-track proposal,
-per-item generation, the LLM fallback, refusal-honouring, invention guards, an
-event fallback and slot application.
-
-    fast_track.py   the front door + Atomicity
-    objects.py      the per-item loop: FastRule first, the LLM for the rest
-    guards.py       _honour_refusal, _guard_inventions, _grounded_title
-    (registry and parser caching stay in objects.py — they are one-liners)
-
-### 2.5 · Two boards, because there are two questions
-
-    fastrule_shape.py    the EXECUTOR: atomic items in, handled / correct-on-handled
-    front_door.py        the FAST TRACK: whole commands in, committed instantly?
-                         wrongly admitted a compound? (today's "non-atomic
-                         diagnostic" section, given its own board)
-
----
+**The fallback path stays**, and matters: at the FRONT DOOR segmentation has not
+run, so there are no slots and the parser must read everything. That is one code
+path with two inputs, not two implementations — `build` uses slots when they are
+there and parses when they are not.
 
 ## 3 · Order of work
 
 | # | step | why it is first / last |
 |---|---|---|
-| 1 | **Measure the ceiling of 2.2** — how many `below-threshold` deferrals carry slots the parser failed to read | a number before a refactor. If it is small, 2.2 is not the lever and the order changes |
-| 2 | `FastRule.build(item)` + use `item.slots` | the substance; the rest is arrangement |
+| 1 | **Measure the ceiling** — of the 573 `below-threshold` deferrals, how many carry slots the parser failed to read | a number before a refactor. If it is small, the converter is not the lever and this order changes |
+| 2 | `FastRule.build(item)` — COPY the slots, parse only operation/title/people/target | the substance; everything else is arrangement |
 | 3 | Split `fast_track.py` out, move `Atomicity` into it | now safe, because `build` no longer needs it |
 | 4 | Two boards | measure each contract on its own question |
 | 5 | `guards.py` | tidying, last, no behaviour change |
 
-**Not in this plan, deliberately:** `stage.py` calls `decompose_validate.run_objects`
-at its tail. That is the OTHER stage's rules living here because they need
-`item.intent` to exist. It is a real wrinkle and it is that stage's to unwind —
-`ENGINE_REWIRE.md` carries it.
+### The values are computed TWICE today, and this plan is what fixes it
+
+Follow one date through the current chain:
+
+    1  decompose_validate.run()        resolves it -> item.slots        ✔
+    2  fastrule.objects.run()          RE-PARSES the text -> intent     ✘
+    3  decompose_validate.run_objects()  resolves it AGAIN, from the
+                                         words, ONTO the intent         ✘
+
+Step 3 exists because step 2 threw step 1 away. **Once `build` copies the slots,
+step 3's value pass has nothing left to do** — and what remains of `run_objects` is
+only its non-value rules: targeting, the boundary guards, the observance flag.
+
+That is the same wrinkle `decompose_validate/ARCHITECTURE.md` lists as its finish
+line ("FastRule reading `slots`", then "deleting `run_objects`"). It is not a
+separate piece of work — **it falls out of step 2 of this plan**, which is the
+argument for doing step 2 properly rather than bolting slots on beside the parse.
 
 ---
 
