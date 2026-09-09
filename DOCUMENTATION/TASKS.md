@@ -189,6 +189,20 @@ had gone through the same process. That row was removed from the failing path
 rather than the mechanism being understood, so if a later cycle sees the same
 shape again, start from here.
 
+## decompose_validate — carried forward (2026-09-08)
+
+The stage is rebuilt, measured and wired; v1 is retired and tagged
+(`decompose-validate-v1`). What is deliberately NOT done, in the order it is
+worth doing:
+
+| # | item | why it is not blocking |
+|---|---|---|
+| 1 | **`decompose.py` is the last v1 file** (194 lines: item splitting + text repair). This stage's settled design says it does NOT split — segmentation does. | Whether its splitting is now redundant is **one audit run** to find out: disable it, compare. If parity, the last of v1 goes. Nobody has run it. |
+| 2 | **FastRule re-parses instead of reading `item.slots`.** | Behaviour is already right (values reach the intents in `run_objects`), so this is duplicated parsing rather than a wrong answer. Natural to do while working on FastRule. |
+| 3 | **11 sealed rows still fail** (of 840; date 99.1%). | They sit in a construction class **train has no failing instance of**, so fixing them means growing train speculatively — and the sealing rule forbids reading the test rows. Below the noise floor. |
+| 4 | **The traceability board's vocabulary is hand-maintained** and has drifted 7 times. | Fix is to derive it from `normalization.py`'s closed tables — the gold's own words, so the board stays independent of `resolve.py` while it stops drifting. Do it before the next batch of forms lands, not after. |
+| 5 | **Segmentation §8.1 / §8.2 / §8.3** are recorded for Gil, §8.3 being the date FLOOR injected into `time` as a word. | Another stage's work. §8.3 already costs two workarounds and caused one live audit failure, so it is the one with a price attached. |
+
 ## Working agreements
 - Everything on the phone is local: no third-party services; the only network peer is the Mac over Tailscale.
 - Prefer doing work directly over spawning sub-agents; keep context small (`/compact` between big tasks).
