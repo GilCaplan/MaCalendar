@@ -313,6 +313,12 @@ def score_rows(rows: list, predict, samples: int = 8) -> dict:
 
 
 def _pc(ok, n) -> str:
+    """THE project rate format (Gil, 2026-09-08): padded, and ALWAYS with x/n.
+
+    `53.5%` alone cannot be read — 53 of 100 and 5,350 of 10,000 print the same
+    and mean very different things. The denominator is what makes a rate a
+    result. Three boards printed this three ways; this is the one.
+    """
     return f"{ok / n:6.1%}  ({ok}/{n})" if n else "     —  (0/0)"
 
 

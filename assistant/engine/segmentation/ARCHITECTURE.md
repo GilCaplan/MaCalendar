@@ -427,7 +427,85 @@ finish.
 
 ---
 
-## 6b · Known gaps found while wiring — NOT yet fixed
+## 7 · Layout
+
+```
+segmentation/
+    ARCHITECTURE.md     this file
+    fastseg/            the deterministic half + invariant.py
+    llmseg/             the model half + prompts/
+    old_seg/            the SHIPPED stage, kept until Gil promotes the new one
+    datasets/           1,694 rows, train/test split by family
+    experiments/        scorer, boards, generator, and every study above
+```
+
+**`old_seg` is still the stage the engine runs.** FastSeg and LLMSeg are proven
+on their own dataset first, per STAGE ISOLATION mode; promotion is a separate,
+deliberate change. Note the coupling honestly: `fastseg` currently *imports*
+`old_seg` for `_kind_of` / `_enforce_pinned_kinds`, so the two are not yet
+independent.
+
+---
+
+# 8 · TO FIX — known defects, recorded not repaired
+
+Each is a real case with a real reproduction. They are written down rather than
+fixed because the work in flight is elsewhere; this section is the queue.
+
+## 8.1 · A bounded enumeration of times must SPLIT (Gil, 2026-09-08)
+
+**The gold is wrong, and so is the code.**
+
+```
+'walk the dog at 9 and 2:30'                                -> gold 1, should be 2
+'take the tablets at noon and at six'                       -> gold 1, should be 2
+'guitar practice at 11 and 4 tomorrow'                      -> gold 1, should be 2
+'gym session on tuesday and thursday this week'             -> gold 1, should be 2
+'can you add the stand up meeting on monday and wednesday'  -> gold 1, should be 2
+```
+
+All five carry the trap `two-times-one-activity`, which is itself the mistaken
+premise — **they are one activity happening SEVERAL TIMES, which is several
+events.** Gil: *"the segmentation is supposed to split 'walk the dog at 9 and
+2:30' into two events of walk the dog."*
+
+**The rule that separates it from recurrence:**
+
+> A **bounded enumeration** of times is SEVERAL items.
+> An **unbounded `every X`** is ONE item with a recurrence.
+
+```
+"walk the dog at 9 and 2:30"              TWO events  — two instances
+"gym on tuesday and thursday this week"   TWO events  — bounded by "this week"
+"gym every tuesday and thursday"          ONE event, recurring
+```
+
+Recurrence is a FEATURE of an item, not more segmentation — and it is
+`decompose_validate`'s to fill, not this stage's.
+
+**It is implementable without endangering the must-not-split decoys**, because
+the trailing conjunct's TYPE separates them, and `find_time_refs` already
+identifies the type:
+
+| | trailing conjunct is | verdict |
+|---|---|---|
+| `walk the dog at 9 and 2:30` | only a TIME | split |
+| `meeting with Sam and Alex at 8` | a NAME | keep |
+| `buy milk and eggs` | an OBJECT | keep |
+
+Today the verbless-conjunct tier keeps all three whole via "the right side has
+no content of its own". That guard is right for the last two and wrong for the
+first.
+
+**Expect the board to DROP when the gold is fixed and before the rule lands** —
+those five rows currently pass and will start failing. That is the gold getting
+more correct ahead of the code, not a regression.
+
+**Fallback if this is missed:** Gil, 2026-09-08 — if segmentation fails to split
+a multi-DAY enumeration, `decompose_validate` should read it as a recurrence
+rather than lose the second day. A degraded answer, but not a lost one.
+
+## 8.2 · The month can be severed from its ordinal
 
 Recorded rather than fixed, because the current job is wiring the engine
 together, not improving FastSeg (Gil, 2026-09-08). Each is a real case with a
@@ -470,21 +548,3 @@ because by then the month is already part of the title.
 > at all is correctly captured as `on the 20th` and correctly resolved
 > downstream to the next future 20th. Segmentation captures words; deciding
 > WHICH 20th is `decompose_validate`'s job and it already works.
-
-## 7 · Layout
-
-```
-segmentation/
-    ARCHITECTURE.md     this file
-    fastseg/            the deterministic half + invariant.py
-    llmseg/             the model half + prompts/
-    old_seg/            the SHIPPED stage, kept until Gil promotes the new one
-    datasets/           1,694 rows, train/test split by family
-    experiments/        scorer, boards, generator, and every study above
-```
-
-**`old_seg` is still the stage the engine runs.** FastSeg and LLMSeg are proven
-on their own dataset first, per STAGE ISOLATION mode; promotion is a separate,
-deliberate change. Note the coupling honestly: `fastseg` currently *imports*
-`old_seg` for `_kind_of` / `_enforce_pinned_kinds`, so the two are not yet
-independent.
