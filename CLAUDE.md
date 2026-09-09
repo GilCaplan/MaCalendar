@@ -179,6 +179,21 @@ filters out by default.
     pytest tests/integration          # needs Ollama; skips without it
     pytest tests/                     # what CI runs
 
+**Use the project venv — `./.venv/bin/python -m pytest`.** A bare `python` may
+be a pyenv shim without `astral`, `pytest` or spaCy, and the suite then reports
+collection errors and phantom failures that look like real regressions. This
+cost a wrong "15 tests were already failing" reading on 2026-09-09; the same
+suite was 1336-green on the venv.
+
+**⏸ CI IS PAUSED — turn it back on when the rebuild is done** (Gil,
+2026-09-09). `.github/workflows/tests.yml` is `workflow_dispatch:` only, so
+nothing runs on push while FastRule and LLMJudge are being rebuilt. **Restore
+the `push`/`pull_request` triggers once that work lands**, and fix the job if
+it is still red — the file carries the diagnosis. It was NOT paused for
+failing tests: the last runs died in *Install native libs*, before pytest ran,
+on `apt-get update` hitting a Hash Sum mismatch in the Chrome apt repo the
+runner image ships and this project never uses.
+
 Integration tests must skip when Ollama is not running — copy the `pytestmark`
 guard from `tests/integration/test_ollama_intent.py`. CI has no Ollama, so a
 test that fails instead of skipping turns the build red.

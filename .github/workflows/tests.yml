@@ -1,10 +1,34 @@
 name: Tests
 
+# PAUSED 2026-09-09 (Gil) — manual trigger only, for the duration of the
+# engine rebuild. Turn the push/pull_request triggers back on when FastRule
+# and LLMJudge are finished; CLAUDE.md carries the reminder.
+#
+# It was NOT paused because the tests fail. The suite is green locally
+# (1336 passed, 1 xfailed). The last two runs died in "Install native libs",
+# before pytest was ever reached:
+#
+#     E: Failed to fetch .../chrome-stable/deb/... Hash Sum mismatch
+#     E: Some index files failed to download.
+#     ##[error]Process completed with exit code 100
+#
+# That is a GitHub runner problem — `apt-get update` choking on the Chrome
+# apt repo the image ships, which this project neither needs nor installs.
+# The likely fix when re-enabling is to stop letting an unrelated repo fail
+# the build, e.g.
+#
+#     sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+#     sudo apt-get update
+#
+# Re-enable by restoring:
+#   on:
+#     push:
+#       branches: [main]
+#     pull_request:
+#       branches: [main]
+
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
   pytest:
