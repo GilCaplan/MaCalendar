@@ -38,22 +38,36 @@ accuracy is this stage's number.
 | `physio the end of the month` | `physio the end of the month` | `today` | **all of it** |
 | `standup every tuesday and thursday at 9` | `standup and` | `every tuesday thursday at 9` | the joiner leaked |
 
-## 2 · The unit of failure is the SPAN, and that is one fix, not two
+## 2 · There are exactly TWO failure modes, and every board is measuring one of them
 
-The invariant is `tokens(action) ∪ tokens(time)` covers every content token. So
-**under-detect the time and the remainder is forced into the action** — there is no
-third place for it to go. "Action polluted" and "time truncated" are the same event
-seen twice.
+Worth pinning down, because the boards name things in ways that invite
+double-counting:
 
-That is why the ablation's singles understate so badly (+14 and +55 against +205):
-fixing either field alone still fails the row, because the boundary is what is
-wrong. It also means the fix has ONE address — the time-span vocabulary — rather
-than one per symptom.
+**THE CUT — which ITEM a word lands in.** Board A: item count 84.5%, 110 rows
+under-split, 51 over-split. Board B's `NO-LOSS violations` (146 items, 415 tokens,
+136 rows) is **the same thing counted in tokens, not a third defect** —
+`_lost_tokens` compares a *matched* gold item against its *matched* predicted item,
+so a "loss" means those words reached a DIFFERENT item. 136 loss rows against
+110 + 51 mis-cut rows is the same population.
 
-**And it explains the downstream number completely.** Given `time="the 20th"` and
+> Checked directly rather than assumed: run FastSeg over all 1,040 train rows and
+> **0 content tokens of the transcript are lost**. The runtime invariant holds. The
+> board's label reads like deletion and is not.
+
+**THE SPAN — which FIELD a word lands in, inside one item.** `tokens(action) ∪
+tokens(time)` covers everything, so under-detecting the time **forces** the
+remainder into the action; there is no third place. "Action polluted" and "time
+truncated" are one event seen twice, which is why the ablation's singles understate
+so badly (+14 and +55 against **+205** together) — fixing either field alone still
+fails the row because the boundary is what is wrong.
+
+**The span explains the downstream number completely.** Given `time="the 20th"` and
 `action="book dentist of november"`, the resolver correctly resolves the 20th;
-November was never handed to it. No downstream work can recover that, which is why
+November was never handed to it, and no downstream work can recover it. That is why
 1,445 value errors attribute here.
+
+So Phase 1 works the SPAN and Phase 3 works the CUT, and no phase is aimed at
+board B's loss line — it will move when the cut does.
 
 ---
 
