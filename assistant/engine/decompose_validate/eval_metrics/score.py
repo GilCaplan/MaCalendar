@@ -84,6 +84,23 @@ def match_items(gold: list, pred: list, threshold: float = 0.5):
 # B · TRACEABILITY — the invariant, and this stage's analogue of no-invention
 # ---------------------------------------------------------------------------
 
+def _own_words(item: dict, text: str) -> str:
+    """The words THIS item is answerable for — its own time and action.
+
+    NOT the whole transcript. Both checks below asked the transcript at first,
+    and both threw false positives for the same reason the stage they measure
+    used to: in "book standup the 21st and yoga in two days", the `21st` belongs
+    to the FIRST item, so charging the second with it is charging an item for a
+    neighbour's words. Segmentation already decided who owns what; the checks
+    have to respect that or they measure segmentation, not this stage.
+
+    `text` is still accepted and used as a fallback for an item that carries no
+    time of its own, where the transcript is all there is.
+    """
+    own = f"{item.get('time') or ''} {item.get('text') or ''}".strip()
+    return (own or (text or "")).lower()
+
+
 def untraceable(item: dict, text: str, today: str) -> list:
     """Values the words cannot support. Empty list = every value is grounded.
 
@@ -97,7 +114,7 @@ def untraceable(item: dict, text: str, today: str) -> list:
     number appears in the text is fine.
     """
     out = []
-    tl = (text or "").lower()
+    tl = _own_words(item, text)
 
     date = item.get("date")
     if date and date != today:
@@ -113,8 +130,9 @@ def untraceable(item: dict, text: str, today: str) -> list:
             says_dom = re.search(rf"\b{d.day}(?:st|nd|rd|th)?\b", tl) is not None
             says_month = d.strftime("%B").lower() in tl
             says_relative = re.search(
-                r"\b(tomorrow|tonight|today|next|this|coming|in \w+ (?:day|week|month)|"
-                r"week from|christmas|new year|every|each|weekend)\b", tl) is not None
+                r"\b(tomorrow|tonight|today|next|this|coming|"
+                r"in \w+ (?:day|week|month)s?|\w+ (?:day|week|month)s? from|"
+                r"christmas|new year|every|each|weekend)\b", tl) is not None
             if not (says_weekday or says_dom or says_month or says_relative):
                 out.append(f"date {date} unsupported by the words")
 
@@ -157,6 +175,7 @@ def contradictions(item: dict, text: str, today: str) -> list:
     real traffic where no labels exist — which is what makes them worth having
     separately from the value board."""
     out = []
+    tl = _own_words(item, text)
     st, en = item.get("start_time"), item.get("end_time")
     if st and en and str(en) <= str(st):
         out.append(f"end {en} is not after start {st}")
@@ -182,7 +201,7 @@ def contradictions(item: dict, text: str, today: str) -> list:
             pass
 
     # The words name a day-of-month; the resolved date must use it.
-    m = re.search(r"\bthe (\d{1,2})(?:st|nd|rd|th)\b", (text or "").lower())
+    m = re.search(r"\bthe (\d{1,2})(?:st|nd|rd|th)\b", tl)
     if m and date:
         try:
             if dt.date.fromisoformat(date).day != int(m.group(1)):

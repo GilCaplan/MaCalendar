@@ -94,6 +94,13 @@ def _gold_item(spec: dict, binding: dict, anchor: dt.date, transcript: str = "")
             continue
         got = _norm_for(slot, raw, anchor, transcript)
         if got is None:
+            # A slot that SHOULD normalize but did not is a hole in the table,
+            # and emitting the item anyway would put `None` in gold — teaching
+            # "no time was said" for a sentence that says one. Drop the row and
+            # let --report name the filler, the same treatment as AMBIGUOUS.
+            if slot.rstrip("23") in ("date", "query_range", "time", "time_range",
+                                     "recurrence", "lead_time", "qty"):
+                return None
             continue
         if got is N.AMBIGUOUS:
             return None
