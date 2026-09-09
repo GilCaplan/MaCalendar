@@ -302,6 +302,79 @@ utterances, which is evidence of what people SAY, not of what the dataset should
 weight. Four traps of a dozen rows each is the right size; matching corpus
 frequency would rebuild the dataset around am/pm spellings.
 
+## 3c · Is the dataset SOUND? Audited 2026-09-09 — yes, with three defects
+
+Asked before building against it, because a dataset defect is invisible in every
+number computed from it.
+
+**It is sound where soundness is hard**, which is the part that cannot be fixed
+later:
+
+| check | result |
+|---|---|
+| rows | 1,694 — 1,554 generated + 140 hand-written |
+| split | 1,040 train / 654 sealed |
+| families | 314, and **0 leak across the split** |
+| duplicate texts appearing in BOTH halves | **0** — so no leakage that family-disjointness would miss |
+| duplicate texts with DISAGREEING gold | **0** — no contradictory labels |
+| gold INVENTING content the text lacks | **0 rows** |
+| family concentration | max 6 rows, median 6 — no family dominates |
+| trap coverage | 44 traps, only 2 with ≤4 rows |
+| ask-count spread | 1-ask 978 · 2-ask 604 · 3-ask 110 · 4-ask 2 |
+
+### Defect 1 — 15 incoherent gold items (9 train, 6 test)
+
+The generator pairs a `{date}` filler with a `{time}` filler that contradicts it:
+
+    "project sync tonight at 9 in the morning"        time='tonight at 9 in the morning'
+    "...town hall on the calendar this evening..."    time='this evening at 9 in the morning'
+    "...sales call ... this afternoon at 9 ..."       time='this afternoon at 9 in the morning'
+
+Two halves of the day inside one item's time. Nobody says these, and a row whose
+gold is itself incoherent cannot teach a correct boundary — the same defect class
+already fixed in decompose_validate's generator (`_incoherent()`), and the same fix
+applies: refuse the pairing and let the generator try another filler.
+
+**The 6 in TEST must be fixed too, and that is not a leakage violation.** Auditing
+whether gold is CORRECT is not reading test failures to direct a fix. Left alone, a
+wrong gold in the sealed half depresses the sealed number permanently with no way
+to diagnose it — which is the one thing the sealing rule cannot protect against.
+
+### Defect 2 — 14 rows where GOLD loses content, and it is a spec question
+
+All of them are tag questions, and gold drops the discourse tail:
+
+    "cross off take out the trash does that seem right"   loses: does, seem, right
+    "move the dentist to friday at ten is that ok"        loses: is
+    "cancel yoga on thursday does that work"              loses: does, work
+
+Dropping the tail is arguably the RIGHT product behaviour — "does that seem right"
+is not part of the command — but the invariant says gold covers every content
+token, so as written gold violates it. This is the `tag-question` trap sitting at
+**0.0%**: gold drops the tail, FastSeg keeps it, and neither is wrong by its own
+rule.
+
+**Needs a ruling, not a patch.** Either the invariant gains an explicit exemption
+for discourse tails (and `invariant.py`'s stop-word set is where it would live), or
+gold keeps them. Until then the trap measures a disagreement about the spec rather
+than a defect in the code.
+
+### Defect 3 — 21 duplicate texts
+
+Harmless: no cross-split pair, no gold disagreement. Worth de-duplicating for
+tidiness, worth nothing for accuracy.
+
+### The coverage gap — see §3b
+
+Four pattern classes with **zero rows**. That is the only place new rows are
+needed; classes 1–8 of the census are already present and adding rows to them would
+measure nothing new.
+
+### So: 29 rows of content defect out of 1,694 (1.7%)
+
+The dataset does not need rebuilding. It needs a coherence guard in the generator,
+one ruling on discourse tails, and four traps' worth of new rows.
+
 ## 4 · The rules that keep this from becoming convoluted
 
 The stage's shape is good and the work must not change it.
