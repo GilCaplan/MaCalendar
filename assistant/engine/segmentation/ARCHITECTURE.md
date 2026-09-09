@@ -539,21 +539,46 @@ more correct ahead of the code, not a regression.
 a multi-DAY enumeration, `decompose_validate` should read it as a recurrence
 rather than lose the second day. A degraded answer, but not a lost one.
 
-### Live evidence, 2026-09-08
+### Live evidence, measured end to end (2026-09-09)
 
-Measured end to end through the real engine, `"walk the dog at 9 and 2:30"` is
-wrong in BOTH configurations of the stage below it:
+`"walk the dog at 9 and 2:30"` produces this from THIS stage:
 
-| decompose_validate's legacy splitter | result |
-|---|---|
-| enabled | `create_todo 'walk the dog'` **plus** `create_event 'Untitled Event'` at 14:30 |
-| disabled | one `create_event` titled `'dog'` at 14:30 — the 9 o'clock is lost entirely |
+    [('walk the dog and', 'today at 9 2:30', 'task')]
+       ^^^^^^^^^^^^^^^^^^         ^^^^^^^^^^
+       the joiner leaked          TWO clocks, one item
 
-Neither is the two events the sentence names, and note that the downstream stage
-cannot fix it either way: with one item it has one item's words, and with a
-garbage title it has a garbage title. **This is the argument for fixing the split
-here** rather than compensating for it later — §8.1's five gold rows are the same
-defect seen from the dataset side.
+and the engine then commits `create_todo 'walk the dog'` **plus**
+`create_event 'Untitled Event'` at 14:30 — neither of the two events the sentence
+names.
+
+**Isolate it and the blame is unambiguous.** The single case is flawless, so
+nothing downstream is at fault:
+
+| said | items | committed |
+|---|---|---|
+| `walk the dog at 9` | `[('walk the dog', 'today at 9', 'task')]` | event, 9–10 AM ✓ |
+| `walk the dog at 2:30` | `[('walk the dog', 'today at 2:30', 'task')]` | event, 2:30–3:30 PM ✓ |
+| `walk the dog` | `[('walk the dog', 'today', 'task')]` | todo ✓ |
+| **`walk the dog at 9 and walk the dog at 2:30`** | two items | **two correct events** ✓ |
+| **`walk the dog at 9 and 2:30`** | **one malformed item** | **todo + `'Untitled Event'`** ✗ |
+
+The fourth row is the one that settles it: repeat the verb and the machinery
+handles it perfectly. So this is not a hard problem downstream — it is the CUT
+declining to split, and once one item carries two clocks no later stage can
+recover, because one item is all the words it has.
+
+### TWO defects here, and they are independently fixable
+
+**(a) The joiner leaks into the action.** `'walk the dog and'` is wrong on any
+reading — "and" belongs to neither the action nor the time. This is a bug even if
+the keep-decision stands, and it is the smaller of the two.
+
+**(b) The keep-decision itself.** §2 Phase 1 lists this sentence as a deliberate
+KEEP ("nothing is left on the right"), and that is the rule §8.1 says is wrong: a
+bounded enumeration of times must SPLIT. Note the tension is real rather than an
+oversight — the same rule correctly keeps `take the tablets at noon and at six`
+whole, so the fix has to distinguish an enumeration of times for ONE action from
+a decoy, not simply drop the condition.
 
 ## 8.2 · The month can be severed from its ordinal
 
