@@ -1,5 +1,10 @@
 # LLMJudge
 
+**`PLAN.md` is what is coming to this stage (2026-09-09)**: `Gatekeeper` moves here
+from FastRule and becomes prompt CONTEXT rather than a veto, and the per-item LLM
+fallback moves here too — because FastRule's job is only `Item -> object`, and *"if
+there's an issue it tells the LLMVerify"* (Gil). This file is how it works today.
+
 **The last check before anything is committed.** Formerly `crosscheck`.
 
 Designed so the model does the job it is good at (extraction) and deterministic

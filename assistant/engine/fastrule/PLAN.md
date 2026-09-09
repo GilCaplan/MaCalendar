@@ -62,64 +62,58 @@ GUI and server each with their own parser. The fix is to stop asking it about ti
 returns nothing scores zero confidence by construction — so this is where that mass
 most plausibly sits. Step 1 below measures it before anything is moved.
 
-## 2b · Three more mismatches, all downstream of the same cause
+## 2b · It does FOUR jobs; three are other components' (Gil, 2026-09-09)
 
-**`Atomicity` belongs to the front door.** `FastRule` carries a component asking
-*"one item or several?"* — segmentation's question, and meaningless to a caller
-whose contract says the item is atomic. It is there because one class serves two
-jobs, and which contract you are in is decided by a string comparison:
-`item.text.strip() != state.text.strip()`.
+> *"FastRule's job is only to take each Item and make it into an object format the
+> software/system [accepts] so we can commit when ready."*
 
-| caller | input | bar | needs Atomicity? |
-|---|---|---|---|
-| `fast_propose` | the WHOLE command | `RULE_THRESHOLD` | **yes** — it is the fast track's admission test |
-| `_parse_item` | ONE item | `SUBITEM_RULE_THRESHOLD` | no — atomic by contract |
+Measured against that, of ~890 lines in `fastrule.py` + `objects.py`:
 
-**The board measures the front door.** `fastrule_shape.py` feeds whole dataset
-rows, so the atomic-item executor is scored as a whole-command executor with 1,399
-non-atomic rows reported as "diagnostic". That section exists only because the two
-jobs share a class.
+| what it does | lines | whose |
+|---|---:|---|
+| **copy the Item's values onto the object** (`_apply_slots`) | **11** | ✅ **FastRule's** |
+| read operation · title · attendees · target | ~90 | ✅ FastRule's |
+| build the object per item (`run`, `_event_fallback`, `_kind_for`) | ~135 | ✅ FastRule's |
+| parser + registry plumbing | ~50 | ✅ needs it |
+| `Atomicity` — *"one item or several?"* | ~100 | ❌ **segmentation's** question |
+| `Gatekeeper` + `_which_store_holds` + `_names_something_real` | ~118 | ❌ **LLMJudge's** (Gil) |
+| the LLM fallback — `_parse_item`'s model half, `_honour_refusal`, `_grounded_title`, `_guard_inventions`, `_llm_trace` | ~150 | ❌ **LLMJudge's** (Gil) |
+| `fast_propose` + `Scorer` — whole-command instant commit | ~55 | ❌ a COMMIT decision |
+| `stage.run` → `decompose_validate.run_objects` | 2 | ❌ that stage's rules |
 
-**DEFER goes to LLMJudge**, and the reason class is the contract it reads:
-`REFUSAL` must not be overturned, `STRUCTURE` means split further, `INCAPACITY`
-means take over with the partial parse. That part is already right and should not
-be touched.
+**~423 of ~890 lines belong somewhere else.** And the function doing the job the
+stage exists for is **eleven lines** that copy **two of eight** available values
+(`reminder_minutes`, `quantity`) — defensively, as a "hint", and only when the
+intent has nothing there already. It never copies `date`, `start_time`, `end_time`,
+`recurrence`, `recur_days` or `recur_until` at all.
 
----
-
-## 2c · The restructure
+## 2c · What FastRule becomes
 
 ```
-   BEFORE                                  AFTER
-
-   fast_propose ─┐                         fast_track.propose(state)
-                 ├─► FastRule.run(TEXT)      └─ Atomicity   (admission test)
-   _parse_item  ─┘   ├─ Atomicity            └─► FastRule.build(item)
-                     ├─ Gatekeeper
-                     ├─ Scorer             objects.run(state)   List[Item]
-                     └─ re-parses               └─► FastRule.build(item)
-                        EVERYTHING                    ├─ COPY the slots
-                                                      ├─ operation · title ·
-                                                      │  attendees · target
-                                                      ├─ Gatekeeper
-                                                      └─ Scorer → object | DEFER
+    List[Item]  ──►  for each Item:
+                       1. COPY item.slots onto the object   (all 8 values)
+                       2. read the ACTION words for
+                          operation · title · attendees · target
+                       3. can't build it?  ──►  DEFER(reason)  ──►  LLMJudge
+                     ──►  List[object], ready for whoever commits
 ```
 
-**`FastRule.build(item) -> object | DEFER`**
+Nothing else. No model call, no atomicity test, no veto, no commit decision.
 
-1. **Copy** what `item.slots` already holds — never re-derive it.
-2. **Read the action words** for the operation, title, attendees and target. This
-   is the rule parser's real job and it keeps it.
-3. **Gatekeeper** — is this a reading that must not execute? (unchanged)
-4. **Scorer** — confident enough? (unchanged) Otherwise DEFER, to LLMJudge.
+**Where each removed piece goes, and why there:**
 
-`Atomicity` moves to `fast_track.py`, where the item does not exist yet and *"is
-this one ask?"* is the right question.
+| moves | to | because |
+|---|---|---|
+| `Atomicity` | the FAST TRACK (`fast_track.py`) | at the front door there is no Item yet, so *"is this one ask?"* is exactly the right question. In the deep track the item is atomic by contract, so the test is dead weight |
+| `Gatekeeper` + its two DB helpers | **LLMJudge**, as prompt CONTEXT (Gil) | it is a *reading* judgement — "this would execute the wrong thing" — and the model is the thing that can resolve it. As a veto it could only refuse; as context it can be answered |
+| the LLM fallback + its guards | **LLMJudge** | Gil: *"if issue it tells the LLMVerify."* FastRule reports `DEFER(INCAPACITY)` and carries its partial parse; the model call happens where the model lives |
+| `fast_propose` + `Scorer` | the fast track / orchestrator | "confident enough to COMMIT?" is a commit decision. FastRule builds; something else decides when to write |
+| the `run_objects` call | `decompose_validate` | already its own stage's finish line |
 
-**The fallback path stays**, and matters: at the FRONT DOOR segmentation has not
-run, so there are no slots and the parser must read everything. That is one code
-path with two inputs, not two implementations — `build` uses slots when they are
-there and parses when they are not.
+**What is left is small and testable on its own**: a pure function from one `Item`
+to one object, with no model, no database, and no opinion about whether to commit.
+That is what makes it measurable against its own task — which is the other half of
+what this restructure is for.
 
 ## 3 · Order of work
 
@@ -127,9 +121,10 @@ there and parses when they are not.
 |---|---|---|
 | 1 | **Measure the ceiling** — of the 573 `below-threshold` deferrals, how many carry slots the parser failed to read | a number before a refactor. If it is small, the converter is not the lever and this order changes |
 | 2 | `FastRule.build(item)` — COPY the slots, parse only operation/title/people/target | the substance; everything else is arrangement |
-| 3 | Split `fast_track.py` out, move `Atomicity` into it | now safe, because `build` no longer needs it |
-| 4 | Two boards | measure each contract on its own question |
-| 5 | `guards.py` | tidying, last, no behaviour change |
+| 3 | Move `Atomicity` to `fast_track.py` | safe once `build` no longer needs it |
+| 4 | Move `Gatekeeper` + the LLM fallback to **LLMJudge** | the biggest move, and it changes a STAGE BOUNDARY — so it goes after the converter works, never beside it |
+| 5 | Two boards | measure each contract on its own question |
+| 6 | Delete what is now dead | `_honour_refusal` and the invention guards go with the model call |
 
 ### The values are computed TWICE today, and this plan is what fixes it
 
