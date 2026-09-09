@@ -383,6 +383,50 @@ for discourse tails (and `invariant.py`'s stop-word set is where it would live),
 gold keeps them. Until then the trap measures a disagreement about the spec rather
 than a defect in the code.
 
+### Gil's rulings on the three discourse classes (2026-09-09)
+
+**A · tag questions — IGNORE the tail, one action.** *"these are to ignore, nothing
+to do with them… just leave as one action, that's what segmentation [is for]."*
+Done: `strip_discourse_tail` in `invariant.py`, called by FastSeg at its own entry
+so the guard and the segmenter cannot disagree. `cross off take out the trash does
+that seem right` → one item, `cross off take out the trash`.
+
+> **And an open DESIGN question he raised with it:** *"perhaps there should be tag
+> for other, meaning it's not event/task/review."* A fourth tag value for words
+> that are none of the three. Not implemented — `tag` is part of the frozen `Item`
+> contract and the next stage is built on three values, so this is a contract
+> change to decide deliberately, not a patch. See defect C below, which is the
+> case that would use it.
+
+**B · greetings — confirmed.** *"standup is the action, 9 is the time."* So `hey`
+is noise and the decomposition is otherwise right. `hey`/`hi`/`hello`/`could` added
+to `_STOP` as plain function words.
+
+**C · enumeration headers — the COUNT IS IMPORTANT, so gold is wrong here.**
+*"well the two tasks part is important."*
+
+    "two tasks due tomorrow buy groceries and return the book"
+    gold drops: two, tasks
+
+That reverses the reading in §3c. It is **not** discourse to be ignored: `two
+tasks` states how many items the sentence contains, which is exactly the fact the
+CUT is trying to get right — a header that says "two" is free supervision for the
+item count, and throwing it away discards the strongest signal in the row.
+
+So the invariant is right to flag it, and the **gold** is the thing to fix. The
+open question is WHERE the count goes, because it belongs to neither item's action:
+
+| option | cost |
+|---|---|
+| keep it in the first item's action | makes `two tasks due tomorrow buy groceries` a title |
+| a new field on `Item` (`count_hint`) | a contract change, and the next stage is built on the current shape |
+| its own item with a fourth tag (Gil's idea from A) | the two questions turn out to be one question |
+
+Left unimplemented on purpose: all three are contract-level, and the third is the
+one that makes A and C the same decision. **5 rows** are affected, so nothing is
+urgent — but the trap `enumeration-header` sits at 0.0% and will stay there until
+this is answered.
+
 ### Defect 3 — 21 duplicate texts
 
 Harmless: no cross-split pair, no gold disagreement. Worth de-duplicating for
