@@ -13,7 +13,7 @@ stage copies the mechanism and records its own numbers.
 | stage | dataset | split unit | test rows | mechanism |
 |---|---|---|---|---|
 | **FastRule** | `fastrule_7200.jsonl` | pattern family | 2,400 | stratified 80/20 + `force_split: "test"` |
-| **decompose_validate** | `datasets/generated.jsonl` | pattern family | *being built (2026-09-08)* | existing families are train-only by construction; new families carry `split` |
+| **decompose_validate** | `datasets/generated.jsonl` | pattern family | 840 (21 families) | growth: the 268 original families are train **by construction**; 49 grown families split 40/60, stratified by nuance |
 | **Segmentation** | `datasets/generated.jsonl` | pattern family | sealed half (289 rows) | — |
 
 **Why an existing dataset cannot simply be cut in half.** decompose_validate's

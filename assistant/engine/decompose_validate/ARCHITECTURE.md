@@ -77,11 +77,59 @@ everywhere instead of being guessed per sentence.
 
 ## Datasets and boards
 
-    datasets/normalization.py   the gold's CLOSED LOOKUP TABLE — every filler, by hand
-    datasets/generate.py        composes gold items from segmentation's own templates
-    datasets/generated.jsonl    795 rows / 1,186 items / 268 families / 5 anchors
-    eval_metrics/score.py       the boards + a 12-check self-test
-    eval_metrics/run_board.py   run the resolver over the set and print them
+    datasets/normalization.py      the gold's CLOSED LOOKUP TABLE — 248 fillers, by hand
+    datasets/generate.py           composes gold items from segmentation's own templates
+    datasets/banks/grown_*.json    THIS stage's own families and filler pools
+    datasets/generated.jsonl       2,764 rows / 3,637 items / 317 families / 16 anchors
+    eval_metrics/score.py          the boards + a 12-check self-test
+    eval_metrics/run_board.py      --split train (default, full detail) | test (aggregates)
+
+### The split — train 1,924 / test 840
+
+Per `engine/TRAIN_TEST_SPLIT_CONVENTION.md`, and the reason it had to be built by
+GROWTH rather than division is worth keeping:
+
+> The original 268 families were tuned against until the board read 100%. A test
+> set carved out of them measures memorisation, not generalisation. The only
+> honest sealed half is made of material the code has never seen.
+
+|  | rows | families | source |
+|---|---:|---:|---|
+| train | 1,924 | 296 | the 268 original (train **by construction**) + 28 grown |
+| test | 840 | 21 | grown only — never mined, never printed |
+
+Family-disjoint and **asserted, not assumed**: `build()` raises if a family
+appears on both sides, and raises if an original family ever reaches test.
+Stratified by nuance over a stable hash so no construction class lands entirely on
+one side — all 11 grown buckets have families in both.
+
+`run_board` defaults to `--split train`. `--split test` prints aggregates only,
+and there is deliberately **no flag that unlocks test row detail** — the safe path
+is the default path.
+
+Two filler banks, for a load-bearing reason: the grown pools live here rather than
+in `fastrule/datasets/banks/`, because editing that file would reshuffle
+FastRule's own 7,200-row split, and widening a pool the original families draw
+from would change which filler each existing row picks.
+
+The 16 anchors are chosen for the arithmetic they break — a leap day, a year end
+and start, a 31st, two month ends, and the five weekdays the original five never
+covered (they are Tue/Sun/Wed/Sun/Thu, so no Monday, Friday or Saturday anchor
+existed at all).
+
+### Where the growth came from — mined, not invented
+
+11,932 corpus texts (the sealed 300 excluded, and the exclusion asserted
+non-empty before mining) scanned for time expressions and diffed against the gold
+table. The dataset grew where real speech actually lives: `"march 5th"` occurs
+**147x** and named months were barely tested; `"morning"` / `"evening"` /
+`"afternoon"` occur **484 / 335 / 233x** and the gold declines all three.
+
+Every new value is adjudicated from the **written conventions**, never from what
+`resolve.py` returns. Two entries stopped being `AMBIGUOUS` by *derivation*:
+`the end of the month` (CLAUDE.md already rules that "the end of September" names
+the final day) and the four bare ranges (the bare-hour convention fixes the start,
+`end_before_start` then forces the end — "from 6 to 8" cannot be 18:00–08:00).
 
 **The gold and the code are deliberately different implementations.**
 `normalization.py` is a closed table; `resolve.py` is a general parser. Copying
@@ -122,31 +170,61 @@ value is a miss. B2's counts only gold. When the two disagree — `45/48` agains
 paid for by one that helps elsewhere; that is the over/under-split precedent from
 segmentation.
 
-### Where it stands
+### Where it stands — 2026-09-08
 
-Board, generated set (795 rows / 1,186 items, **gold-fed items** so segmentation
-is not charged), 2026-09-08:
+**Gold-fed items**, so a segmentation slip is never charged here.
 
-    all fields exact (row)     100.0%  (795/795)
-    date 100% · start_time 100% · end_time 100% · recurrence 100%
-    quantity 100% · reminder_minutes 100%
-    inventions 0 · phrases lost 0 · contradictions 0 · harm/item 0.000
-    0 model calls · 0.000 s/row
+| | train (1,924 / 296 fam) | **sealed test (840 / 21 fam)** |
+|---|---|---|
+| all fields exact (row) | 99.9% (1922/1924) | **97.1% (816/840)** |
+| date | 100% | 98.6% |
+| start_time | 99.9% | 98.8% |
+| end_time | 100% | **100%** |
+| recurrence | 100% | **100%** |
+| quantity | 100% | **100%** |
+| reminder_minutes | 100% | **100%** |
+| inventions · lost · contradictions | 0 · 0 · 0 | **0 · 0 · 0** |
+| harm / matched item | 0.002 | 0.067 |
+| cost | 0 model calls, 0.000 s/row | same |
 
-**This board is SATURATED and has stopped being an instrument.** 100% on a
-generated set means the resolver covers every pattern the generator emits — that
-is not evidence about real speech, and there is **no held-out number for this
-stage**: the split does not exist yet and one carved now would not be held out,
-because the resolver was tuned against all 268 families. The next measurement has
-to come from a different source: real utterances, and real segmentation output
-instead of gold-fed items.
+**Generalisation gap: 2.8 points** — the first held-out number this stage has ever
+had. Test has been read twice, aggregates only; no test row has been read or
+mined, and every fix was directed from train diagnostics.
+
+> ### SCOPE: this measures DECOMPOSE, not validate
+>
+> Board G is validate's board and it still reports **"not run"** — it compares a
+> before-state to an after-state, and with no repair step there is no before.
+> `checks.py` does not exist yet, so **validate, the observance flag and the 15
+> conventions are unmeasured.** 97.1% must not be quoted as if it covered them.
+>
+> The gap is not cosmetic. `resolve.py` is deterministic per-item arithmetic;
+> validate is the half that needs the transcript, has to decide *not* to act, and
+> can damage an item that was already right. That is precisely why board G never
+> sums "improved" with "BROKE".
+
+### The saturation this replaced
+
+Before the growth the board read **100% (795/795)** and had stopped being an
+instrument: it measured only patterns the generator already emitted. Adding new
+constructions dropped it to **80.0%** immediately, which is the whole argument for
+growing a dataset rather than polishing against a saturated one. The original
+families now read 95.9% rather than 100% — improving the gold made those rows
+harder, so part of that 100% was a measure of what the gold declined to ask.
 
 ## What the boards caught, and what that cost
 
-Nine defects on the way from 88.3% to 100%. **Only five were in the code** — two
-were the board itself, one the gold, one the dataset. That ratio is the lesson
-worth keeping: read the failing ROWS, because a metric moving sharply against a
-change is as likely to be wrong as the change is.
+**23 defects fixed on this stage so far, and only 14 were in the code** — 6 were
+the boards, 2 the gold, 1 the dataset. That ratio is the lesson worth keeping:
+read the failing ROWS, because a metric moving sharply against a change is as
+likely to be wrong as the change is.
+
+The board bugs all had one shape: **the check knew a single spelling of the
+truth.** It had never heard of "twice a week", so 115 correct recurrences were
+reported as invented; it demanded a bare `9` from `"09:30"`; it looked for "six"
+in `"twenty to seven"` (a *to*-hour is one MORE than the hour it resolves to); it
+wanted the digits of an end time derived from a duration to appear in words that
+cannot contain them; and it treated a series' derived start date as an invention.
 
 The two board bugs both had the same shape — the check knew **one spelling of
 the truth**. A digits-only search for the hour called 26 correct answers
@@ -165,12 +243,28 @@ No family was lost: the generator retried other anchors, so all 268 remain.
 
 | piece | state |
 |---|---|
-| `resolve.py` — the decompose half | **done**, 100% on the generated set |
-| `datasets/` + `eval_metrics/` | **done**, 9 boards, self-test green |
-| `checks.py` — the validate half | **next** |
+| `resolve.py` — the decompose half | **done**, 99.9% train / 97.1% sealed |
+| `datasets/` + `eval_metrics/` | **done**, 9 boards, self-test green, split sealed |
+| `checks.py` — the validate half | **next** — board G cannot run until it exists |
 | the observance **flag** | not built — replaces the old block |
 | wiring into `stage.py` | not done; the legacy `decompose.py`/`validate.py` still run |
 | deleting `run_objects` | the finish line |
+
+## Open questions for Gil — both real product gaps, neither guessed at
+
+**1. Coarse parts of the day.** `"morning"`, `"afternoon"`, `"evening"`,
+`"night"`, `"lunchtime"` are the MOST frequent time words in the corpus (484 /
+233 / 335 / 52 / 122 occurrences) and the gold declines every one of them. Only
+`late afternoon` has a ruling (17:00–19:00, Gil 2026-09-08). They are marked
+`AMBIGUOUS` and their rows are dropped rather than resolved to a number nobody
+chose — so a large slice of real speech is currently untested and, in the live
+engine, unresolved.
+
+**2. A yearly cadence cannot be represented.** `"every year"` / `"annually"` /
+`"yearly"` (24x in the corpus) have no home in `daily|weekly|monthly`. Rounding to
+monthly fires eleven extra times a year, so the resolver DECLINES instead — which
+means an annual reminder currently gets no recurrence at all. The options are a
+fourth cadence, or a flag telling the speaker it was not booked as a series.
 
 `PLAN.md` holds the design record: what existed, the five reasons it was
 convoluted, the X3 field spec and what validate can do that segmentation cannot.
