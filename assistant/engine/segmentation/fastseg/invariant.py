@@ -24,7 +24,34 @@ _STOP = frozenset(
     # Disfluencies. Dropping "um" is not losing information, and counting it as
     # loss made 35 of the 66 content-loss rows noise — which would have sent
     # the next cycle chasing a splitter bug that does not exist.
-    + "um uh er hmm yeah yep okay ok so like oh".split())
+    + "um uh er hmm yeah yep okay ok so like oh".split()
+    # Greetings and politeness openers. Same argument as the disfluencies: they
+    # are about the ASKING, not about what is asked. "could" joins "can", which
+    # was already here.
+    + "hey hi hello could".split())
+
+#: A TRAILING CONFIRMATION is discourse ABOUT the command, not part of it (Gil,
+#: 2026-09-09): "cross off take out the trash does that seem right" asks for
+#: reassurance, and the command is the cross-off. Gold already drops these — this
+#: is what makes the invariant agree with gold instead of contradicting it.
+#:
+#: A PATTERN, deliberately not stop-words. The tokens involved are ordinary
+#: content elsewhere: "book work meeting", "turn right at the lights", "does the
+#: gym close at nine". Only the trailing whole phrase is discourse, so only the
+#: trailing whole phrase is exempt.
+_TAIL = re.compile(
+    r"[\s,]+(?:"
+    r"does\s+that\s+(?:seem|sound|look|work)(?:\s+(?:right|ok|okay|good|fine))?"
+    r"|(?:is|does)\s+that\s+(?:ok|okay|right|good|fine|work|alright)"
+    r"|(?:sounds?|seems?|looks?)\s+(?:right|good|ok|okay|fine)"
+    r"|am\s+i\s+right"
+    r")\s*[?.!]*$", re.I)
+
+
+def strip_discourse_tail(s: str) -> str:
+    """Drop a trailing confirmation question. Used by the invariant AND by
+    FastSeg, so the two cannot disagree about whether those words are content."""
+    return _TAIL.sub("", s or "").strip()
 
 #: SPEC.md: "an item with no time reference at all gets today". The default is
 #: therefore a legal value that is NOT expected to appear in the text, and the
@@ -34,7 +61,7 @@ DEFAULT_TIME = "today"
 
 
 def content(s: str) -> "set[str]":
-    return {w for w in re.findall(r"[a-z0-9']+", (s or "").lower())
+    return {w for w in re.findall(r"[a-z0-9']+", strip_discourse_tail(s).lower())
             if w not in _STOP}
 
 

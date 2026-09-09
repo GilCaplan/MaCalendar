@@ -487,7 +487,13 @@ def fastseg(text: str) -> "list[dict]":
     """text -> [{"action", "time", "tag"}, ...]"""
     from assistant.intent.cleanup import strip_spoken_noise
 
-    clean = strip_spoken_noise(text or "")
+    # A TRAILING CONFIRMATION is discourse about the command, not part of it
+    # (Gil, 2026-09-09) -- "cross off take out the trash does that seem right".
+    # Stripped HERE so it never enters the pipeline, and using the invariant's own
+    # function so the guard and the segmenter cannot disagree about whether those
+    # words are content. Safe before `cut` because the tail is at the end, so no
+    # earlier offset moves.
+    clean = _invariant.strip_discourse_tail(strip_spoken_noise(text or ""))
     pieces = cut(clean)
     return [{"action": a, "time": t, "tag": tag(a, t)}
             for a, t in assign_times(clean, pieces)]
