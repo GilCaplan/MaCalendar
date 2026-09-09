@@ -26,6 +26,7 @@ reading teaches that reading as fact.
 from __future__ import annotations
 
 import datetime as dt
+import re
 
 #: Marks a filler whose normalization is a product decision we have not made.
 #: Rows using it are EXCLUDED and reported, never guessed at.
@@ -301,12 +302,23 @@ BARE_HOURS = {
 #:
 #: If the CONVENTION itself is wrong, no board will say so — that is a human
 #: judgement, the same status as the date floor.
-_EVENING_WORDS = ("tonight", "this evening", "evening", "dinner", "supper",
-                  "drinks", "pm")
+#: A WORD-BOUNDED regex, not a substring list. As substrings, "pm" matched inside
+#: "4pm" -- so any sentence containing an explicit pm time made every bare hour in
+#: it evening. Combined with reading the whole transcript (fixed below) that let
+#: ONE item's "4pm" push a NEIGHBOUR's "8 o'clock" to 20:00.
+_EVENING = re.compile(r"\b(tonight|this evening|evening|dinner|supper|drinks|pm)\b")
 
 
-def resolve_time(filler: str, transcript: str = ""):
-    """-> "HH:MM" | AMBIGUOUS | None. Needs the sentence for a bare hour."""
+def resolve_time(filler: str, own_words: str = ""):
+    """-> "HH:MM" | AMBIGUOUS | None. Needs the ITEM'S OWN words for a bare hour.
+
+    `own_words` is this item's time plus its action — NOT the transcript. The
+    bare-hour convention says "7-8 is pm when evening words are present", and the
+    only evening words that can speak for an item are its own: in "team meeting
+    from 3 to 4pm and budget review at quarter to nine" the 4pm belongs to the
+    meeting, and letting it decide the budget review's hour is charging an item
+    for a neighbour's words — the bug class this whole stage was built to end.
+    """
     key = filler.strip().lower()
     if key in PART_OF_DAY_WINDOW:
         return PART_OF_DAY_WINDOW[key][0]      # the start; the end via window()
@@ -315,10 +327,10 @@ def resolve_time(filler: str, transcript: str = ""):
     if key not in BARE_HOURS:
         return None
     h, m = BARE_HOURS[key]
-    tl = (transcript or "").lower()
+    tl = (own_words or "").lower()
     if h <= 6:
         return f"{h + 12:02d}:{m:02d}"
-    if 7 <= h <= 8 and any(w in tl for w in _EVENING_WORDS):
+    if 7 <= h <= 8 and _EVENING.search(tl):
         return f"{h + 12:02d}:{m:02d}"
     return f"{h:02d}:{m:02d}"
 

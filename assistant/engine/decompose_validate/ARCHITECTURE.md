@@ -141,7 +141,8 @@ agree BY CONSTRUCTION about where an item's boundaries are — a
 decompose_validate score can never be quietly measuring a segmentation
 disagreement.
 
-The 5 anchors are chosen to make hard cases **reachable rather than hoped for**:
+The original 5 anchors were chosen to make hard cases **reachable rather than
+hoped for**:
 a mid-month Tuesday, a Sunday past the 15th (so "the 15th" must roll a month),
 a month end, December (so it must roll the year), and a short February.
 

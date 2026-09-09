@@ -125,7 +125,8 @@ def _norm_for(slot: str, value: str, anchor: dt.date, transcript: str = ""):
     if base in ("date", "query_range"):
         return N.resolve_date(value, anchor)
     if base == "time":
-        return N.resolve_time(value, transcript)
+        return N.resolve_time(value, transcript)   # `transcript` is the item's own
+                                                   # words here; see _gold_item
     if base == "time_range":
         return N.TIME_RANGES.get(value.strip().lower())
     if base == "recurrence":
@@ -174,7 +175,10 @@ def _gold_item(spec: dict, binding: dict, anchor: dt.date, transcript: str = "")
         raw = binding.get(slot)
         if raw is None:
             continue
-        got = _norm_for(slot, raw, anchor, transcript)
+        # THE ITEM'S OWN WORDS, not the row's. A bare hour reads evening words
+        # from the item that spoke it -- a neighbour's "4pm" must not move it.
+        got = _norm_for(slot, raw, anchor,
+                        f"{item['time']} {item['text']}")
         if got is None:
             # A slot that SHOULD normalize but did not is a hole in the table,
             # and emitting the item anyway would put `None` in gold — teaching
@@ -367,6 +371,10 @@ def main() -> None:
     ap.add_argument("--out", default=os.path.join(_HERE, "generated.jsonl"))
     ap.add_argument("--report", action="store_true")
     ap.add_argument("--no-write", action="store_true")
+    ap.add_argument("--accept-gold-change", action="store_true",
+                    help="permit rows to keep their text while their GOLD moves. "
+                         "Only for a deliberate correction to normalization.py — "
+                         "it is otherwise the signature of an accident.")
     a = ap.parse_args()
 
     rows, dropped = build(a.per_template)
@@ -385,11 +393,6 @@ def main() -> None:
                if r["id"] in old and json.dumps(
                    [r["text"], r["today"], r["gold"]], sort_keys=True) != old[r["id"]]]
     missing = sorted(set(old) - {r["id"] for r in rows})
-
-    if not a.no_write:
-        with open(a.out, "w") as fh:
-            for r in rows:
-                fh.write(json.dumps(r) + "\n")
 
     by_split = collections.Counter(r["split"] for r in rows)
     fam_split = {}
@@ -413,9 +416,21 @@ def main() -> None:
     # those families accept a different three. Same families, same constructions,
     # different fillers. What WOULD be a failure is a row whose text and anchor
     # are unchanged but whose GOLD moved — that is `changed`, and it is fatal.
+    if changed and not a.accept_gold_change:
+        raise ValueError(
+            f"{len(changed)} rows kept their text but changed gold, e.g. "
+            f"{changed[:5]}. If that is deliberate (a correction to "
+            f"normalization.py), re-run with --accept-gold-change; if not, it is "
+            f"an accident and the gold has drifted under the resolver.")
     if changed:
-        raise ValueError(f"{len(changed)} rows kept their text but changed gold: "
-                         f"{changed[:5]}")
+        print(f"   ACCEPTED: {len(changed)} rows kept their text and their gold "
+              f"moved — a deliberate gold correction")
+
+    if not a.no_write:
+        with open(a.out, "w") as fh:
+            for r in rows:
+                fh.write(json.dumps(r) + "\n")
+
     if old:
         print(f"   drift guard: {len(old) - len(missing)} rows identical to the "
               f"previous run, {len(missing)} replaced, 0 with moved gold")

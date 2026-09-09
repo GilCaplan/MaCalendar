@@ -659,6 +659,13 @@ def resolve(said: str, anchor: dt.date, context: str = "",
     # THE DATE FLOOR — segmentation's rule, applied identically here so the two
     # stages cannot disagree about it: the day defaults to today, the clock is
     # never invented.
+    # `date_floored` says the date is a DEFAULT rather than something the speaker
+    # said. Without it a caller cannot tell "today" from "no day named", and
+    # validate used the floored value as EVIDENCE — overwriting a date some other
+    # producer supplied with today, for any item whose words name no day. The
+    # board cannot see that bug: the gold applies the same floor, so both sides
+    # agree and the item scores correct.
+    out["date_floored"] = not out["date"]
     if not out["date"]:
         out["date"] = anchor.isoformat()
     return out

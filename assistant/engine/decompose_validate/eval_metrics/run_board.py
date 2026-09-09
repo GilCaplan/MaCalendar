@@ -26,7 +26,9 @@ import sys
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))))))
 sys.path.insert(0, _ROOT)
+from assistant.engine.decompose_validate import checks as C               # noqa: E402
 from assistant.engine.decompose_validate import resolve as R              # noqa: E402
+from assistant.engine.decompose_validate.datasets import perturb as P      # noqa: E402
 from assistant.engine.decompose_validate.eval_metrics import score as S    # noqa: E402
 
 _DATA = os.path.join(_ROOT, "assistant", "engine", "decompose_validate",
@@ -38,6 +40,12 @@ def main() -> None:
     ap.add_argument("--split", choices=("train", "test"), default="train")
     ap.add_argument("--samples", type=int, default=6,
                     help="example rows to print; forced to 0 for test")
+    ap.add_argument("--stage", choices=("decompose", "both"), default="both",
+                    help="'decompose' scores resolve.py alone; 'both' runs "
+                         "validate over its output too")
+    ap.add_argument("--perturb", action="store_true",
+                    help="INJECT defects into the gold and let validate repair "
+                         "them — this is what makes board G measurable")
     a = ap.parse_args()
 
     every = [json.loads(l) for l in open(_DATA)]
@@ -47,20 +55,42 @@ def main() -> None:
 
     by = {(r["text"], r["today"]): r for r in rows}
 
-    def predict(text, today):
-        anchor = dt.date.fromisoformat(today)
+    def decompose(row, anchor):
+        """resolve.py's answer for every item in the row."""
         out = []
-        for g in by[(text, today)]["gold"]:
-            v = R.resolve(g["time"], anchor, text, action=g["text"])
+        for g in row["gold"]:
+            # The item's OWN words as context, not the row's — the same rule the
+            # gold now follows, so a neighbour's "4pm" cannot move this item's
+            # bare hour.
+            v = R.resolve(g["time"], anchor, f"{g['time']} {g['text']}",
+                          action=g["text"])
             out.append({"kind": g["kind"], "text": g["text"], "time": g["time"],
                         "date": v["date"], "start_time": v["start_time"],
                         "end_time": v["end_time"], "recurrence": v["recurrence"],
+                        "recur_days": v.get("recur_days") or [],
                         "recur_until": v.get("recur_until"),
                         "quantity": R.resolve_quantity(g["text"]),
                         # lead time is a TIME slot, so it lives in `time`
                         "reminder_minutes": R.resolve_lead_time(g["time"]) or
                                             R.resolve_lead_time(g["text"])})
         return out
+
+    def predict(text, today):
+        anchor = dt.date.fromisoformat(today)
+        row = by[(text, today)]
+
+        # PERTURBED: start from the gold with a defect injected, so what is being
+        # measured is validate's repair rather than decompose's arithmetic.
+        # CLEAN: start from decompose's own output, which is the harder question —
+        # does validate damage work that was already right?
+        before = ([dict(x) for x in P.perturb_row(row)[0]] if a.perturb
+                  else decompose(row, anchor))
+        if a.stage == "decompose":
+            return before
+
+        after, fixes, flags = C.run(before, text, anchor)
+        return {"items": after, "before": before,
+                "fixes": len(fixes), "flags": len(flags)}
 
     samples = 0 if a.split == "test" else a.samples
     res = S.score_rows(rows, predict, samples=samples)
