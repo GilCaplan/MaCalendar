@@ -64,17 +64,23 @@ words minus the time, `time` is the time reference **as spoken** (never
 resolved), `tag` is `event | task | review`.
 
 **decompose_validate** — takes the items **and the transcript** (`X2`).
-`decompose` splits until each item is atomic and then COMPLETES it: the date and
-clock times resolved from its own `time`, recurrence rounded, quantity, lead
-time, attendees. `validate` then compares the completed items back against the
-transcript and fixes or blocks what does not hold.
+`decompose` RESOLVES — the date and clock times from the item's own `time`,
+recurrence and its bound, quantity, lead time. It never splits; segmentation
+already decided the boundaries. `validate` then compares the completed items
+back against the transcript, fixes what it can deterministically, and **FLAGS**
+what it cannot.
 
-X3 is therefore **complete or blocked, never half-built** — FastRule receives
-items with nothing left to re-read, which is why the transcript stops here.
-Every field must be TRACEABLE to the words: an unsupported date is an invention.
+**Flags, never blocks** (Gil, 2026-09-08). A blocked item is a command that
+silently did nothing; a flagged one is committed with a note the speaker can
+see and act on. The stage's job is to be honest about doubt, not to withhold.
 
-Not built that way yet — see `decompose_validate/PLAN.md` for what exists, why
-it is convoluted, and the order to fix it.
+X3 is therefore **complete, and honest about what it could not settle** —
+FastRule receives items with nothing left to re-read, which is why the
+transcript stops here. Every field must be TRACEABLE to the words: an
+unsupported date is an invention, and the board counts them.
+
+`decompose_validate/ARCHITECTURE.md` is the stage's own reference — the X3
+field list, the conventions, the boards and what they have caught.
 
 **FastRule** — turns items into objects that can be written. Rules first, a
 model only where they cannot decide, and a DEFER verdict that is a contract:
@@ -172,6 +178,7 @@ hidden:
 | | state |
 |---|---|
 | **LLMSeg** | off by default (`MACALENDAR_LLMSEG`). Measured net-negative four ways — §6. |
+| **`decompose_validate/resolve.py`** | built and scored (100% on its generated set, 0 model calls) but **not yet the wired path** — `stage.py` still runs the legacy `decompose.py`/`validate.py`. Wiring waits on `checks.py`, the validate half, so the stage is replaced once rather than half-swapped. |
 | **the loop** | `llmjudge.rewrite_for_retry` is a stub returning None, so no loop fires. The contract and its single call site are in place; the rewrite itself wants a model call grounded on `state.raw_text`. |
 
 **Why the loop is gated on a rewrite rather than just re-running.**
