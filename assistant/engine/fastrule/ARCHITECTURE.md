@@ -1,5 +1,9 @@
 # FastRule
 
+**`PLAN.md` is the restructure plan (2026-09-09)** — what to change, in what
+order, and the rules that keep this folder from becoming convoluted. This file is
+how it works today.
+
 **The ATOMIC-ITEM EXECUTOR.** Given one atomic item — a single event or task —
 it produces the object, in about 50 ms, with no model. The deep system is the
 **ATOMIZER**: it splits until items are atomic and then hands each one back
