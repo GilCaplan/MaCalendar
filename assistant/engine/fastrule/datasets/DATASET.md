@@ -9,9 +9,9 @@ serve as an unmined FastRule measurement — every rank had, at some point,
 had a human look at how FastRule did on it. Grown from 6,000 to 7,200 rows
 later the same day (Gil) with a test-only pool that widens unseen-wording
 coverage without touching a single train row — see "Growing test-only"
-below and `SPLIT.md`.
+below and `engine/TRAIN_TEST_SPLIT_CONVENTION.md`.
 
-**TEST ROWS ARE NEVER MINED — see `SPLIT.md` first.** That rule is the whole
+**TEST ROWS ARE NEVER MINED — see `engine/TRAIN_TEST_SPLIT_CONVENTION.md` first.** That rule is the whole
 point of the 80/20 split existing at all, and it applies identically to
 every row in `split == "test"` regardless of which pool (original
 stratified, or the newer forced-test-only growth) it came from. This file
@@ -24,7 +24,8 @@ is schema and composition, not the leakage discipline.
     banks/simple_patterns.json      202 single-intent pattern families (157 original + 45 test-only)
     banks/complex_patterns.json     316 nuance-targeting pattern families (260 original + 56 test-only)
     fastrule_7200.jsonl             the generated dataset — 7,200 rows, one JSON object per line
-    SPLIT.md                        how the split is built (80/20 + force_split), and the no-mining rule
+    ../../TRAIN_TEST_SPLIT_CONVENTION.md   how the split is built (80/20 + force_split), and the
+                                    no-mining rule — ENGINE-WIDE, every stage's dataset obeys it
     DATASET.md                      this file
 
 `scripts/gen_fastrule_dataset.py` is the only code involved: it reads the
@@ -36,7 +37,7 @@ regeneration is byte-identical (verified: `md5` of two consecutive runs
 matches, and — the load-bearing check for the 2026-09-07 growth — a
 from-scratch run of only the original 417 families reproduces the current
 file's 4,800 train rows exactly, full-JSON and text-only hashes both
-matching; see `SPLIT.md`).
+matching; see `engine/TRAIN_TEST_SPLIT_CONVENTION.md`).
 
 ## Why patterns + fillers, not 6,000 hand-written rows
 
@@ -93,12 +94,12 @@ One JSON object per line:
 
 - **`id`** — `<family>-<counter>`, counter zero-padded to 3 digits, stable
   and unique; regenerating produces the same id for the same row.
-- **`split`** — `"train"` or `"test"`. See `SPLIT.md`.
+- **`split`** — `"train"` or `"test"`. See `engine/TRAIN_TEST_SPLIT_CONVENTION.md`.
 - **`tier`** — `"simple"` (single-intent, wording-variety focused) or
   `"complex"` (nuance-targeting: compounds, decoys, edge cases).
 - **`family`** — the pattern skeleton's slug. This is what the stratified
   80/20 split is stratified over (`force_split` families are assigned
-  directly instead — see `SPLIT.md`), and what "no family > 3% of the
+  directly instead — see `engine/TRAIN_TEST_SPLIT_CONVENTION.md`), and what "no family > 3% of the
   total" is measured against (largest family in the current build:
   `c_and_te_6` at 17 rows / 0.24%).
 - **`expect.events` / `expect.tasks`** — how many NEW events/tasks the
@@ -290,7 +291,7 @@ checking a bank edit before committing to a regenerate).
 **Totals.** 7,200 rows, 7,200 unique texts, 518 pattern families (202
 simple + 316 complex). Train 4,800 (66.7%) / test 2,400 (33.3%). Largest
 family is 0.24% of the total, well under the 3% cap. Full mechanism and the
-train-invariance proof: `SPLIT.md`.
+train-invariance proof: `engine/TRAIN_TEST_SPLIT_CONVENTION.md`.
 
 **Before → after the 2026-09-07 test-only growth:**
 
@@ -395,14 +396,14 @@ needed.
 
 ## Growing test-only: `force_split`
 
-See `SPLIT.md` for the full mechanism, the exact numbers, and the
+See `engine/TRAIN_TEST_SPLIT_CONVENTION.md` for the full mechanism, the exact numbers, and the
 train-invariance proof. Short version: a family may declare
 `"force_split": "test"` and is then assigned directly to test, entirely
 bypassing the stratified 80/20's hash-based bucket assignment — so adding
 one can never reshuffle any *other* family's train/test side, and can never
 produce a train row (`build_forced_test()` in `scripts/gen_fastrule_dataset.py`
 asserts both). **These rows are eval-only, exactly like the rest of
-`split == "test"`** — the leakage rule at the top of `SPLIT.md` (test
+`split == "test"`** — the leakage rule at the top of `engine/TRAIN_TEST_SPLIT_CONVENTION.md` (test
 results are never mined) makes no distinction between the two test pools.
 Growing this pool is therefore always safe to do between measurement runs:
 it changes what generalization is measured against, never what the model is
@@ -440,7 +441,7 @@ or not), the current bank files (including `categories_fixture.json`), and
 wall-clock). Two consecutive runs produce byte-identical
 `fastrule_7200.jsonl` (verified via `md5` during construction of this
 dataset, and again — full-JSON and text-only hashes both — for the 4,800
-train rows specifically across the 2026-09-07 growth; see `SPLIT.md`). The
+train rows specifically across the 2026-09-07 growth; see `engine/TRAIN_TEST_SPLIT_CONVENTION.md`). The
 script also **self-verifies on every run** before writing: exact row
 count, all-unique texts, the stratified pool's own split fraction in [19%,
 21%], train count exactly the original 4,800, no `force_split` family
@@ -462,7 +463,7 @@ To extend the dataset: add a family to `banks/simple_patterns.json` or
 explicitly — see the module docstring and `validate_family()` in
 `scripts/gen_fastrule_dataset.py` for the placeholder-suffix convention that
 avoids two asks silently clobbering the same slot key), then regenerate.
-**Two ways to add a family, with different blast radii** (`SPLIT.md` has
+**Two ways to add a family, with different blast radii** (`engine/TRAIN_TEST_SPLIT_CONVENTION.md` has
 the full mechanism): a plain family joins the stratified 80/20 pool and
 *can reshuffle which existing families land in train vs test* (the
 stratified split is a function of full `(tier, action)` bucket membership),

@@ -1,4 +1,31 @@
-# The 80/20 split — how it's built, and the rule that protects it
+# Train / test splits — the engine-wide convention
+
+**This is the rule for EVERY stage's dataset, not just FastRule's.** Moved up
+here from `fastrule/datasets/SPLIT.md` (Gil, 2026-09-08) when a second stage
+needed it, because a leakage rule that lives inside one stage's folder reads as
+that stage's local habit instead of the standard it is.
+
+Two things are general and binding — the no-mining rule in the next section, and
+splitting by **pattern family** rather than by row. Everything after that is
+FastRule's *instantiation*: its numbers, its buckets, its generator. A new
+stage copies the mechanism and records its own numbers.
+
+| stage | dataset | split unit | test rows | mechanism |
+|---|---|---|---|---|
+| **FastRule** | `fastrule_7200.jsonl` | pattern family | 2,400 | stratified 80/20 + `force_split: "test"` |
+| **decompose_validate** | `datasets/generated.jsonl` | pattern family | *being built (2026-09-08)* | existing families are train-only by construction; new families carry `split` |
+| **Segmentation** | `datasets/generated.jsonl` | pattern family | sealed half (289 rows) | — |
+
+**Why an existing dataset cannot simply be cut in half.** decompose_validate's
+795 rows were all fitted against — the resolver was tuned until it scored 100%
+on them — so a split carved out of them now would be measuring memorisation, not
+generalisation. The only honest sealed half is built from material the code has
+never seen. That is what `force_split: "test"` is for, and it is why growth is
+the way to get a test set rather than division.
+
+---
+
+# FastRule's instantiation: the 80/20 split
 
 **Two pools make up `split == "test"` now (2026-09-07 growth): the original
 stratified 80/20's test slice (1,200 rows, 86 families) and a newer

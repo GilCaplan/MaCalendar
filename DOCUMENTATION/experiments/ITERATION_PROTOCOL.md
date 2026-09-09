@@ -41,7 +41,7 @@ improve.** Hypotheses come from the training pool's failures only. A test
 score may be REPORTED (to Gil, in RESULTS.md as a milestone line) but never
 ANALYZED for direction; if a test run disappoints, the response is more
 training-pool mining, never a peek at which test rows failed. The same rule
-binds the FastRule 6000 set's test half (SPLIT.md there). **The other 2,699 rows are the training pool**: mine them, train
+binds the FastRule 6000 set's test half (engine/TRAIN_TEST_SPLIT_CONVENTION.md there). **The other 2,699 rows are the training pool**: mine them, train
 on them, tune against them freely. dev-fast 250 / dev-full 600 remain the
 working slices inside that pool. The old "held-out 601–3000, aggregates
 only" rule is retired — the sealed 300 replace it.

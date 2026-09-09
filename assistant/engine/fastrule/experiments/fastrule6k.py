@@ -17,7 +17,7 @@ row, against `expect`:
 
 LEAKAGE GUARD, enforced here: --split test prints aggregates only — no row
 text, no per-family lines, no misses. Test mistakes are never mined
-(assistant/engine/fastrule/datasets/SPLIT.md; ITERATION_PROTOCOL.md).
+(assistant/engine/TRAIN_TEST_SPLIT_CONVENTION.md; ITERATION_PROTOCOL.md).
 """
 from __future__ import annotations
 

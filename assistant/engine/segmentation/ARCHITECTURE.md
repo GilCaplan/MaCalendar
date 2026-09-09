@@ -151,6 +151,40 @@ it gains tasks:
 
 A parser was tried here first and was much worse (65.0%) — see §6.
 
+#### Candidate, not yet tried: the logistic `kind` head (Gil, 2026-09-08)
+
+The engine already carries a trained **event/task classifier** —
+`classifier.py`'s `KindFeatures` + `LogisticModel`, weights in
+`intent/route_model_weights.json` — and FastRule consults it as a fallthrough
+tier. TAG is the same question, so it is worth measuring here instead of a
+hand-built reader plus a lexicon override.
+
+**What it would have to beat: 87.5% accuracy / 89.9% task recall** on the 1,383
+matched items above. Cheap enough to be worth the test — inference is a
+hand-written dot product over a float list, no ML dependency, well inside
+FastSeg's 0.002 s/row.
+
+Three things to get right before believing any number it produces:
+
+- **It has two classes; TAG has three.** `kind` is event/task, and `review` is
+  absent. The review test is deterministic and deliberately SHARED with LLMSeg
+  so the two cannot disagree about what a review looks like — so the shape to
+  test is *review pre-check first, then the head decides event vs task*, not a
+  three-class head.
+- **It was fitted on a different dataset** — `fastrule_7200.jsonl`'s train half.
+  Scoring it on segmentation's items is therefore a genuine cross-dataset
+  generalisation test, which is a point in its favour, but the two corpora
+  overlap in provenance (both are built from the same filler banks), so the
+  comparison must be run on segmentation's own held-out half or it will read
+  high for the wrong reason.
+- **Compare it against the RIGHT baseline.** Not the engine reader alone
+  (84.7%) — against reader + lexicon-over-`event` (87.5%), which is what ships.
+  Beating the weaker number would be a measurement artifact, and that is exactly
+  the mistake the table above exists to prevent.
+
+Not a design change: TAG's contract (`event | task | review`) is unchanged, and
+swapping the reader for a Component inside the stage is invisible to the trace.
+
 ---
 
 ## 3 · LLMSeg — the model half, **OFF BY DEFAULT**

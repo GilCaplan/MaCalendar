@@ -3,7 +3,7 @@
 under assistant/engine/fastrule/datasets/banks/. Currently 7,200 rows: the original 6,000-row
 stratified 80/20 pool (train 4,800 / test 1,200) plus a 1,200-row
 forced-test-only pool grown on top of it (Gil, 2026-09-07) — see
-`build_forced_test()` and assistant/engine/fastrule/datasets/SPLIT.md.
+`build_forced_test()` and assistant/engine/TRAIN_TEST_SPLIT_CONVENTION.md.
 
 WHY a generator instead of thousands of hand-written rows: the banks are the
 authored artifact (pattern SKELETONS + generic slot fillers); this script
@@ -37,7 +37,7 @@ Usage:
     python -m scripts.gen_fastrule_dataset --no-write  # verify-only dry run
 
 See assistant/engine/fastrule/datasets/DATASET.md for the schema and design rationale, and
-assistant/engine/fastrule/datasets/SPLIT.md for how the 80/20 train/test split is built and
+assistant/engine/TRAIN_TEST_SPLIT_CONVENTION.md for how the 80/20 train/test split is built and
 why TEST ROWS MUST NEVER BE MINED (Gil's ruling — see that file).
 """
 from __future__ import annotations
@@ -58,7 +58,7 @@ OUT = ROOT / "dataset" / "fastrule" / "fastrule_7200.jsonl"
 CATEGORIES_FIXTURE = BANKS / "categories_fixture.json"
 
 # Changing SEED changes every row's fillers and the split assignment — only
-# do it deliberately, and note the regen in SPLIT.md / DATASET.md.
+# do it deliberately, and note the regen in engine/TRAIN_TEST_SPLIT_CONVENTION.md / DATASET.md.
 SEED = "fastrule-6000-v1"
 
 SIMPLE_TOTAL = 2000
@@ -532,7 +532,7 @@ def build_forced_test(tier: str, patterns: list[dict], total: int, fillers: dict
     """Families with `force_split: "test"` — assigned directly, bypassing
     `stratified_split()`'s hash-based 80/20 entirely (that mechanism, and
     every row it produces for the ORIGINAL families, is untouched — see
-    `build_tier`). `total` is this pool's own row target (SPLIT.md), added
+    `build_tier`). `total` is this pool's own row target (engine/TRAIN_TEST_SPLIT_CONVENTION.md), added
     ON TOP of the tier's original SIMPLE_TOTAL/COMPLEX_TOTAL, not carved out
     of it — that's what keeps train exactly as it was."""
     for fam in patterns:
