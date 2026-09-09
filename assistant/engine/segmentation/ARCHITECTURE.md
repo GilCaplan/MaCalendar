@@ -138,16 +138,92 @@ deletes is decided later.
 
 ## 2 · FastSeg — the deterministic half
 
-No model. ~10 ms per command. Three phases, and the order is measured rather
-than chosen: DialogUSR (Findings of EMNLP 2022) reports Split → (Delete +
-Complete) beating the reverse by 9 exact-match points.
+No model. ~3 ms per command, 0 model calls over 1,051 rows. **Five phases**, and
+the order is measured rather than chosen: DialogUSR (Findings of EMNLP 2022) reports
+Split → (Delete + Complete) beating the reverse by 9 exact-match points.
 
 ```
-   text ──► 1 CUT ──► pieces ──► 2 ASSIGN TIME ──► 3 TAG ──► items
-                          ▲                │
-                          └────────────────┘
-                        both phases see the ORIGINAL string
+   text
+     |
+     v
+  +--------------------------------------------------------------+
+  |  0  CLEAN                                                    |
+  |     strip_spoken_noise      "um", "so", false starts         |
+  |     strip_discourse_tail    "...does that seem right"        |
+  +--------------------------------------------------------------+
+     |  clean
+     v
+  +--------------------------------------------------------------+
+  |  1  CUT            -> pieces (SUBSTRINGS of `clean`)         |
+  |     loop to a FIXED POINT, max 3 rounds:                     |
+  |       a. split_clauses + every_part_is_an_ask                |
+  |       b. _split_verbless_conjuncts                           |
+  |          both sides timed AND the right side has content      |
+  +--------------------------------------------------------------+
+     |  pieces
+     v                          .-------------------------------.
+  +----------------------------|  find_time_refs(clean)         |
+  |  2  ASSIGN TIME            |  every pattern, then LONGEST-  |
+  |     reads the pieces AND   |  FIRST, non-overlapping, with  |
+  |     the ORIGINAL string    |  the preposition absorbed left |
+  |                            '-------------------------------'
+  |     INTERIOR ref -> its own piece                            |
+  |     LEADING     -> fills a SLOT any piece left empty         |
+  |     TRAILING    -> only a piece with NO time at all          |
+  |     the DATE FLOOR: no day named -> "today"                  |
+  |     joined by SLOT CLASS (day, then clock), not by position  |
+  +--------------------------------------------------------------+
+     |  [(action, time), ...]
+     v
+  +--------------------------------------------------------------+
+  |  3  EXPAND ENUMERATIONS                                      |
+  |     one activity at SEVERAL times becomes several items      |
+  |     "at 9 and 2:30" -> "at 9" + "at 2:30", action COPIED     |
+  +--------------------------------------------------------------+
+     |  [(action, time), ...]
+     v
+  +--------------------------------------------------------------+
+  |  4  TAG          event | task | review | other               |
+  |     engine reader decides; then ONE-WAY vetoes over `event`  |
+  +--------------------------------------------------------------+
+     |
+     v
+   [ {action, time, tag}, ... ]
 ```
+
+**Why phase 3 is separate from phase 1**, which looks like it should be the cut's
+job: `cut` returns SUBSTRINGS and phase 2 maps each one back into `clean` by
+position (`_locate`). A synthesised piece — "walk the dog at 2:30", assembled from
+words that are not adjacent in the text — has nowhere to be located. On
+(action, time) PAIRS that constraint is gone, so the expansion happens after the
+mapping and `cut` stays the fixed-point loop it is.
+
+### The time-reference vocabulary — one table, eight kinds
+
+`_TIME_PATTERNS` is the single place a new time expression is taught, and **its
+order does not matter**: `find_time_refs` collects every candidate from every
+pattern and then takes them longest-first, non-overlapping. So `late afternoon`
+beats `afternoon` by being longer rather than by being placed above it. That was
+once a docstring claim rather than a property of the code, and it cost 31
+content-loss rows before it became one.
+
+| kind | slot | example | why the kind exists |
+|---|---|---|---|
+| `date` | day | `next friday`, `the 20th of november` | |
+| `recurrence` | day | `every tuesday and thursday`, `on sundays` | temporal repetition IS the time (Gil) |
+| `deadline` | day | `by friday`, `until next tuesday` | it is what distributes over a whole command |
+| `clock` | clock | `at 7am`, `ten thirty`, `9 in the morning` | |
+| `range` | clock | `from 3 to 4pm`, `between 2 and 4` | ONE reference, not two ends — otherwise the joiner cuts the range in half |
+| `lead` | clock | `15 minutes before`, `an hour ahead` | a reminder offset, and it must NOT make a side look independently timed |
+| `enum_clock` | clock | `at 9 and 2:30` | a bounded enumeration, expanded in phase 3 |
+| `enum_day` | day | `on tuesday and thursday` | the same, over days |
+
+**The two slot classes are the GOLD's**, not this file's invention:
+`experiments/generate.py` has `_DAY_SLOTS` and `_CLOCK_SLOTS`, and it puts
+`lead_time` and `time_range` on the clock side. Matching it matters more than it
+looks — a `lead` falling to `day` would both collide with a real date and satisfy
+the `any(_slot(r) == "day")` test that guards the date floor, switching the floor
+off silently.
 
 ### Phase 1 — CUT
 
@@ -211,10 +287,70 @@ clause.
 **The date floor** — the day defaults to `today`, the clock is never invented.
 Nothing said → `today`; a clock only → `today at 7`; a day only → `tomorrow`.
 
-### Phase 3 — TAG
+### Phase 3 — EXPAND ENUMERATIONS
 
-The engine's own reader decides first, then **one** correction is applied in
-**one** direction: the lexicon may talk it out of `event`, never into it.
+A **bounded enumeration** of times is SEVERAL items; an **unbounded `every X`** is
+ONE item with a recurrence. Gil, 2026-09-08: *"the segmentation is supposed to split
+'walk the dog at 9 and 2:30' into two events of walk the dog."*
+
+    walk the dog at 9 and 2:30        ->  walk the dog @ today at 9
+                                          walk the dog @ today at 2:30
+    gym on tuesday and thursday this week  ->  two events, bounded by "this week"
+    gym every tuesday and thursday    ->  ONE event, recurring
+
+The action is **copied, not divided** — which is why the invariant permits a token
+in more than one item. The preposition is copied too: "at 9 and 2:30" says `at` once
+and means it twice, so a part that lost it gets it back rather than reading
+"today 2:30".
+
+**The three decoys survive by their reference TYPE**, not by a special case each:
+
+| | the trailing conjunct is | so |
+|---|---|---|
+| `walk the dog at 9 and 2:30` | only a TIME (`enum_clock`) | expand |
+| `book gym between 2 and 4` | inside ONE `range` reference | untouched |
+| `meeting with Sam and Alex at 8` | a NAME, and no time left of the joiner | untouched |
+| `buy milk and eggs` | an OBJECT, no time at all | untouched |
+
+That is why the vocabulary work in phase 2 had to land first: once a range is a
+single reference, the rule is simply *"two clock-class references, expand"* and the
+decoys exclude themselves by counting. Written the other way round it needs a
+carve-out per decoy.
+
+### Phase 4 — TAG
+
+`event | task | review | other`. The engine's own reader decides first, so this
+module and the tuning experiments cannot disagree about what a review looks like.
+Then **every correction is a ONE-WAY VETO over `event`, never into it** — and that
+asymmetry, rather than the quality of any single signal, is what makes the phase
+work. It has now been measured three times:
+
+| signal | as a verdict (both directions) | as a veto over `event` |
+|---|---|---|
+| the task-verb lexicon | 82.4% | **87.5%** |
+| the logistic `kind` head | 80.4% | 80.1% — refuted either way (§6) |
+| `_NOT_CALENDAR` → `other` | never tried; it would swallow tasks | shipped |
+
+**The three vetoes, in order** (`tag()`):
+
+1. **`other`** — not a calendar ask at all (`thanks`, `play some music`,
+   `turn on the lights`). A closed vocabulary, because a bare noun phrase is the
+   NORMAL way to name an event (`physio`, `standup`) so no shape test can separate
+   `physio` from `i love you`. **A stated time overrules the veto**: "turn on the
+   lights" is smart-home, "turn on the oven at 6" is a reminder, and the only
+   difference is that the speaker scheduled one.
+2. **the task-verb lexicon, read at the HEAD VERB** — after skipping the preamble
+   (`i need to`, `please`, `um so`). Reading every word let a NOUN decide: "add the
+   budget review" and "add a call with Riley" were tagged `task` because `review`
+   and `call` are on the list, though the verb is `add`. 56 of 179 errors.
+3. **a STATED CLOCK cancels a task verdict** — "walk the dog" is a to-do and "walk
+   the dog at 9" is an appointment. Same verb; the speaker named a time. 34 of 179.
+   The floor's bare "today" does not count, since the engine wrote it.
+
+Measured on 1,516 gold items: lexicon anywhere **88.6%** → head verb only 89.8% →
++ the clock rule **90.8%**. Live board: **89.7% train, 90.2% sealed**.
+
+The historical measurements that set the shape:
 Measured over 1,383 matched items — overriding both ways loses more events than
 it gains tasks:
 
@@ -279,6 +415,26 @@ swapping the reader for a Component inside the stage is invisible to the trace.
 ---
 
 ## 3 · LLMSeg — the model half, **OFF BY DEFAULT**
+
+> ### TEST LLMSEG AGAIN WHEN THIS STAGE IS PICKED BACK UP (Gil, 2026-09-09)
+>
+> Its four measurements against FastSeg were taken when FastSeg was a **much weaker
+> segmenter** — exact-row 51.5%, time-on-a-spoken-time 74.2%, no lead times, no
+> ranges, no spoken clocks. FastSeg is now 68.2% train / 66.5% sealed with
+> time-on-spoken at 91.9%, so **every one of those comparisons is stale in both
+> directions**:
+>
+> - the gap LLMSeg had to close is far smaller, so it has less room to help;
+> - but the rows it was breaking may be rows FastSeg now gets right on its own,
+>   which is exactly where a verifier stops being able to do harm.
+>
+> The oracle-gate figure (+3.8%) and the accept-step arithmetic in §6 are the
+> numbers to re-derive first. **Board D has never run** — it needs both a FastSeg
+> answer and a final prediction, so it only reports with LLMSeg on, which means the
+> one board built to answer "does the correction pay for itself" has no data at all.
+> Re-run it before deciding anything.
+>
+> Cheap to check and easy to get wrong by reusing the old conclusion.
 
 > ### The flag
 >
@@ -618,7 +774,17 @@ the receiving end.
 Each is a real case with a real reproduction. They are written down rather than
 fixed because the work in flight is elsewhere; this section is the queue.
 
-## 8.1 · A bounded enumeration of times must SPLIT (Gil, 2026-09-08)
+## 8.1 · RESOLVED 2026-09-09 — a bounded enumeration of times must SPLIT
+
+> **Done.** Phase 3 (`_expand_enumerations`) implements it and the five gold rows
+> were corrected in the same change; the trap was renamed from
+> `two-times-one-activity`, whose NAME was the mistaken premise, to
+> `time-enumeration`. It scores 66.7% now (0.0% before) — the remaining row fails
+> on the action wording, not the cut. **The record below is kept as written**,
+> because it called the fix, the decoy risk and the board's dip in advance and that
+> is worth being able to check.
+
+### The original entry (Gil, 2026-09-08)
 
 **The gold is wrong, and so is the code.**
 

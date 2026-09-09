@@ -1,11 +1,75 @@
 # Segmentation — the plan (2026-09-09)
 
-Read `ARCHITECTURE.md` first: this file says what to DO and in what order, and it
-does not restate how the stage works.
+Read `ARCHITECTURE.md` first: §0 is where the stage stands and §2 is how FastSeg
+works, phase by phase, with the flow chart. This file is what to DO next.
 
 ---
 
-## 1 · The diagnosis — three measurements, one conclusion
+## 0 · STATUS — what this plan delivered, and what it did not
+
+**Paused here (Gil, 2026-09-09).** The stage is wired, measured on both halves, and
+the remaining work is named below rather than discovered later.
+
+|  | start of 2026-09-09 | now (train) | **sealed** |
+|---|---:|---:|---:|
+| exact-row | 51.3% | **68.2%** | **66.5%** |
+| exact-set | 61.2% | 76.6% | 75.5% |
+| item count — the CUT | 84.7% | 85.3% | 81.4% |
+| time on a **spoken** time | 73.4% | **91.9%** | **93.5%** |
+| tag | 87.3% | **89.7%** | **90.2%** |
+| over · under split | 51 · 110 | 46 · 108 | 28 · 95 |
+| inventions | 0 | **0** | **0** |
+| **end to end, with the next stage** | **51.6%** | **85.9%** | — |
+
+The sealed half was read ONCE, at the milestone, aggregates only — and it lands
+within 1–4 points of train while being BETTER on five metrics. The largest gap is
+item count (−3.9), which is the cut: **the held-out set is weakest exactly where the
+work stopped**, not at random.
+
+| phase | state |
+|---|---|
+| **1 · the time-span vocabulary** | **DONE** — one table. The +205 lever, and it paid: end-to-end 51.6% → 86.0% |
+| **2 · the dangling joiner** | **DONE** — as a side effect of phase 1's spans; the downstream count went 52 → 0 |
+| **3a · §8.1 enumeration** | **DONE** — `_expand_enumerations`, five gold rows corrected, decoys intact |
+| **3b · the under-split compounds** | **NOT DONE** — 108 rows, and the biggest remaining lever |
+| **4 · §8.3 the injected floor** | **NOT DONE** — no accuracy, removes two workarounds |
+| **5 · TAG** | **DONE differently** — the logistic head was refuted; two rules found by reading errors by SHAPE won instead (87.3% → 89.7%) |
+| **the dataset** | **DONE** — incoherent gold 15 → 0, duplicates 21 → 0, four missing classes added, generator un-broken |
+| **the `other` tag** | **DONE** — `ITEM_KINDS`' fourth value, which nothing had produced; six of eleven unusable inputs were reaching the calendar |
+
+### When this is picked back up, in this order
+
+1. **3b — the CUT.** Under-split 108 rows; `and_compound` 53.6%, `joiner` 50.0%,
+   `remind_then` 45.8%; multi-ask rows 17 points behind single-ask. The ablation
+   caps exact-row at 84.5% until this moves. **It is the risky half** — over-split
+   is "garbage immediately", and phase 1's one regression came from exactly this,
+   loosening a split condition. Change one condition at a time and read
+   over-split before the headline.
+2. **Re-test LLMSeg** — `ARCHITECTURE.md` §3 carries the note. Its four
+   measurements were taken against a much weaker FastSeg and are stale in BOTH
+   directions. Board D has never run at all.
+3. **§8.3** — the date floor written into `time` as a literal word, costing two
+   workarounds. Needs the dataset regenerated, so it is a cycle of its own.
+4. **`old_seg` retirement** — 716 lines inactive with three things still borrowed
+   (`_envelope_split`'s reader, `_enforce_pinned_kinds`/`_kind_of`, and
+   `object_rules.is_interrogative_create` in the next stage). Same shape
+   `validate.py` had; retire it the same way.
+5. **A board for unusable input.** The `other` work was verified on eleven hand
+   probes and the audit's 25 cases are all well-formed commands, so **nothing in
+   the repo measures it.** Until it exists, an `other` regression is invisible.
+6. **Two contract questions for Gil** (§3c) — where an enumeration header's count
+   goes, and whether `other` should carry it. They are the same decision.
+
+### What NOT to re-spend (§6's refuted table, plus today)
+
+A spaCy POS rewrite of the tagger (65.0%), destination distribution, gating LLMSeg,
+the model doing the cutting (83.9% → 57.3%), a similarity threshold for the action,
+and — added today — **the logistic `kind` head as a tagger** (88.7% → 80.4%, worse
+on all three slices including rows outside its fitting data).
+
+---
+
+## 1 · The diagnosis that drove it — three measurements, one conclusion
 
 **(a) The oracle ablation** (ARCHITECTURE §6) already named the lever:
 

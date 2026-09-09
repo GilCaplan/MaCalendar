@@ -189,7 +189,28 @@ had gone through the same process. That row was removed from the failing path
 rather than the mechanism being understood, so if a later cycle sees the same
 shape again, start from here.
 
-## Where the next work is — measured, not guessed (2026-09-09)
+## Segmentation — PAUSED 2026-09-09, and where it got to
+
+`assistant/engine/segmentation/PLAN.md` §0 is the status; `ARCHITECTURE.md` §0 is
+the standing overview and §2 is FastSeg phase by phase with the flow chart.
+
+    exact-row        51.3% -> 68.2% train, 66.5% SEALED
+    spoken time      73.4% -> 91.9% train, 93.5% sealed
+    tag              87.3% -> 89.7% train, 90.2% sealed
+    END TO END       51.6% -> 85.9%
+    inventions           0 -> 0
+
+The sealed 660 rows were read once, aggregates only, and land within 1-4 points of
+train while being better on five metrics — weakest on item count, which is exactly
+where the work stopped.
+
+**Pick it up at PLAN.md §0's ordered list.** First is 3b, the under-split compounds
+(108 rows, the biggest remaining lever, and the risky half). Second is **re-testing
+LLMSeg**: its four measurements were taken against a much weaker FastSeg and are
+stale in both directions, and board D — the one built to answer "does the correction
+pay for itself" — has never run at all.
+
+## The measurement that set the priority (2026-09-09)
 
 `decompose_validate/eval_metrics/end_to_end.py` settles which stage to work on. On
 its 1,924 train rows, running the REAL segmenter:
