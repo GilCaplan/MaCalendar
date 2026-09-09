@@ -97,6 +97,11 @@ def match_items(gold: list, pred: list, threshold: float = 0.5):
 # B · TRACEABILITY — the invariant, and this stage's analogue of no-invention
 # ---------------------------------------------------------------------------
 
+_SPOKEN_DIGIT = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
+                 7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven",
+                 12: "twelve"}
+
+
 def _own_words(item: dict, text: str) -> str:
     """The words THIS item is answerable for — its own time and action.
 
@@ -163,7 +168,14 @@ def untraceable(item: dict, text: str, today: str) -> list:
         # and a CORRECT answer got reported as an invention. Digit-boundary
         # instead: not preceded or followed by another digit, which also stops
         # "17:00" matching a 7.
+        # A SPOKEN HOUR LICENSES ITS DIGIT. Whisper writes "ten thirty", which
+        # contains no digit at all, so a digits-only search reported 26 CORRECT
+        # answers as inventions. Written out here rather than imported from the
+        # resolver: the scorer must never agree with the code under test by
+        # sharing its table.
+        spoken = _SPOKEN_DIGIT.get(h) or _SPOKEN_DIGIT.get(h12)
         if not (re.search(rf"(?<!\d){h}(?!\d)|(?<!\d){h12}(?!\d)", tl)
+                or (spoken and re.search(rf"\b{spoken}\b", tl))
                 or re.search(r"\b(noon|midday|midnight|lunchtime|morning|"
                              r"afternoon|evening|tonight|half past|quarter)\b", tl)):
             out.append(f"{field} {wren} unsupported by the words")
@@ -220,14 +232,20 @@ def contradictions(item: dict, text: str, today: str) -> list:
         except ValueError:
             pass
 
-    # The words name a day-of-month; the resolved date must use it.
+    # The words name a day-of-month; the resolved date must use it — UNLESS an
+    # until/through puts that ordinal on the series' END. "every weekend through
+    # the 30th" starts on the coming weekend and finishes on the 30th, and the
+    # check flagged five CORRECT items for not starting on it. It has to know
+    # which end of the range the ordinal names, exactly as the resolver does.
+    bound = re.search(r"\b(?:until|till|up to|through|thru|including)\b", tl)
     m = re.search(r"\bthe (\d{1,2})(?:st|nd|rd|th)\b", tl)
-    if m and date:
+    if m and date and not (bound and bound.start() < m.start()):
         try:
             if dt.date.fromisoformat(date).day != int(m.group(1)):
                 out.append(f"text says the {m.group(1)}th but date is {date}")
         except ValueError:
             pass
+
     return out
 
 
