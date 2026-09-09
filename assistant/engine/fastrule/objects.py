@@ -29,6 +29,16 @@ import re
 
 from assistant.engine.state import EngineState, Item
 
+#: PORTED OUT 2026-09-09 (Gil) — the model half's helpers and its three
+#: guards now live in `llmjudge/llm_fallback.py`, where the model lives.
+#: This import is the redirect: the code moved, `_parse_item`'s branch
+#: below did not, and behaviour is unchanged. `_parse_item` itself stays
+#: here — it is the rules-vs-model BRANCH POINT, not a liftable unit, and
+#: phase B replaces it with a DEFER(INCAPACITY) consumer.
+from assistant.engine.llmjudge.llm_fallback import (   # noqa: F401
+    _grounded_title, _guard_inventions, _honour_refusal, _llm_trace,
+    _TITLE_STOP)
+
 logger = logging.getLogger(__name__)
 
 #: Fragments of a split command accept rule parses at this relaxed bar
@@ -147,52 +157,6 @@ def _friendly(item_id: str) -> str:
     return "part " + item_id.replace("item_", "").replace("-", ".")
 
 
-def _llm_trace(state: EngineState, parser, cfg, title: str) -> None:
-    from assistant.trace import LLM
-    state.llm_ms += parser.last_llm_ms
-    if state.trace:
-        state.trace.step(LLM, title,
-                         f"{cfg.llm_engine}:{getattr(cfg, cfg.llm_engine).model} · "
-                         f"{parser.last_examples_used} history example(s) used",
-                         raw=(parser.last_raw_response or "")[:1500] or None,
-                         examples=parser.last_examples_used)
-
-
-def _honour_refusal(got, res, item: Item, state: EngineState):
-    """FastRule REFUSED this reading — the LLM may resolve the objection, but
-    a bare re-read must not overturn it.
-
-    The distinction that matters: for a generic-target veto ("delete this
-    event" names nothing), the LLM legitimately fixes it by RESOLVING the
-    reference to a real title — anaphora memory is exactly that job. What it
-    must not do is hand back the same empty target and have it executed,
-    which is what happened before the audit found this path. Empty slots
-    surfacing as "I couldn't find…" is the right answer; guessing is not.
-    """
-    from assistant.trace import RULE
-
-    if not got:
-        return got
-    if not (res.reason or "").startswith("generic-target"):
-        return got          # the other refusals stand as parsed
-    from assistant.engine.fastrule.fastrule import _GENERIC_TARGET_RE
-    kept = []
-    for name, intent in got:
-        if name.startswith(("update_", "delete_", "complete_")):
-            target = str(getattr(intent, "match_title", "") or "").strip()
-            if not target or _GENERIC_TARGET_RE.match(target):
-                # unresolved: the model gave back the same bare noun
-                state.messages.append(
-                    "I wasn't sure which one you meant, so I left it alone.")
-                if state.trace:
-                    state.trace.step(RULE, f"Held back {_friendly(item.id)}",
-                                     f"“{target or 'no target'}” names nothing "
-                                     "specific — refusing rather than guessing",
-                                     ok=False)
-                continue
-        kept.append((name, intent))
-    return kept
-
 
 def _parse_item(item: Item, state: EngineState, cfg) -> "list | None":
     """One atomic item → intents. FastRule first, the LLM for what it can't
@@ -275,45 +239,6 @@ def _parse_item(item: Item, state: EngineState, cfg) -> "list | None":
     got = parser.parse(item.spoken())
     _llm_trace(state, parser, cfg, f"Read {_friendly(item.id)}")
     return _guard_inventions(got, item, state)
-
-
-#: Words too generic to ground a title on their own (cycle 7).
-_TITLE_STOP = {"the", "a", "an", "and", "with", "for", "new", "my", "our"}
-
-
-def _grounded_title(title: str, text: str) -> bool:
-    """Every content word of an LLM event title must be spoken in the item's
-    own words, prefix-stemmed so "Meeting" grounds on "meet". A title the
-    words never said is a fabrication (hypothesis #5: garble input produced
-    "New Event", conference room, 10:00-11:00 — none of it in the words)."""
-    words = [w for w in re.findall(r"[a-z']+", title.casefold())
-             if len(w) > 2 and w not in _TITLE_STOP]
-    if not words:
-        return True                       # bare/stopword titles judged elsewhere
-    toks = set(re.findall(r"[a-z']+", text.casefold()))
-    def ok(w: str) -> bool:
-        stem = w[:4]
-        return any(tk.startswith(stem) or w.startswith(tk[:4])
-                   for tk in toks if len(tk) > 2)
-    return all(ok(w) for w in words)
-
-
-def _guard_inventions(got, item: Item, state: EngineState):
-    """Drop LLM-fabricated events (cycle 7); rule-parser output never routes
-    through here — rules are grounded by construction. An emptied list falls
-    through to the event-kind retry / event_fallback / honest unknown."""
-    if not got:
-        return got
-    kept = []
-    for name, intent in got:
-        if name == "create_event" and item.kind != "task":
-            title = str(getattr(intent, "title", "") or "")
-            if not _grounded_title(title, item.text):
-                state.add_fix("generate", "invention_guard", title[:40], "",
-                              note="LLM title not grounded in the item's words")
-                continue
-        kept.append((name, intent))
-    return kept
 
 
 def run(state: EngineState, cfg) -> EngineState:

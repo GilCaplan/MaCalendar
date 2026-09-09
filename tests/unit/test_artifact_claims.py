@@ -598,6 +598,10 @@ _STAGE_FILES = {
     "label":      "label/label.py",
 }
 _FASTRULE_PY = "assistant/engine/fastrule/fastrule.py"
+#: `Gatekeeper` MOVED here 2026-09-09 (the port, `llmjudge/PLAN.md` §1.0). It is
+#: a Component, not a Stage, so the chain's shape — and `BRAIN_VERSION` — did
+#: not change; only which folder owns the veto did.
+_GATEKEEPER_PY = "assistant/engine/llmjudge/gatekeeper.py"
 
 
 def _classes(path: pathlib.Path) -> set:
@@ -605,10 +609,19 @@ def _classes(path: pathlib.Path) -> set:
 
 
 def test_the_fastrule_components_named_on_the_page_exist(all_prose):
-    """FastRule's inner objects, by the names the page prints."""
+    """FastRule's inner objects, by the names the page prints.
+
+    `Gatekeeper` is checked against LLMJudge's folder rather than FastRule's:
+    the veto moved there because as a veto it could only refuse, and the
+    objection it raises is one a model can actually answer. The page names it
+    under LLMJudge for the same reason.
+    """
     have = _classes(ROOT / _FASTRULE_PY)
-    for cls in ("FastRule", "Atomicity", "Gatekeeper", "Scorer"):
+    for cls in ("FastRule", "Atomicity", "Scorer"):
         assert cls in have, f"{cls} is no longer a class in {_FASTRULE_PY}"
+    assert "Gatekeeper" in _classes(ROOT / _GATEKEEPER_PY), (
+        f"Gatekeeper is no longer a class in {_GATEKEEPER_PY} — if it moved "
+        "again, the page and this check move with it")
     for name, text in all_prose.items():
         if _ENGINE_MARK not in text:
             continue

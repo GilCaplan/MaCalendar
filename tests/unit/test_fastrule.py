@@ -1,5 +1,8 @@
 """FastRule — the selective classifier's gates, unit-level (no LLM).
 
+The three gate tests that belonged to `Gatekeeper` moved to
+`test_engine_llmjudge.py` with it in the 2026-09-09 port.
+
 conftest.py has already pointed every store at scratch before this import.
 """
 import pytest
@@ -12,14 +15,6 @@ def fastrule(registry_with_real_actions):
     # the autouse isolated_registry empties the action registry; intents are
     # built from it, so FastRule needs the real actions restored
     return FastRule(0.80)
-
-def test_f4a_polite_imperative_is_not_a_question(fastrule):
-    """"Can you create X" wants X created — the interrogative gate must not
-    read the courtesy as a question. Real questions still abstain."""
-    r = fastrule.run("Can you create a new list in my podcast?")
-    assert r.committed and r.intents[0][0] == "create_todo"
-    r = fastrule.run("Do I need to be reminded of any meetings on Monday?")
-    assert not r.committed and r.reason == "interrogative-create"
 
 
 def test_f4b_marking_a_date_never_completes_a_task(fastrule):
@@ -46,13 +41,6 @@ def test_f5_plain_and_clause_coordination_abstains(fastrule):
     assert r.reason != "clause-coordination"  # NP-coordination: one event,
     # two guests - whatever else the parser decides, the F5 gate stays out
 
-
-def test_f7_rename_never_commits_a_create(fastrule):
-    """"rename flu shot to sales call" fast-committed create_todo at 0.95 —
-    and FastRule can't know which store holds the old title anyway. Renames
-    abstain; deep's matcher searches both stores."""
-    r = fastrule.run("rename flu shot to sales call")
-    assert not r.committed and r.reason == "rename-misroute"
 
 
 def test_f7_priority_setting_is_an_update(fastrule):
@@ -220,22 +208,3 @@ def test_stale_weights_are_refused_rather_than_silently_truncated(fastrule):
     assert m.predict("anything at all") == (None, 0.0)
 
 
-def test_personalisation_is_lookup_not_training(fastrule):
-    """Gil's principle: the shipped models stay generic and identical for
-    every user; the personal part is the DATA they are pointed at. So a
-    lookup against the user's own stores must (a) resolve what generic
-    English cannot, and (b) never let a wrong parse through just because
-    something was found."""
-    from assistant.db import get_db
-    from assistant.actions.calendar.intent import CalendarIntent
-
-    # nothing in the stores: the rename cannot be resolved, so it defers
-    r = fastrule.run("rename flu shot to sales call")
-    assert not r.committed and r.reason == "rename-misroute"
-
-    get_db().create_event(CalendarIntent(title="flu shot", date="2026-09-10",
-                                         start_time="09:00", end_time="10:00"))
-    # now the store is known — but the parse reads it as a CREATE, which
-    # disagrees. The lookup must CONFIRM a parse, never merely permit one.
-    r = fastrule.run("rename flu shot to sales call")
-    assert not r.committed, "a lookup must not launder a wrong parse"

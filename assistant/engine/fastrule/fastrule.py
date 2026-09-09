@@ -43,29 +43,22 @@ from dataclasses import dataclass
 #: routing and the model can never disagree about where a sentence divides.
 from assistant.intent.coordination import ASK_JOINER_RE as _ASK_JOINER_RE
 
+#: PORTED OUT 2026-09-09 (Gil) — `Gatekeeper` and its two store lookups now
+#: live in `llmjudge/gatekeeper.py`, because a veto that can only refuse is
+#: worth more to the model as answerable CONTEXT. This import is the
+#: redirect: the code moved, the call sites here did not, and behaviour is
+#: unchanged. It goes away with the call sites in phase B (see
+#: `llmjudge/PLAN.md` §1.0 and `fastrule/PLAN.md` §3).
+from assistant.engine.llmjudge.gatekeeper import (      # noqa: F401
+    Gatekeeper, _GENERIC_TARGET_RE, _INTERROGATIVE_RE, _POLITE_IMPERATIVE_RE,
+    _names_something_real, _which_store_holds)
+
 # The gate patterns and the verdict type (carried from v1 at retirement).
 _STRONG_COMPOUND_RE = re.compile(
     r"\band\s+(?:then|also)\b"
     r"|[.;!?]\s+(?:also|then|plus|and)\b"
     r"|\s[—–]\s*and\b"
     r"|,\s*then\b",
-    re.I)
-
-_GENERIC_TARGET_RE = re.compile(
-    r"^(?:my |the |a |an |this )?(?:reminder|alert|event|appointment|task|todo|list)s?$"
-    r"|^(?:you|it|me|this|that|them)$",
-    re.I)
-
-# "Can you create/add/make …" is a polite imperative, not a question —
-# the speaker wants the thing made (F4a; "Can you create a new list in my
-# podcast?" was gate-blocked despite a correct create parse).
-_POLITE_IMPERATIVE_RE = re.compile(
-    r"^\s*(?:hey\s+\w+,?\s*)?(?:can|could|would|will)\s+you\s+(?:please\s+)?"
-    r"(?:create|add|make|set|put|start|book|schedule|remind)\b", re.I)
-
-_INTERROGATIVE_RE = re.compile(
-    r"^\s*(?:hey\s+\w+,?\s*)?(?:who|what|when|where|which|whose|how|do|does|did|is|are|am|can|could|would|will|should)\b"
-    r"|\bcould you (?:tell|let me know|check)\b|\bdo i have\b|\?\s*$",
     re.I)
 
 
@@ -230,123 +223,6 @@ def _parse_covers_the_compound(reason: str, text: str, intents) -> bool:
         return False
     return len(intents) >= 1 + len(_ASK_JOINER_RE.findall(text))
 
-
-def _which_store_holds(title: str) -> "str | None":
-    """"event", "task", or None — where the user's own data says this lives.
-
-    This is the question the rename gate was created because FastRule could
-    NOT answer: "rename flu shot to sales call" defers because the rules
-    cannot know whether "flu shot" is on the calendar or the task list. The
-    user's own stores know. One indexed query answers it, for any user, on
-    day one, with no training and no developer.
-    """
-    q = (title or "").strip()
-    if len(q) < 3:
-        return None
-    try:
-        from assistant.db import get_db
-        db = get_db()
-        ev = db.search_events(q, limit=2)
-        td = db.search_todos(q, limit=2)
-    except Exception:
-        return None
-    if ev and not td:
-        return "event"
-    if td and not ev:
-        return "task"
-    return None          # absent, or ambiguous — defer, never guess
-
-
-def _names_something_real(target: str) -> bool:
-    """Does the user's own calendar or task list actually contain this?
-
-    PERSONALISATION BY LOOKUP, NOT BY TRAINING (Gil, 2026-09-07). The shipped
-    models stay generic and identical for every user; the personal part is
-    the data they are pointed at. So "delete the dentist" is generic English
-    to a model, but if THIS user has an event called "dentist appointment",
-    it names something real and FastRule can act on it. Works for a brand-new
-    user on day one, needs no refit, and needs no developer.
-
-    Costs one indexed query. Any failure means "not resolved" — a lookup
-    problem must never turn into a commit.
-    """
-    q = (target or "").strip()
-    if len(q) < 3:
-        return False
-    try:
-        from assistant.db import get_db
-        db = get_db()
-        return bool(db.search_events(q, limit=1) or db.search_todos(q, limit=1))
-    except Exception:
-        return False
-
-
-class Gatekeeper:
-    """Intent-level vetoes, v1 order: interrogative (with the polite
-    exemption), rename-misroute, generic-target."""
-
-    def judge(self, text: str, intents) -> "str | None":
-        if (_INTERROGATIVE_RE.search(text)
-                and not _POLITE_IMPERATIVE_RE.search(text)
-                and any(n.startswith("create_") for n, _ in intents)):
-            return "interrogative-create"
-        if (re.match(r"^\s*(?:please\s+)?rename\b", text, re.I)
-                and any(n.startswith("create_") for n, _ in intents)):
-            # The gate exists because the rules cannot know WHICH store holds
-            # the old title. The user's own data can: if exactly one store
-            # has it, the rename is resolvable and no longer a misroute.
-            # …and only when the PARSE AGREES with what the data says. The
-            # probe that built this found the gate was doing double duty: it
-            # deferred both because the store was unknown AND because the
-            # parse was wrong ("rename flu shot to sales call" parses as
-            # create_todo). Resolving the store alone would have committed
-            # that wrong action, so the lookup must CONFIRM the parse, never
-            # merely permit it.
-            m = re.match(r"^\s*(?:please\s+)?rename\s+(.+?)\s+to\s+", text, re.I)
-            store = _which_store_holds(m.group(1)) if m else None
-            parsed_domain = ("task" if any("todo" in n for n, _ in intents)
-                             else "event")
-            if store is not None and store == parsed_domain and not any(
-                    n.startswith("create_") for n, _ in intents):
-                pass                    # data and parse agree — resolvable
-            else:
-                return "rename-misroute"
-        # The same veto on the CREATE side, which it never had. "Create an
-        # event now to go out for a run" parses to a create_event titled
-        # "event" — the word for a calendar entry, not a name for one — and
-        # FastRule committed it at confidence 1.00. Real usage, 2026-09-08:
-        # the user got an event called "event" at midnight.
-        #
-        # A generic TARGET on a mutation and a generic TITLE on a create are
-        # the same failure: the rules found a shape and no subject. It is a
-        # REFUSAL, so the deep track may RESOLVE it — the model reads "go out
-        # for a run" as the title, which it does — but must not re-commit the
-        # empty one.
-        #
-        # Deliberately `_GENERIC_TARGET_RE`, NOT validate's
-        # `is_placeholder_title`: that one answers "could this title be
-        # improved?" and flags "meeting with Tal", a perfectly good event to
-        # create. Using it as a commit veto broke 14 tests. The question here
-        # is the narrow one — is the title ONLY the generic noun, no subject.
-        for name, intent in intents:
-            if not name.startswith("create_"):
-                continue
-            titles = [str(getattr(intent, "title", "") or "")]
-            titles += [str(x) for x in (getattr(intent, "titles", None) or [])]
-            for title in titles:
-                title = title.strip()
-                if title and _GENERIC_TARGET_RE.match(title):
-                    return f"generic-title:{title}"
-        for name, intent in intents:
-            if name.startswith(("update_", "delete_", "complete_")):
-                target = str(getattr(intent, "match_title", "") or "").strip()
-                if _GENERIC_TARGET_RE.match(target):
-                    # …unless the user's own data says it names something.
-                    # "the dentist" is generic English and a real event.
-                    if _names_something_real(target):
-                        continue
-                    return f"generic-target:{target}"
-        return None
 
 
 class Scorer:

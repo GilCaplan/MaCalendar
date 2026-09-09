@@ -108,7 +108,8 @@ for events, tags for tasks; adjacent events never share a colour.
 | Component, not a Stage | in |
 |---|---|
 | `FastSeg` · `LLMSeg` · `old_seg` | `segmentation/` |
-| `Atomicity` · `Gatekeeper` · `Scorer` | `fastrule/` |
+| `Atomicity` · `Scorer` | `fastrule/` |
+| `Gatekeeper` · the LLM fallback + its three guards | `llmjudge/` — **moved 2026-09-09**; FastRule still calls them |
 | `Engine` | the whole pipeline as one runnable thing |
 
 Two consequences worth knowing:

@@ -25,6 +25,9 @@ model when they cannot be, DEFER when neither is sure** — applied three times:
    text ──► parse ──► Atomicity ──► Gatekeeper ──► Scorer ──► commit
                      (one or many?)  (must this      (confident   or
                                       NOT execute?)   enough?)    DEFER
+                                          │
+                                          └─ lives in llmjudge/gatekeeper.py
+                                             since 2026-09-09; called from here
 ```
 
 | unit | question | on failure |
@@ -33,6 +36,19 @@ model when they cannot be, DEFER when neither is sure** — applied three times:
 | **Atomicity** | one item, or several? | rules **or** model, both unconditional |
 | **Gatekeeper** | is this a reading that must not execute as stated? | veto |
 | **Scorer** | threshold + missing slots | DEFER |
+
+**`Gatekeeper` no longer lives in this folder** (2026-09-09, Gil). Its code —
+the class, the two store lookups and the three gate regexes — moved to
+`llmjudge/gatekeeper.py`, along with the model half of `_parse_item` and its
+three guards (`llmjudge/llm_fallback.py`). The step still runs exactly here and
+at exactly this point in the order: the port was a MOVE with an import
+redirect, and the product-shape board was identical either side of it. What
+changes it into prompt CONTEXT rather than a veto is phase B —
+`llmjudge/PLAN.md` §1.1, not yet done.
+
+The reason-class contract (`REFUSAL` / `STRUCTURE` / `INCAPACITY` and
+`reason_class()`) deliberately stayed: the DEFER is this stage's *product*, and
+that is the vocabulary it is written in.
 
 Atomicity answers *only* whether the item is atomic; what routing does about a
 compound is `run`'s business. v1 had the two fused, and the fusion cost the
