@@ -49,8 +49,8 @@ The brain. Every device — the Mac GUI and the iPhone — POSTs text to
 |---|---|---|---|
 | **Ingest & fix** | `X0` the raw transcript(s) | `X1` one repaired command string | `ingest/` |
 | **Segmentation** | `X1` a command | `X2` `[(action, time, tag), …]` | `segmentation/` |
-| **decompose_validate** | `X2` items | `X3` atomic, repaired, legal items | `decompose_validate/` |
-| **FastRule** | `X3` items | `X4` calendar / to-do objects ready to write | `fastrule/` |
+| **decompose_validate** | `X2` = (items, X1) — items **and** the fixed transcript | `X3` items, COMPLETE: every field an object needs, resolved and traceable | `decompose_validate/` |
+| **FastRule** | `X3` complete items — no transcript | `X4` calendar / to-do objects ready to write | `fastrule/` |
 | **LLMJudge** | `X4` objects + the raw text | approve, or `X1'` a rewritten command | `llmjudge/` |
 | **COMMIT + label** | approved objects | rows in the DB, categorised | `label/` + the orchestrator |
 
@@ -63,9 +63,18 @@ never remembered.
 words minus the time, `time` is the time reference **as spoken** (never
 resolved), `tag` is `event | task | review`.
 
-**decompose_validate** — splits until items are atomic (two times → two events,
-quantities, recurrence) and repairs them (past dates, am/pm, until/through, the
-observance gate). Date **resolution** lands here.
+**decompose_validate** — takes the items **and the transcript** (`X2`).
+`decompose` splits until each item is atomic and then COMPLETES it: the date and
+clock times resolved from its own `time`, recurrence rounded, quantity, lead
+time, attendees. `validate` then compares the completed items back against the
+transcript and fixes or blocks what does not hold.
+
+X3 is therefore **complete or blocked, never half-built** — FastRule receives
+items with nothing left to re-read, which is why the transcript stops here.
+Every field must be TRACEABLE to the words: an unsupported date is an invention.
+
+Not built that way yet — see `decompose_validate/PLAN.md` for what exists, why
+it is convoluted, and the order to fix it.
 
 **FastRule** — turns items into objects that can be written. Rules first, a
 model only where they cannot decide, and a DEFER verdict that is a contract:

@@ -113,6 +113,68 @@ That change dissolves problems 1–4 at once:
 
 ---
 
+## 4b · X3 — the output structure
+
+X3 is **the item list, complete**. Same shape as X2's items, with every field an
+object needs already filled and checked. The transcript does NOT travel on to
+FastRule: once the items are complete, FastRule has no reason to re-read the
+words, and taking the string away is what stops it re-deriving.
+
+```
+X2 = ( [Item, …], X1 )        items + the fixed transcript
+X3 =   [Item, …]              items, COMPLETE — nothing left to re-read
+```
+
+### The fields, derived from what FastRule builds
+
+`CalendarIntent` needs `title · date · start_time · end_time · recurrence ·
+recur_until · attendees · location · description · reminder_minutes`.
+`CreateTodoIntent` needs `titles · quantities · due_date · list_name · priority
+· tags`. So an item at X3 carries the union, per kind:
+
+| field | filled by | example |
+|---|---|---|
+| `kind` | segmentation | `event` \| `task` \| `review` |
+| `text` | segmentation | the action words, time removed |
+| `time` | segmentation | **as spoken**, unresolved — `"on the 20th of November at 9am"` |
+| `date` | **decompose** | `"2026-11-20"` — RESOLVED here, once, per item |
+| `start_time` / `end_time` | **decompose** | `"09:00"` / `"10:00"` |
+| `recurrence` | **decompose** | `daily` \| `weekly` \| `monthly`, already rounded |
+| `recur_until` | **decompose** | ISO date, until/through applied |
+| `quantity` | decompose *(exists)* | `5` |
+| `reminder_minutes` | decompose *(exists)* | `30` |
+| `attendees` | decompose | `["Sam"]` |
+| `blocked` | **validate** | a refusal reason, or None |
+
+### Three properties X3 must have
+
+**1 · RESOLVED, exactly once.** `time` stays the spoken words; `date` and the
+clock fields are the resolution of it. Both are present, so a later stage can
+always check the resolution against what was said — which is what makes
+validate's job possible at all.
+
+**2 · Every field TRACEABLE to the transcript.** A date, a recurrence or a
+quantity that no words support is an invention, and that is validate's
+invariant (§5c). This is the same shape of contract segmentation already has,
+which means it can be scored the same way.
+
+**3 · COMPLETE or BLOCKED, never half-built.** An item either has what it needs
+or carries `blocked` with a reason that is said out loud. FastRule then has one
+job — build the object — and no repair to do.
+
+### What this buys
+
+`run_objects` and its 17 rules exist because items arrive at FastRule
+incomplete, so the fields get patched after the object is made. Fill them at X3
+and the second pass has nothing to do. **That is the finish line in §6: delete
+`run_objects`.**
+
+It also settles today's bug by construction. `date` is resolved per item from
+that item's own `time`, so there is no flat list of dates to pin by index, and
+"which event does this date belong to" is never asked.
+
+---
+
 ## 5 · What needs research before building
 
 **a · Which of the 17 rules are genuinely item-level?** Some are
