@@ -112,7 +112,11 @@ def run(state, cfg):
     items: "list[Item]" = []
     for envelope in envelopes:
         for action, when, tag in _segment_items(envelope):
-            kind = tag if tag in ("event", "task", "review") else \
+            # `other` is one of ITEM_KINDS and is passed THROUGH. It used to fall
+            # to the else branch and be re-read as an event, which threw away the
+            # one verdict that says "this is not a calendar ask at all" — so the
+            # tag existed in the contract and nothing could ever produce it.
+            kind = tag if tag in ("event", "task", "review", "other") else \
                 _enforce_pinned_kinds(_kind_of(action), action)
             items.append(Item(id=f"item_{len(items) + 1}", kind=kind,
                               text=action, time=when))

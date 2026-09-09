@@ -321,6 +321,19 @@ def run(state: EngineState, cfg) -> EngineState:
 
     out: list = []
     for item in state.items:
+        if item.kind == "other":
+            # NOT A CALENDAR ASK. Segmentation has already decided this is none of
+            # event/task/review ("thanks", "play some music", "turn on the
+            # lights"), so there is nothing here to turn into an object. Skipped
+            # BEFORE `_parse_item`, which saves the LLM call as well as the wrong
+            # answer — and `action = "unknown"` routes it to the orchestrator's
+            # existing honest reply rather than a new branch that says the same
+            # thing differently.
+            item.action, item.intent = "unknown", None
+            state.add_fix("generate", "not_a_calendar_ask", item.text[:40], "",
+                          note="tagged `other` by segmentation")
+            out.append(item)
+            continue
         try:
             got = _parse_item(item, state, cfg)
         except (LLMUnavailableError, LLMTimeoutError):

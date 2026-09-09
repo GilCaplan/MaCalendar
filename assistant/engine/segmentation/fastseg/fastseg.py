@@ -541,6 +541,49 @@ _TASK_VERBS = frozenset("""
 """.split())
 
 
+#: NOT A CALENDAR ASK AT ALL — `other`, the fourth value `ITEM_KINDS` has always
+#: carried and that nothing ever produced (2026-09-09).
+#:
+#: WHY A CLOSED LIST rather than a shape test: a bare noun phrase is the NORMAL way
+#: to name an event — "physio", "standup", "dentist appointment", "coffee with sam"
+#: — so "this does not look like a command" cannot be the test. `_kind_of` returns
+#: `event` for every one of those AND for "i love you", because syntactically they
+#: are the same thing. The difference is semantic, so the signal has to be
+#: vocabulary.
+#:
+#: Measured harm before this existed: of eleven unusable inputs, SIX reached the
+#: calendar — "i love you", "play some music", "turn on the lights", "the weather is
+#: nice today" and "hmm let me think" each created an event, and "wait no forget it"
+#: MODIFIED one.
+_NOT_CALENDAR = (
+    # greetings, thanks, acknowledgements — a whole utterance, not a fragment
+    r"^(?:hi|hey|hello|thanks|thank\s+you|cheers|ta|bye|goodbye|good\s+(?:morning|"
+    r"night)|ok(?:ay)?(?:\s+(?:cool|great|thanks|then))?|cool|great|nice|sure|yes|"
+    r"no|yeah|yep|nope|never\s+mind|nevermind|forget\s+it|scrap\s+that)$",
+    # abandoning the thought
+    r"\b(?:never\s+mind|forget\s+it|forget\s+that|scrap\s+that|ignore\s+that|"
+    r"my\s+mistake|wrong\s+one)\b",
+    # thinking aloud
+    r"^(?:hmm|erm|um|uh)?\s*(?:let\s+me\s+think|hold\s+on|one\s+(?:sec|second|"
+    r"moment)|wait)\b",
+    # another domain entirely — a calendar cannot act on these
+    r"^(?:play|pause|stop|skip|resume)\s+(?:some\s+|the\s+)?(?:music|song|playlist|"
+    r"radio|podcast|tv)\b",
+    r"\bturn\s+(?:on|off|up|down)\s+the\s+\w+",
+    r"^(?:what'?s|how'?s|tell\s+me)\s+the\s+(?:weather|temperature|news|time)\b",
+    r"^(?:call|text|message|email)\s+(?:mum|mom|dad)$",   # a phone action, not a diary entry
+    # conversation about the world rather than the diary
+    r"^the\s+weather\s+is\b", r"^i\s+(?:love|hate|miss)\s+you\b",
+)
+_NOT_CALENDAR_RE = [re.compile(p, re.I) for p in _NOT_CALENDAR]
+
+
+def _is_not_calendar(action: str) -> bool:
+    """True when the words are not a calendar ask at all."""
+    a = (action or "").strip().lower()
+    return bool(a) and any(rx.search(a) for rx in _NOT_CALENDAR_RE)
+
+
 def _lexicon_kind(action: str) -> "str | None":
     for word in action.lower().replace(",", " ").split():
         word = word.strip(".!?")
@@ -580,6 +623,14 @@ def tag(action: str, time_str: str) -> str:
     if kind not in ("event", "task", "review"):
         kind = "event"
     if kind == "event":
+        # A ONE-WAY VETO, over `event` only — the third time that asymmetry is the
+        # thing that works here. The task lexicon below wins the same way (87.5%
+        # against 82.4% overriding both directions), and the logistic head failed
+        # BECAUSE it answered in both directions. `other` can therefore never
+        # swallow a task or a review, and `_kind_of` calls everything it cannot
+        # place an event, so `event` is exactly where an unusable ask lands.
+        if _is_not_calendar(action):
+            return "other"
         return _lexicon_kind(action) or kind
     return kind
 
