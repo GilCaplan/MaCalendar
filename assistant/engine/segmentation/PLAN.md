@@ -73,7 +73,20 @@ board B's loss line — it will move when the cut does.
 
 ## 3 · The order of work
 
-### Phase 1 — the time-span vocabulary  ·  the +205 lever  ·  ONE table
+### Phase 1 — the time-span vocabulary  ·  DONE 2026-09-09
+
+    exact-row       51.3% -> 64.8%     on a SPOKEN time   73.4% -> 91.6%
+    exact-set       61.2% -> 76.3%     over/under split    51/110 -> 47/108
+    END TO END      51.6% -> 86.0%     value errors down   1445 -> 234
+
+Three local changes, exactly as designed below. The over-split regression it caused
+on the first pass (51 -> 71 rows) and its three causes are in the commit; fixing
+them landed at 47, below where it started.
+
+**Tag is the binding constraint now** — flat at 87.3% while everything else moved,
+and A2's most-missed field (129) now that time has fallen to 21. Phase 5 moves up.
+
+#### The original brief — the +205 lever  ·  ONE table
 
 #### The research behind this list (2026-09-09)
 

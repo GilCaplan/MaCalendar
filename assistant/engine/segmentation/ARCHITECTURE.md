@@ -345,17 +345,31 @@ failure mode is not a measurement.
 FastSeg alone, segment-tuning **TRAIN** half (1,040 rows). The sealed 654 rows
 have never been scored.
 
-| metric | before | after |
-|---|---|---|
-| exact-row | 33.1% | **51.5%** |
-| item count — *the cut* | 78.6% | **84.5%** |
-| item F1 | 91.2% | **94.1%** |
-| time on a SPOKEN time | 49.1% | **74.2%** |
-| tag accuracy | 83.7% | **87.5%** |
-| task recall | 70.7% | **89.9%** |
-| NO-INVENTION violations | 0 | **0** |
-| row-level 2-of-3 | — | **79.7%** |
-| latency | 3 ms | **~10 ms**, zero model calls |
+| metric | start | segment-tuning | **+ span vocabulary (2026-09-09)** |
+|---|---|---|---|
+| exact-set | — | 61.2% | **76.3%** |
+| exact-row | 33.1% | 51.5% | **64.8%** |
+| item count — *the cut* | 78.6% | 84.5% | **85.3%** |
+| item F1 | 91.2% | 94.1% | **94.5%** |
+| over / under split | — | 51 / 110 | **47 / 108** |
+| time on a SPOKEN time | 49.1% | 74.2% | **91.6%** |
+| row-level 2-of-3 | — | 79.7% | **83.5%** |
+| tag accuracy | 83.7% | 87.5% | 87.3% |
+| NO-INVENTION violations | 0 | 0 | **0** |
+| latency | 3 ms | ~10 ms | **~10 ms**, zero model calls |
+
+The third column is `PLAN.md` Phase 1 — the time-span vocabulary, which was the
+oracle ablation's biggest lever (+205 rows) and turned out to be entries in ONE
+table plus two one-line changes. **Downstream it moved the pipeline from 51.6% to
+86.0%** rows-fully-right (`decompose_validate/eval_metrics/end_to_end.py`), and the
+attribution there still shows zero value errors that are the resolver's own.
+
+Traps that moved: `lead_time` 0.0% → 50.0% (72 rows), `time_list_vs_range`
+2.8% → 72.2%, `recurrence` 61.1% → 88.9%, `until_through` 33.3% → 64.3%.
+
+**Tag is now the binding constraint** — flat at 87.3% while everything around it
+moved, and it is the field A2 reports missed most often (129) now that time has
+fallen to 21. That is the case for the `kind`-head candidate in §2 Phase 3.
 
 ### Where the remaining headroom is — oracle ablation
 
