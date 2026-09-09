@@ -387,6 +387,127 @@ def run(state: EngineState, cfg) -> EngineState:
     return state
 
 
+def _resolve_onto_intent(state: EngineState, item, intent, today,
+                         carried_day: "str | None" = None) -> "str | None":
+    """The per-item resolver + validate's checks, written onto a built intent.
+
+    THIS REPLACES THE INDEX-PINNING RULES. `_rule_relative_date_pin` and
+    `_rule_due_date_pin` read the WHOLE transcript, produced a flat list of dates
+    and matched them to events BY ORDER (`ev_idx`, `n_events`,
+    `orig_event_dates`). That is the bug class behind `a987aba`: when the list is
+    shorter than the events -- which it legitimately is, because the bare-ordinal
+    branch refuses to claim a month-named ordinal -- the wrong event gets the
+    wrong date, or keeps a stale one.
+
+    Here nothing is pinned. Each item's OWN words are resolved, so the question
+    "which event does this date belong to" is never asked. Segmentation already
+    answered it.
+
+    The values come from `resolve.py` and are then checked by `checks.py` -- the
+    same two modules the stage's boards score, rather than a third policy that
+    could drift from them.
+    """
+    from assistant.engine.decompose_validate import checks as _checks
+
+    said = (getattr(item, "time", None) or "").strip()
+    spoken = item.spoken() if hasattr(item, "spoken") else (item.text or "")
+    is_todo = item.action == "create_todo"
+
+    # WITH ONE ITEM, THE TRANSCRIPT *IS* THAT ITEM'S OWN WORDS. An item can reach
+    # here carrying no words of its own — `fast_propose` builds items straight
+    # from intents — and then the sentence is the only evidence there is. This is
+    # not the pinning bug returning: pinning was about deciding WHICH of several
+    # events a date belonged to, and with a single item that question cannot
+    # arise. With two or more, there is deliberately no fallback.
+    only_item = sum(1 for i in state.items if i.intent is not None) == 1
+    if not (said or spoken).strip() and only_item:
+        said = state.text or ""
+        spoken = said
+
+    # STRIP THE INJECTED FLOOR, once, here. FastSeg materialises the date floor as
+    # the literal word "today" in `item.time` (fastseg.py's floor block) so its
+    # output format matches LLMSeg's prompt -- and LLMSeg is off by default. The
+    # cost lands here: a floored day becomes indistinguishable from a spoken one,
+    # so a carried day cannot tell it has permission to fill the gap.
+    #
+    # `Item.spoken()` already works around the same injection, which is the
+    # argument for containing it at ONE boundary rather than teaching every reader
+    # to ignore it. The transcript is the discriminator: if the sentence never says
+    # "today", no speaker did. The real fix belongs in segmentation, whose contract
+    # is CAPTURE, DO NOT RESOLVE -- recorded in its ARCHITECTURE.md §8.
+    words = said or spoken
+    if re.search(r"\btoday\b", words, re.I) and not re.search(
+            r"\btoday\b", state.text or "", re.I):
+        words = re.sub(r"\s+", " ", re.sub(r"\btoday\b", " ", words, flags=re.I)).strip()
+
+    d = {"kind": "task" if is_todo else "event",
+         "text": item.text or "",
+         # With no separated time (an older segmenter, or a FastRule-built item)
+         # the item's spoken words are all there is -- still ITS OWN words.
+         "time": words,
+         "date": getattr(intent, "due_date" if is_todo else "date", None),
+         "start_time": getattr(intent, "start_time", None),
+         "end_time": getattr(intent, "end_time", None),
+         "recurrence": getattr(intent, "recurrence", None),
+         "recur_days": list(getattr(intent, "recur_days", []) or []),
+         "recur_until": getattr(intent, "recur_until", None),
+         "quantity": None,
+         "reminder_minutes": getattr(intent, "reminder_minutes", None)}
+
+    # A LEADING DAY CARRIES FORWARD. "set a meeting tomorrow at 1 pm, another one
+    # at 4 pm" says the day ONCE; the second item's own words name none, and the
+    # floor would put it today. So an item with no day of its own inherits the day
+    # of the item before it.
+    #
+    # This is NOT the index-pinning bug returning, and the difference is the whole
+    # point: pinning matched the Nth date to the Nth event, which is a GUESS that
+    # breaks as soon as the counts differ. Carrying a day forward is a SCOPE rule
+    # -- segmentation's documented LEADING behaviour -- and it only ever fills a
+    # gap, never overrides a day the item actually named.
+    from assistant.engine.decompose_validate import resolve as _resolve
+
+    # AN INJECTED "today" IS NOT A SPOKEN DAY. Segmentation materialises the date
+    # floor as a literal word, so item 2 of "a meeting tomorrow at 1 pm, another
+    # one at 4 pm" arrives with time="today at 4 pm" and LOOKS like it named its
+    # own day — which stopped the carry and booked it today. The transcript is the
+    # discriminator: if it never says "today", no speaker did.
+    spoke_a_day = not _resolve.resolve(
+        d["time"], today, f"{d['time']} {d['text']}", action=d["text"]
+    )["date_floored"]
+    if not spoke_a_day and carried_day:
+        d["date"] = carried_day
+
+    out, fixes, flags = _checks.run([d], state.text, today)
+    got = out[0]
+
+    for field in ("date", "start_time", "end_time", "recurrence", "recur_days",
+                  "recur_until", "reminder_minutes"):
+        if is_todo and field != "date":
+            continue                       # a todo carries only a due date
+        target = "due_date" if (is_todo and field == "date") else field
+        if not hasattr(intent, target):
+            continue
+        was, now = getattr(intent, target, None), got.get(field)
+        if now is None or str(was) == str(now):
+            continue
+        try:
+            setattr(intent, target, now)
+        except Exception:
+            continue                       # a validator refused it; leave it be
+        state.add_fix("validate", "resolve_from_own_words", str(was), str(now),
+                      note=f"{item.text!r}: {said or spoken!r}")
+
+    for flag in flags:
+        # A FLAG NEVER BLOCKS (Gil, 2026-09-08): it is recorded so the reply can
+        # mention it, and the item still commits.
+        state.add_fix("validate", f"flag:{flag.rule}", "", "", note=flag.why)
+
+    # Only a day the item SAID becomes the carried one. Passing an inherited day
+    # on would be fine, but passing a FLOORED one would make "today" spread
+    # across a command that never mentioned it.
+    return got.get("date") if spoke_a_day else carried_day
+
+
 def run_objects(state: EngineState, cfg) -> EngineState:
     """Post-generation, field level: the ported named rules + the gate."""
     from assistant.trace import VALIDATE
@@ -405,6 +526,7 @@ def run_objects(state: EngineState, cfg) -> EngineState:
     orig_event_dates = {getattr(i, "date", None) for _, a, i in pairs if a == "create_event"}
     ev_idx = 0
     td_idx = 0
+    carried_day = None
 
     for item, action, intent in pairs:
         if action in ("update_event", "delete_event"):
@@ -416,17 +538,17 @@ def run_objects(state: EngineState, cfg) -> EngineState:
             _rule_create_from_remove_guard(state, item, intent)
             if item.action != "create_event" or item.intent is None:
                 continue
-            _rule_relative_date_pin(state, intent, rel, recur, ev_idx, n_events,
-                                    orig_event_dates, transcript)
+            # THE VALUE PASS, per item, replacing nine transcript-wide rules:
+            # relative_date_pin, past_date_bump, recurrence_words,
+            # until_exclusive, weekly_start_day, at_time_is_start, now_means_now
+            # and bare_hour_pm. Their conventions all live in `resolve.py` now,
+            # measured on this stage's own dataset.
             ev_idx += 1
+            carried_day = _resolve_onto_intent(state, item, intent, today,
+                                               carried_day)
             _rule_past_date_bump(state, intent, today)
-            _rule_recurrence_words(state, intent, recur)
-            _rule_until_exclusive(state, intent, tl)
-            _rule_weekly_start_day(state, intent, tl, today)
-            _rule_at_time_is_start(state, intent, transcript)
             _rule_now_means_now(state, intent, transcript)
             _rule_morning_title_guard(state, intent, transcript)
-            _rule_bare_hour_pm(state, intent, transcript, tl)
             _rule_junk_event_drop(state, item, intent, n_events, pairs)
             if item.intent is None:
                 continue
@@ -439,8 +561,9 @@ def run_objects(state: EngineState, cfg) -> EngineState:
             _rule_create_from_remove_guard(state, item, intent)
             if item.intent is None:
                 continue
-            _rule_due_date_pin(state, intent, rel, recur, td_idx, n_todos)
             td_idx += 1
+            carried_day = _resolve_onto_intent(state, item, intent, today,
+                                               carried_day)
 
     _rule_question_creates_nothing(state, cfg, pairs)
     _rule_cadence_round_and_announce(state, tl)

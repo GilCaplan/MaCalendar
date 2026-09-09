@@ -15,7 +15,7 @@ class CalendarIntent(BaseIntent):
     attendees: List[str] = []             # names or email addresses
     location: Optional[str] = None
     description: Optional[str] = None
-    recurrence: Optional[str] = None      # 'daily', 'weekly', 'monthly'
+    recurrence: Optional[str] = None      # 'daily' | 'weekly' | 'monthly' | 'yearly'
     # WEEKLY ONLY: the weekdays a series lands on, lowercase, when the speaker
     # named more than one ("every tuesday and thursday"). Empty means the same
     # weekday as the first instance, which is how every series behaved before
@@ -46,12 +46,17 @@ class CalendarIntent(BaseIntent):
     @field_validator("recurrence", mode="after")
     @classmethod
     def recurrence_known(cls, v: Any) -> Any:
-        """Only daily/weekly/monthly; LLM noise ('unknown', 'none', 'once', 'every monday') → None/weekly."""
+        """Only daily/weekly/monthly/yearly; LLM noise ('unknown', 'none', 'once',
+        'every monday') → None/weekly."""
         if v is None:
             return None
         sv = str(v).strip().lower()
-        if sv in ("daily", "weekly", "monthly"):
+        if sv in ("daily", "weekly", "monthly", "yearly"):
             return sv
+        # YEARLY before the substring heuristics below, which would otherwise
+        # fall through to None: "yearly" contains no "day", "week" or "month".
+        if "year" in sv or sv in ("annual", "annually"):
+            return "yearly"
         if "day" in sv and "week" not in sv and "mon" not in sv:
             return "daily"
         if "week" in sv or any(d in sv for d in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")):

@@ -254,8 +254,11 @@ TIMES = {
     "eight in the evening": "20:00", "ten thirty in the morning": "10:30",
     # Coarse parts of the day. These are a PRODUCT decision, not a fact, so
     # each one is either decided by Gil or left ambiguous — never guessed.
-    "first thing in the morning": AMBIGUOUS,   # undecided
-    "around lunchtime": AMBIGUOUS,             # undecided
+    # STILL undecided, deliberately. "first thing" implies earlier than the
+    # morning window's 09:00 and no one has said how much earlier; "early
+    # evening" would land inside `late afternoon` (17:00-19:00) and the two
+    # cannot both be right.
+    "first thing in the morning": AMBIGUOUS,
     "early evening": AMBIGUOUS,                # undecided
 }
 
@@ -267,7 +270,17 @@ TIMES = {
 #: the sentence is a different filler and wins outright. This only fills the gap
 #: when the speaker gave nothing more precise.
 PART_OF_DAY_WINDOW = {
+    # Gil, 2026-09-08, after mining showed these are the corpus's MOST frequent
+    # time words and the gold declined every one of them: morning 484x,
+    # evening 335x, afternoon 233x, lunchtime 122x, night 52x. Declining the
+    # commonest thing people say is not neutrality, it is a hole.
     "late afternoon": ("17:00", "19:00"),
+    "morning": ("09:00", "12:00"),
+    "afternoon": ("12:00", "17:00"),
+    "evening": ("19:00", "22:00"),
+    "night": ("21:00", "23:00"),
+    "lunchtime": ("12:00", "13:00"),
+    "around lunchtime": ("12:00", "13:00"),   # the same window, hedged
 }
 
 #: Times spoken WITHOUT am/pm, as an (hour, minute) pair. Their value depends on
@@ -377,12 +390,13 @@ RECURRENCES = {
     "twice a week": ("weekly", None), "twice a day": ("daily", None),
     "every other day": ("daily", None), "biweekly": ("weekly", None),
     "fortnightly": ("weekly", None), "every three weeks": ("weekly", None),
-    # A YEARLY cadence cannot be rounded honestly: the nearest representable
-    # value is monthly, which is 12x wrong and would fire eleven times a year
-    # that nobody asked for. Rounding is only acceptable when it stays close,
-    # so this is AMBIGUOUS rather than silently mangled -- and it is a real
-    # product gap ("every year" 24x in the corpus), recorded in ARCHITECTURE.md.
-    "every year": AMBIGUOUS, "annually": AMBIGUOUS, "yearly": AMBIGUOUS,
+    # A FOURTH CADENCE (Gil, 2026-09-08). Rounding a yearly series to monthly is
+    # 12x wrong and fires eleven times nobody asked for, and declining it left an
+    # annual reminder with no recurrence at all. So `yearly` is now representable
+    # rather than approximated -- the one case where rounding could not stay near
+    # the truth.
+    "every year": ("yearly", None), "annually": ("yearly", None),
+    "yearly": ("yearly", None),
 }
 
 #: Recurrences whose cadence was ROUNDED to fit daily|weekly|monthly. The reply

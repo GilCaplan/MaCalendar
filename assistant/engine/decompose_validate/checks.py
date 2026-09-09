@@ -48,6 +48,10 @@ _FROM_TIME = ("date", "start_time", "end_time", "recurrence", "recur_until")
 _WEEKDAY = ("monday", "tuesday", "wednesday", "thursday", "friday",
             "saturday", "sunday")
 
+#: An event's default length, used ONLY to replace an end that a corrected start
+#: has made meaningless. Never to invent an end where none was implied.
+DEFAULT_MINUTES = 60
+
 #: Phrases with no agreed value, so nothing can resolve them. The speaker said
 #: something real and the engine has no ruling, which is a FLAG rather than a
 #: silent drop — see ARCHITECTURE.md's open questions.
@@ -198,6 +202,22 @@ def end_after_start(item, said, transcript, anchor, fixes, flags):
                              "a bare end hour before the start reads as pm"))
             item["end_time"] = bumped
             return
+
+    # A STALE END AFTER A MOVED START. If the words moved the start, the end that
+    # was there described the OLD reading and is not a duration worth preserving:
+    # "dinner at 8 pm" parsed as 18:00-20:00 had the 8pm as its END, so once the
+    # start is corrected to 20:00 the 20:00 end is the same number twice over, not
+    # a two-hour dinner. Carried from `_rule_at_time_is_start`, which this
+    # replaced: an "at" time sets the start and the end gets the default length.
+    if any(f.field == "start_time" for f in fixes):
+        h0, mi0 = (int(x) for x in start.split(":"))
+        total = h0 * 60 + mi0 + DEFAULT_MINUTES
+        fresh = f"{total // 60 % 24:02d}:{total % 60:02d}"
+        fixes.append(Fix("end_after_start", "end_time", end, fresh,
+                         "the start moved, so the old end no longer describes it"))
+        item["end_time"] = fresh
+        return
+
     flags.append(Flag("end_after_start",
                       f"ends {end} but starts {start}", "end_time"))
 
@@ -286,7 +306,13 @@ def run(items: list, transcript: str, anchor: dt.date):
     for item in items:
         fresh = dict(item)
         said = _words(fresh, transcript, anchor)
+        # PER ITEM, then merged: `end_after_start` has to know whether THIS
+        # item's start moved, and a shared list would let a neighbour's fix
+        # answer that question.
+        mine, theirs = [], []
         for rule in RULES:
-            rule(fresh, said, transcript, anchor, fixes, flags)
+            rule(fresh, said, transcript, anchor, mine, theirs)
+        fixes.extend(mine)
+        flags.extend(theirs)
         out.append(fresh)
     return out, fixes, flags

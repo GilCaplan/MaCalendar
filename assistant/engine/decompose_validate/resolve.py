@@ -34,9 +34,13 @@ import re
 WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday",
             "saturday", "sunday")
 _WD = {name: i for i, name in enumerate(WEEKDAYS)}
-_MONTHS = {m.lower(): i for i, m in enumerate(
-    ("January", "February", "March", "April", "May", "June", "July",
-     "August", "September", "October", "November", "December"), start=1)}
+_MONTH_NAMES = ("January", "February", "March", "April", "May", "June", "July",
+                "August", "September", "October", "November", "December")
+_MONTHS = {m.lower(): i for i, m in enumerate(_MONTH_NAMES, start=1)}
+#: ABBREVIATIONS too. "Oct 6" is an ordinary way to write a date and resolved to
+#: nothing, which silently left an `until` bound unapplied.
+_MONTHS.update({m[:3].lower(): i for i, m in enumerate(_MONTH_NAMES, start=1)})
+_MONTHS["sept"] = 9
 _NUMBER = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4,
            "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
            "a couple of": 2, "a dozen": 12, "half a dozen": 6, "twelve": 12,
@@ -230,7 +234,17 @@ _WORD_CLOCK = {"noon": (12, 0), "midday": (12, 0), "midnight": (0, 0)}
 #: "late afternoon" is 5-7pm (Gil, 2026-09-08). Only settled ones are here —
 #: "early evening" and "around lunchtime" have no ruling yet, so they resolve
 #: to nothing rather than to a number nobody chose.
-PART_OF_DAY = {"late afternoon": ("17:00", "19:00")}
+#: "tonight" is listed in its own right, and as the EVENING window rather than
+#: the night one -- which is also what the gold's date hint says. Without it the
+#: substring match below found "night" inside it and answered 21:00.
+PART_OF_DAY = {"tonight": ("19:00", "22:00"),
+               "late afternoon": ("17:00", "19:00"),
+               "around lunchtime": ("12:00", "13:00"),
+               "lunchtime": ("12:00", "13:00"),
+               "morning": ("09:00", "12:00"),
+               "afternoon": ("12:00", "17:00"),
+               "evening": ("19:00", "22:00"),
+               "night": ("21:00", "23:00")}
 #: MINUTES SPOKEN AS WORDS, signed: positive is "past", negative is "to" and
 #: borrows an hour. Only half and quarter existed, so "ten past six" and "twenty
 #: to seven" resolved to nothing -- ordinary ways to say a time.
@@ -275,14 +289,48 @@ def _bare_hour(h: int, minute: int, said: str) -> str:
     return f"{h:02d}:{minute:02d}"
 
 
+#: Anything that states a clock time explicitly. Used to decide whether a coarse
+#: part of day still applies -- "unless stated otherwise" (Gil, 2026-09-08).
+_EXPLICIT_CLOCK = re.compile(
+    r"\d{1,2}\s*:\s*\d{2}"                       # 14:00, 6:45
+    r"|\d{1,2}\s*(?:am|pm|a\.m\.|p\.m\.)"          # 7am, 5 pm
+    r"|\bat\s+\d{1,2}\b"                          # at 7
+    r"|\b\d{1,2}\s*o'?clock\b"                    # 8 o'clock
+    r"|\b(?:noon|midday|midnight)\b"
+    r"|\b(?:half|quarter|five|ten|twenty|twenty[\s-]five)\s+(?:past|to)\b"
+    r"|\bat\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b",
+    re.I)
+
+
+def window_for(said: str) -> "tuple[str, str] | None":
+    """The coarse window a phrase names, or None.
+
+    Returns None when the sentence STATES a clock, because then the window is not
+    what the speaker meant: "tomorrow morning at 9" is 09:00 exactly, not the
+    whole 09:00-12:00 block, and its end must not be pinned to noon.
+
+    Longest phrase first -- "late afternoon" contains "afternoon", and letting
+    dict order decide put 12:00 where 17:00 belongs, five hours out.
+    """
+    t = (said or "").lower()
+    if _EXPLICIT_CLOCK.search(t):
+        return None
+    # WORD BOUNDARIES, not `in`. A bare substring test found "night" inside
+    # BOTH "tonight" (answering 21:00 for a phrase the gold calls evening) and
+    # "fortnightly" (inventing a clock time on a cadence that names none). This
+    # is the third substring bug of its kind in this module -- "pm" matched inside
+    # "4pm" and "weekly" inside "biweekly" -- so the lesson is the general one:
+    # a time vocabulary lives inside other English words.
+    for phrase in sorted(PART_OF_DAY, key=len, reverse=True):
+        if re.search(rf"\b{re.escape(phrase)}\b", t):
+            return PART_OF_DAY[phrase]
+    return None
+
+
 def resolve_clock(said: str, context: str = "") -> "str | None":
     """One item's time words -> "HH:MM", or None if they name no clock time."""
     t = (said or "").lower()
     ctx = f"{t} {context or ''}"
-
-    for phrase, (start, _end) in PART_OF_DAY.items():
-        if phrase in t:
-            return start
 
     for word, (h, mi) in _WORD_CLOCK.items():
         if re.search(rf"\b{word}\b", t):
@@ -335,7 +383,13 @@ def resolve_clock(said: str, context: str = "") -> "str | None":
     m = re.search(r"\bat\s+(\d{1,2})\b(?!\s*:)", t) or re.search(r"\b(\d{1,2})\s*o'?clock\b", t)
     if m:
         return _bare_hour(int(m.group(1)), 0, ctx)
-    return None
+
+    # A COARSE WINDOW IS THE LAST RESORT. Gil's ruling is "unless stated
+    # otherwise", so a stated clock wins -- and it only wins if it is tried
+    # first. With this branch at the TOP, "this evening at 8pm" returned 19:00
+    # and "tomorrow morning at 9" was right only by coincidence.
+    win = window_for(said)
+    return win[0] if win else None
 
 
 def resolve_range(said: str, context: str = "") -> "tuple[str, str] | None":
@@ -421,9 +475,12 @@ def resolve_recurrence(said: str) -> "dict | None":
     # acceptable while it stays near the truth. Declining leaves the item with no
     # recurrence, which validate can flag; committing monthly would be wrong every
     # month until someone noticed. A real product gap, not an oversight.
+    # YEARLY is representable now (Gil, 2026-09-08) rather than declined: see
+    # normalization.py. A named MONTH still reads as yearly -- "every January" is
+    # once a year, not once a month.
     if re.search(r"\b(every year|annually|yearly|every (?:january|february|march|"
                  r"april|may|june|july|august|september|october|november|december))\b", t):
-        return None
+        return {"cadence": "yearly", "days": [], "rounded": False}
 
     # ROUNDED cadences: representable only approximately, and the reply has to
     # SAY so. Ordered most specific first -- "every other day" is daily-rounded,
@@ -618,9 +675,9 @@ def resolve(said: str, anchor: dt.date, context: str = "",
         out["start_time"], out["end_time"] = rng
     else:
         out["start_time"] = resolve_clock(said, context)
-        for phrase, (_s, end) in PART_OF_DAY.items():
-            if phrase in (said or "").lower():
-                out["end_time"] = end      # a window carries its own end
+        win = window_for(said)
+        if win:
+            out["end_time"] = win[1]       # a window carries its own end
 
     # HEAD, not `said`. resolve_recurrence over the whole string read the
     # BOUND's weekday as one of the series' days: "weekly until next wednesday"

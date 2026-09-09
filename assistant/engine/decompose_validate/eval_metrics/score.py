@@ -199,8 +199,13 @@ def untraceable(item: dict, text: str, today: str) -> list:
                 or re.search(rf"(?<!\d){h:02d}(?!\d)|(?<!\d){h12:02d}(?!\d)", tl)
                 or any(w and re.search(rf"\b{w}\b", tl) for w in words)
                 or derived_end
+                # THE WHOLE COARSE VOCABULARY. "night" was missing, so every
+                # correct 21:00 from "tomorrow night" was reported as invented —
+                # the same shape of board bug as the other five: the check knew
+                # some spellings of the truth and not all of them.
                 or re.search(r"\b(noon|midday|midnight|lunchtime|morning|"
-                             r"afternoon|evening|tonight|half past|quarter)\b", tl)):
+                             r"afternoon|evening|tonight|night|dawn|dusk|"
+                             r"half past|quarter)\b", tl)):
             out.append(f"{field} {wren} unsupported by the words")
 
     q = item.get("quantity")
@@ -211,9 +216,18 @@ def untraceable(item: dict, text: str, today: str) -> list:
     # Same blind spot as the trigger in `resolve_recurrence` had: the one-word
     # and frequency cadences. 115 CORRECT weekly recurrences were reported as
     # invented because the check had never heard of "twice a week".
+    # SEVENTH TIME. Every one of this board's false positives has had the same
+    # shape: the check knows SOME spellings of the truth. The vocabulary below is
+    # hand-maintained and drifts behind the resolver every time a form is added
+    # (this round: yearly/annually).
+    #
+    # The structural fix is written up in ARCHITECTURE.md: derive the vocabulary
+    # from `normalization.py`'s closed tables — the GOLD's own words, so the board
+    # stays independent of `resolve.py` while it stops drifting. Not done here
+    # because it is a board refactor, not a one-line vocabulary patch.
     rec = item.get("recurrence")
     if rec and not re.search(r"\b(every|each|daily|weekly|monthly|nightly|everyday|"
-                             r"biweekly|fortnightly|"
+                             r"biweekly|fortnightly|yearly|annually|annual|"
                              r"(?:once|twice|thrice|\d+\s+times)\s+a)\b", tl):
         out.append(f"recurrence {rec!r} unsupported by the words")
     return out

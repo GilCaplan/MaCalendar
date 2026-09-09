@@ -170,6 +170,7 @@ def _gold_item(spec: dict, binding: dict, anchor: dt.date, transcript: str = "")
     # The DATE FLOOR (segmentation's SPEC): an item with no day of its own is
     # today. Applied here too, so the two stages cannot disagree about it.
     saw_day = False
+    coarse = None            # a part-of-day named by a DATE filler ("this evening")
 
     for slot in _SLOT.findall(spec["time"]) + _SLOT.findall(spec["action"]):
         raw = binding.get(slot)
@@ -203,8 +204,8 @@ def _gold_item(spec: dict, binding: dict, anchor: dt.date, transcript: str = "")
             else:
                 item["date"] = iso
                 saw_day = True
-            if hint and not item["start_time"]:
-                item["_part_of_day"] = hint
+            if hint:
+                coarse = hint            # applied after the loop, see below
         elif base == "time":
             item["start_time"] = got
             win = N.window(raw)
@@ -248,6 +249,17 @@ def _gold_item(spec: dict, binding: dict, anchor: dt.date, transcript: str = "")
                 h, mi = (int(x) for x in item["start_time"].split(":"))
                 total = h * 60 + mi + got
                 item["end_time"] = f"{total // 60 % 24:02d}:{total % 60:02d}"
+
+    # "this evening" is BOTH a day and a coarse time, and the hint used to be
+    # recorded and never used -- so gold said start_time=None for a phrase that
+    # names one. Applied HERE, after every slot, because a STATED clock outranks a
+    # window: "this evening at 8pm" is 20:00 (Gil: "unless stated otherwise").
+    if coarse and not item["start_time"]:
+        win = N.PART_OF_DAY_WINDOW.get(coarse)
+        if win:
+            item["start_time"], item["end_time"] = win
+        else:
+            item["_part_of_day"] = coarse
 
     if not saw_day:
         item["date"] = anchor.isoformat()      # the floor

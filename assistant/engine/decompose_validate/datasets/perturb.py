@@ -126,8 +126,12 @@ def perturb(item: dict, kind: str) -> dict:
     elif kind == "lead_time_wrong":
         out["reminder_minutes"] = int(item["reminder_minutes"]) + 17
     elif kind == "recurrence_wrong":
+        # A ROTATION, so every cadence maps to a different real one. It has to
+        # cover all four -- `yearly` (added 2026-09-08) raised a KeyError here,
+        # which is the dataset failing loudly rather than scoring something wrong.
         out["recurrence"] = {"daily": "weekly", "weekly": "monthly",
-                             "monthly": "daily"}[item["recurrence"]]
+                             "monthly": "yearly",
+                             "yearly": "daily"}[item["recurrence"]]
     return out
 
 

@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS events (
     color          TEXT    NOT NULL DEFAULT '#0078d4',
     created_at     TEXT    NOT NULL,
     series_id      INTEGER,               -- NULL = not recurring; shared by all instances
-    recurrence     TEXT    NOT NULL DEFAULT '',   -- '' | 'daily' | 'weekly' | 'monthly'
+    recurrence     TEXT    NOT NULL DEFAULT '',   -- '' | 'daily' | 'weekly' | 'monthly' | 'yearly'
     recur_days     TEXT    NOT NULL DEFAULT '',   -- weekly only: 'tuesday,thursday'
     recurrence_end TEXT    NOT NULL DEFAULT ''    -- '' or ISO date (last allowed date)
 )
@@ -490,6 +490,17 @@ def _next_date(d: datetime.date, recurrence: str, anchor_day: int | None = None,
             year += 1
         day = anchor_day if anchor_day is not None else d.day
         # Clamp day to the last valid day of the target month
+        max_day = calendar.monthrange(year, month)[1]
+        return datetime.date(year, month, min(day, max_day))
+    if recurrence == "yearly":
+        # A FOURTH CADENCE (Gil, 2026-09-08). Feb 29 is the whole difficulty:
+        # stepping it a year lands on a date that does not exist, so it clamps to
+        # the 28th — and `anchor_day` is not enough to undo that, because the
+        # month matters too. Chaining from the previous instance would turn one
+        # leap-day series into a permanent 28th, so the ANCHOR month/day is what
+        # each step is computed from where it is known.
+        day = anchor_day if anchor_day is not None else d.day
+        year, month = d.year + 1, d.month
         max_day = calendar.monthrange(year, month)[1]
         return datetime.date(year, month, min(day, max_day))
     raise ValueError(f"Unknown recurrence: {recurrence!r}")

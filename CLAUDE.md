@@ -334,7 +334,10 @@ judgement).
 
 ## Recurring events
 
-`recurrence` is only ever `daily`, `weekly` or `monthly`. Anything a speaker
+`recurrence` is only ever `daily`, `weekly`, `monthly` or `yearly` (the fourth
+added 2026-09-08: rounding a yearly series to monthly is 12x wrong and fires
+eleven times nobody asked for, so it is the one cadence rounding could not
+honestly cover). Anything a speaker
 says that is not one of those gets rounded to one that is, and the rounding is
 announced in the reply rather than done quietly. **A weekly series may name
 SEVERAL weekdays** — `recur_days` carries them ("every tuesday and thursday");

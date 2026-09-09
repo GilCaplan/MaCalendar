@@ -117,7 +117,14 @@
   "ten thirty",
   "noon",
   "midnight",
-  "midday"
+  "midday",
+  "morning",
+  "afternoon",
+  "evening",
+  "night",
+  "lunchtime",
+  "late afternoon",
+  "around lunchtime"
  ],
  "time_ranges": [
   "from 4 to 6",
@@ -162,7 +169,10 @@
   "every weekday",
   "every weekend",
   "every other week",
-  "every monday"
+  "every monday",
+  "every year",
+  "annually",
+  "yearly"
  ],
  "lead_times": [
   "1 hour before",

@@ -582,3 +582,64 @@ because by then the month is already part of the title.
 > at all is correctly captured as `on the 20th` and correctly resolved
 > downstream to the next future 20th. Segmentation captures words; deciding
 > WHICH 20th is `decompose_validate`'s job and it already works.
+
+## 8.3 · The date FLOOR is injected into `time` as a WORD (found 2026-09-08)
+
+`fastseg.py`'s floor block writes the literal string `"today"` into an item's
+`time` when the item names a clock but no day:
+
+```python
+if not any(_slot(r) == "day" for r in mine):
+    time_str = f"today {time_str}".strip()      # fastseg.py:352
+```
+
+**This resolves, and segmentation's contract is CAPTURE, DO NOT RESOLVE.** The
+floor is a value-level default, and `decompose_validate` owns it —
+`checks.date_floor` applies it there, from the anchor, without putting a word in
+the item that nobody said.
+
+### Why it is worth fixing rather than living with
+
+It makes a FLOORED day indistinguishable from a SPOKEN one for every consumer
+downstream, and two separate workarounds already exist for that:
+
+1. `Item.spoken()` filters the injected `"today"` back out, and says so:
+   *"pasting that in would put a word in the title that nobody uttered."*
+2. `validate._resolve_onto_intent` now strips it again at this stage's boundary,
+   because a carried day could not tell it had permission to fill a gap.
+
+**The live failure it caused**, from the audit corpus:
+
+    "set a meeting tomorrow at 1 pm, another one at 4 pm and then pizza
+     at 6:30 pm tomorrow"
+
+Item 2 arrives as `time="today at 4 pm"`. The day was never spoken — the
+transcript contains no `"today"` at all — but it LOOKS spoken, so the leading
+`"tomorrow"` cannot carry forward and the event books on the wrong day. Both
+workarounds above exist solely to undo this one injection.
+
+### What it costs to fix
+
+The reason it was added is in the code comment: FastSeg emitted the bare form
+while the tuned LLMSeg prompt taught the floored one, so **the two halves
+disagreed on every clock-only item and the accept step paid for it each time**.
+Note that LLMSeg is OFF by default (§3), so today the injection serves an inert
+component while an active stage pays for it.
+
+So the fix is not a one-line deletion:
+
+- **Segmentation's own gold encodes the floored form.** `experiments/generate.py`
+  inserts `("day", "today")`, and `experiments/check_prompt.py` asserts
+  *"FLOOR requires 'today {t}'"*. Removing the injection means regenerating the
+  dataset and re-reading the boards — the `time_default_ok` metric in
+  `compare_boards.py` is scoring exactly this.
+- **LLMSeg's prompt teaches the floored form.** If both halves must agree, the
+  normalisation belongs at LLMSeg's ACCEPT step (strip a floored `"today"` from
+  what the model returns) rather than in FastSeg's output, so the bare form is
+  what both emit.
+- **`Item.spoken()`'s filter can then go**, along with this stage's boundary
+  strip — which is the test that the fix actually landed: two workarounds
+  disappear.
+
+Not urgent — the boundary strip contains it — but it is a contract violation, and
+it has already cost one live bug and two workarounds.

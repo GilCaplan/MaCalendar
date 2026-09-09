@@ -79,8 +79,9 @@ everywhere instead of being guessed per sentence.
 | **bare hour** | 1–6 is PM; 7–8 is PM only with evening words. "gym at 5" is not 5am. |
 | **until / through** | "until" EXCLUDES the day it names; "through" and "including" keep it (CLAUDE.md). |
 | **a series' first instance** | the **soonest** weekday the sentence names — not the first one said. An explicit "starting X" outranks the cadence but must still land on a day the cadence names. |
-| **recurrence** | only `daily` / `weekly` / `monthly`; anything else is rounded and the rounding is **announced in the reply**, never done quietly. |
-| **late afternoon** | 17:00–19:00 (Gil, 2026-09-08). "early evening" and "around lunchtime" have no ruling, so they resolve to **nothing** rather than to a number nobody chose. |
+| **recurrence** | `daily` / `weekly` / `monthly` / `yearly`; anything else is rounded and the rounding is **announced in the reply**, never done quietly. |
+| **parts of day** | windows, ruled 2026-09-08: morning 09:00–12:00 · afternoon 12:00–17:00 · late afternoon 17:00–19:00 · evening & tonight 19:00–22:00 · night 21:00–23:00 · lunchtime 12:00–13:00. **A stated clock always wins** — "this evening at 8pm" is 20:00, and then no window end applies. "early evening" and "first thing in the morning" still have no ruling: the former would land inside late afternoon, the latter implies earlier than 09:00 by an unstated amount. |
+| **recurrence, the fourth cadence** | `yearly` is representable (Gil, 2026-09-08) rather than rounded. Rounding it to monthly is 12× wrong and fires eleven times nobody asked for — the one cadence rounding could not honestly cover. |
 | **"next week"** | too vague to resolve — context-dependent, so it is left unresolved (Gil). |
 | **a duration is not a count** | "extend the blood test by 30 minutes" has no quantity. |
 | **`reminder_minutes` is about THIS item** | "an hour before **sales call**" measures from a different event; it is a relation, not a lead time. |
@@ -207,15 +208,21 @@ injects defects and asks *does it repair?*
 
 | | train (1,924 / 296 fam) | **sealed test (840 / 21 fam)** |
 |---|---|---|
-| all fields exact — clean | 100.0% (1924/1924) | **98.1% (824/840)** |
-| all fields exact — perturbed | 100.0% (1924/1924) | **99.4% (835/840)** |
+| all fields exact — clean | 99.9% (1923/1924) | **98.7% (829/840)** |
+| all fields exact — perturbed | 99.9% (1923/1924) | 99.4% |
 | perturbed, WITHOUT validate | — | 31.2% (262/840) |
-| date · start_time (clean) | 100% · 100% | 98.6% · 99.9% |
+| date · start_time (clean) | 100% · 99.9% | 99.1% · 99.9% |
 | end_time · recurrence · quantity · reminder | 100% each | **100% each** |
-| inventions · lost · contradictions | 0 · 0 · 0 | **0 · 0 · 0** |
-| board G — improved / **BROKE** | 1691 / **0** | 682 / **0** |
+| inventions · lost · contradictions | 0 · 0 · 0 | 0 · 0 · 0 |
+| board G — improved / **BROKE** | 1684 / **0** | — / **0** |
 | harm / matched item | 0.000 | 0.044 |
 | cost | 0 model calls, 0.000 s/row | same |
+
+**The live path uses this** as of 2026-09-08: `validate.run_objects` calls the
+per-item resolver instead of `_rule_relative_date_pin` and eight sibling rules.
+The audit regression floor is at **parity — 72% exact / 75% recall, the same 7
+failures as the legacy path**, which is what a swap of this size has to show
+before it is worth keeping.
 
 **98.1% is the honest end-to-end figure** (words → values). Perturbed reads higher
 for a structural reason: there validate restores gold values from the words, while
@@ -225,6 +232,22 @@ the resolver is what is wrong there.
 Those 16 sit in a construction class **train has no failing instance of** (train is
 100%), so the next step is growing train in the date-heavy classes, never looking
 at test rows. Test has been read at milestones only, aggregates only.
+
+### The recurring board bug, and its structural fix
+
+**Seven of this stage's defects were the traceability check knowing SOME
+spellings of the truth**, never all of them: it had not heard of "twice a week"
+(115 correct recurrences reported as invented), wanted a bare `9` from `"09:30"`,
+looked for "six" in `"twenty to seven"`, wanted an end time derived from a
+duration to appear in words that cannot contain it, treated a series' derived
+start as invented, lacked `"night"`, and lacked `"yearly"`.
+
+Its vocabulary is a hand-maintained regex, so it drifts behind the resolver every
+time a form is added. **The fix is to derive it from `normalization.py`'s closed
+tables** — the GOLD's own words. That keeps the board independent of
+`resolve.py`, which is the property that lets it catch bugs at all, while
+removing the drift. Not done yet: it is a board refactor rather than a
+vocabulary patch, and it should be done before the next batch of forms lands.
 
 ### The bug no board could have found
 
@@ -291,21 +314,26 @@ No family was lost: the generator retried other anchors, so all 268 remain.
 | FastRule reading `slots` | **next** — the swap that makes these values what rows are built from |
 | deleting `run_objects` | the finish line, blocked on the row above |
 
-## Open questions for Gil — both real product gaps, neither guessed at
+## Both open questions are now RULED (Gil, 2026-09-08)
 
-**1. Coarse parts of the day.** `"morning"`, `"afternoon"`, `"evening"`,
-`"night"`, `"lunchtime"` are the MOST frequent time words in the corpus (484 /
-233 / 335 / 52 / 122 occurrences) and the gold declines every one of them. Only
-`late afternoon` has a ruling (17:00–19:00, Gil 2026-09-08). They are marked
-`AMBIGUOUS` and their rows are dropped rather than resolved to a number nobody
-chose — so a large slice of real speech is currently untested and, in the live
-engine, unresolved.
+Parts of day became windows and `yearly` became a fourth cadence — see the
+conventions table. Together they cover roughly 1,000 corpus occurrences that the
+gold previously declined. What implementing them exposed, in order:
 
-**2. A yearly cadence cannot be represented.** `"every year"` / `"annually"` /
-`"yearly"` (24x in the corpus) have no home in `daily|weekly|monthly`. Rounding to
-monthly fires eleven extra times a year, so the resolver DECLINES instead — which
-means an annual reminder currently gets no recurrence at all. The options are a
-fourth cadence, or a flag telling the speaker it was not booked as a series.
+- **A stated clock has to beat a coarse window.** With the part-of-day branch
+  first in `resolve_clock`, "this evening at 8pm" returned 19:00 and "tomorrow
+  morning at 9" was right only by coincidence. Both sides now apply the window
+  last, after every explicit form has had its chance.
+- **A time vocabulary lives inside other English words.** `"night"` matched
+  inside **"tonight"** (21:00 for a phrase the gold calls evening) and inside
+  **"fortnightly"** (a clock time invented on a cadence naming none). Third
+  substring bug of the session — `"pm"` inside `"4pm"`, `"weekly"` inside
+  `"biweekly"` — so the vocabulary is matched on word boundaries throughout now.
+- **The fourth cadence had to reach the DB.** `_next_date` gained a `yearly`
+  branch, and Feb 29 is its whole difficulty: stepping a leap day clamps to the
+  28th, so the step is computed from the ANCHOR month/day rather than chained
+  from the previous instance — otherwise one leap-day series becomes a permanent
+  28th. `recurrence` is a TEXT column with no constraint, so no migration.
 
 `PLAN.md` holds the design record: what existed, the five reasons it was
 convoluted, the X3 field spec and what validate can do that segmentation cannot.
