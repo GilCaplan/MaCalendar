@@ -233,6 +233,62 @@ validate fast and scoreable, and keeps the division clean:
 
 > **validate finds contradictions. LLMJudge settles doubt.**
 
+## 4d · SETTLED with Gil, 2026-09-08 — the design to build
+
+**decompose RESOLVES. validate CHECKS. Neither splits.**
+
+### decompose — a resolver, and nothing else
+
+Splitting is SEGMENTATION's, entirely. `_split_times` and `_llm_split_times`
+are deleted. Gil: *"we aren't trying to split into more items — recurrence is
+something else, not more segmentation. It is the same event, it just recurs,
+and that's a feature of the item that decompose_validate gives to the item."*
+
+So per item, from its OWN `time` and the anchor:
+
+```
+resolve_relative("tomorrow", anchor)            -> date
+resolve_weekday("next tuesday", anchor)         -> date
+resolve_ordinal("the 20th of November", anchor) -> date
+resolve_clock("half past six", X1)              -> "18:30"
+resolve_recurrence("every other tuesday")       -> ("weekly", "tuesday", rounded)
+```
+
+Pure functions of ONE item. **No index-pinning, because there is no list to
+index into** — which is what removes the `a987aba` bug class and today's.
+
+**Fallback Gil specified:** if segmentation failed to split a multi-DAY
+enumeration ("gym on tuesday and thursday"), decompose reads it as a RECURRENCE
+rather than losing the second day. Degraded, not lost.
+
+### validate — checks, none of which mutate control flow
+
+Each is `(item, X1) -> findings`:
+
+```
+check_traceable(item, X1)    a value the words do not support
+check_consistent(item)       end>start, until>date, weekday matches the series
+check_honoured(items, X1)    every time phrase reached a value
+```
+
+It FIXES what it can and RECORDS what it cannot. Nothing is refused here.
+
+### The four non-rules leave
+
+| today | goes to |
+|---|---|
+| `_rule_junk_event_drop` | segmentation — a boundary decision |
+| `_rule_question_creates_nothing` | segmentation — that is the `review` tag |
+| `_rule_interrogative_create_asks_first` | its own gate, before the chain |
+| `_observance_verdict` | **a FLAG on the item** (Gil), surfaced at commit |
+
+### The observance FLAG
+
+It stops refusing. It becomes a field — *"this lands inside Shabbat"* — carried
+to commit, which NOTIFIES rather than blocks. The existing recurring-series skip
+logic in `db._skip_for_observance` is untouched; this changes only what happens
+to a one-off the assistant creates.
+
 ## 5 · What needs research before building
 
 **a · Which of the 17 rules are genuinely item-level?** Some are
