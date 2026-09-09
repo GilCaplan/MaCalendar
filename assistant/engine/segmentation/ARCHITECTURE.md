@@ -11,20 +11,25 @@ from becoming convoluted. This file is how the stage WORKS.
 **Wired and live**: `IMPLEMENTATION = "fastseg"`, LLMSeg off, 0 model calls.
 Verified end to end through `engine.run_transcript`, not inferred from the boards.
 
-| | train half (1,051 rows / 1,513 items) |
-|---|---|
-| exact-set (actions) | **76.3%** |
-| exact-row (action+time+tag) | **64.8%** |
-| **the CUT alone** — right item count | **85.3%** |
-| item precision · recall · F1 | 96.7% · 92.4% · **94.5%** |
-| over-split · under-split | 47 · **108** rows |
-| time on a **spoken** time | **91.6%** |
-| tag accuracy | **87.3%** |
-| NO-INVENTION violations | **0** |
-| cost | **0 model calls**, 3.5 s for 1,051 rows |
-| **downstream, end to end** | **86.0%** rows fully right |
+| | train (1,051 rows) | **SEALED (660 rows)** |
+|---|---|---|
+| exact-set (actions) | 76.6% | **75.5%** |
+| exact-row (action+time+tag) | 68.2% | **66.5%** |
+| **the CUT alone** — right item count | 85.3% | **81.4%** |
+| item precision · recall · F1 | 96.8 · 92.4 · 94.6 | **97.0 · 90.6 · 93.7** |
+| over-split · under-split | 46 · 108 | **28 · 95** |
+| time on a **spoken** time | 91.9% | **93.5%** |
+| tag accuracy | 89.7% | **90.2%** |
+| A2 — 2 of 3 fields | 91.6% | **93.6%** |
+| NO-INVENTION violations | 0 | **0** |
+| cost | **0 model calls**, 3.5 s for 1,051 rows | same |
+| **downstream, end to end** | **85.9%** rows fully right | — |
 
-The sealed 660 rows have never been scored.
+**The sealed half was read once, at the milestone, aggregates only** — and it
+holds: within 1–4 points of train on every metric and BETTER on five of them
+(tag, time-on-spoken, item precision, 2-of-3, over-split rate). The largest gap is
+item count, −3.9, which is the CUT — the part deliberately left unfinished. Work
+that had been fitted to the train half would not look like this.
 
 ### THE BINDING CONSTRAINT IS NOW THE CUT
 
