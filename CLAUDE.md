@@ -316,6 +316,16 @@ judgement).
   torch, and the combination used to segfault. `tests/conftest.py` pins BLAS
   to one thread, which fixed it, but the audit does not. The same applies to
   any two model-loading jobs side by side.
+- **A path in an experiment or generator rots silently, and only breaks when you
+  next run it.** The per-stage restructure moved datasets and banks, and three
+  things kept pointing at the old locations for a month: segmentation's dataset
+  GENERATOR (`FileNotFoundError`, so the dataset could not be rebuilt),
+  FastRule's PRIMARY BOARD, and `scripts/fit_route_models.py` — the script that
+  fits the logistic weights. Nothing noticed because all three are manual steps
+  whose OUTPUT is committed, so the stale `.jsonl` and `.json` kept working.
+  **Before trusting any board, run it.** And note the trap in these files: `ROOT =
+  parents[1]` meant the repo root before the move and means the STAGE folder after
+  it, so a path that merely looks wrong may be right and vice versa.
 - **The API reference is generated.** After adding or changing an endpoint:
   `python scripts/gen_api_reference.py`.
 - **The API reloads itself; nothing else does.** It runs with `--reload`, so

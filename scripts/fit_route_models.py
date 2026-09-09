@@ -33,7 +33,9 @@ sys.path.insert(0, str(ROOT))
 
 from assistant.intent.classifier import ModelRouter  # noqa: E402
 
-DATA = ROOT / "dataset" / "fastrule" / "fastrule_7200.jsonl"
+#: Same stale path as the boards had. This one matters twice over: it is the
+#: script that FITS the logistic heads, so the weights could not be refitted.
+DATA = ROOT / "assistant" / "engine" / "fastrule" / "datasets" / "fastrule_7200.jsonl"
 
 _ACTION2OP = {"create_event": "new", "create_todo": "new",
               "update_event": "edit", "update_todo": "edit",

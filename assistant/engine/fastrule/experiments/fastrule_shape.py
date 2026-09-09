@@ -44,7 +44,10 @@ for _b in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
     os.environ.setdefault(_b, "1")
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-DATA = ROOT / "dataset" / "fastrule" / "fastrule_7200.jsonl"
+#: The dataset moved into this stage's folder in the per-stage restructure;
+#: this line still pointed at `dataset/fastrule/` until 2026-09-09, so THE
+#: PRIMARY BOARD RAISED FileNotFoundError and could not be run at all.
+DATA = ROOT / "datasets" / "fastrule_7200.jsonl"   # ROOT is the STAGE folder
 _CLOCK = _dt.datetime(2026, 9, 9, 10, 0)
 #: the layer-0 verdicts — a defer carrying one of these means FastRule
 #: RECOGNISED the compound, rather than tripping over it by luck

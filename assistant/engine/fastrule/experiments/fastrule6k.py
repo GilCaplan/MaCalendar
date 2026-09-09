@@ -38,7 +38,7 @@ for _blas in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
     os.environ.setdefault(_blas, "1")
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-_FIXTURE = ROOT / "dataset" / "fastrule" / "banks" / "categories_fixture.json"
+_FIXTURE = ROOT / "datasets" / "banks" / "categories_fixture.json"
 
 # isolate BEFORE importing assistant; categories -> the dataset's fixture
 _T = tempfile.mkdtemp(prefix="fr6k_")
@@ -90,7 +90,7 @@ def main() -> int:
                           if any(k in low for k in d.get("keywords", ())))
 
         rows = [json.loads(l) for l in
-                (ROOT / "dataset" / "fastrule" / "fastrule_7200.jsonl").open()]
+                (ROOT / "datasets" / "fastrule_7200.jsonl").open()]
         rows = [r for r in rows if r["split"] == a.split
                 and (not a.tier or r["tier"] == a.tier)]
 
