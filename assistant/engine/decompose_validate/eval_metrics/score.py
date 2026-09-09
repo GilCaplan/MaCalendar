@@ -39,6 +39,19 @@ import re
 VALUE_FIELDS = ("date", "start_time", "end_time", "recurrence",
                 "quantity", "reminder_minutes")
 
+#: HARM — not every wrong field costs the same, so counting them equally hides
+#: which failures actually hurt. Weights are a PRODUCT judgement, written here
+#: so they can be argued with rather than buried in a total:
+#:
+#:   recurrence  a wrong cadence is wrong EVERY week until someone notices —
+#:               the only failure that repeats itself, so it is the worst
+#:   date/start  you miss the thing
+#:   end         the event is there, just the wrong length
+#:   quantity    "buy 3" instead of "buy 5" — visible on the list
+#:   reminder    you get nudged at the wrong moment, or not at all
+HARM_WEIGHT = {"recurrence": 4, "date": 3, "start_time": 3,
+               "end_time": 1, "quantity": 1, "reminder_minutes": 1}
+
 _WEEKDAY_NAME = ("monday", "tuesday", "wednesday", "thursday",
                  "friday", "saturday", "sunday")
 
@@ -190,13 +203,20 @@ def contradictions(item: dict, text: str, today: str) -> list:
     if date and today and str(date) < str(today):
         out.append(f"date {date} is in the past (anchor {today})")
 
-    # A weekly series named a weekday: the start must BE that weekday.
-    want = item.get("recurrence_weekday")
-    if want and date:
+    # A weekly series named its weekday(s): the start must be ONE OF THEM.
+    # `want` may be a single name or a LIST -- "every tuesday and thursday" is
+    # one series on two days. Comparing a string to a list always differs, so
+    # the first version reported every multi-day series as a contradiction.
+    want = item.get("recurrence_weekday") or item.get("recur_days")
+    wanted = {want} if isinstance(want, str) else set(want or ())
+    # An explicit "starting X" overrides: the speaker chose the first instance,
+    # and a series may legitimately begin before its first named weekday.
+    starts_explicitly = re.search(r"\b(starting|from|beginning)\b", tl) is not None
+    if wanted and date and not starts_explicitly:
         try:
-            if _WEEKDAY_NAME[dt.date.fromisoformat(date).weekday()] != want:
-                out.append(f"weekly series says {want} but starts on a "
-                           f"{_WEEKDAY_NAME[dt.date.fromisoformat(date).weekday()]}")
+            got = _WEEKDAY_NAME[dt.date.fromisoformat(date).weekday()]
+            if got not in wanted:
+                out.append(f"series is on {sorted(wanted)} but starts on a {got}")
         except ValueError:
             pass
 
@@ -253,6 +273,11 @@ def score_rows(rows: list, predict, samples: int = 8) -> dict:
     miss_g = miss_p = 0
     calls = seconds = 0.0
     rows_reporting = 0
+    harm = 0
+    harm_by_field = collections.Counter()
+    answered = collections.Counter()      # gold had a value AND we produced one
+    asked = collections.Counter()         # gold had a value
+    fix_improved = fix_broke = fix_still = 0
     by_anchor = collections.defaultdict(lambda: [0, 0])
     by_trap = collections.defaultdict(lambda: [0, 0])
     failures = []
@@ -267,7 +292,27 @@ def score_rows(rows: list, predict, samples: int = 8) -> dict:
             calls += meta.get("calls") or 0
             seconds += meta.get("seconds") or 0.0
 
+        before = (out.get("before") if isinstance(out, dict) else None) or []
         pairs, mg, mp = match_items(gold, pred)
+        # G · FIXES — did validate's repairs help? Compared per matched item,
+        # BEFORE the repairs against AFTER, both against gold. Without this the
+        # board measures the resolver and says nothing about the stage's own
+        # job, and a repair that damages correct items is invisible.
+        if before:
+            bp, _bg, _bpp = match_items(gold, before)
+            was = {gi: all(str(gold[gi].get(f)) == str(before[pi].get(f))
+                           for f in VALUE_FIELDS) for gi, pi in bp}
+            for gi, pi in pairs:
+                now = all(str(gold[gi].get(f)) == str(pred[pi].get(f))
+                          for f in VALUE_FIELDS)
+                if gi not in was:
+                    continue
+                if was[gi] and not now:
+                    fix_broke += 1
+                elif not was[gi] and now:
+                    fix_improved += 1
+                elif not was[gi] and not now:
+                    fix_still += 1
         miss_g += len(mg)
         miss_p += len(mp)
 
@@ -285,6 +330,15 @@ def score_rows(rows: list, predict, samples: int = 8) -> dict:
                     field_ok[f] += 1
                 else:
                     item_ok = False
+            for f in VALUE_FIELDS:
+                if g.get(f) is not None:
+                    asked[f] += 1
+                    if p.get(f) is not None:
+                        answered[f] += 1
+                if g.get(f) is not None or p.get(f) is not None:
+                    if str(g.get(f)) != str(p.get(f)):
+                        harm += HARM_WEIGHT.get(f, 1)
+                        harm_by_field[f] += HARM_WEIGHT.get(f, 1)
             bad = untraceable(p, text, today)
             if bad:
                 inv_items += 1
@@ -319,6 +373,11 @@ def score_rows(rows: list, predict, samples: int = 8) -> dict:
         "honoured": {"rows_with_a_lost_phrase": unhon_rows,
                      "phrases_lost": unhon_phrases},
         "contradictions": {"items": contra_items},
+        "harm": {"total": harm, "per_item": harm / matched if matched else 0,
+                 "by_field": dict(harm_by_field)},
+        "abstention": {f: (answered[f], asked[f]) for f in VALUE_FIELDS},
+        "fixes": {"improved": fix_improved, "broke": fix_broke,
+                  "still_wrong": fix_still, "ran": bool(before)},
         "matching": {"unmatched_gold": miss_g, "unmatched_pred": miss_p},
         "cost": {"rows_reporting": rows_reporting, "calls": calls,
                  "calls_per_row": calls / n if n else 0,
@@ -367,6 +426,31 @@ def format_board(r: dict) -> str:
 
     add("\nD · CONTRADICTIONS — impossible on their own terms (no gold needed)")
     add(f"   items                      {r['contradictions']['items']}   MUST BE 0")
+
+    ab = r["abstention"]
+    add("\nB2 · ABSTENTION — of the items that NAMED a value, did we commit one")
+    add("   (a resolver that declines everything scores 0 inventions and is useless)")
+    for f, (got, want) in ab.items():
+        if want:
+            add(f"   {f:<24}  {_pc(got, want)}")
+
+    h = r["harm"]
+    add("\nD2 · HARM — wrong fields weighted by what they cost")
+    add(f"   harm per matched item      {h['per_item']:.3f}")
+    if h["by_field"]:
+        add("   where it comes from: " + " · ".join(
+            f"{k} {v}" for k, v in sorted(h["by_field"].items(), key=lambda kv: -kv[1])))
+
+    fx = r["fixes"]
+    add("\nG · FIXES — did validate's repairs pay for themselves")
+    if not fx["ran"]:
+        add("   not run (the predictor reported no BEFORE state)")
+    else:
+        add(f"   improved                   {fx['improved']}")
+        add(f"   BROKE                      {fx['broke']}   <- the one that matters")
+        add(f"   still wrong                {fx['still_wrong']}")
+        add("   (improved and BROKE are never summed: a repair that damages a "
+            "correct\n    item is not paid for by one that helps elsewhere)")
 
     m = r["matching"]
     add(f"\n   (matching: {m['unmatched_gold']} gold items unmatched, "
@@ -438,6 +522,38 @@ def _selftest() -> int:
     r = score_rows(rows, loses_phrase)
     checks.append(("a dropped time phrase is unhonoured",
                    r["honoured"]["phrases_lost"] >= 1))
+
+    # The three newest boards must also SEE their own defect, or they are
+    # decoration. Added with them rather than after, on the principle that an
+    # unverified board is worse than no board — it reads as evidence.
+    def abstains(text, today):
+        it = dict(rows[0]["gold"][0]); it["start_time"] = None; return [it]
+
+    r = score_rows(rows, abstains)
+    checks.append(("declining a value shows on ABSTENTION",
+                   r["abstention"]["start_time"] == (0, 1)))
+    checks.append(("...and costs harm", r["harm"]["total"] == HARM_WEIGHT["start_time"]))
+
+    r = score_rows(rows, wrong_date)
+    checks.append(("a wrong date is weighted by its harm",
+                   r["harm"]["by_field"].get("date") == HARM_WEIGHT["date"]))
+
+    def repaired(text, today):
+        """BEFORE was wrong, AFTER is right — an improvement."""
+        bad_item = dict(rows[0]["gold"][0]); bad_item["date"] = "2026-01-01"
+        return {"items": [dict(rows[0]["gold"][0])], "before": [bad_item]}
+
+    def damaged(text, today):
+        """BEFORE was right, AFTER is wrong — the failure that matters."""
+        bad_item = dict(rows[0]["gold"][0]); bad_item["date"] = "2026-01-01"
+        return {"items": [bad_item], "before": [dict(rows[0]["gold"][0])]}
+
+    r = score_rows(rows, repaired)
+    checks.append(("a repair that helps counts as improved",
+                   r["fixes"]["improved"] == 1 and r["fixes"]["broke"] == 0))
+    r = score_rows(rows, damaged)
+    checks.append(("a repair that DAMAGES a correct item is caught",
+                   r["fixes"]["broke"] == 1 and r["fixes"]["improved"] == 0))
 
     bad = [name for name, ok in checks if not ok]
     for name, ok in checks:

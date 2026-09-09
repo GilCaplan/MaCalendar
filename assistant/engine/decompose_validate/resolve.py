@@ -122,7 +122,14 @@ def resolve_date(said: str, anchor: dt.date) -> "str | None":
     # bare-today branch placed first swallowed it and returned the anchor —
     # every "a week from today" resolved to today. The longer phrase wins.
     # "in three weeks", "two weeks from now", "a week from today"
-    m = re.search(r"\b(?:in\s+)?(\w+)\s+(day|week|month)s?\s*(?:from\s+(?:now|today))?\b", t)
+    # NOT followed by "before" -- "the 21st a day before" is a LEAD TIME on the
+    # 21st, not "in a day". Read as an offset it produced tomorrow and threw
+    # away the 21st entirely.
+    # The lookahead sits DIRECTLY on the unit. Placed after the optional
+    # `\s*` it never fired, because that had already eaten the space and the
+    # lookahead saw "before" with no whitespace in front of it.
+    m = re.search(r"\b(?:in\s+)?(\w+)\s+(day|week|month)s?(?!\s+before)\s*"
+                  r"(?:from\s+(?:now|today))?", t)
     if m and (m.group(1).isdigit() or m.group(1) in _NUMBER):
         n = int(m.group(1)) if m.group(1).isdigit() else _NUMBER[m.group(1)]
         unit = m.group(2)
@@ -242,10 +249,26 @@ def resolve_range(said: str, context: str = "") -> "tuple[str, str] | None":
     m = re.search(r"\b(?:from|between)\s+(.+?)\s+(?:to|until|till|and)\s+(.+?)$", t)
     if not m:
         return None
+
+    def _side(part: str, ctx: str) -> "str | None":
+        """Inside a range, a BARE NUMBER is a clock time. Outside one it is not
+        -- "buy 3 apples" must never become 03:00 -- which is why this lives
+        here and not in resolve_clock. Without it "from 3 to 4pm" failed
+        entirely: the start returned None and took the whole range with it."""
+        got = resolve_clock(part, ctx)
+        if got:
+            return got
+        bare = re.fullmatch(r"\s*(\d{1,2})(?::(\d{2}))?\s*", part)
+        if bare:
+            return _bare_hour(int(bare.group(1)), int(bare.group(2) or 0), ctx)
+        return None
     # The END carries the am/pm for both when only it has one — "from 3 to 4pm"
     # is 15:00-16:00, not 03:00-16:00.
-    end = resolve_clock(m.group(2), context)
-    start = resolve_clock(m.group(1), f"{context} {m.group(2)}")
+    end = _side(m.group(2), context)
+    # The END carries the am/pm for both when only it has one -- "from 3 to 4pm"
+    # is 15:00-16:00, not 03:00-16:00 -- so the end's words join the start's
+    # context.
+    start = _side(m.group(1), f"{context} {m.group(2)}")
     if not (start and end):
         return None
     if end <= start:                      # "from 9 to 2:30" crosses midday
