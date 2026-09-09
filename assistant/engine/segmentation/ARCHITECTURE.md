@@ -162,7 +162,7 @@ and worse on every slice including the hand-written rows that cannot be in its
 fitting data. It over-predicts `task`, which is precisely the failure the lexicon
 experiment below already measured and rejected.
 
-**The lesson generalises past this one试.** Two independent signals — a task-verb
+**The lesson generalises past this one arm.** Two independent signals — a task-verb
 lexicon and a fitted task/event classifier — both fail the same way on this data,
 by calling events tasks. Calendar commands are verb-rooted imperatives, so anything
 keyed on the verb leans task; and of 439 items no verb list decides, **349 are
