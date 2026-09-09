@@ -37,8 +37,18 @@ functions, one item at a time, no transcript scan, no list to index into:
 | `resolve_lead_time` | `reminder_minutes` |
 | `resolve_quantity` | `quantity` |
 
-**validate** compares the completed items back against `X1`, repairs what it can
-prove, and **flags** the rest.
+**validate** (`checks.py`) compares the completed items back against `X1`, repairs
+what it can prove, and **flags** the rest. 7 fix rules, 5 flag rules.
+
+The repair that is always available: read the item's own words again and let them
+win — because an item may arrive with values from the LLM judge, FastRule's partial
+parse or a rewritten retry, not just from `resolve.py`. Two guards keep that from
+being destructive: where the words name **nothing** the existing value stands
+(silence is not evidence), and only fields the words speak to are touched.
+
+A rule **flags** when the disagreement is real but the wrong half is unknowable —
+a series whose end precedes its start could have either end mistaken, so guessing
+would either book a series nobody asked for or drop one they did.
 
 **Flags, never blocks** (Gil, 2026-09-08). A blocked item is a command that
 silently did nothing. A flagged one is committed with a note the speaker can see.
@@ -171,38 +181,66 @@ value is a miss. B2's counts only gold. When the two disagree — `45/48` agains
 paid for by one that helps elsewhere; that is the over/under-split precedent from
 segmentation.
 
+### validate's dataset — injected defects
+
+`datasets/perturb.py`. Validate cannot be scored on "text → values"; that is
+decompose's board. Its question is **"(a broken item, the transcript) → repaired,
+or flagged"**, which the existing gold gives once a defect is injected. 11 defect
+classes, from the settled check table rather than invented.
+
+**A third of items are left alone.** Those controls are the only rows that can see
+the failure that actually matters — a rule that rewrites what was already right —
+and without them a rule that overwrites everything scores perfectly.
+
+One class is deliberately excluded: shifting a date that came from the **floor**.
+The words then name no day at all, so there is nothing to repair from, and scoring
+it as a failure would push validate toward guessing. That is a test of
+clairvoyance, not of validation.
+
 ### Where it stands — 2026-09-08
 
 **Gold-fed items**, so a segmentation slip is never charged here.
 
+The stage has two jobs, so it is measured two ways. **Clean** runs validate over
+decompose's own output and asks *does it damage correct work?* **Perturbed**
+injects defects and asks *does it repair?*
+
 | | train (1,924 / 296 fam) | **sealed test (840 / 21 fam)** |
 |---|---|---|
-| all fields exact (row) | 99.9% (1922/1924) | **97.1% (816/840)** |
-| date | 100% | 98.6% |
-| start_time | 99.9% | 98.8% |
-| end_time | 100% | **100%** |
-| recurrence | 100% | **100%** |
-| quantity | 100% | **100%** |
-| reminder_minutes | 100% | **100%** |
+| all fields exact — clean | 100.0% (1924/1924) | **98.1% (824/840)** |
+| all fields exact — perturbed | 100.0% (1924/1924) | **99.4% (835/840)** |
+| perturbed, WITHOUT validate | — | 31.2% (262/840) |
+| date · start_time (clean) | 100% · 100% | 98.6% · 99.9% |
+| end_time · recurrence · quantity · reminder | 100% each | **100% each** |
 | inventions · lost · contradictions | 0 · 0 · 0 | **0 · 0 · 0** |
-| harm / matched item | 0.002 | 0.067 |
+| board G — improved / **BROKE** | 1691 / **0** | 682 / **0** |
+| harm / matched item | 0.000 | 0.044 |
 | cost | 0 model calls, 0.000 s/row | same |
 
-**Generalisation gap: 2.8 points** — the first held-out number this stage has ever
-had. Test has been read twice, aggregates only; no test row has been read or
-mined, and every fix was directed from train diagnostics.
+**98.1% is the honest end-to-end figure** (words → values). Perturbed reads higher
+for a structural reason: there validate restores gold values from the words, while
+in clean mode it inherits decompose's 16 residual errors, which it cannot fix —
+the resolver is what is wrong there.
 
-> ### SCOPE: this measures DECOMPOSE, not validate
->
-> Board G is validate's board and it still reports **"not run"** — it compares a
-> before-state to an after-state, and with no repair step there is no before.
-> `checks.py` does not exist yet, so **validate, the observance flag and the 15
-> conventions are unmeasured.** 97.1% must not be quoted as if it covered them.
->
-> The gap is not cosmetic. `resolve.py` is deterministic per-item arithmetic;
-> validate is the half that needs the transcript, has to decide *not* to act, and
-> can damage an item that was already right. That is precisely why board G never
-> sums "improved" with "BROKE".
+Those 16 sit in a construction class **train has no failing instance of** (train is
+100%), so the next step is growing train in the date-heavy classes, never looking
+at test rows. Test has been read at milestones only, aggregates only.
+
+### The bug no board could have found
+
+`resolve()` ALWAYS returns a date, because of the floor. So `agree_with_words` was
+treating **today** as evidence and overwriting any date whose words name no day —
+destroying values an LLM or FastRule had supplied. **2,764 scored rows could never
+catch it**: the gold applies the same floor, so both sides agreed and every item
+scored correct. A unit test caught it in one line.
+
+`resolve()` now reports `date_floored`, and the floor is applied by the rule whose
+job that is. It also took board G's BROKE column on the sealed half from 4 to 0 —
+those broken items were validate imposing the floored date on items that had
+arrived correct.
+
+The lesson generalises: **a board cannot see a defect its gold shares.** Unit tests
+and boards fail differently, which is why both exist.
 
 ### The saturation this replaced
 
@@ -246,10 +284,12 @@ No family was lost: the generator retried other anchors, so all 268 remain.
 |---|---|
 | `resolve.py` — the decompose half | **done**, 99.9% train / 97.1% sealed |
 | `datasets/` + `eval_metrics/` | **done**, 9 boards, self-test green, split sealed |
-| `checks.py` — the validate half | **next** — board G cannot run until it exists |
-| the observance **flag** | not built — replaces the old block |
-| wiring into `stage.py` | not done; the legacy `decompose.py`/`validate.py` still run |
-| deleting `run_objects` | the finish line |
+| `checks.py` — the validate half | **done**, 12 rules, board G live, BROKE 0 both splits |
+| `datasets/perturb.py` + board G | **done**, 11 defect classes, a third controls |
+| the observance **flag** | **done** — reuses `db._skip_for_observance`, says nothing when observance cannot be computed |
+| wiring into `stage.py` | **partial**: values land in `item.slots`, traced; the legacy pair still runs and is still what feeds FastRule |
+| FastRule reading `slots` | **next** — the swap that makes these values what rows are built from |
+| deleting `run_objects` | the finish line, blocked on the row above |
 
 ## Open questions for Gil — both real product gaps, neither guessed at
 
