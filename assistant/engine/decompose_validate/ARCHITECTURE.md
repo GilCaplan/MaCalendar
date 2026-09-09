@@ -218,6 +218,33 @@ injects defects and asks *does it repair?*
 | harm / matched item | 0.000 | 0.044 |
 | cost | 0 model calls, 0.000 s/row | same |
 
+### H · END TO END — the honest number, and the attribution (2026-09-09)
+
+Every board above is **gold-fed**: items arrive as gold `(text, time)` pairs, which
+excludes segmentation error by construction. That is correct for measuring a
+resolver — a segmentation slip must not be charged here — but it says nothing about
+what a speaker gets. `eval_metrics/end_to_end.py` asks that, and it is much harsher:
+
+    ITEM RECALL       89.6%  (2292/2557 gold items reached the stage)
+    spurious items      162
+    rows fully right   51.6%  (993/1924)      <- against 99.9% gold-fed
+
+**And then it attributes the blame**, which is what makes the number usable — a raw
+end-to-end figure blames the pair and tells you nothing about which half to fix:
+
+    1445 value errors on matched items
+       words DIFFER -> upstream       1445  100.0%
+       words AGREE  -> THIS stage        0    0.0%
+
+**Zero.** Every value this stage got wrong on real input, it computed correctly
+from the words it was handed — the words were not the ones the sentence called for.
+Plus two malformed-item counts that need no gold at all: **54 items with two clocks
+crammed into one** and **52 whose action ends in a dangling joiner**.
+
+That is the evidence that sent the next work to segmentation rather than here, and
+the reason to keep this board: if a change to `resolve.py` ever regresses, the
+words-AGREE bucket is where it appears, and it must stay at 0.
+
 **The live path uses this** as of 2026-09-08: `validate.run_objects` calls the
 per-item resolver instead of `_rule_relative_date_pin` and eight sibling rules.
 The audit regression floor is at **parity — 72% exact / 75% recall, the same 7

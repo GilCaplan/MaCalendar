@@ -189,6 +189,23 @@ had gone through the same process. That row was removed from the failing path
 rather than the mechanism being understood, so if a later cycle sees the same
 shape again, start from here.
 
+## Where the next work is — measured, not guessed (2026-09-09)
+
+`decompose_validate/eval_metrics/end_to_end.py` settles which stage to work on. On
+its 1,924 train rows, running the REAL segmenter:
+
+- **decompose_validate makes 0 value errors of its own.** All 1,445 value errors on
+  matched items are cases where different WORDS arrived; the resolver computed each
+  correctly from what it was given.
+- **Segmentation loses 265 of 2,557 items** (recall 89.6%), invents 162, and emits
+  106 provably malformed ones (54 with two clocks in one item, 52 with an action
+  ending in a joiner) — the last two countable without any gold.
+
+So end-to-end row accuracy is **51.6%** against 99.9% gold-fed, and the gap is
+segmentation's. **Segmentation is the next stage to work on, not FastRule** —
+whose own board would be read through the same lossy input. Its §8.1 already names
+the two defects, and §7b now carries these numbers from the receiving end.
+
 ## decompose_validate — carried forward (2026-09-08)
 
 The stage is rebuilt, measured and wired; v1 is retired and tagged

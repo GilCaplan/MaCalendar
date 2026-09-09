@@ -481,6 +481,32 @@ independent.
 
 ---
 
+## 7b · What the stage below measures coming out of here (2026-09-09)
+
+`decompose_validate/eval_metrics/end_to_end.py` runs the real FastSeg and then
+resolves values, and splits every value error by whose it is. On the 1,924 rows of
+that stage's train split:
+
+| | |
+|---|---:|
+| gold items that reached the next stage | **89.6%** (2292/2557) |
+| spurious items produced | **162** |
+| items with TWO clock times inside one | **54** |
+| items whose action ends in a dangling joiner | **52** |
+| value errors downstream caused by different WORDS arriving | **1,445** |
+| value errors that were the resolver's own | **0** |
+
+The last two lines are the ones to read together. The downstream stage scores
+99.9% when fed gold items and makes **zero** errors of its own on real ones — so
+the 51.6% end-to-end row accuracy is this stage's number, not its.
+
+None of this is a new defect: the dangling joiner and the two-clock item are §8.1
+and its (a)/(b) split, seen at scale instead of one example. The 265 missing items
+and 162 spurious ones are the item-count metric of §6 (FastSeg 77.9% there) from
+the receiving end.
+
+---
+
 # 8 · TO FIX — known defects, recorded not repaired
 
 Each is a real case with a real reproduction. They are written down rather than
